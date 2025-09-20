@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # Aplicação Principal
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: soundmeet-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
+      - MONGODB_URL=mongodb://mongo:27017/soundmeet
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://soundmeet:soundmeet123@rabbitmq:5672
+      - KEYCLOAK_URL=http://keycloak:8080
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - rabbitmq
+      - keycloak
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - soundmeet-network
+
+  # PostgreSQL - Banco Principal
+  postgres:
+    image: postgres:15-alpine
+    container_name: soundmeet-postgres
+    environment:
+      POSTGRES_DB: soundmeet
+      POSTGRES_USER: soundmeet
+      POSTGRES_PASSWORD: soundmeet123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - soundmeet-network
+
+  # MongoDB - Analytics e Logs
+  mongo:
+    image: mongo:7.0
+    container_name: soundmeet-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: soundmeet
+      MONGO_INITDB_ROOT_PASSWORD: soundmeet123
+      MONGO_INITDB_DATABASE: soundmeet
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - soundmeet-network
+
+  # Redis - Cache e Sessões
+  redis:
+    image: redis:7-alpine
+    container_name: soundmeet-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - soundmeet-network
+
+  # RabbitMQ - Mensageria
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: soundmeet-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: soundmeet
+      RABBITMQ_DEFAULT_PASS: soundmeet123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - soundmeet-network
+
+  # Keycloak - Autenticação
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0
+    container_name: soundmeet-keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: soundmeet
+      KC_DB_PASSWORD: soundmeet123
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8080
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    command: start-dev
+    networks:
+      - soundmeet-network
+
+  # MinIO - Armazenamento S3 Local (para desenvolvimento)
+  minio:
+    image: minio/minio:latest
+    container_name: soundmeet-minio
+    environment:
+      MINIO_ROOT_USER: soundmeet
+      MINIO_ROOT_PASSWORD: soundmeet123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - soundmeet-network
+
+  # Adminer - Interface de Banco
+  adminer:
+    image: adminer:latest
+    container_name: soundmeet-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+      - mongo
+    networks:
+      - soundmeet-network
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+
+networks:
+  soundmeet-network:
+    driver: bridge
