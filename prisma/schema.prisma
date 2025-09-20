@@ -1,0 +1,525 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// DOMÍNIO MUSICIAN
+// ========================================
+
+model Musician {
+  id      String   @id @default(uuid())
+  email            String   @unique
+  name             String
+  stage_name       String?
+  bio              String?
+  avatar           String?
+  phone            String?
+  genres           String[] @default([])
+  instruments      String[] @default([])
+  experience_years Int?
+  qr_code          String?  @unique
+  rating           Float    @default(0)
+  total_ratings    Int      @default(0)
+  is_active        Boolean  @default(true)
+  is_verified      Boolean  @default(false)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Relacionamentos
+  profile      MusicianProfile?
+  bands        BandMember[]
+  requests     MusicRequest[]
+  tips         Tip[]
+  events       EventMusician[]
+  analytics    MusicianAnalytics[]
+  library      MusicLibrary[]
+  interactions UserInteraction[]
+
+  @@map("musicians")
+}
+
+model MusicianProfile {
+  id           String   @id @default(uuid())
+  musicianId   String   @unique
+  instruments  String[] // ["guitar", "vocals", "piano"]
+  genres       String[] // ["rock", "pop", "jazz"]
+  experience   Int // anos de experiência
+  priceRange   Json // {min: 500, max: 2000}
+  location     Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
+  availability Json // {days: ["monday", "friday"], hours: {start: "19:00", end: "23:00"}}
+  socialLinks  Json? // {instagram: "@musician", youtube: "channel"}
+  rating       Float    @default(0)
+  totalRatings Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@map("musician_profiles")
+}
+
+model Band {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  avatar      String?
+  genres      String[]
+  isActive    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  members BandMember[]
+  events  EventMusician[]
+
+  @@map("bands")
+}
+
+model BandMember {
+  id         String   @id @default(uuid())
+  bandId     String
+  musicianId String
+  role       String // "leader", "member"
+  instrument String
+  joinedAt   DateTime @default(now())
+
+  band     Band     @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@unique([bandId, musicianId])
+  @@map("band_members")
+}
+
+model MusicLibrary {
+  id         String   @id @default(uuid())
+  musicianId String
+  title      String
+  artist     String
+  genre      String?
+  key        String? // Tom da música
+  bpm        Int?
+  lyrics     String?
+  chords     Json? // Cifras customizadas
+  notes      String? // Anotações pessoais
+  difficulty Int      @default(1) // 1-5
+  isFavorite Boolean  @default(false)
+  source     String? // "cifra_club", "ultimate_guitar", "custom"
+  sourceId   String? // ID da fonte externa
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  musician Musician       @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  requests MusicRequest[]
+
+  @@map("music_library")
+}
+
+// ========================================
+// DOMÍNIO ESTABLISHMENT - BAR, RESTAURANT, CLUB, VENUE
+// ========================================
+
+model Establishment {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  name        String
+  description String?
+  avatar      String?
+  cnpj        String?  @unique
+  phone       String?
+  isActive    Boolean  @default(true)
+  isVerified  Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relacionamentos
+  profile   EstablishmentProfile?
+  events    Event[]
+  bookings  Booking[]
+  analytics EstablishmentAnalytics[]
+
+  @@map("establishments")
+}
+
+model EstablishmentProfile {
+  id              String   @id @default(uuid())
+  establishmentId String   @unique
+  type            String // "bar", "restaurant", "club", "venue"
+  capacity        Int?
+  location        Json // {address: "", city: "", state: "", coordinates: {}}
+  amenities       String[] // ["sound_system", "stage", "parking"]
+  preferredGenres String[]
+  operatingHours  Json // {monday: {open: "18:00", close: "02:00"}}
+  priceRange      Json // {min: 200, max: 1000}
+  socialLinks     Json?
+  rating          Float    @default(0)
+  totalRatings    Int      @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+
+  @@map("establishment_profiles")
+}
+
+model Event {
+  id              String   @id @default(uuid())
+  establishmentId String
+  name            String
+  description     String?
+  date            DateTime
+  startTime       DateTime
+  endTime         DateTime
+  status          String   @default("scheduled") // "scheduled", "active", "completed", "cancelled"
+  maxCapacity     Int?
+  currentCapacity Int      @default(0)
+  isPublic        Boolean  @default(true)
+  coverCharge     Float?   @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  establishment Establishment   @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  musicians     EventMusician[]
+  requests      MusicRequest[]
+  attendees     EventAttendee[]
+  bookings      Booking[]
+  tips          Tip[]
+
+  @@map("events")
+}
+
+model EventMusician {
+  id         String    @id @default(uuid())
+  eventId    String
+  musicianId String?
+  bandId     String?
+  fee        Float?
+  status     String    @default("confirmed") // "confirmed", "pending", "cancelled"
+  startTime  DateTime?
+  endTime    DateTime?
+  created_at  DateTime  @default(now())
+
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band     Band?     @relation(fields: [bandId], references: [id], onDelete: SetNull)
+
+  @@map("event_musicians")
+}
+
+model Booking {
+  id              String   @id @default(uuid())
+  establishmentId String
+  eventId         String?
+  musicianId      String?
+  bandId          String?
+  date            DateTime
+  startTime       DateTime
+  endTime         DateTime
+  fee             Float
+  status          String   @default("pending") // "pending", "confirmed", "cancelled", "completed"
+  notes           String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  event         Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@map("bookings")
+}
+
+// ========================================
+// DOMÍNIO AUDIENCE
+// ========================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  name      String
+  avatar    String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relacionamentos
+  profile      UserProfile?
+  requests     MusicRequest[]
+  votes        RequestVote[]
+  tips         Tip[]
+  attendances  EventAttendee[]
+  points       UserPoints[]
+  badges       UserBadge[]
+  interactions UserInteraction[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  favoriteGenres  String[]
+  favoriteArtists String[]
+  location        Json?
+  preferences     Json? // Preferências de notificação, etc
+  socialLinks     Json?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model EventAttendee {
+  id       String    @id @default(uuid())
+  eventId  String
+  userId   String
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+  isActive Boolean   @default(true)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_attendees")
+}
+
+model UserInteraction {
+  id         String   @id @default(uuid())
+  userId     String
+  musicianId String?
+  type       String // "scan_qr", "tip", "request", "share", "follow"
+  metadata   Json? // Dados adicionais da interação
+  points     Int      @default(0)
+  created_at  DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+
+  @@map("user_interactions")
+}
+
+// ========================================
+// DOMÍNIO REQUEST
+// ========================================
+
+model MusicRequest {
+  id         String    @id @default(uuid())
+  eventId    String
+  userId     String
+  musicianId String
+  libraryId  String?
+  songTitle  String
+  artistName String
+  message    String?
+  status     String    @default("pending") // "pending", "accepted", "rejected", "played"
+  priority   Int       @default(0)
+  votesCount Int       @default(0)
+  playedAt   DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  musician Musician         @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  library  MusicLibrary?    @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+  votes    RequestVote[]
+  feedback RequestFeedback?
+
+  @@map("music_requests")
+}
+
+model RequestVote {
+  id        String   @id @default(uuid())
+  requestId String
+  userId    String
+  voteType  String // "up", "down"
+  created_at DateTime @default(now())
+
+  request MusicRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, userId])
+  @@map("request_votes")
+}
+
+model RequestFeedback {
+  id        String   @id @default(uuid())
+  requestId String   @unique
+  rating    Int // 1-5
+  comment   String?
+  created_at DateTime @default(now())
+
+  request MusicRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("request_feedback")
+}
+
+// ========================================
+// DOMÍNIO GAMIFICATION
+// ========================================
+
+model UserPoints {
+  id          String   @id @default(uuid())
+  userId      String
+  points      Int
+  source      String // "scan_qr", "request", "tip", "share", "accepted_request"
+  description String?
+  metadata    Json? // Dados adicionais
+  created_at   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_points")
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  icon        String
+  category    String // "engagement", "support", "discovery", "social"
+  requirement Json // Critérios para conquistar
+  points      Int      @default(0)
+  rarity      String   @default("common") // "common", "rare", "epic", "legendary"
+  isActive    Boolean  @default(true)
+  created_at   DateTime @default(now())
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id       String   @id @default(uuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+  progress Json? // Progresso para badges com múltiplos níveis
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+model Ranking {
+  id        String   @id @default(uuid())
+  type      String // "monthly_fans", "top_supporters", "discoverers"
+  period    String // "2024-01", "2024-02"
+  data      Json // Rankings calculados
+  created_at DateTime @default(now())
+
+  @@unique([type, period])
+  @@map("rankings")
+}
+
+// ========================================
+// DOMÍNIO PAYMENT
+// ========================================
+
+model Tip {
+  id            String   @id @default(uuid())
+  userId        String
+  musicianId    String
+  eventId       String?
+  amount        Float
+  message       String?
+  paymentMethod String // "pix", "credit_card", "wallet"
+  status        String   @default("pending") // "pending", "completed", "failed", "refunded"
+  transactionId String?
+  pixKey        String?
+  isAnonymous   Boolean  @default(false)
+  showInWall    Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  event    Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@map("tips")
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  userId        String?
+  musicianId    String?
+  type          String // "tip", "booking_fee", "commission"
+  amount        Float
+  fee           Float    @default(0)
+  netAmount     Float
+  status        String   @default("pending")
+  paymentMethod String
+  externalId    String? // ID do provedor de pagamento
+  metadata      Json?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@map("transactions")
+}
+
+model MusicianWallet {
+  id             String   @id @default(uuid())
+  musicianId     String   @unique
+  balance        Float    @default(0)
+  totalEarned    Float    @default(0)
+  totalWithdrawn Float    @default(0)
+  pixKey         String?
+  bankAccount    Json? // Dados bancários
+  isActive       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("musician_wallets")
+}
+
+// ========================================
+// ANALYTICS E MÉTRICAS
+// ========================================
+
+model MusicianAnalytics {
+  id               String   @id @default(uuid())
+  musicianId       String
+  date             DateTime @db.Date
+  profileViews     Int      @default(0)
+  qrScans          Int      @default(0)
+  requestsReceived Int      @default(0)
+  requestsAccepted Int      @default(0)
+  tipsReceived     Int      @default(0)
+  totalTipAmount   Float    @default(0)
+  socialShares     Int      @default(0)
+  newFollowers     Int      @default(0)
+  engagementScore  Float    @default(0)
+  created_at        DateTime @default(now())
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@unique([musicianId, date])
+  @@map("musician_analytics")
+}
+
+model EstablishmentAnalytics {
+  id              String   @id @default(uuid())
+  establishmentId String
+  date            DateTime @db.Date
+  eventsHosted    Int      @default(0)
+  totalAttendees  Int      @default(0)
+  musiciansHired  Int      @default(0)
+  totalSpent      Float    @default(0)
+  avgRating       Float    @default(0)
+  created_at       DateTime @default(now())
+
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+
+  @@unique([establishmentId, date])
+  @@map("establishment_analytics")
+}
