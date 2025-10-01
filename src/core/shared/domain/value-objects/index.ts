@@ -24,3 +24,20 @@ export * from "./address.vo";
 
 // CNPJ Value Object
 export * from "./cnpj.vo";
+
+// Level Value Object
+export * from "./level.vo";
+
+// Badge Value Object
+export * from "./badge.vo";
+
+// Social Links Value Object
+export * from "./social-links.vo";
+
+// Points Value Object
+export * from "./points.vo";
+
+// Audience Value Objects
+export * from "./audience-level.vo";
+export * from "./audience-points.vo";
+export * from "./audience-preferences.vo";

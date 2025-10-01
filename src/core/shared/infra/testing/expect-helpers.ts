@@ -3,6 +3,17 @@
 //import { FieldsErrors } from "../../domain/validators/validator-fields-interface";
 import { Notification } from "../../domain/validators/notification";
 import { ValueObject } from "../../domain/value-object";
+
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      notificationContainsErrorMessages(
+        received: Array<string | { [key: string]: string[] }>,
+      ): R;
+      toBeValueObject(received: ValueObject): R;
+    }
+  }
+}
 // type Expected =
 //   | {
 //       validator: ClassValidatorFields<any>;

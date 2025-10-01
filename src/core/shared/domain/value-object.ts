@@ -1,4 +1,4 @@
-import isEqual from "lodash/isEqual";
+import isEqual = require("lodash/isEqual");
 
 export abstract class ValueObject {
   public equals(vo: this): boolean {
