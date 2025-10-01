@@ -9,11 +9,11 @@ import {
 import { CreateMusicianInput } from "./create-musician.input";
 
 export class CreateMusicianUseCase
-  implements IUseCase<CreateMusicianInput, CreateMusicianOutput>
+  implements IUseCase<CreateMusicianInput, MusicianOutput>
 {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
-  async execute(input: CreateMusicianInput): Promise<CreateMusicianOutput> {
+  async execute(input: CreateMusicianInput): Promise<MusicianOutput> {
     const entity = Musician.create({
       email: input.email,
       name: input.name,
@@ -21,8 +21,8 @@ export class CreateMusicianUseCase
       bio: input.bio,
       avatar: input.avatar,
       phone: input.phone,
-      genres: input.genres,
-      instruments: input.instruments,
+      genres: input.genres || [],
+      instruments: input.instruments || [],
       experience_years: input.experience_years,
       is_active: input.is_active,
     });
@@ -36,5 +36,3 @@ export class CreateMusicianUseCase
     return MusicianOutputMapper.toOutput(entity);
   }
 }
-
-export type CreateMusicianOutput = MusicianOutput;
