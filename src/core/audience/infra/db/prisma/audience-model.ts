@@ -1,0 +1,23 @@
+export type AudienceModel = {
+  id: string;
+  email: string;
+  name: string;
+  nickname: string | null;
+  avatar: string | null;
+  phone: string | null;
+  points: number;
+  monthly_points: number;
+  level: number;
+  badges: string[];
+  favorite_genres: string[];
+  favorite_artists: string[];
+  preferred_languages: string[];
+  location: any;
+  social_links: any;
+  notification_settings: any;
+  privacy_settings: any;
+  discovery_settings: any;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+};
