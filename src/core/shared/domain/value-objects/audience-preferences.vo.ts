@@ -55,6 +55,7 @@ export class AudiencePreferences extends ValueObject {
     "Folk",
     "Classical",
     "Electronic",
+    "House",
     "Hip Hop",
     "R&B",
     "Reggae",
