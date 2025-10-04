@@ -1,12 +1,14 @@
-import { AggregateRoot } from "../../shared/domain/aggregate-root";
 import { ValueObject } from "../../shared/domain/value-object";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { Email } from "../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../shared/domain/value-objects/phone.vo";
-import { QRCode } from "../../shared/domain/value-objects/qr-code.vo";
-import { Rating } from "../../shared/domain/value-objects/rating.vo";
 import { MusicianValidatorFactory } from "./musician.validator";
 import { MusicianFakeBuilder } from "./musician-fake.builder";
+import {
+  AggregateRoot,
+  Uuid,
+  Email,
+  Phone,
+  QRCode,
+  Rating,
+} from "../../shared/domain";
 
 export type MusicianConstructorProps = {
   id?: MusicianId;
