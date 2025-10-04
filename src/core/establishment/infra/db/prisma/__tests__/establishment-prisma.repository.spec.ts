@@ -68,13 +68,13 @@ describe("EstablishmentPrismaRepository", () => {
         modelProps,
       );
 
-      const result = await repository.findById(establishment.establishment_id);
+      const result = await repository.findById(establishment.id);
 
       expect(prisma.establishment.findUnique).toHaveBeenCalledWith({
-        where: { id: establishment.establishment_id.id },
+        where: { id: establishment.id.id },
       });
       expect(result).toBeInstanceOf(Establishment);
-      expect(result?.establishment_id).toEqual(establishment.establishment_id);
+      expect(result?.id).toEqual(establishment.id);
       expect(result?.name).toBe(establishment.name);
       expect(result?.email).toEqual(establishment.email);
       expect(result?.cnpj).toEqual(establishment.cnpj);
@@ -114,12 +114,12 @@ describe("EstablishmentPrismaRepository", () => {
 
       expect(prisma.establishment.findMany).toHaveBeenCalledWith();
       expect(result).toHaveLength(2);
-      expect(result[0].establishment_id.id).toBe(
-        establishments[0].establishment_id.id,
+      expect(result[0].id.id).toBe(
+        establishments[0].id.id,
       );
       expect(result[0].name).toBe(establishments[0].name);
-      expect(result[1].establishment_id.id).toBe(
-        establishments[1].establishment_id.id,
+      expect(result[1].id.id).toBe(
+        establishments[1].id.id,
       );
       expect(result[1].name).toBe(establishments[1].name);
     });
@@ -130,14 +130,12 @@ describe("EstablishmentPrismaRepository", () => {
       const establishment = Establishment.fake().anEstablishment().build();
       const modelProps = EstablishmentModelMapper.toModel(establishment);
 
-      (prisma.establishment.findUnique as jest.Mock).mockResolvedValue(
-        modelProps,
-      );
+      (prisma.establishment.update as jest.Mock).mockResolvedValue(modelProps);
 
       await repository.update(establishment);
 
       expect(prisma.establishment.update).toHaveBeenCalledWith({
-        where: { id: establishment.establishment_id.id },
+        where: { id: establishment.id.id },
         data: modelProps,
       });
     });
@@ -151,7 +149,7 @@ describe("EstablishmentPrismaRepository", () => {
       });
 
       await expect(repository.update(establishment)).rejects.toThrow(
-        new NotFoundError(establishment.establishment_id.id, Establishment),
+        new NotFoundError(establishment.id.id, Establishment),
       );
     });
   });

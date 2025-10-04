@@ -13,7 +13,7 @@ export type EstablishmentModelProps = EstablishmentModel;
 export class EstablishmentModelMapper {
   static toModel(entity: Establishment): EstablishmentModel {
     return {
-      id: entity.establishment_id.id,
+      id: entity.id.id,
       email: entity.email.value,
       name: entity.name,
       description: entity.description,
@@ -40,7 +40,7 @@ export class EstablishmentModelMapper {
     });
 
     return new Establishment({
-      establishment_id: new EstablishmentId(model.id),
+      id: new EstablishmentId(model.id),
       name: model.name,
       email: new Email(model.email),
       cnpj: model.cnpj,

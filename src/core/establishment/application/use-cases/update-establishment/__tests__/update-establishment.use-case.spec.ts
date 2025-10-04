@@ -36,7 +36,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "t".repeat(256),
       email: "invalid-email",
     };
@@ -60,7 +60,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     const arrange = [
       {
         input: {
-          id: establishment.establishment_id.id,
+          id: establishment.id.id,
           name: "Updated Bar",
         },
         expected: {
@@ -71,7 +71,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
       },
       {
         input: {
-          id: establishment.establishment_id.id,
+          id: establishment.id.id,
           name: "Rock Club Updated",
           email: "updated@rockclub.com",
           description: "Updated description",
@@ -107,7 +107,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
       const output = await useCase.execute(input);
       expect(output).toStrictEqual({
-        id: establishment.establishment_id.id,
+        id: establishment.id.id,
         name: expected.name,
         email: expected.email,
         cnpj: establishment.cnpj
@@ -158,7 +158,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "QR Updated Bar",
       generate_qr_code: true,
     };
@@ -176,7 +176,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "Repository Updated Bar",
       email: "repo@updated.com",
     };
@@ -196,7 +196,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "",
       email: "invalid-email",
     };
@@ -211,7 +211,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "Updated Name",
       cnpj: "90.441.272/0001-10", // This should be ignored
     };

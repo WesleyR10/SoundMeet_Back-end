@@ -16,7 +16,7 @@ import {
 import { EstablishmentRatedEvent } from "./events/establishment-rated.event";
 
 export type EstablishmentConstructorProps = {
-  establishment_id?: EstablishmentId;
+  id?: EstablishmentId;
   name: string;
   description?: string | null;
   avatar?: string | null;
@@ -57,7 +57,7 @@ export type EstablishmentCreateCommand = {
 export class EstablishmentId extends Uuid {}
 
 export class Establishment extends AggregateRoot {
-  establishment_id: EstablishmentId;
+  id: EstablishmentId;
   name: string;
   description: string | null;
   avatar: string | null;
@@ -76,7 +76,7 @@ export class Establishment extends AggregateRoot {
 
   constructor(props: EstablishmentConstructorProps) {
     super();
-    this.establishment_id = props.establishment_id ?? new EstablishmentId();
+    this.id = props.id ?? new EstablishmentId();
     this.name = props.name;
     this.description = props.description ?? null;
     this.avatar = props.avatar ?? null;
@@ -91,7 +91,7 @@ export class Establishment extends AggregateRoot {
     this.qr_code = props.qr_code
       ? new QRCode({
           code: props.qr_code,
-          url: `https://soundmeet.app/establishment/${this.establishment_id.id}`,
+          url: `https://soundmeet.app/establishment/${this.id.id}`,
         })
       : null;
     this.is_active = props.is_active ?? true;
@@ -189,10 +189,10 @@ export class Establishment extends AggregateRoot {
   }
 
   generateQRCode(): void {
-    const qrData = `soundmeet://establishment/${this.establishment_id.id}`;
+    const qrData = `soundmeet://establishment/${this.id.id}`;
     this.qr_code = new QRCode({
       code: qrData,
-      url: `https://soundmeet.app/establishment/${this.establishment_id.id}`,
+      url: `https://soundmeet.app/establishment/${this.id.id}`,
     });
   }
 
@@ -207,7 +207,7 @@ export class Establishment extends AggregateRoot {
 
     this.applyEvent(
       new EstablishmentRatedEvent(
-        this.establishment_id,
+        this.id,
         new Rating(ratingValue),
         comment ?? null,
         ratedBy,
@@ -261,12 +261,12 @@ export class Establishment extends AggregateRoot {
   }
 
   get entity_id(): ValueObject {
-    return this.establishment_id;
+    return this.id;
   }
 
   toJSON() {
     return {
-      establishment_id: this.establishment_id.id,
+      establishment_id: this.id.id,
       name: this.name,
       description: this.description,
       avatar: this.avatar,

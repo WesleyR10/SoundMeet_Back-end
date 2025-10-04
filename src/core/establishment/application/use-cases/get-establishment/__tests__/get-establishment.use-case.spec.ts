@@ -40,13 +40,13 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
     };
 
     const output = await useCase.execute(input);
 
     expect(output).toMatchObject({
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "Test Bar",
       email: "test@bar.com",
       cnpj: {
@@ -80,13 +80,13 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
     };
 
     const output = await useCase.execute(input);
 
     expect(output).toMatchObject({
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "Complete Bar",
       email: "complete@bar.com",
       cnpj: {
@@ -115,7 +115,7 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
     };
 
     const output = await useCase.execute(input);
@@ -134,13 +134,13 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
     };
 
     const output = await useCase.execute(input);
 
     expect(output).toMatchObject({
-      id: establishment.establishment_id.id,
+      id: establishment.id.id,
       name: "Minimal Bar",
       email: "minimal@bar.com",
       cnpj: {
@@ -171,16 +171,16 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
 
     // Get first establishment
     const output1 = await useCase.execute({
-      id: establishment1.establishment_id.id,
+      id: establishment1.id.id,
     });
     expect(output1.name).toBe("Bar 1");
-    expect(output1.id).toBe(establishment1.establishment_id.id);
+    expect(output1.id).toBe(establishment1.id.id);
 
     // Get second establishment
     const output2 = await useCase.execute({
-      id: establishment2.establishment_id.id,
+      id: establishment2.id.id,
     });
     expect(output2.name).toBe("Bar 2");
-    expect(output2.id).toBe(establishment2.establishment_id.id);
+    expect(output2.id).toBe(establishment2.id.id);
   });
 });

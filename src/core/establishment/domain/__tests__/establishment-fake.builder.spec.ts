@@ -39,20 +39,20 @@ describe("EstablishmentFakeBuilder Unit Tests", () => {
     test("should pass index to establishment_id factory", () => {
       faker.withEstablishmentId((index) => new EstablishmentId());
       const establishment = faker.build();
-      expect(establishment.establishment_id).toBeInstanceOf(EstablishmentId);
+      expect(establishment.id).toBeInstanceOf(EstablishmentId);
 
       const fakerMany = EstablishmentFakeBuilder.theEstablishments(2);
       fakerMany.withEstablishmentId((index) => new EstablishmentId());
       const establishments = fakerMany.build();
 
-      expect(establishments[0].establishment_id).toBeInstanceOf(
+      expect(establishments[0].id).toBeInstanceOf(
         EstablishmentId,
       );
-      expect(establishments[1].establishment_id).toBeInstanceOf(
+      expect(establishments[1].id).toBeInstanceOf(
         EstablishmentId,
       );
-      expect(establishments[0].establishment_id).not.toBe(
-        establishments[1].establishment_id,
+      expect(establishments[0].id).not.toBe(
+        establishments[1].id,
       );
     });
   });
@@ -396,7 +396,7 @@ describe("EstablishmentFakeBuilder Unit Tests", () => {
     const faker = EstablishmentFakeBuilder.anEstablishment();
     let establishment = faker.build();
 
-    expect(establishment.establishment_id).toBeInstanceOf(EstablishmentId);
+    expect(establishment.id).toBeInstanceOf(EstablishmentId);
     expect(typeof establishment.name === "string").toBeTruthy();
     expect(establishment.email).toBeInstanceOf(Email);
     expect(establishment.cnpj).toBeInstanceOf(CNPJ);
@@ -424,7 +424,7 @@ describe("EstablishmentFakeBuilder Unit Tests", () => {
       .withcreated_at(created_at)
       .build();
 
-    expect(establishment.establishment_id.id).toBe(establishment_id.id);
+    expect(establishment.id.id).toBe(establishment_id.id);
     expect(establishment.name).toBe("Test Establishment");
     expect(establishment.email.value).toBe("test@establishment.com");
     expect(establishment.cnpj?.value).toBe("84244955000184");
@@ -441,7 +441,7 @@ describe("EstablishmentFakeBuilder Unit Tests", () => {
     let establishments = faker.build();
 
     establishments.forEach((establishment) => {
-      expect(establishment.establishment_id).toBeInstanceOf(EstablishmentId);
+      expect(establishment.id).toBeInstanceOf(EstablishmentId);
       expect(typeof establishment.name === "string").toBeTruthy();
       expect(establishment.email).toBeInstanceOf(Email);
       expect(establishment.cnpj).toBeInstanceOf(CNPJ);
@@ -471,7 +471,7 @@ describe("EstablishmentFakeBuilder Unit Tests", () => {
       .build();
 
     establishments.forEach((establishment, index) => {
-      expect(establishment.establishment_id.id).toBe(establishment_id.id);
+      expect(establishment.id.id).toBe(establishment_id.id);
       expect(establishment.name).toBe(`Test Establishment ${index}`);
       expect(establishment.email.value).toBe(`test${index}@establishment.com`);
       expect(establishment.cnpj?.value).toBe(

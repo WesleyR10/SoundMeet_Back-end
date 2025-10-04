@@ -1,4 +1,3 @@
-import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
 import { EstablishmentInMemoryRepository } from "../establishment-in-memory.repository";
 import { Establishment } from "../../../../domain/establishment.aggregate";
 import { Email } from "../../../../../shared/domain/value-objects/email.vo";

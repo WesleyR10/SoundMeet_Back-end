@@ -191,7 +191,7 @@ export class EstablishmentFakeBuilder<TBuild = any> {
         const ratingValue = this.callFactory(this._rating, index);
 
         const establishment = new Establishment({
-          establishment_id: !this._establishment_id
+          id: !this._establishment_id
             ? undefined
             : this.callFactory(this._establishment_id, index),
           name: this.callFactory(this._name, index),
