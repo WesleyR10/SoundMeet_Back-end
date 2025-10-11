@@ -1,0 +1,121 @@
+import { ValueObject } from "../../../shared/domain/value-object";
+
+export enum PointsSourceEnum {
+  SCAN_QR = "scan_qr",
+  REQUEST = "request",
+  ACCEPTED_REQUEST = "accepted_request",
+  TIP = "tip",
+  SOCIAL_SHARE = "social_share",
+  BONUS = "bonus",
+}
+
+export type PointsSourceProps = {
+  value: PointsSourceEnum;
+};
+
+export class PointsSource extends ValueObject {
+  readonly value: PointsSourceEnum;
+
+  constructor(props: PointsSourceProps) {
+    super();
+    this.value = props.value;
+    this.validate();
+  }
+
+  private validate(): void {
+    if (!Object.values(PointsSourceEnum).includes(this.value)) {
+      throw new InvalidPointsSourceError(
+        `Invalid points source: ${this.value}`,
+      );
+    }
+  }
+
+  static create(value: string | PointsSourceEnum): PointsSource {
+    return new PointsSource({ value: value as PointsSourceEnum });
+  }
+
+  static scanQr(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.SCAN_QR });
+  }
+
+  static request(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.REQUEST });
+  }
+
+  static acceptedRequest(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.ACCEPTED_REQUEST });
+  }
+
+  static tip(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.TIP });
+  }
+
+  static socialShare(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.SOCIAL_SHARE });
+  }
+
+  static bonus(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.BONUS });
+  }
+
+  isScanQr(): boolean {
+    return this.value === PointsSourceEnum.SCAN_QR;
+  }
+
+  isRequest(): boolean {
+    return this.value === PointsSourceEnum.REQUEST;
+  }
+
+  isAcceptedRequest(): boolean {
+    return this.value === PointsSourceEnum.ACCEPTED_REQUEST;
+  }
+
+  isTip(): boolean {
+    return this.value === PointsSourceEnum.TIP;
+  }
+
+  isSocialShare(): boolean {
+    return this.value === PointsSourceEnum.SOCIAL_SHARE;
+  }
+
+  isBonus(): boolean {
+    return this.value === PointsSourceEnum.BONUS;
+  }
+
+  getPointsValue(): number {
+    switch (this.value) {
+      case PointsSourceEnum.SCAN_QR:
+        return 10;
+      case PointsSourceEnum.REQUEST:
+        return 25;
+      case PointsSourceEnum.ACCEPTED_REQUEST:
+        return 50;
+      case PointsSourceEnum.SOCIAL_SHARE:
+        return 50;
+      case PointsSourceEnum.TIP:
+        return 1; // 1 ponto por real
+      case PointsSourceEnum.BONUS:
+        return 0; // Valor variável
+      default:
+        return 0;
+    }
+  }
+
+  toString(): string {
+    return this.value;
+  }
+
+  toJSON() {
+    return {
+      value: this.value,
+      points_value: this.getPointsValue(),
+    };
+  }
+}
+
+export class InvalidPointsSourceError extends Error {
+  constructor(message?: string) {
+    super(message || "Invalid points source");
+    this.name = "InvalidPointsSourceError";
+  }
+}
