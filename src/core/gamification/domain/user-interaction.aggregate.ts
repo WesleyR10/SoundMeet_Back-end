@@ -52,13 +52,15 @@ export class UserInteraction extends AggregateRoot {
   }
 
   static create(command: UserInteractionCreateCommand): UserInteraction {
-    return new UserInteraction({
+    const entity = new UserInteraction({
       user_id: command.user_id,
       interaction_type: command.interaction_type,
       target_id: command.target_id,
       metadata: command.metadata,
       points_earned: command.points_earned,
     });
+    entity.validate();
+    return entity;
   }
 
   changeInteractionType(type: string): void {

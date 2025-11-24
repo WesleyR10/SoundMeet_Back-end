@@ -36,11 +36,11 @@ export class UserScoreInMemoryRepository
       let matches = true;
 
       if (filter.user_id) {
-        matches = matches && userScore.user_id === filter.user_id;
+        matches = matches && userScore.user_id?.id === filter.user_id;
       }
 
       if (filter.score_type) {
-        matches = matches && userScore.score_type === filter.score_type;
+        matches = matches && userScore.score_type?.value === filter.score_type;
       }
 
       return matches;
