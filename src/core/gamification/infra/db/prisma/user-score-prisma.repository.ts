@@ -1,12 +1,18 @@
-import { PrismaClient } from '@prisma/client';
-import { UserScore, UserScoreId } from '../../../domain/user-score.aggregate';
-import { IUserScoreRepository } from '../../../domain/user-score.repository';
-import { UserScoreModelMapper, UserScoreModelProps } from './user-score-model-mapper';
-import { UserScoreSearchParams, UserScoreSearchResult } from '../../../domain/user-score.repository';
-import { NotFoundError } from '../../../../shared/domain/errors/not-found.error';
+import { PrismaClient } from "@prisma/client";
+import { UserScore, UserScoreId } from "../../../domain/user-score.aggregate";
+import { IUserScoreRepository } from "../../../domain/user-score.repository";
+import {
+  UserScoreModelMapper,
+  UserScoreModelProps,
+} from "./user-score-model-mapper";
+import {
+  UserScoreSearchParams,
+  UserScoreSearchResult,
+} from "../../../domain/user-score.repository";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 
 export class UserScorePrismaRepository implements IUserScoreRepository {
-  sortableFields: string[] = ['created_at', 'points'];
+  sortableFields: string[] = ["created_at", "points"];
 
   constructor(private prismaClient: PrismaClient) {}
 
@@ -96,7 +102,9 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
       }),
     ]);
 
-    const entities = models.map((model) => UserScoreModelMapper.toEntity(model));
+    const entities = models.map((model) =>
+      UserScoreModelMapper.toEntity(model),
+    );
 
     return new UserScoreSearchResult({
       items: entities,
@@ -106,13 +114,16 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
     });
   }
 
-  async findByUserAndType(userId: string, scoreType: string): Promise<UserScore[]> {
+  async findByUserAndType(
+    userId: string,
+    scoreType: string,
+  ): Promise<UserScore[]> {
     const models = await this.prismaClient.userScore.findMany({
       where: {
         user_id: userId,
         score_type: scoreType,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
     });
     return models.map((model) => UserScoreModelMapper.toEntity(model));
   }
@@ -125,7 +136,10 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
     return result._sum.points || 0;
   }
 
-  async getPointsByUserAndType(userId: string, scoreType: string): Promise<number> {
+  async getPointsByUserAndType(
+    userId: string,
+    scoreType: string,
+  ): Promise<number> {
     const result = await this.prismaClient.userScore.aggregate({
       where: {
         user_id: userId,
@@ -156,8 +170,8 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
   }
 
   private formatQuery(props: UserScoreSearchParams) {
-    let where: any = {};
-    let orderBy: any = {};
+    const where: any = {};
+    const orderBy: any = {};
 
     if (props.filter) {
       if (props.filter.user_id) {
@@ -169,9 +183,9 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
     }
 
     if (props.sort && this.sortableFields.includes(props.sort)) {
-      orderBy[props.sort] = props.sort_dir || 'asc';
+      orderBy[props.sort] = props.sort_dir || "asc";
     } else {
-      orderBy.created_at = 'desc';
+      orderBy.created_at = "desc";
     }
 
     return { where, orderBy };

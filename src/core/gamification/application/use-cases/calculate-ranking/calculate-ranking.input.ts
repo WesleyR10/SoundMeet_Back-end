@@ -1,5 +1,8 @@
 import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
-import { RankingPeriodEnum, RankingTypeEnum } from "../../../domain/value-objects/ranking-type.vo";
+import {
+  RankingPeriodEnum,
+  RankingTypeEnum,
+} from "../../../domain/value-objects/ranking-type.vo";
 
 export class CalculateRankingInput {
   @IsEnum(RankingTypeEnum)

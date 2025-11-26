@@ -9,15 +9,10 @@ import {
   UserPointsSearchParams,
   UserPointsSearchResult,
 } from "../../../domain/user-points.repository";
-import {
-  UserPointsModelMapper,
-} from "./user-points-model-mapper";
+import { UserPointsModelMapper } from "./user-points-model-mapper";
 
 export class UserPointsPrismaRepository implements IUserPointsRepository {
-  sortableFields: string[] = [
-    "points",
-    "created_at",
-  ];
+  sortableFields: string[] = ["points", "created_at"];
 
   constructor(private prismaClient: PrismaClient) {}
 
@@ -169,13 +164,13 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
     // Assumindo que cada nível tem uma faixa de pontos
     const minPoints = level * 100; // Exemplo: nível 1 = 100 pontos
     const maxPoints = (level + 1) * 100 - 1;
-    
+
     const models = await this.prismaClient.userPoints.findMany({
-      where: { 
+      where: {
         points: {
           gte: minPoints,
           lte: maxPoints,
-        }
+        },
       },
     });
     return models.map((model) => UserPointsModelMapper.toEntity(model));

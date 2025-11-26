@@ -1,5 +1,5 @@
-import { UserScore } from '../../../domain/user-score.aggregate';
-import { UserScoreId } from '../../../domain/user-score.aggregate';
+import { UserScore } from "../../../domain/user-score.aggregate";
+import { UserScoreId } from "../../../domain/user-score.aggregate";
 
 export type UserScoreModelProps = {
   id: string;

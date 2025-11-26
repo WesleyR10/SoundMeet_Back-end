@@ -19,10 +19,7 @@ export class UserPointsInMemoryRepository
   >
   implements IUserPointsRepository
 {
-  sortableFields: string[] = [
-    "points",
-    "created_at",
-  ];
+  sortableFields: string[] = ["points", "created_at"];
 
   async search(props: UserPointsSearchParams): Promise<UserPointsSearchResult> {
     const result = await super.search(props);

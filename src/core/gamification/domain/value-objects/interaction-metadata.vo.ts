@@ -56,7 +56,7 @@ export interface LevelUpMetadata extends BaseInteractionMetadata {
 }
 
 // Union type for all possible metadata
-export type InteractionMetadata = 
+export type InteractionMetadata =
   | QrScanMetadata
   | TipMetadata
   | MusicRequestMetadata
@@ -69,61 +69,82 @@ export type InteractionMetadata =
 // Type guard functions
 export class InteractionMetadataValidator {
   static isQrScanMetadata(metadata: any): metadata is QrScanMetadata {
-    return metadata && typeof metadata === 'object';
+    return metadata && typeof metadata === "object";
   }
 
   static isTipMetadata(metadata: any): metadata is TipMetadata {
-    return metadata && typeof metadata === 'object' && typeof metadata.amount === 'number';
+    return (
+      metadata &&
+      typeof metadata === "object" &&
+      typeof metadata.amount === "number"
+    );
   }
 
-  static isMusicRequestMetadata(metadata: any): metadata is MusicRequestMetadata {
-    return metadata && typeof metadata === 'object' && 
-           typeof metadata.song_title === 'string' && 
-           typeof metadata.artist_name === 'string';
+  static isMusicRequestMetadata(
+    metadata: any,
+  ): metadata is MusicRequestMetadata {
+    return (
+      metadata &&
+      typeof metadata === "object" &&
+      typeof metadata.song_title === "string" &&
+      typeof metadata.artist_name === "string"
+    );
   }
 
   static isSocialShareMetadata(metadata: any): metadata is SocialShareMetadata {
-    return metadata && typeof metadata === 'object' && 
-           typeof metadata.platform === 'string' && 
-           typeof metadata.content_type === 'string';
+    return (
+      metadata &&
+      typeof metadata === "object" &&
+      typeof metadata.platform === "string" &&
+      typeof metadata.content_type === "string"
+    );
   }
 
   static isFollowMetadata(metadata: any): metadata is FollowMetadata {
-    return metadata && typeof metadata === 'object' && 
-           typeof metadata.followed_user_type === 'string' && 
-           typeof metadata.followed_user_id === 'string';
+    return (
+      metadata &&
+      typeof metadata === "object" &&
+      typeof metadata.followed_user_type === "string" &&
+      typeof metadata.followed_user_id === "string"
+    );
   }
 
   static isBadgeUnlockMetadata(metadata: any): metadata is BadgeUnlockMetadata {
-    return metadata && typeof metadata === 'object' && 
-           typeof metadata.badge_id === 'string' && 
-           typeof metadata.badge_name === 'string';
+    return (
+      metadata &&
+      typeof metadata === "object" &&
+      typeof metadata.badge_id === "string" &&
+      typeof metadata.badge_name === "string"
+    );
   }
 
   static isLevelUpMetadata(metadata: any): metadata is LevelUpMetadata {
-    return metadata && typeof metadata === 'object' && 
-           typeof metadata.previous_level === 'number' && 
-           typeof metadata.new_level === 'number';
+    return (
+      metadata &&
+      typeof metadata === "object" &&
+      typeof metadata.previous_level === "number" &&
+      typeof metadata.new_level === "number"
+    );
   }
 
   static validateMetadataForInteractionType(
-    interactionType: string, 
-    metadata: any
+    interactionType: string,
+    metadata: any,
   ): boolean {
     switch (interactionType) {
-      case 'qr_scan':
+      case "qr_scan":
         return this.isQrScanMetadata(metadata);
-      case 'tip':
+      case "tip":
         return this.isTipMetadata(metadata);
-      case 'music_request':
+      case "music_request":
         return this.isMusicRequestMetadata(metadata);
-      case 'social_share':
+      case "social_share":
         return this.isSocialShareMetadata(metadata);
-      case 'follow':
+      case "follow":
         return this.isFollowMetadata(metadata);
-      case 'badge_unlock':
+      case "badge_unlock":
         return this.isBadgeUnlockMetadata(metadata);
-      case 'level_up':
+      case "level_up":
         return this.isLevelUpMetadata(metadata);
       default:
         return metadata === null || metadata === undefined;

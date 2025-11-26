@@ -2,7 +2,10 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { IRankingRepository } from "../../../domain/ranking.repository";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
 import { Ranking } from "../../../domain/ranking.aggregate";
-import { RankingTypeEnum, RankingPeriodEnum } from "../../../domain/value-objects/ranking-type.vo";
+import {
+  RankingTypeEnum,
+  RankingPeriodEnum,
+} from "../../../domain/value-objects/ranking-type.vo";
 import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
 import { CalculateRankingInput } from "./calculate-ranking.input";
 
@@ -48,7 +51,9 @@ export class CalculateRankingUseCase
           break;
         case RankingTypeEnum.TOP_APOIADORES:
           // Considera apenas pontos provenientes de TIP_GIVEN
-          if (String(score.score_type?.value ?? score.score_type) === "tip_given") {
+          if (
+            String(score.score_type?.value ?? score.score_type) === "tip_given"
+          ) {
             accumulate(userId, score.points);
           }
           break;
@@ -72,7 +77,11 @@ export class CalculateRankingUseCase
     // Ordenar e criar entidades Ranking
     const sorted = Array.from(totalsByUser.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([user_id, total], index) => ({ user_id, total, position: index + 1 }));
+      .map(([user_id, total], index) => ({
+        user_id,
+        total,
+        position: index + 1,
+      }));
 
     const entities: Ranking[] = sorted.map((row) =>
       Ranking.create({

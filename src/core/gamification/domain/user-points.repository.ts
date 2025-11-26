@@ -35,7 +35,8 @@ export class UserPointsSearchParams extends DefaultSearchParams<UserPointsFilter
         : value;
 
     const filter = {
-      ...(_value && _value.audienceId && { audienceId: `${_value?.audienceId}` }),
+      ...(_value &&
+        _value.audienceId && { audienceId: `${_value?.audienceId}` }),
       ...(_value &&
         typeof _value.points_gte === "number" && {
           points_gte: _value.points_gte,

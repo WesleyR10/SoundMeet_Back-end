@@ -27,7 +27,3 @@ export * from "./update-ranking/update-ranking.use-case";
 export * from "./update-user-badge/update-user-badge.use-case";
 export * from "./update-user-interaction/update-user-interaction.use-case";
 export * from "./update-user-points/update-user-points.use-case";
-
-
-
-

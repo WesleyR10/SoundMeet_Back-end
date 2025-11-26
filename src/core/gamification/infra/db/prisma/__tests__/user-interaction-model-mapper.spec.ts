@@ -61,10 +61,10 @@ describe("UserInteractionModelMapper", () => {
         audienceId: "123e4567-e89b-12d3-a456-426614174001",
         type: "music_request",
         musicianId: "123e4567-e89b-12d3-a456-426614174002",
-        metadata: { 
-          song_title: "Great performance!", 
+        metadata: {
+          song_title: "Great performance!",
           artist_name: "Local Band",
-          message: "Could you play this song?"
+          message: "Could you play this song?",
         },
         points: 15,
         created_at: new Date("2024-01-01T00:00:00.000Z"),
