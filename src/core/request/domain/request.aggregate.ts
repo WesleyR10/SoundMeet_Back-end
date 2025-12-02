@@ -1,11 +1,7 @@
 import { ValueObject } from "../../shared/domain/value-object";
 import { RequestValidatorFactory } from "./request.validator";
 import { RequestFakeBuilder } from "./request-fake.builder";
-import {
-  AggregateRoot,
-  Uuid,
-  Points,
-} from "../../shared/domain";
+import { AggregateRoot, Uuid, Points } from "../../shared/domain";
 import {
   RequestStatus,
   RequestStatusEnum,
@@ -14,6 +10,8 @@ import { RequestMessage } from "./value-objects/request-message.vo";
 import { SongTitle } from "./value-objects/song-title.vo";
 import { RequestAcceptedEvent } from "./events/request-accepted.event";
 import { RequestRejectedEvent } from "./events/request-rejected.event";
+import { RequestCreatedEvent } from "./events/request-created.event";
+import { RequestUpdatedEvent } from "./events/request-updated.event";
 
 export type RequestConstructorProps = {
   id?: RequestId;
@@ -81,6 +79,15 @@ export class Request extends AggregateRoot {
     });
 
     request.validate();
+    request.applyEvent(new RequestCreatedEvent({
+      request_id: request.id,
+      audience_id: request.audience_id.id,
+      musician_id: request.musician_id.id,
+      song_title: request.song_title.value,
+      artist: request.artist,
+      message: request.message?.value || null,
+      created_at: request.created_at,
+    }));
     return request;
   }
 
@@ -127,6 +134,16 @@ export class Request extends AggregateRoot {
     );
   }
 
+  private dispatchUpdateEvent(): void {
+    this.applyEvent(new RequestUpdatedEvent({
+      request_id: this.id,
+      song_title: this.song_title.value,
+      artist: this.artist,
+      message: this.message?.value || null,
+      updated_at: new Date()
+    }));
+  }
+
   changeSongTitle(song_title: string): void {
     if (!this.status.isPending()) {
       this.notification.addError(
@@ -136,6 +153,7 @@ export class Request extends AggregateRoot {
       return;
     }
     this.song_title = SongTitle.create(song_title);
+    this.dispatchUpdateEvent();
   }
 
   changeArtist(artist: string | null): void {
@@ -147,6 +165,7 @@ export class Request extends AggregateRoot {
       return;
     }
     this.artist = artist;
+    this.dispatchUpdateEvent();
   }
 
   changeMessage(message: string | null): void {
@@ -158,6 +177,7 @@ export class Request extends AggregateRoot {
       return;
     }
     this.message = message ? RequestMessage.create(message) : null;
+    this.dispatchUpdateEvent();
   }
 
   get isPending(): boolean {

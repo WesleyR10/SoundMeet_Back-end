@@ -200,7 +200,7 @@ export class RequestPrismaRepository implements IRequestRepository {
         musicianId: musician_id,
         status: "accepted",
       },
-      orderBy: { created_at: "desc"},
+      orderBy: { created_at: "desc" },
     });
     return models.map((model) => RequestModelMapper.toEntity(model));
   }
@@ -213,7 +213,7 @@ export class RequestPrismaRepository implements IRequestRepository {
         musicianId: musician_id,
         status: "rejected",
       },
-      orderBy: { created_at: "desc"},
+      orderBy: { created_at: "desc" },
     });
     return models.map((model) => RequestModelMapper.toEntity(model));
   }

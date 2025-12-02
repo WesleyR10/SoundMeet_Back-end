@@ -1,6 +1,6 @@
 import { Chance } from "chance";
 import { Request, RequestId } from "./request.aggregate";
-import { RequestStatus} from "./value-objects/request-status.vo";
+import { RequestStatus } from "./value-objects/request-status.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { v4 as uuidv4 } from "uuid";
 

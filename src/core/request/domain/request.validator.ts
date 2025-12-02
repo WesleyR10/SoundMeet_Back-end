@@ -30,14 +30,20 @@ export class RequestRules {
   @IsOptional({ groups: ["artist"] })
   @IsString({ groups: ["artist"] })
   @ValidateIf((o) => o.artist !== null && o.artist !== undefined)
-  @IsNotEmpty({ groups: ["artist"], message: "Artist cannot be empty when provided" })
+  @IsNotEmpty({
+    groups: ["artist"],
+    message: "Artist cannot be empty when provided",
+  })
   artist: string | null;
 
   @MaxLength(500, { groups: ["message"] })
   @IsOptional({ groups: ["message"] })
   @IsString({ groups: ["message"] })
   @ValidateIf((o) => o.message !== null && o.message !== undefined)
-  @IsNotEmpty({ groups: ["message"], message: "Message cannot be empty when provided" })
+  @IsNotEmpty({
+    groups: ["message"],
+    message: "Message cannot be empty when provided",
+  })
   message: string | null;
 
   @IsIn(Object.values(RequestStatusEnum), { groups: ["status"] })
@@ -61,13 +67,13 @@ export class RequestValidator extends ClassValidatorFields {
       ? fields
       : [
           "audience_id",
-          "musician_id", 
+          "musician_id",
           "song_title",
           "status",
           "artist",
-          "message"
+          "message",
         ];
-    
+
     return super.validate(notification, new RequestRules(data), newFields);
   }
 }
