@@ -41,21 +41,67 @@ export class RankingInMemoryRepository
       let matches = true;
 
       if (filter.user_id) {
-        matches = matches && ranking.user_id === filter.user_id;
+        matches = matches && ranking.user_id.id === filter.user_id;
       }
 
       if (filter.ranking_type) {
-        matches = matches && ranking.ranking_type === filter.ranking_type;
+        matches = matches && ranking.ranking_type.value === filter.ranking_type;
       }
 
       if (filter.period) {
-        matches = matches && ranking.period === filter.period;
+        matches = matches && ranking.period.value === filter.period;
       }
 
       return matches;
     });
 
     return filtered;
+  }
+
+  async findByUserAndEstablishment(
+    user_id: string,
+    establishment_id: string,
+    period_type: string,
+  ): Promise<Ranking | null> {
+    throw new Error("Method not implemented.");
+  }
+
+  async findByUserAndTypeAndPeriod(
+    user_id: string,
+    ranking_type: string,
+    period: string,
+    period_start: Date,
+    period_end: Date,
+  ): Promise<Ranking | null> {
+    const ranking = this.items.find(
+      (item) =>
+        item.user_id.id === user_id &&
+        item.ranking_type.value === ranking_type &&
+        item.period.value === period &&
+        item.period_start.getTime() === period_start.getTime() &&
+        item.period_end.getTime() === period_end.getTime(),
+    );
+    return ranking || null;
+  }
+
+  async findTopRankings(
+    establishment_id: string,
+    period_type: string,
+    limit?: number,
+  ): Promise<Ranking[]> {
+    throw new Error("Method not implemented.");
+  }
+
+  async findCurrentRankings(
+    ranking_type: string,
+    period: string,
+  ): Promise<Ranking[]> {
+    return this.items.filter(
+      (item) =>
+        item.ranking_type.value === ranking_type &&
+        item.period.value === period &&
+        item.isCurrentPeriod(),
+    );
   }
 
   getEntity(): new (...args: any[]) => Ranking {

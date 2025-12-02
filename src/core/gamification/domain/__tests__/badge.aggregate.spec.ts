@@ -16,6 +16,8 @@ describe("Badge Unit Tests without validator", () => {
       icon: "🎵",
       category: "engagement",
       requirement: { scans: 1 },
+      points: 0,
+      rarity: "common",
     });
 
     expect(badge.id).toBeInstanceOf(BadgeId);
@@ -68,6 +70,8 @@ describe("Badge Unit Tests without validator", () => {
       icon: "🎵",
       category: "engagement",
       requirement: { scans: 1 },
+      points: 0,
+      rarity: "common",
     });
     expect(badge.id).toBeInstanceOf(BadgeId);
     expect(badge.entity_id).toBeInstanceOf(BadgeId);
@@ -124,6 +128,8 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: { scans: 1 },
+        points: 0,
+        rarity: "common",
       });
     });
 
@@ -200,6 +206,7 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: {},
+        points: 0,
         rarity: "common",
       });
       expect(commonBadge.isRare).toBe(false);
@@ -210,6 +217,7 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: {},
+        points: 100,
         rarity: "rare",
       });
       expect(rareBadge.isRare).toBe(true);
@@ -220,6 +228,7 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: {},
+        points: 500,
         rarity: "epic",
       });
       expect(epicBadge.isRare).toBe(true);
@@ -230,6 +239,7 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: {},
+        points: 1000,
         rarity: "legendary",
       });
       expect(legendaryBadge.isRare).toBe(true);
@@ -242,6 +252,7 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: {},
+        points: 0,
         rarity: "common",
       });
       expect(commonBadge.isLegendary).toBe(false);
@@ -252,6 +263,7 @@ describe("Badge Unit Tests without validator", () => {
         icon: "🎵",
         category: "engagement",
         requirement: {},
+        points: 1000,
         rarity: "legendary",
       });
       expect(legendaryBadge.isLegendary).toBe(true);

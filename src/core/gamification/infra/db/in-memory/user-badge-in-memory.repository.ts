@@ -29,18 +29,31 @@ export class UserBadgeInMemoryRepository
     return this.items.filter((item) => item.user_id.id === user_id);
   }
 
-  async findByUserIdAndBadgeType(
+  async findByUserAndBadgeType(
     user_id: string,
-    badge_type: BadgeType,
+    badge_type: string,
   ): Promise<UserBadge | null> {
     const badge = this.items.find(
-      (item) => item.user_id.id === user_id && item.badge.type === badge_type,
+      (item) =>
+        item.user_id.id === user_id && item.badge_type.value === badge_type,
     );
     return badge || null;
   }
 
-  async findByBadgeType(badge_type: BadgeType): Promise<UserBadge[]> {
-    return this.items.filter((item) => item.badge.type === badge_type);
+  async findByBadgeType(badge_type: string): Promise<UserBadge[]> {
+    return this.items.filter((item) => item.badge_type.value === badge_type);
+  }
+
+  async findUnlockedByUser(user_id: string): Promise<UserBadge[]> {
+    return this.items.filter(
+      (item) => item.user_id.id === user_id && item.is_unlocked,
+    );
+  }
+
+  async findInProgressByUser(user_id: string): Promise<UserBadge[]> {
+    return this.items.filter(
+      (item) => item.user_id.id === user_id && !item.is_unlocked,
+    );
   }
 
   protected async applyFilter(
@@ -56,33 +69,34 @@ export class UserBadgeInMemoryRepository
         return false;
       }
 
-      if (filter.badge_type && item.badge.type !== filter.badge_type) {
+      if (filter.badge_type && item.badge_type.value !== filter.badge_type) {
         return false;
       }
 
       if (
         filter.badge_category &&
-        item.badge.category !== filter.badge_category
+        item.badge_type.value !== filter.badge_category // TODO: Implement category
       ) {
         return false;
       }
 
-      if (filter.badge_rarity && item.badge.rarity !== filter.badge_rarity) {
+      if (filter.badge_rarity && item.badge_type.value !== filter.badge_rarity) {
+        // TODO: Implement rarity
         return false;
       }
 
       if (
         filter.earned_at_gte &&
-        item.earned_at &&
-        item.earned_at < filter.earned_at_gte
+        item.unlocked_at &&
+        item.unlocked_at < filter.earned_at_gte
       ) {
         return false;
       }
 
       if (
         filter.earned_at_lte &&
-        item.earned_at &&
-        item.earned_at > filter.earned_at_lte
+        item.unlocked_at &&
+        item.unlocked_at > filter.earned_at_lte
       ) {
         return false;
       }

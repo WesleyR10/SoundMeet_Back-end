@@ -2,7 +2,6 @@ import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-mem
 import {
   UserInteraction,
   UserInteractionId,
-  InteractionType,
 } from "../../../domain/user-interaction.aggregate";
 import {
   UserInteractionFilter,
@@ -42,7 +41,7 @@ export class UserInteractionInMemoryRepository
   }
 
   async findByInteractionType(
-    interaction_type: InteractionType,
+    interaction_type: string,
   ): Promise<UserInteraction[]> {
     return this.items.filter(
       (item) => item.interaction_type === interaction_type,
@@ -51,7 +50,7 @@ export class UserInteractionInMemoryRepository
 
   async findByUserIdAndType(
     user_id: string,
-    interaction_type: InteractionType,
+    interaction_type: string,
   ): Promise<UserInteraction[]> {
     return this.items.filter(
       (item) =>
@@ -80,7 +79,7 @@ export class UserInteractionInMemoryRepository
   }
 
   async getInteractionCountByType(
-    interaction_type: InteractionType,
+    interaction_type: string,
   ): Promise<number> {
     return this.items.filter(
       (item) => item.interaction_type === interaction_type,

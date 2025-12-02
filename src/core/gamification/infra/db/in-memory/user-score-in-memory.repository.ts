@@ -36,17 +36,49 @@ export class UserScoreInMemoryRepository
       let matches = true;
 
       if (filter.user_id) {
-        matches = matches && userScore.user_id?.id === filter.user_id;
+        matches = matches && userScore.user_id.id === filter.user_id;
       }
 
       if (filter.score_type) {
-        matches = matches && userScore.score_type?.value === filter.score_type;
+        matches = matches && userScore.score_type.value === filter.score_type;
+      }
+
+      if (filter.reference_id) {
+        matches = matches && userScore.reference_id === filter.reference_id;
       }
 
       return matches;
     });
 
     return filtered;
+  }
+
+  async findByUserAndType(
+    user_id: string,
+    score_type: string,
+  ): Promise<UserScore[]> {
+    return this.items.filter(
+      (item) =>
+        item.user_id.id === user_id && item.score_type.value === score_type,
+    );
+  }
+
+  async getTotalPointsByUser(user_id: string): Promise<number> {
+    return this.items
+      .filter((item) => item.user_id.id === user_id)
+      .reduce((total, item) => total + item.points, 0);
+  }
+
+  async getPointsByUserAndType(
+    user_id: string,
+    score_type: string,
+  ): Promise<number> {
+    return this.items
+      .filter(
+        (item) =>
+          item.user_id.id === user_id && item.score_type.value === score_type,
+      )
+      .reduce((total, item) => total + item.points, 0);
   }
 
   getEntity(): new (...args: any[]) => UserScore {

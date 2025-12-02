@@ -25,6 +25,8 @@ export type UserInteractionCreateCommand = {
   points_earned?: number;
 };
 
+export { UserInteractionId } from "./value-objects/gamification-id.vo";
+
 export class UserInteraction extends AggregateRoot {
   id: UserInteractionId;
   user_id: Uuid;

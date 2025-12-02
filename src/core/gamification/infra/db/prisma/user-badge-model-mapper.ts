@@ -1,6 +1,6 @@
 import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
 import { BadgeType } from "../../../domain/value-objects/badge-type.vo";
-import { JsonValue } from "@prisma/client/runtime/library";
+import { Prisma } from "@prisma/client";
 
 // Tipo que reflete o schema Prisma real
 export type UserBadgePrismaModel = {
@@ -8,7 +8,7 @@ export type UserBadgePrismaModel = {
   audienceId: string;
   badgeId: string;
   earnedAt: Date;
-  progress: JsonValue;
+  progress: Prisma.JsonValue;
 };
 
 // Tipo para uso interno (compatível com a entidade)

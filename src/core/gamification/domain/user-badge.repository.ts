@@ -12,6 +12,10 @@ export type UserBadgeFilter = {
   is_unlocked?: boolean | null;
   progress_min?: number | null;
   progress_max?: number | null;
+  badge_category?: string | null;
+  badge_rarity?: string | null;
+  earned_at_gte?: Date | null;
+  earned_at_lte?: Date | null;
 };
 
 export class UserBadgeSearchParams extends DefaultSearchParams<UserBadgeFilter> {

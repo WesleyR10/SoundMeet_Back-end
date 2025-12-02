@@ -4,7 +4,7 @@ import {
   BadgeCategory,
   BadgeRarity,
 } from "../../../domain/badge.aggregate";
-import { JsonValue } from "@prisma/client/runtime/library";
+import { Prisma } from "@prisma/client";
 
 export type BadgeModelProps = {
   id: string;
@@ -26,7 +26,7 @@ export type BadgePrismaModel = {
   description: string;
   icon: string;
   category: string;
-  requirement: JsonValue;
+  requirement: Prisma.JsonValue;
   points: number;
   rarity: string;
   is_active: boolean;
