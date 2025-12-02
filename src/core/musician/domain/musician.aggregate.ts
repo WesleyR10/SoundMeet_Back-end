@@ -1,6 +1,8 @@
 import { ValueObject } from "../../shared/domain/value-object";
 import { MusicianValidatorFactory } from "./musician.validator";
 import { MusicianFakeBuilder } from "./musician-fake.builder";
+import { MusicianCreatedEvent } from "./events/musician-created.event";
+import { MusicianVerifiedEvent } from "./events/musician-verified.event";
 import {
   AggregateRoot,
   Uuid,
@@ -95,6 +97,24 @@ export class Musician extends AggregateRoot {
     const musician = new Musician(props);
     musician.validate(["name", "email"]);
     musician.generateQRCode();
+    musician.applyEvent(new MusicianCreatedEvent({
+      musician_id: musician.id,
+      email: musician.email,
+      name: musician.name,
+      stage_name: musician.stage_name,
+      bio: musician.bio,
+      avatar: musician.avatar,
+      phone: musician.phone,
+      genres: musician.genres,
+      instruments: musician.instruments,
+      experience_years: musician.experience_years,
+      qr_code: musician.qr_code,
+      rating: musician.rating,
+      total_ratings: musician.total_ratings,
+      is_active: musician.is_active,
+      is_verified: musician.is_verified,
+      created_at: musician.created_at,
+    }));
     return musician;
   }
 
@@ -170,6 +190,10 @@ export class Musician extends AggregateRoot {
 
   verify(): void {
     this.is_verified = true;
+    this.applyEvent(new MusicianVerifiedEvent({
+      musician_id: this.id,
+      verified_at: new Date()
+    }));
   }
 
   unverify(): void {

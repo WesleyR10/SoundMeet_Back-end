@@ -33,7 +33,7 @@ describe("CreateMusicianUseCase Integration Tests", () => {
     expect(musician.name).toBe(input.name);
     expect(musician.stage_name).toBe(input.stage_name);
     expect(musician.email.value).toBe(input.email);
-    expect(musician.phone.value).toBe(input.phone);
+    expect(musician.phone!.value).toBe(input.phone);
     expect(musician.bio).toBe(input.bio);
     expect(musician.genres).toEqual(input.genres);
     expect(musician.instruments).toEqual(input.instruments);
@@ -41,12 +41,12 @@ describe("CreateMusicianUseCase Integration Tests", () => {
     expect(musician.is_active).toBe(true);
     expect(musician.is_verified).toBe(false);
     expect(musician.qr_code).toBeDefined();
-    expect(musician.qr_code.isValid).toBe(true);
+    expect(musician.qr_code!.isValid).toBe(true);
 
     expect(output.id).toBe(musician.id.id);
     expect(output.name).toBe(musician.name);
     expect(output.email).toBe(musician.email.value);
-    expect(output.qr_code).toBe(musician.qr_code.code);
+    expect(output.qr_code).toBe(musician.qr_code!.code);
   });
 
   it("should create a musician with minimal required data", async () => {
@@ -114,7 +114,7 @@ describe("CreateMusicianUseCase Integration Tests", () => {
     expect(musicians[2].name).toBe("Musician 3");
 
     // Each musician should have unique QR codes
-    const qrCodes = musicians.map((m) => m.qr_code.code);
+    const qrCodes = musicians.map((m) => m.qr_code!.code);
     const uniqueQrCodes = new Set(qrCodes);
     expect(uniqueQrCodes.size).toBe(3);
   });

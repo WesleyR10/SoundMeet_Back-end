@@ -20,7 +20,7 @@ export class ListMusiciansUseCase
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: ListMusiciansInput): Promise<ListMusiciansOutput> {
-    const params = new MusicianSearchParams(input);
+    const params = MusicianSearchParams.create(input);
     const searchResult = await this.musicianRepo.search(params);
 
     return this.toOutput(searchResult);

@@ -129,7 +129,7 @@ describe("CreateMusicianUseCase Unit Tests", () => {
         created_at: repository.items[0].created_at,
       });
       expect(repository.items[0]).toBeInstanceOf(Musician);
-      expect(repository.items[0].qr_code.isValid).toBe(true);
+      expect(repository.items[0].qr_code!.isValid).toBe(true);
     });
   });
 
@@ -146,7 +146,7 @@ describe("CreateMusicianUseCase Unit Tests", () => {
     const musician = repository.items[0];
 
     expect(output.qr_code).toBeDefined();
-    expect(output.qr_code).toBe(musician.qr_code.code);
-    expect(musician.qr_code.isValid).toBe(true);
+    expect(output.qr_code).toBe(musician.qr_code!.code);
+    expect(musician.qr_code!.isValid).toBe(true);
   });
 });
