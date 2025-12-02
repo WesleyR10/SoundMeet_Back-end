@@ -5,9 +5,26 @@ export type AudiencePreferencesProps = {
   favoriteGenres: string[];
   favoriteArtists: string[];
   preferredLanguages: string[];
+  location?: LocationSettings | null;
+  socialLinks?: SocialLinksSettings | null;
   notificationSettings: NotificationSettings;
   privacySettings: PrivacySettings;
   musicDiscoverySettings: MusicDiscoverySettings;
+};
+
+export type LocationSettings = {
+  latitude: number;
+  longitude: number;
+  city: string;
+  state: string;
+};
+
+export type SocialLinksSettings = {
+  instagram?: string | null;
+  twitter?: string | null;
+  facebook?: string | null;
+  youtube?: string | null;
+  spotify?: string | null;
 };
 
 export type NotificationSettings = {
@@ -42,6 +59,8 @@ export class AudiencePreferences extends ValueObject {
   readonly favoriteGenres: string[];
   readonly favoriteArtists: string[];
   readonly preferredLanguages: string[];
+  readonly location: LocationSettings | null;
+  readonly socialLinks: SocialLinksSettings | null;
   readonly notificationSettings: NotificationSettings;
   readonly privacySettings: PrivacySettings;
   readonly musicDiscoverySettings: MusicDiscoverySettings;
@@ -96,6 +115,8 @@ export class AudiencePreferences extends ValueObject {
     this.favoriteGenres = props.favoriteGenres;
     this.favoriteArtists = props.favoriteArtists;
     this.preferredLanguages = props.preferredLanguages;
+    this.location = props.location ?? null;
+    this.socialLinks = props.socialLinks ?? null;
     this.notificationSettings = props.notificationSettings;
     this.privacySettings = props.privacySettings;
     this.musicDiscoverySettings = props.musicDiscoverySettings;
@@ -107,6 +128,8 @@ export class AudiencePreferences extends ValueObject {
       favoriteGenres: [],
       favoriteArtists: [],
       preferredLanguages: ["pt-BR"],
+      location: null,
+      socialLinks: null,
       notificationSettings: {
         pushNotifications: true,
         emailNotifications: true,
@@ -336,6 +359,8 @@ export class AudiencePreferences extends ValueObject {
       favoriteGenres: this.favoriteGenres,
       favoriteArtists: this.favoriteArtists,
       preferredLanguages: this.preferredLanguages,
+      location: this.location,
+      socialLinks: this.socialLinks,
       notificationSettings: this.notificationSettings,
       privacySettings: this.privacySettings,
       musicDiscoverySettings: this.musicDiscoverySettings,
