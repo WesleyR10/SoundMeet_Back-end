@@ -16,6 +16,12 @@ import { TipSentEvent } from "./events/tip-sent.event";
 import { SongVotedEvent } from "./events/song-voted.event";
 import { SocialMediaSharedEvent } from "./events/social-media-shared.event";
 import { MusicianIndicatedEvent } from "./events/musician-indicated.event";
+import { AudienceCreatedEvent } from "./events/audience-created.event";
+
+import { AudienceUpdatedEvent } from "./events/audience-updated.event";
+import { AudiencePreferencesUpdatedEvent } from "./events/audience-preferences-updated.event";
+import { AudienceLevelUpgradedEvent } from "./events/audience-level-upgraded.event";
+import { AudienceBadgeEarnedEvent } from "./events/audience-badge-earned.event";
 
 export type AudienceConstructorProps = {
   id?: AudienceId;
@@ -127,6 +133,8 @@ export class Audience extends AggregateRoot {
           [],
         preferredLanguages: props.preferences.preferredLanguages ||
           props.preferences.preferred_languages || ["pt-BR"],
+        location: props.preferences.location || null,
+        socialLinks: props.preferences.socialLinks || props.preferences.social_links || null,
         notificationSettings: props.preferences.notificationSettings ||
           props.preferences.notification_settings || {
             pushNotifications: true,
@@ -162,6 +170,8 @@ export class Audience extends AggregateRoot {
         favoriteGenres: [],
         favoriteArtists: [],
         preferredLanguages: ["pt-BR"],
+        location: null,
+        socialLinks: null,
         notificationSettings: {
           pushNotifications: true,
           emailNotifications: true,
@@ -277,13 +287,39 @@ export class Audience extends AggregateRoot {
     });
 
     audience.validate(["name", "email"]);
+    audience.applyEvent(new AudienceCreatedEvent({
+      audience_id: audience.id,
+      name: audience.name,
+      email: audience.email,
+      phone: audience.phone,
+      avatar: audience.avatar,
+      favorite_genres: audience.favorite_genres,
+      totalPoints: audience.totalPoints,
+      currentLevel: audience.currentLevel,
+      badges: audience.badges,
+      is_active: audience.is_active,
+      created_at: audience.created_at,
+    }));
     return audience;
+  }
+
+  private dispatchUpdateEvent(): void {
+    this.applyEvent(new AudienceUpdatedEvent({
+      audience_id: this.id,
+      name: this.name,
+      email: this.email.value,
+      nickname: this.nickname,
+      avatar: this.avatar,
+      phone: this.phone ? this.phone.value : null,
+      updated_at: this.updated_at
+    }));
   }
 
   changeName(name: string): void {
     this.name = name;
     this.updated_at = new Date();
     this.validate(["name"]);
+    this.dispatchUpdateEvent();
   }
 
   changeEmail(email: string): void {
@@ -291,6 +327,7 @@ export class Audience extends AggregateRoot {
       this.email = new Email(email);
       this.updated_at = new Date();
       this.validate();
+      this.dispatchUpdateEvent();
     } catch (error) {
       throw error;
     }
@@ -299,16 +336,29 @@ export class Audience extends AggregateRoot {
   changeNickname(nickname: string | null): void {
     this.nickname = nickname;
     this.updated_at = new Date();
+    this.dispatchUpdateEvent();
   }
 
   changeAvatar(avatar: string | null): void {
     this.avatar = avatar;
     this.updated_at = new Date();
+    this.dispatchUpdateEvent();
   }
 
   changePhone(phone: string | null): void {
     this.phone = phone ? new Phone(phone) : null;
     this.updated_at = new Date();
+    this.dispatchUpdateEvent();
+  }
+
+  private dispatchPreferencesEvent(): void {
+    this.applyEvent(new AudiencePreferencesUpdatedEvent({
+      audience_id: this.id,
+      favorite_genres: this.favorite_genres,
+      favorite_artists: this.favorite_artists,
+      preferred_languages: this.preferred_languages,
+      updated_at: this.updated_at
+    }));
   }
 
   updatePreferences(
@@ -364,6 +414,7 @@ export class Audience extends AggregateRoot {
 
     this.preferences = updatedPreferences;
     this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
   }
 
   updateFavoriteGenres(genres: string[]): void {
@@ -372,6 +423,7 @@ export class Audience extends AggregateRoot {
       favoriteGenres: genres,
     });
     this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
   }
 
   updateFavoriteArtists(artists: string[]): void {
@@ -380,21 +432,25 @@ export class Audience extends AggregateRoot {
       favoriteArtists: artists,
     });
     this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
   }
 
   updateNotificationSettings(settings: any): void {
     this.preferences = this.preferences.updateNotificationSettings(settings);
     this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
   }
 
   updatePrivacySettings(settings: any): void {
     this.preferences = this.preferences.updatePrivacySettings(settings);
     this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
   }
 
   updateDiscoverySettings(settings: any): void {
     this.preferences = this.preferences.updateMusicDiscoverySettings(settings);
     this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
   }
 
   // Points management methods
@@ -443,6 +499,13 @@ export class Audience extends AggregateRoot {
     const newLevel = AudienceLevel.fromPoints(this.points.total);
     if (newLevel.level !== this.level.level) {
       this.level = newLevel;
+      this.applyEvent(new AudienceLevelUpgradedEvent({
+        audience_id: this.id,
+        new_level: this.level.level,
+        new_level_name: this.level.name,
+        total_points: this.points.total,
+        occurred_at: new Date()
+      }));
     }
   }
 
@@ -451,6 +514,11 @@ export class Audience extends AggregateRoot {
     if (!this.badges.includes(badge)) {
       this.badges.push(badge);
       this.updated_at = new Date();
+      this.applyEvent(new AudienceBadgeEarnedEvent({
+        audience_id: this.id,
+        badge: badge,
+        earned_at: new Date()
+      }));
     }
   }
 
@@ -500,9 +568,15 @@ export class Audience extends AggregateRoot {
     this.applyEvent(new SongVotedEvent(this.id, requestId, vote));
   }
 
-  shareOnSocialMedia(platform: string, musicianId: string): void {
+  shareOnSocialMedia(
+    requestId: string,
+    platform: string,
+    message?: string,
+  ): void {
     this.addPointsForAction("share_social");
-    this.applyEvent(new SocialMediaSharedEvent(this.id, musicianId, platform));
+    this.applyEvent(
+      new SocialMediaSharedEvent(this.id, requestId, platform, message),
+    );
   }
 
   indicateMusician(establishmentId: string, musicianId: string): void {

@@ -1,6 +1,3 @@
-import { Audience, AudienceId } from "../../../../domain/audience.aggregate";
-import { Email } from "../../../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../../../shared/domain/value-objects/phone.vo";
 import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
 import {
   AudienceModelMapper,

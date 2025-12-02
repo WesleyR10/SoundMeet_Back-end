@@ -118,7 +118,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
 
     const output = await useCase.execute(input);
 
-    expect(output.favorite_genres).toEqual(newGenres);
+    expect(output.preferences.favorite_genres).toEqual(newGenres);
     expect(repository.items[0].favorite_genres).toEqual(newGenres);
   });
 
@@ -216,7 +216,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     expect(output.name).toBe("Updated Name");
     expect(output.nickname).toBe("UpdatedNick");
     expect(output.avatar).toBe("updated-avatar.jpg");
-    expect(output.favorite_genres).toEqual(["Rock", "Metal"]);
+    expect(output.preferences.favorite_genres).toEqual(["Rock", "Metal"]);
     expect(output.is_active).toBe(false);
   });
 });

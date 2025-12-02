@@ -21,8 +21,23 @@ export class AudienceModelMapper {
       favorite_genres: entity.preferences.favoriteGenres,
       favorite_artists: entity.preferences.favoriteArtists,
       preferred_languages: entity.preferences.preferredLanguages,
-      location: null, // TODO: Implementar location no aggregate
-      social_links: null, // TODO: Implementar social_links no aggregate
+      location: entity.preferences.location
+        ? {
+            latitude: entity.preferences.location.latitude,
+            longitude: entity.preferences.location.longitude,
+            city: entity.preferences.location.city,
+            state: entity.preferences.location.state,
+          }
+        : null,
+      social_links: entity.preferences.socialLinks
+        ? {
+            instagram: entity.preferences.socialLinks.instagram,
+            twitter: entity.preferences.socialLinks.twitter,
+            facebook: entity.preferences.socialLinks.facebook,
+            youtube: entity.preferences.socialLinks.youtube,
+            spotify: entity.preferences.socialLinks.spotify,
+          }
+        : null,
       notification_settings: entity.preferences.notificationSettings,
       privacy_settings: entity.preferences.privacySettings,
       discovery_settings: entity.preferences.musicDiscoverySettings,
@@ -47,6 +62,23 @@ export class AudienceModelMapper {
       favoriteGenres: model.favorite_genres || [],
       favoriteArtists: model.favorite_artists || [],
       preferredLanguages: model.preferred_languages || ["pt-BR"],
+      location: model.location
+        ? {
+            latitude: (model.location as any).latitude,
+            longitude: (model.location as any).longitude,
+            city: (model.location as any).city,
+            state: (model.location as any).state,
+          }
+        : undefined,
+      socialLinks: model.social_links
+        ? {
+            instagram: (model.social_links as any).instagram,
+            twitter: (model.social_links as any).twitter,
+            facebook: (model.social_links as any).facebook,
+            youtube: (model.social_links as any).youtube,
+            spotify: (model.social_links as any).spotify,
+          }
+        : undefined,
       notificationSettings: {
         pushNotifications: true,
         emailNotifications: true,

@@ -163,7 +163,7 @@ describe("AudienceInMemoryRepository", () => {
         .build();
       repository.items = audiences;
 
-      const searchParams = new AudienceSearchParams({
+      const searchParams = AudienceSearchParams.create({
         page: 1,
         per_page: 2,
         sort: "name",

@@ -1,12 +1,5 @@
 import { Audience, AudienceId } from "../audience.aggregate";
-import {
-  Email,
-  Phone,
-  AudiencePoints,
-  AudienceLevel,
-  AudiencePreferences,
-} from "../../../shared/domain";
-import "../../../shared/infra/testing/expect-helpers";
+import { Email, Phone, AudiencePoints } from "@core/shared/domain";
 
 describe("Audience Without Validator Unit Tests", () => {
   beforeEach(() => {
