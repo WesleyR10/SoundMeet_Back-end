@@ -82,7 +82,7 @@ describe("MusicianController (e2e)", () => {
           per_page: 15,
           sort: "created_at",
           sort_dir: "desc",
-          filter: null,
+          filter: undefined,
         });
 
         expect(res.body.meta).toStrictEqual({
