@@ -16,10 +16,10 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: establishment.description,
         avatar: establishment.avatar,
         phone: establishment.phone?.value || null,
-        isActive: establishment.is_active,
+        is_active: establishment.is_active,
         isVerified: establishment.is_verified,
         created_at: establishment.created_at,
-        updated_at: establishment.created_at,
+        updated_at: expect.any(Date),
       });
     });
 
@@ -42,10 +42,10 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: null,
         avatar: null,
         phone: null,
-        isActive: establishment.is_active,
+        is_active: establishment.is_active,
         isVerified: establishment.is_verified,
         created_at: establishment.created_at,
-        updated_at: establishment.created_at,
+        updated_at: expect.any(Date),
       });
     });
 
@@ -68,10 +68,10 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: "Great place for live music",
         avatar: "https://example.com/avatar.jpg",
         phone: "11999999999",
-        isActive: establishment.is_active,
+        is_active: establishment.is_active,
         isVerified: establishment.is_verified,
         created_at: establishment.created_at,
-        updated_at: establishment.created_at,
+        updated_at: expect.any(Date),
       });
     });
   });
@@ -86,10 +86,16 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: "Great place for live music",
         avatar: "https://example.com/avatar.jpg",
         phone: "11999999999",
-        isActive: true,
+        is_active: true,
         isVerified: false,
         created_at: new Date("2023-01-01"),
         updated_at: new Date("2023-01-01"),
+        address_street: "Rua Exemplo",
+        address_number: "123",
+        address_neighborhood: "Centro",
+        address_city: "São Paulo",
+        address_state: "SP",
+        address_zip_code: "01000-000",
       };
 
       const establishment = EstablishmentModelMapper.toEntity(model);
@@ -110,7 +116,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       expect(establishment.establishment_type).toBe("bar");
       expect(establishment.rating.value).toBe(0);
       expect(establishment.total_ratings).toBe(0);
-      expect(establishment.is_active).toBe(model.isActive);
+      expect(establishment.is_active).toBe(model.is_active);
       expect(establishment.is_verified).toBe(model.isVerified);
       expect(establishment.created_at).toEqual(model.created_at);
     });
@@ -124,10 +130,16 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: null,
         avatar: null,
         phone: null,
-        isActive: true,
+        is_active: true,
         isVerified: false,
         created_at: new Date("2023-01-01"),
         updated_at: new Date("2023-01-01"),
+        address_street: "Rua Exemplo",
+        address_number: "123",
+        address_neighborhood: "Centro",
+        address_city: "São Paulo",
+        address_state: "SP",
+        address_zip_code: "01000-000",
       };
 
       const establishment = EstablishmentModelMapper.toEntity(model);
@@ -161,10 +173,16 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: "Temporarily closed",
         avatar: null,
         phone: null,
-        isActive: false,
+        is_active: false,
         isVerified: true,
         created_at: new Date("2023-01-01"),
         updated_at: new Date("2023-01-01"),
+        address_street: "Rua Exemplo",
+        address_number: "123",
+        address_neighborhood: "Centro",
+        address_city: "São Paulo",
+        address_state: "SP",
+        address_zip_code: "01000-000",
       };
 
       const establishment = EstablishmentModelMapper.toEntity(model);
@@ -200,9 +218,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       const model = EstablishmentModelMapper.toModel(originalEstablishment);
       const convertedEstablishment = EstablishmentModelMapper.toEntity(model);
 
-      expect(convertedEstablishment.id.id).toBe(
-        originalEstablishment.id.id,
-      );
+      expect(convertedEstablishment.id.id).toBe(originalEstablishment.id.id);
       expect(convertedEstablishment.name).toBe(originalEstablishment.name);
       expect(convertedEstablishment.email.value).toBe(
         originalEstablishment.email.value,

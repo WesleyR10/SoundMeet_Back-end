@@ -11,7 +11,7 @@ import { CreateEstablishmentInput } from "./create-establishment.input";
 export class CreateEstablishmentUseCase
   implements IUseCase<CreateEstablishmentInput, CreateEstablishmentOutput>
 {
-  constructor(private establishmentRepo: IEstablishmentRepository) {}
+  constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
 
   async execute(
     input: CreateEstablishmentInput,

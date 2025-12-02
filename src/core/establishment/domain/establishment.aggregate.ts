@@ -14,6 +14,8 @@ import {
   QRCode,
 } from "../../shared/domain";
 import { EstablishmentRatedEvent } from "./events/establishment-rated.event";
+import { EstablishmentCreatedEvent } from "./events/establishment-created.event";
+import { EstablishmentVerifiedEvent } from "./events/establishment-verified.event";
 
 export type EstablishmentConstructorProps = {
   id?: EstablishmentId;
@@ -121,6 +123,21 @@ export class Establishment extends AggregateRoot {
     });
     establishment.validate(["name", "email", "address", "establishment_type"]);
     establishment.generateQRCode();
+    establishment.applyEvent(new EstablishmentCreatedEvent({
+      establishment_id: establishment.id,
+      name: establishment.name,
+      email: establishment.email,
+      cnpj: establishment.cnpj,
+      phone: establishment.phone,
+      address: establishment.address,
+      description: establishment.description,
+      avatar: establishment.avatar,
+      cover: null, // Assuming cover is not in command yet
+      rating: establishment.rating,
+      is_active: establishment.is_active,
+      is_verified: establishment.is_verified,
+      created_at: establishment.created_at,
+    }));
     return establishment;
   }
 
@@ -137,9 +154,9 @@ export class Establishment extends AggregateRoot {
     this.avatar = avatar;
   }
 
-  changeCnpj(cnpj: string | null): void {
+  changeCnpj(cnpj: string ): void {
     try {
-      this.cnpj = cnpj ? new CNPJ(cnpj) : null;
+      this.cnpj = new CNPJ(cnpj);
       this.validate(["cnpj"]);
     } catch (error) {
       if (error instanceof InvalidCNPJError) {
@@ -225,6 +242,10 @@ export class Establishment extends AggregateRoot {
 
   verify(): void {
     this.is_verified = true;
+    this.applyEvent(new EstablishmentVerifiedEvent({
+      establishment_id: this.id,
+      verified_at: new Date()
+    }));
   }
 
   unverify(): void {

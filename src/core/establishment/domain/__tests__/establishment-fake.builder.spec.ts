@@ -45,15 +45,9 @@ describe("EstablishmentFakeBuilder Unit Tests", () => {
       fakerMany.withEstablishmentId((index) => new EstablishmentId());
       const establishments = fakerMany.build();
 
-      expect(establishments[0].id).toBeInstanceOf(
-        EstablishmentId,
-      );
-      expect(establishments[1].id).toBeInstanceOf(
-        EstablishmentId,
-      );
-      expect(establishments[0].id).not.toBe(
-        establishments[1].id,
-      );
+      expect(establishments[0].id).toBeInstanceOf(EstablishmentId);
+      expect(establishments[1].id).toBeInstanceOf(EstablishmentId);
+      expect(establishments[0].id).not.toBe(establishments[1].id);
     });
   });
 

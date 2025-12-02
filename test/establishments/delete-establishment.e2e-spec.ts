@@ -58,12 +58,12 @@ describe("EstablishmentController (e2e)", () => {
         await establishmentRepo.insert(establishmentCreated);
 
         await request(appHelper.app.getHttpServer())
-          .delete(`/establishments/${establishmentCreated.establishment_id.id}`)
+          .delete(`/establishments/${establishmentCreated.id.id}`)
           .authenticate(appHelper.app)
           .expect(204);
 
         const establishmentDeleted = await establishmentRepo.findById(
-          establishmentCreated.establishment_id,
+          establishmentCreated.id,
         );
         expect(establishmentDeleted).toBeNull();
       });

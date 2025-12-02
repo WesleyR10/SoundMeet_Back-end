@@ -91,7 +91,7 @@ describe("EstablishmentController (e2e)", () => {
           await establishmentRepo.insert(establishmentCreated);
           return request(appHelper.app.getHttpServer())
             .patch(
-              `/establishments/${establishmentCreated.establishment_id.id}`,
+              `/establishments/${establishmentCreated.id.id}`,
             )
             .authenticate(appHelper.app)
             .send(send_data)
@@ -129,7 +129,7 @@ describe("EstablishmentController (e2e)", () => {
         await establishmentRepo.insert(establishmentCreated);
 
         const res = await request(appHelper.app.getHttpServer())
-          .patch(`/establishments/${establishmentCreated.establishment_id.id}`)
+          .patch(`/establishments/${establishmentCreated.id.id}`)
           .authenticate(appHelper.app)
           .send(send_data)
           .expect(200);
@@ -138,7 +138,7 @@ describe("EstablishmentController (e2e)", () => {
           res.body.data,
         );
         const establishmentUpdated = await establishmentRepo.findById(
-          establishmentCreated.establishment_id,
+          establishmentCreated.id,
         );
         const presenter = EstablishmentOutputMapper.toOutput(
           establishmentUpdated!,
@@ -146,7 +146,7 @@ describe("EstablishmentController (e2e)", () => {
         const serialized = instanceToPlain(presenter);
         expect(keyInResponse).toStrictEqual(serialized);
         expect(res.body.data).toMatchObject({
-          id: establishmentCreated.establishment_id.id,
+          id: establishmentCreated.id.id,
           ...send_data,
         });
       });

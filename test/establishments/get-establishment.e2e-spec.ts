@@ -61,7 +61,7 @@ describe("EstablishmentController (e2e)", () => {
         await establishmentRepo.insert(establishmentCreated);
 
         const res = await request(appHelper.app.getHttpServer())
-          .get(`/establishments/${establishmentCreated.establishment_id.id}`)
+          .get(`/establishments/${establishmentCreated.id.id}`)
           .authenticate(appHelper.app)
           .expect(200);
 

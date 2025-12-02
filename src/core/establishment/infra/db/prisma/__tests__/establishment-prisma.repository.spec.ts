@@ -114,13 +114,9 @@ describe("EstablishmentPrismaRepository", () => {
 
       expect(prisma.establishment.findMany).toHaveBeenCalledWith();
       expect(result).toHaveLength(2);
-      expect(result[0].id.id).toBe(
-        establishments[0].id.id,
-      );
+      expect(result[0].id.id).toBe(establishments[0].id.id);
       expect(result[0].name).toBe(establishments[0].name);
-      expect(result[1].id.id).toBe(
-        establishments[1].id.id,
-      );
+      expect(result[1].id.id).toBe(establishments[1].id.id);
       expect(result[1].name).toBe(establishments[1].name);
     });
   });

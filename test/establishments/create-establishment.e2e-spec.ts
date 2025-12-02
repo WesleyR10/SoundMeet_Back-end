@@ -1,11 +1,11 @@
 import request from "supertest";
 import { IEstablishmentRepository } from "../../src/core/establishment/domain/establishment.repository";
-import { ESTABLISHMENT_PROVIDERS } from "../../src/nest-modules/establishment-module/establishment.providers";
 import { startApp } from "../../src/nest-modules/shared-module/testing/helpers";
 import { Uuid } from "../../src/core/shared/domain/value-objects/uuid.vo";
-import { EstablishmentController } from "../../src/nest-modules/establishment-module/establishment.controller";
 import { EstablishmentOutputMapper } from "../../src/core/establishment/application/use-cases/common/establishment-output";
 import { instanceToPlain } from "class-transformer";
+import { EstablishmentController } from "src/nest-modules/establishment-module/establishment.controller";
+import { ESTABLISHMENT_PROVIDERS } from "src/nest-modules/establishment-module/establishment.providers";
 
 describe("EstablishmentController (e2e)", () => {
   const appHelper = startApp();
@@ -140,7 +140,7 @@ describe("EstablishmentController (e2e)", () => {
         const serialized = instanceToPlain(presenter);
         expect(keyInResponse).toStrictEqual(serialized);
         expect(res.body.data).toMatchObject({
-          id: establishmentCreated!.establishment_id.id,
+          id: establishmentCreated!.id.id,
           email: send_data.email,
           name: send_data.name,
           description: send_data.description ?? null,
