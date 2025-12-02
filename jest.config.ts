@@ -199,10 +199,27 @@ const config: Config = {
 
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: 'src',
+  roots: ['<rootDir>'],
   testRegex: '.*\\..*spec\\.ts$',
   transform: {
     '^.+\\.(t|j)s$': '@swc/jest',
   },
+  modulePathIgnorePatterns: [
+    '<rootDir>/../dist',
+    '<rootDir>/../node_modules',
+    '<rootDir>/../.trae-server',
+    '<rootDir>/../.cursor-server',
+    '<rootDir>/../.vscode-server',
+    '<rootDir>/../venv_apostas',
+    '/home/wesleyr10/.nvm',
+    '/home/wesleyr10/.npm',
+    '/home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/.nvm',
+    'package.json',
+    '<rootDir>/../FC3-admin-catalogo-de-videos-typescript',
+    '<rootDir>/../Supermarket-WR/FC3-admin-catalogo-de-videos-typescript',
+    '<rootDir>/../test-live-coding/todo-app-axios',
+    '<rootDir>/../test-live-coding/todo-app-block'
+  ],
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   coveragePathIgnorePatterns: [

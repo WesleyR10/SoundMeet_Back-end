@@ -7,15 +7,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-// ========================================
+// =================== =====================
 // DOMÍNIO MUSICIAN
 // ========================================
 
 model Musician {
-  id      String   @id @default(uuid())
+  id               String   @id @default(uuid())
   email            String   @unique
   name             String
   stage_name       String?
@@ -58,8 +57,8 @@ model MusicianProfile {
   socialLinks  Json? // {instagram: "@musician", youtube: "channel"}
   rating       Float    @default(0)
   totalRatings Int      @default(0)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
@@ -72,12 +71,13 @@ model Band {
   description String?
   avatar      String?
   genres      String[]
-  isActive    Boolean  @default(true)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
   members BandMember[]
   events  EventMusician[]
+  tips    Tip[]
 
   @@map("bands")
 }
@@ -112,8 +112,8 @@ model MusicLibrary {
   isFavorite Boolean  @default(false)
   source     String? // "cifra_club", "ultimate_guitar", "custom"
   sourceId   String? // ID da fonte externa
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   musician Musician       @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   requests MusicRequest[]
@@ -133,10 +133,22 @@ model Establishment {
   avatar      String?
   cnpj        String?  @unique
   phone       String?
-  isActive    Boolean  @default(true)
+  
+  // Endereço (Flattened Address Value Object)
+  address_street       String?
+  address_number       String?
+  address_complement   String?
+  address_neighborhood String?
+  address_city         String?
+  address_state        String?
+  address_zip_code     String?
+  address_lat          Float?
+  address_long         Float?
+
+  is_active   Boolean  @default(true)
   isVerified  Boolean  @default(false)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
   // Relacionamentos
   profile   EstablishmentProfile?
@@ -160,8 +172,8 @@ model EstablishmentProfile {
   socialLinks     Json?
   rating          Float    @default(0)
   totalRatings    Int      @default(0)
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 
@@ -181,8 +193,8 @@ model Event {
   currentCapacity Int      @default(0)
   isPublic        Boolean  @default(true)
   coverCharge     Float?   @default(0)
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   establishment Establishment   @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   musicians     EventMusician[]
@@ -203,7 +215,7 @@ model EventMusician {
   status     String    @default("confirmed") // "confirmed", "pending", "cancelled"
   startTime  DateTime?
   endTime    DateTime?
-  created_at  DateTime  @default(now())
+  created_at DateTime  @default(now())
 
   event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
@@ -224,8 +236,8 @@ model Booking {
   fee             Float
   status          String   @default("pending") // "pending", "confirmed", "cancelled", "completed"
   notes           String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   event         Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
@@ -237,70 +249,66 @@ model Booking {
 // DOMÍNIO AUDIENCE
 // ========================================
 
-model User {
-  id        String   @id @default(uuid())
-  email     String?  @unique
-  name      String
-  avatar    String?
-  phone     String?
-  isActive  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+model Audience {
+  id                    String   @id @default(uuid())
+  email                 String   @unique
+  name                  String
+  nickname              String?
+  avatar                String?
+  phone                 String?
+  points                Int      @default(0)
+  monthly_points        Int      @default(0)
+  level                 Int      @default(1)
+  last_points_update    DateTime @default(now())
+  favorite_genres       String[] @default([])
+  favorite_artists      String[] @default([])
+  preferred_languages   String[] @default(["pt-BR"])
+  location              Json? // {latitude, longitude, city, state} para descoberta por proximidade
+  social_links          Json? // Links para redes sociais
+  notification_settings Json? // Configurações de notificação
+  privacy_settings      Json? // Configurações de privacidade
+  discovery_settings    Json? // Configurações de descoberta musical
+  is_active             Boolean  @default(true)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
 
   // Relacionamentos
-  profile      UserProfile?
-  requests     MusicRequest[]
-  votes        RequestVote[]
-  tips         Tip[]
-  attendances  EventAttendee[]
-  points       UserPoints[]
-  badges       UserBadge[]
-  interactions UserInteraction[]
+  requests       MusicRequest[]
+  votes          RequestVote[]
+  tips           Tip[]
+  attendances    EventAttendee[]
+  points_history UserPoints[]
+  badges         UserBadge[]
+  interactions   UserInteraction[]
 
-  @@map("users")
-}
-
-model UserProfile {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  favoriteGenres  String[]
-  favoriteArtists String[]
-  location        Json?
-  preferences     Json? // Preferências de notificação, etc
-  socialLinks     Json?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_profiles")
+  @@map("audiences")
 }
 
 model EventAttendee {
-  id       String    @id @default(uuid())
-  eventId  String
-  userId   String
-  joinedAt DateTime  @default(now())
-  leftAt   DateTime?
-  isActive Boolean   @default(true)
+  id         String    @id @default(uuid())
+  eventId    String
+  audienceId String
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+  is_active  Boolean   @default(true)
 
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, userId])
+  @@unique([eventId, audienceId])
   @@map("event_attendees")
 }
 
 model UserInteraction {
   id         String   @id @default(uuid())
-  userId     String
+  audienceId String
   musicianId String?
   type       String // "scan_qr", "tip", "request", "share", "follow"
   metadata   Json? // Dados adicionais da interação
   points     Int      @default(0)
-  created_at  DateTime @default(now())
+  created_at DateTime @default(now())
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Cascade)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
 
   @@map("user_interactions")
@@ -313,7 +321,7 @@ model UserInteraction {
 model MusicRequest {
   id         String    @id @default(uuid())
   eventId    String
-  userId     String
+  audienceId String
   musicianId String
   libraryId  String?
   songTitle  String
@@ -323,11 +331,11 @@ model MusicRequest {
   priority   Int       @default(0)
   votesCount Int       @default(0)
   playedAt   DateTime?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
   event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audience Audience         @relation(fields: [audienceId], references: [id], onDelete: Cascade)
   musician Musician         @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   library  MusicLibrary?    @relation(fields: [libraryId], references: [id], onDelete: SetNull)
   votes    RequestVote[]
@@ -337,24 +345,24 @@ model MusicRequest {
 }
 
 model RequestVote {
-  id        String   @id @default(uuid())
-  requestId String
-  userId    String
-  voteType  String // "up", "down"
+  id         String   @id @default(uuid())
+  requestId  String
+  audienceId String
+  voteType   String // "up", "down"
   created_at DateTime @default(now())
 
-  request MusicRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request  MusicRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  audience Audience     @relation(fields: [audienceId], references: [id], onDelete: Cascade)
 
-  @@unique([requestId, userId])
+  @@unique([requestId, audienceId])
   @@map("request_votes")
 }
 
 model RequestFeedback {
-  id        String   @id @default(uuid())
-  requestId String   @unique
-  rating    Int // 1-5
-  comment   String?
+  id         String   @id @default(uuid())
+  requestId  String   @unique
+  rating     Int // 1-5
+  comment    String?
   created_at DateTime @default(now())
 
   request MusicRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -368,14 +376,14 @@ model RequestFeedback {
 
 model UserPoints {
   id          String   @id @default(uuid())
-  userId      String
+  audienceId  String
   points      Int
   source      String // "scan_qr", "request", "tip", "share", "accepted_request"
   description String?
   metadata    Json? // Dados adicionais
-  created_at   DateTime @default(now())
+  created_at  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
 
   @@map("user_points")
 }
@@ -389,8 +397,8 @@ model Badge {
   requirement Json // Critérios para conquistar
   points      Int      @default(0)
   rarity      String   @default("common") // "common", "rare", "epic", "legendary"
-  isActive    Boolean  @default(true)
-  created_at   DateTime @default(now())
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
 
   userBadges UserBadge[]
 
@@ -398,24 +406,36 @@ model Badge {
 }
 
 model UserBadge {
-  id       String   @id @default(uuid())
-  userId   String
-  badgeId  String
-  earnedAt DateTime @default(now())
-  progress Json? // Progresso para badges com múltiplos níveis
+  id         String   @id @default(uuid())
+  audienceId String
+  badgeId    String
+  earnedAt   DateTime @default(now())
+  progress   Json? // Progresso para badges com múltiplos níveis
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, badgeId])
+  @@unique([audienceId, badgeId])
   @@map("user_badges")
 }
 
+model UserScore {
+  id           String   @id @default(uuid())
+  user_id      String
+  score_type   String // "qr_scan", "tip_given", "social_share", etc.
+  points       Int      @default(0)
+  reference_id String? // ID da referência (tip, evento, etc.)
+  description  String?
+  created_at   DateTime @default(now())
+
+  @@map("user_scores")
+}
+
 model Ranking {
-  id        String   @id @default(uuid())
-  type      String // "monthly_fans", "top_supporters", "discoverers"
-  period    String // "2024-01", "2024-02"
-  data      Json // Rankings calculados
+  id         String   @id @default(uuid())
+  type       String // "monthly_fans", "top_supporters", "discoverers"
+  period     String // "2024-01", "2024-02"
+  data       Json // Rankings calculados
   created_at DateTime @default(now())
 
   @@unique([type, period])
@@ -428,8 +448,9 @@ model Ranking {
 
 model Tip {
   id            String   @id @default(uuid())
-  userId        String
-  musicianId    String
+  audienceId    String
+  musicianId    String?
+  bandId        String?
   eventId       String?
   amount        Float
   message       String?
@@ -437,14 +458,16 @@ model Tip {
   status        String   @default("pending") // "pending", "completed", "failed", "refunded"
   transactionId String?
   pixKey        String?
+  pixKeyType    String?
   isAnonymous   Boolean  @default(false)
   showInWall    Boolean  @default(true)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  event    Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band     Band?     @relation(fields: [bandId], references: [id], onDelete: SetNull)
+  event    Event?    @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@map("tips")
 }
@@ -453,6 +476,7 @@ model Transaction {
   id            String   @id @default(uuid())
   userId        String?
   musicianId    String?
+  bandId        String?
   type          String // "tip", "booking_fee", "commission"
   amount        Float
   fee           Float    @default(0)
@@ -461,8 +485,8 @@ model Transaction {
   paymentMethod String
   externalId    String? // ID do provedor de pagamento
   metadata      Json?
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   @@map("transactions")
 }
@@ -474,10 +498,11 @@ model MusicianWallet {
   totalEarned    Float    @default(0)
   totalWithdrawn Float    @default(0)
   pixKey         String?
+  pixKeyType     String?
   bankAccount    Json? // Dados bancários
-  isActive       Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
 
   @@map("musician_wallets")
 }
@@ -499,7 +524,7 @@ model MusicianAnalytics {
   socialShares     Int      @default(0)
   newFollowers     Int      @default(0)
   engagementScore  Float    @default(0)
-  created_at        DateTime @default(now())
+  created_at       DateTime @default(now())
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
@@ -516,7 +541,7 @@ model EstablishmentAnalytics {
   musiciansHired  Int      @default(0)
   totalSpent      Float    @default(0)
   avgRating       Float    @default(0)
-  created_at       DateTime @default(now())
+  created_at      DateTime @default(now())
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 

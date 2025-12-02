@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # Aplicação Principal
@@ -6,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     container_name: soundmeet-app
     ports:
       - "3000:3000"

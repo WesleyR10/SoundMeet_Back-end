@@ -1,34 +1,36 @@
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Instalar dependências do sistema
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copiar arquivos de dependências
-COPY package*.json ./
+COPY package.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
-# Instalar dependências
-RUN npm ci --only=production && npm cache clean --force
+# Instalar dependências (inclui dev para permitir geração do Prisma)
+RUN npm install --no-audit --no-fund
+
+# Variáveis necessárias para leitura do schema durante a geração
+ENV DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
 
 # Gerar Prisma Client
 RUN npx prisma generate
 
 # Estágio de desenvolvimento
 FROM base AS development
-RUN npm ci
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "start:dev"]
 
 # Estágio de build
 FROM base AS build
-RUN npm ci
 COPY . .
 RUN npm run build
 
 # Estágio de produção
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
