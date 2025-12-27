@@ -2,8 +2,7 @@ import { ConfigService } from "@nestjs/config";
 
 export const CONFIG_SCHEMA_TYPE = Symbol("CONFIG_SCHEMA_TYPE");
 
-export type ConfigSchemaType = ConfigService<{
-  // Environment
+export type EnvConfig = {
   NODE_ENV: "development" | "production" | "test";
   PORT: number;
   APP_URL: string;
@@ -85,4 +84,6 @@ export type ConfigSchemaType = ConfigService<{
   MAX_REQUESTS_PER_USER_PER_EVENT: number;
   REQUEST_COOLDOWN_MINUTES: number;
   VOTING_INTERVAL_MINUTES: number;
-}>;
+};
+
+export type ConfigSchemaType = ConfigService<EnvConfig>;
