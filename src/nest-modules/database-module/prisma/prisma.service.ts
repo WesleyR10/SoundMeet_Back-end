@@ -1,66 +1,88 @@
 import {
   Injectable,
-  OnModuleInit,
   OnModuleDestroy,
+  OnModuleInit,
   Logger,
 } from "@nestjs/common";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { ConfigService } from "@nestjs/config";
+import { queryTags } from "@prisma/sqlcommenter-query-tags";
+import { traceContext } from "@prisma/sqlcommenter-trace-context";
 import { ConfigSchemaType } from "../../config-module/config.schema";
 
 @Injectable()
 export class PrismaService
-  extends PrismaClient
+  extends PrismaClient<
+    Prisma.PrismaClientOptions,
+    "query" | "info" | "warn" | "error"
+  >
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor(private configService: ConfigSchemaType) {
     const adapter = new PrismaPg({
-      connectionString: configService.get("DATABASE_URL"),
+      connectionString: configService.get<string>("DATABASE_URL")!,
     });
+
+    const nodeEnv = configService.get<string>("NODE_ENV");
+    const logQueriesFlag =
+      configService.get<boolean>("PRISMA_LOG_QUERIES") ?? false;
+
+    const shouldLogQueries =
+      typeof logQueriesFlag === "boolean"
+        ? logQueriesFlag
+        : nodeEnv === "development";
+
+    const errorFormat: Prisma.ErrorFormat =
+      nodeEnv === "production" ? "minimal" : "pretty";
+
+    const logConfig: Prisma.LogDefinition[] = [
+      {
+        emit: "event",
+        level: "error",
+      },
+      {
+        emit: "event",
+        level: "info",
+      },
+      {
+        emit: "event",
+        level: "warn",
+      },
+    ];
+
+    if (shouldLogQueries) {
+      logConfig.unshift({
+        emit: "event",
+        level: "query",
+      });
+    }
 
     super({
       adapter,
-      log: [
-        {
-          emit: "event",
-          level: "query",
-        },
-        {
-          emit: "event",
-          level: "error",
-        },
-        {
-          emit: "event",
-          level: "info",
-        },
-        {
-          emit: "event",
-          level: "warn",
-        },
-      ],
+      errorFormat,
+      log: logConfig,
+      comments: [queryTags(), traceContext()],
     });
 
-    // Log queries in development
-    if (configService.get("NODE_ENV") === "development") {
-      this.$on("query" as any, (e: any) => {
+    if (shouldLogQueries) {
+      this.$on("query", (e: Prisma.QueryEvent) => {
         this.logger.debug(`Query: ${e.query}`);
         this.logger.debug(`Params: ${e.params}`);
         this.logger.debug(`Duration: ${e.duration}ms`);
       });
     }
 
-    this.$on("error" as any, (e: any) => {
+    this.$on("error", (e: Prisma.LogEvent) => {
       this.logger.error("Prisma Error:", e);
     });
 
-    this.$on("warn" as any, (e: any) => {
+    this.$on("warn", (e: Prisma.LogEvent) => {
       this.logger.warn("Prisma Warning:", e);
     });
 
-    this.$on("info" as any, (e: any) => {
+    this.$on("info", (e: Prisma.LogEvent) => {
       this.logger.log("Prisma Info:", e);
     });
   }
@@ -68,9 +90,9 @@ export class PrismaService
   async onModuleInit() {
     try {
       await this.$connect();
-      this.logger.log("✅ Connected to PostgreSQL database");
+      this.logger.log("Connected to PostgreSQL database");
     } catch (error) {
-      this.logger.error("❌ Failed to connect to PostgreSQL database:", error);
+      this.logger.error("Failed to connect to PostgreSQL database:", error);
       throw error;
     }
   }
@@ -78,18 +100,12 @@ export class PrismaService
   async onModuleDestroy() {
     try {
       await this.$disconnect();
-      this.logger.log("✅ Disconnected from PostgreSQL database");
+      this.logger.log("Disconnected from PostgreSQL database");
     } catch (error) {
-      this.logger.error(
-        "❌ Error disconnecting from PostgreSQL database:",
-        error,
-      );
+      this.logger.error("Error disconnecting from PostgreSQL database:", error);
     }
   }
 
-  /**
-   * Clean database for testing purposes
-   */
   async cleanDatabase() {
     if (this.configService.get("NODE_ENV") !== "test") {
       throw new Error("cleanDatabase can only be used in test environment");
@@ -107,24 +123,18 @@ export class PrismaService
 
     try {
       await this.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
-      this.logger.log("🧹 Database cleaned successfully");
+      this.logger.log("Database cleaned successfully");
     } catch (error) {
-      this.logger.error("❌ Error cleaning database:", error);
+      this.logger.error("Error cleaning database:", error);
       throw error;
     }
   }
 
-  /**
-   * Execute raw SQL with logging
-   */
   async executeRaw(sql: string, ...values: any[]) {
     this.logger.debug(`Executing raw SQL: ${sql}`);
     return this.$executeRawUnsafe(sql, ...values);
   }
 
-  /**
-   * Query raw SQL with logging
-   */
   async queryRaw<T = unknown>(sql: string, ...values: any[]): Promise<T> {
     this.logger.debug(`Querying raw SQL: ${sql}`);
     return this.$queryRawUnsafe(sql, ...values);

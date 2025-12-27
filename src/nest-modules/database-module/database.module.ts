@@ -3,14 +3,12 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { CacheModule } from "@nestjs/cache-manager";
 import { redisStore } from "cache-manager-redis-store";
 import { ConfigService } from "@nestjs/config";
-
 import { PrismaService } from "./prisma/prisma.service";
 import { ConfigSchemaType } from "../config-module/config.schema";
 
 @Global()
 @Module({
   imports: [
-    // MongoDB Connection
     MongooseModule.forRootAsync({
       useFactory: (configService: ConfigSchemaType) => ({
         uri: configService.get("MONGODB_URL"),
@@ -19,8 +17,6 @@ import { ConfigSchemaType } from "../config-module/config.schema";
       }),
       inject: [ConfigService],
     }),
-
-    // Redis Cache
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async (configService: ConfigSchemaType) => {
@@ -32,7 +28,7 @@ import { ConfigSchemaType } from "../config-module/config.schema";
           host: url.hostname,
           port: parseInt(url.port) || 6379,
           password: url.password || undefined,
-          ttl: 300, // 5 minutes default TTL
+          ttl: 300,
         };
       },
       inject: [ConfigService],
