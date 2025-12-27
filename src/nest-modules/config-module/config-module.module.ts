@@ -27,9 +27,7 @@ const CONFIG_RABBITMQ_SCHEMA = {
   RABBITMQ_URL: Joi.string().required(),
   RABBITMQ_EXCHANGE: Joi.string().default("soundmeet.exchange"),
   RABBITMQ_QUEUE_REQUESTS: Joi.string().default("soundmeet.requests"),
-  RABBITMQ_QUEUE_NOTIFICATIONS: Joi.string().default(
-    "soundmeet.notifications",
-  ),
+  RABBITMQ_QUEUE_NOTIFICATIONS: Joi.string().default("soundmeet.notifications"),
   RABBITMQ_QUEUE_PAYMENTS: Joi.string().default("soundmeet.payments"),
   RABBITMQ_QUEUE_GAMIFICATION: Joi.string().default("soundmeet.gamification"),
 };
@@ -90,13 +88,9 @@ const CONFIG_LIMITS_SCHEMA = {
   RATE_LIMIT_TTL: Joi.number().default(60),
   RATE_LIMIT_MAX: Joi.number().default(100),
   MAX_FILE_SIZE: Joi.number().default(10485760),
-  ALLOWED_IMAGE_TYPES: Joi.string().default(
-    "image/jpeg,image/png,image/webp",
-  ),
+  ALLOWED_IMAGE_TYPES: Joi.string().default("image/jpeg,image/png,image/webp"),
   ALLOWED_VIDEO_TYPES: Joi.string().default("video/mp4,video/webm"),
-  ALLOWED_AUDIO_TYPES: Joi.string().default(
-    "audio/mpeg,audio/wav,audio/ogg",
-  ),
+  ALLOWED_AUDIO_TYPES: Joi.string().default("audio/mpeg,audio/wav,audio/ogg"),
   POINTS_SCAN_QR: Joi.number().default(10),
   POINTS_MUSIC_REQUEST: Joi.number().default(25),
   POINTS_REQUEST_ACCEPTED: Joi.number().default(50),
@@ -105,6 +99,10 @@ const CONFIG_LIMITS_SCHEMA = {
   MAX_REQUESTS_PER_USER_PER_EVENT: Joi.number().default(5),
   REQUEST_COOLDOWN_MINUTES: Joi.number().default(2),
   VOTING_INTERVAL_MINUTES: Joi.number().default(3),
+};
+
+const CONFIG_PRISMA_SCHEMA = {
+  PRISMA_LOG_QUERIES: Joi.boolean().default(false),
 };
 
 @Global()
@@ -135,7 +133,11 @@ export class ConfigModuleRoot extends NestConfigModule {
 
     return super.forRoot({
       isGlobal: true,
-      envFilePath: [...providedEnvFiles, ...defaultEnvFiles, ...envsFolderFiles],
+      envFilePath: [
+        ...providedEnvFiles,
+        ...defaultEnvFiles,
+        ...envsFolderFiles,
+      ],
       validationSchema: Joi.object({
         ...CONFIG_ENV_SCHEMA,
         ...CONFIG_DATABASE_CACHE_SCHEMA,
@@ -146,6 +148,7 @@ export class ConfigModuleRoot extends NestConfigModule {
         ...CONFIG_PAYMENT_SCHEMA,
         ...CONFIG_NOTIFICATIONS_SCHEMA,
         ...CONFIG_LIMITS_SCHEMA,
+        ...CONFIG_PRISMA_SCHEMA,
       }),
       ...restOptions,
     });

@@ -84,6 +84,9 @@ export type EnvConfig = {
   MAX_REQUESTS_PER_USER_PER_EVENT: number;
   REQUEST_COOLDOWN_MINUTES: number;
   VOTING_INTERVAL_MINUTES: number;
+
+  // Prisma
+  PRISMA_LOG_QUERIES: boolean;
 };
 
 export type ConfigSchemaType = ConfigService<EnvConfig>;
