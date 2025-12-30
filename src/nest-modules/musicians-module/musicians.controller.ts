@@ -11,6 +11,7 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CreateMusicianDto } from "./dto/create-musician.dto";
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
@@ -25,6 +26,7 @@ import {
 import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-output";
 import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 
+@ApiTags("Musicians")
 @Controller("musicians")
 export class MusiciansController {
   @Inject(CreateMusicianUseCase)
@@ -43,18 +45,34 @@ export class MusiciansController {
   private listUseCase: ListMusiciansUseCase;
 
   @Post()
+  @ApiOperation({
+    summary: "Criar músico",
+    description: "Cria um perfil de músico e gera QR Code permanente.",
+  })
+  @ApiResponse({ status: 201, type: MusicianPresenter })
   async create(@Body() createMusicianDto: CreateMusicianDto) {
     const output = await this.createUseCase.execute(createMusicianDto as any);
     return MusiciansController.serialize(output);
   }
 
   @Get()
+  @ApiOperation({
+    summary: "Listar músicos",
+    description: "Lista músicos com paginação, ordenação e filtros.",
+  })
+  @ApiResponse({ status: 200, type: MusicianCollectionPresenter })
   async findAll(@Query() query: SearchMusiciansDto) {
     const output = await this.listUseCase.execute(query);
     return new MusicianCollectionPresenter(output);
   }
 
   @Get(":id")
+  @ApiOperation({
+    summary: "Buscar músico por ID",
+    description: "Retorna os detalhes do perfil do músico.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {
@@ -63,6 +81,12 @@ export class MusiciansController {
   }
 
   @Patch(":id")
+  @ApiOperation({
+    summary: "Atualizar músico",
+    description: "Atualiza dados do perfil do músico.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
   async update(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() updateMusicianDto: UpdateMusicianDto,
@@ -76,6 +100,12 @@ export class MusiciansController {
 
   @HttpCode(204)
   @Delete(":id")
+  @ApiOperation({
+    summary: "Remover músico",
+    description: "Remove o perfil do músico.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
   async remove(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {
