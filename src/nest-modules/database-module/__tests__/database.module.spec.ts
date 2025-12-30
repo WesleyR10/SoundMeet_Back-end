@@ -143,7 +143,10 @@ describe("DatabaseModule Unit Tests", () => {
       });
 
       const prisma = new PrismaService(configService) as any;
-      expect(prisma.$on).not.toHaveBeenCalledWith("query", expect.any(Function));
+      expect(prisma.$on).not.toHaveBeenCalledWith(
+        "query",
+        expect.any(Function),
+      );
     });
 
     it("should block cleanDatabase outside test environment", async () => {
@@ -167,11 +170,13 @@ describe("DatabaseModule Unit Tests", () => {
       });
 
       const prisma = new PrismaService(configService) as any;
-      prisma.$queryRaw = jest.fn().mockResolvedValue([
-        { tablename: "users" },
-        { tablename: "_prisma_migrations" },
-        { tablename: "musicians" },
-      ]);
+      prisma.$queryRaw = jest
+        .fn()
+        .mockResolvedValue([
+          { tablename: "users" },
+          { tablename: "_prisma_migrations" },
+          { tablename: "musicians" },
+        ]);
       prisma.$executeRawUnsafe = jest.fn().mockResolvedValue(undefined);
 
       await prisma.cleanDatabase();

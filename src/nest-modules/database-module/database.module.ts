@@ -1,5 +1,8 @@
 import { Global, Module } from "@nestjs/common";
-import { MongooseModule, type MongooseModuleFactoryOptions } from "@nestjs/mongoose";
+import {
+  MongooseModule,
+  type MongooseModuleFactoryOptions,
+} from "@nestjs/mongoose";
 import { CacheModule } from "@nestjs/cache-manager";
 import { redisStore } from "cache-manager-redis-store";
 import { ConfigService } from "@nestjs/config";
