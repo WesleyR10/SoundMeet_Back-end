@@ -13,9 +13,10 @@ import { ListRequestsInput } from "./list-requests.input";
 
 export type ListRequestsOutput = PaginationOutput<RequestOutput>;
 
-export class ListRequestsUseCase
-  implements IUseCase<ListRequestsInput, ListRequestsOutput>
-{
+export class ListRequestsUseCase implements IUseCase<
+  ListRequestsInput,
+  ListRequestsOutput
+> {
   constructor(private requestRepo: IRequestRepository) {}
 
   async execute(input: ListRequestsInput): Promise<ListRequestsOutput> {

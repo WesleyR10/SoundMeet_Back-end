@@ -76,14 +76,13 @@ export class AudienceSearchParams extends SearchParams<AudienceFilter> {
 
 export class AudienceSearchResult extends SearchResult<Audience> {}
 
-export interface IAudienceRepository
-  extends ISearchableRepository<
-    Audience,
-    AudienceId,
-    AudienceFilter,
-    AudienceSearchParams,
-    AudienceSearchResult
-  > {
+export interface IAudienceRepository extends ISearchableRepository<
+  Audience,
+  AudienceId,
+  AudienceFilter,
+  AudienceSearchParams,
+  AudienceSearchResult
+> {
   // Métodos específicos do domínio Audience
   findByEmail(email: string): Promise<Audience | null>;
   findActiveAudiences(): Promise<Audience[]>;

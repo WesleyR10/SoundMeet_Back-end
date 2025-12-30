@@ -2,9 +2,9 @@ type Flatten<Type> = Type extends Array<infer Item> ? Item : Type;
 
 type Value<Ok, Error> = Ok | Error;
 
-export class Either<Ok = unknown, ErrorType = Error>
-  implements Iterable<Value<Ok, ErrorType>>
-{
+export class Either<Ok = unknown, ErrorType = Error> implements Iterable<
+  Value<Ok, ErrorType>
+> {
   private _ok: Ok;
   private _error: ErrorType;
 
@@ -116,9 +116,11 @@ export class Either<Ok = unknown, ErrorType = Error>
   }
 }
 
-class EitherIterator<Ok, Error>
-  implements Iterator<Value<Ok, Error>, Value<Ok, Error>, undefined>
-{
+class EitherIterator<Ok, Error> implements Iterator<
+  Value<Ok, Error>,
+  Value<Ok, Error>,
+  undefined
+> {
   private _value: { ok: Ok; error: Error };
   private index = 0;
 

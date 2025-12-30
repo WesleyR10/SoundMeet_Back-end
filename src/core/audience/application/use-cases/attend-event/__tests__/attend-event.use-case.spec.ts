@@ -20,7 +20,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       audience_id: audienceId.id,
       event_id: "event_123",
       establishment_id: "establishment_123",
-      event_date: new Date("2024-12-31T20:00:00Z"),
+      event_date: "2024-12-31T20:00:00Z",
       notes: "Looking forward to this event!",
     };
 
@@ -34,7 +34,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       audience_id: "invalid-id",
       event_id: "event_123",
       establishment_id: "establishment_123",
-      event_date: new Date("2024-12-31T20:00:00Z"),
+      event_date: "2024-12-31T20:00:00Z",
       notes: "Looking forward to this event!",
     };
 
@@ -51,7 +51,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       audience_id: audience.id.id,
       event_id: "event_123",
       establishment_id: "establishment_123",
-      event_date: new Date("2024-12-31T20:00:00Z"),
+      event_date: "2024-12-31T20:00:00Z",
       notes: "Looking forward to this event!",
     };
 
@@ -66,7 +66,7 @@ describe("AttendEventUseCase Unit Tests", () => {
         input: {
           event_id: "event_123",
           establishment_id: "establishment_123",
-          event_date: new Date("2024-12-31T20:00:00Z"),
+          event_date: "2024-12-31T20:00:00Z",
           notes: "Looking forward to this event!",
         },
         expected: {
@@ -77,7 +77,7 @@ describe("AttendEventUseCase Unit Tests", () => {
         input: {
           event_id: "event_456",
           establishment_id: "establishment_456",
-          event_date: new Date("2024-12-25T19:30:00Z"),
+          event_date: "2024-12-25T19:30:00Z",
           notes: "Christmas special event!",
         },
         expected: {
@@ -88,7 +88,7 @@ describe("AttendEventUseCase Unit Tests", () => {
         input: {
           event_id: "event_789",
           establishment_id: "establishment_789",
-          event_date: new Date("2024-11-15T21:00:00Z"),
+          event_date: "2024-11-15T21:00:00Z",
           notes: "Jazz night event",
         },
         expected: {
@@ -130,7 +130,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       audience_id: audience.id.id,
       event_id: "event_123",
       establishment_id: "establishment_123",
-      event_date: new Date("2024-12-31T20:00:00Z"),
+      event_date: "2024-12-31T20:00:00Z",
     };
 
     const output = await useCase.execute(input);
@@ -151,7 +151,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       audience_id: audience.id.id,
       event_id: "event_123",
       establishment_id: "establishment_123",
-      event_date: new Date("2024-12-31T20:00:00Z"),
+      event_date: "2024-12-31T20:00:00Z",
       notes: "Looking forward to this event!",
     };
 
@@ -180,7 +180,7 @@ describe("AttendEventUseCase Unit Tests", () => {
     const audience = Audience.fake().build();
     await repository.insert(audience);
 
-    const pastDate = new Date("2023-01-01T20:00:00Z");
+    const pastDate = "2023-01-01T20:00:00Z";
     const input: AttendEventInput = {
       audience_id: audience.id.id,
       event_id: "event_past",

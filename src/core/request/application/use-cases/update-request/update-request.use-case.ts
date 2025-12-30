@@ -7,9 +7,10 @@ import { IRequestRepository } from "../../../domain/request.repository";
 import { RequestOutput, RequestOutputMapper } from "../common/request-output";
 import { UpdateRequestInput } from "./update-request.input";
 
-export class UpdateRequestUseCase
-  implements IUseCase<UpdateRequestInput, UpdateRequestOutput>
-{
+export class UpdateRequestUseCase implements IUseCase<
+  UpdateRequestInput,
+  UpdateRequestOutput
+> {
   constructor(private readonly requestRepo: IRequestRepository) {}
 
   async execute(input: UpdateRequestInput): Promise<RequestOutput> {

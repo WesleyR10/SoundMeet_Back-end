@@ -36,11 +36,12 @@ describe("CompleteProfileUseCase Unit Tests", () => {
         profile_visibility: "public",
         show_activity: true,
         show_favorites: true,
-      },
+      } as any,
       discovery_settings: {
-        discoverable: true,
-        show_location: false,
-        show_preferences: true,
+        discoverable_by_email: true,
+        discoverable_by_phone: true,
+        show_in_suggestions: true,
+        location_based_suggestions: false,
       },
     };
 
@@ -115,11 +116,12 @@ describe("CompleteProfileUseCase Unit Tests", () => {
             profile_visibility: "private",
             show_activity: false,
             show_favorites: true,
-          },
+          } as any,
           discovery_settings: {
-            discoverable: false,
-            show_location: true,
-            show_preferences: false,
+            discoverable_by_email: false,
+            discoverable_by_phone: false,
+            show_in_suggestions: false,
+            location_based_suggestions: true,
           },
         },
         expected: {
@@ -210,11 +212,12 @@ describe("CompleteProfileUseCase Unit Tests", () => {
         profile_visibility: "public",
         show_activity: true,
         show_favorites: true,
-      },
+      } as any,
       discovery_settings: {
-        discoverable: true,
-        show_location: false,
-        show_preferences: true,
+        discoverable_by_email: true,
+        discoverable_by_phone: true,
+        show_in_suggestions: true,
+        location_based_suggestions: false,
       },
     };
 

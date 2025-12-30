@@ -14,4 +14,4 @@ export * from "./use-cases/attend-event/attend-event.use-case";
 export * from "./use-cases/complete-profile/complete-profile.use-case";
 
 // Validations
-export * from "./validations";
+// validations index removed

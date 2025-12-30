@@ -12,9 +12,10 @@ import {
 } from "../common/audience-output";
 import { ListAudiencesInput } from "./list-audiences.input";
 
-export class ListAudiencesUseCase
-  implements IUseCase<ListAudiencesInput, ListAudiencesOutput>
-{
+export class ListAudiencesUseCase implements IUseCase<
+  ListAudiencesInput,
+  ListAudiencesOutput
+> {
   constructor(private readonly audienceRepo: IAudienceRepository) {}
 
   async execute(input: ListAudiencesInput): Promise<ListAudiencesOutput> {
@@ -28,7 +29,7 @@ export class ListAudiencesUseCase
     const { items: _items, ...otherProps } = searchResult;
     const items = _items.map((item) => AudienceOutputMapper.toOutput(item));
 
-    return PaginationOutputMapper.toOutput(items, otherProps);
+    return PaginationOutputMapper.toOutput(items, searchResult);
   }
 }
 

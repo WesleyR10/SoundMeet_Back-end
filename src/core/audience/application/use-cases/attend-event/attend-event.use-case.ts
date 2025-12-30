@@ -9,9 +9,10 @@ import {
 } from "../common/audience-output";
 import { AttendEventInput } from "./attend-event.input";
 
-export class AttendEventUseCase
-  implements IUseCase<AttendEventInput, AudienceOutput>
-{
+export class AttendEventUseCase implements IUseCase<
+  AttendEventInput,
+  AudienceOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: AttendEventInput): Promise<AudienceOutput> {
@@ -27,12 +28,7 @@ export class AttendEventUseCase
     }
 
     // Participar do evento
-    audience.attendEvent(
-      input.event_id,
-      input.establishment_id,
-      new Date(input.event_date),
-      input.notes,
-    );
+    audience.attendEvent(input.event_id);
 
     if (audience.notification.hasErrors()) {
       throw new EntityValidationError(audience.notification.toJSON());

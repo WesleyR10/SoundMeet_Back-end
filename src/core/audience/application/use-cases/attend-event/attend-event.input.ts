@@ -1,7 +1,7 @@
 import {
   IsNotEmpty,
   IsString,
-  IsUuid,
+  IsUUID,
   IsOptional,
   IsDateString,
 } from "class-validator";
@@ -9,17 +9,17 @@ import {
 export class AttendEventInput {
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   audience_id: string;
 
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   event_id: string;
 
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   establishment_id: string;
 
   @IsDateString()

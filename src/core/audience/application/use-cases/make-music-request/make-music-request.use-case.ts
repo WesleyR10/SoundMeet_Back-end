@@ -9,9 +9,10 @@ import {
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Points } from "../../../../shared/domain/value-objects/points.vo";
 
-export class MakeMusicRequestUseCase
-  implements IUseCase<MakeMusicRequestInput, MakeMusicRequestOutput>
-{
+export class MakeMusicRequestUseCase implements IUseCase<
+  MakeMusicRequestInput,
+  MakeMusicRequestOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: MakeMusicRequestInput): Promise<MakeMusicRequestOutput> {

@@ -8,9 +8,10 @@ import {
 } from "../common/audience-output";
 import { GetAudienceInput } from "./get-audience.input";
 
-export class GetAudienceUseCase
-  implements IUseCase<GetAudienceInput, GetAudienceOutput>
-{
+export class GetAudienceUseCase implements IUseCase<
+  GetAudienceInput,
+  GetAudienceOutput
+> {
   constructor(private readonly audienceRepo: IAudienceRepository) {}
 
   async execute(input: GetAudienceInput): Promise<GetAudienceOutput> {

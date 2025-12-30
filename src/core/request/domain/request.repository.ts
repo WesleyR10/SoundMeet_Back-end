@@ -45,14 +45,13 @@ export class RequestSearchParams extends DefaultSearchParams<RequestFilter> {
 
 export class RequestSearchResult extends DefaultSearchResult<Request> {}
 
-export interface IRequestRepository
-  extends ISearchableRepository<
-    Request,
-    RequestId,
-    RequestFilter,
-    RequestSearchParams,
-    RequestSearchResult
-  > {
+export interface IRequestRepository extends ISearchableRepository<
+  Request,
+  RequestId,
+  RequestFilter,
+  RequestSearchParams,
+  RequestSearchResult
+> {
   findByAudienceId(audience_id: string): Promise<Request[]>;
   findByMusicianId(musician_id: string): Promise<Request[]>;
   findPendingRequests(musician_id?: string): Promise<Request[]>;

@@ -9,9 +9,10 @@ import {
 } from "../common/audience-output";
 import { IndicateMusicianInput } from "./indicate-musician.input";
 
-export class IndicateMusicianUseCase
-  implements IUseCase<IndicateMusicianInput, AudienceOutput>
-{
+export class IndicateMusicianUseCase implements IUseCase<
+  IndicateMusicianInput,
+  AudienceOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: IndicateMusicianInput): Promise<AudienceOutput> {
@@ -27,11 +28,7 @@ export class IndicateMusicianUseCase
     }
 
     // Indicar músico
-    audience.indicateMusician(
-      input.musician_id,
-      input.establishment_id,
-      input.message,
-    );
+    audience.indicateMusician(input.musician_id, input.establishment_id);
 
     if (audience.notification.hasErrors()) {
       throw new EntityValidationError(audience.notification.toJSON());

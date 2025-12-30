@@ -1,19 +1,19 @@
-import { IsNotEmpty, IsString, IsUuid, IsOptional } from "class-validator";
+import { IsNotEmpty, IsString, IsUUID, IsOptional } from "class-validator";
 
 export class IndicateMusicianInput {
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   audience_id: string;
 
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   musician_id: string;
 
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   establishment_id: string;
 
   @IsString()

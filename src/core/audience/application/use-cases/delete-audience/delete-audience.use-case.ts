@@ -4,9 +4,10 @@ import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import { DeleteAudienceInput } from "./delete-audience.input";
 
-export class DeleteAudienceUseCase
-  implements IUseCase<DeleteAudienceInput, void>
-{
+export class DeleteAudienceUseCase implements IUseCase<
+  DeleteAudienceInput,
+  void
+> {
   constructor(private readonly audienceRepo: IAudienceRepository) {}
 
   async execute(input: DeleteAudienceInput): Promise<void> {

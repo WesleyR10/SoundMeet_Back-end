@@ -21,8 +21,8 @@ describe("VoteSongUseCase Unit Tests", () => {
     const audienceId = new Uuid();
     const input: VoteSongInput = {
       audience_id: audienceId.id,
-      song_id: "song_123",
       request_id: "request_123",
+      vote: "up",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -33,8 +33,8 @@ describe("VoteSongUseCase Unit Tests", () => {
   it("should throw error when audience_id is not valid", async () => {
     const input: VoteSongInput = {
       audience_id: "invalid-id",
-      song_id: "song_123",
       request_id: "request_123",
+      vote: "down",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -48,8 +48,8 @@ describe("VoteSongUseCase Unit Tests", () => {
 
     const input: VoteSongInput = {
       audience_id: audience.id.id,
-      song_id: "song_123",
       request_id: "request_123",
+      vote: "up",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -61,8 +61,8 @@ describe("VoteSongUseCase Unit Tests", () => {
     const arrange = [
       {
         input: {
-          song_id: "song_123",
           request_id: "request_123",
+          vote: "up",
         },
         expected: {
           points_added: 1,
@@ -70,8 +70,8 @@ describe("VoteSongUseCase Unit Tests", () => {
       },
       {
         input: {
-          song_id: "song_456",
           request_id: "request_456",
+          vote: "down",
         },
         expected: {
           points_added: 1,
@@ -87,7 +87,7 @@ describe("VoteSongUseCase Unit Tests", () => {
       const fullInput: VoteSongInput = {
         audience_id: audience.id.id,
         ...input,
-      };
+      } as VoteSongInput;
 
       const output = await useCase.execute(fullInput);
 
@@ -112,8 +112,8 @@ describe("VoteSongUseCase Unit Tests", () => {
 
     const input: VoteSongInput = {
       audience_id: audience.id.id,
-      song_id: "song_123",
       request_id: "request_123",
+      vote: "up",
     };
 
     const output = await useCase.execute(input);

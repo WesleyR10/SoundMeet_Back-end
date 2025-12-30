@@ -23,6 +23,7 @@ describe("SendTipUseCase Unit Tests", () => {
       id: audienceId.id,
       amount: 10.0,
       musician_id: "musician_123",
+      payment_method: "pix",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -35,6 +36,7 @@ describe("SendTipUseCase Unit Tests", () => {
       id: "invalid-id",
       amount: 10.0,
       musician_id: "musician_123",
+      payment_method: "pix",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -48,6 +50,7 @@ describe("SendTipUseCase Unit Tests", () => {
         input: {
           amount: 5.0,
           musician_id: "musician_123",
+          payment_method: "pix",
         },
         expected: {
           points_earned: 5,
@@ -93,10 +96,10 @@ describe("SendTipUseCase Unit Tests", () => {
       repository.items = [audience];
       const spyUpdate = jest.spyOn(repository, "update");
 
-      const fullInput = {
+      const fullInput: SendTipInput = {
         id: audience.id.id,
         ...input,
-      };
+      } as SendTipInput;
 
       const output = await useCase.execute(fullInput);
 
@@ -122,12 +125,14 @@ describe("SendTipUseCase Unit Tests", () => {
       id: audience.id.id,
       amount: 10.0,
       musician_id: "musician_123",
+      payment_method: "pix",
     };
 
     const input2: SendTipInput = {
       id: audience.id.id,
       amount: 15.0,
       musician_id: "musician_456",
+      payment_method: "pix",
     };
 
     const output1 = await useCase.execute(input1);
@@ -186,6 +191,7 @@ describe("SendTipUseCase Unit Tests", () => {
       amount: 100.0,
       musician_id: "musician_999",
       message: "You deserve this!",
+      payment_method: "pix",
     };
 
     const output = await useCase.execute(input);

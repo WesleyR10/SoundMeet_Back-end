@@ -9,9 +9,10 @@ export type GetMusicianRequestsOutput = {
   pending_count: number;
 };
 
-export class GetMusicianRequestsUseCase
-  implements IUseCase<GetMusicianRequestsInput, GetMusicianRequestsOutput>
-{
+export class GetMusicianRequestsUseCase implements IUseCase<
+  GetMusicianRequestsInput,
+  GetMusicianRequestsOutput
+> {
   constructor(private requestRepo: IRequestRepository) {}
 
   async execute(

@@ -7,9 +7,10 @@ import { DeleteRequestInput } from "./delete-request.input";
 
 export type DeleteRequestOutput = void;
 
-export class DeleteRequestUseCase
-  implements IUseCase<DeleteRequestInput, DeleteRequestOutput>
-{
+export class DeleteRequestUseCase implements IUseCase<
+  DeleteRequestInput,
+  DeleteRequestOutput
+> {
   constructor(private readonly requestRepo: IRequestRepository) {}
 
   async execute(input: DeleteRequestInput): Promise<DeleteRequestOutput> {

@@ -8,9 +8,10 @@ import {
   AudienceOutput,
 } from "../common/audience-output";
 
-export class CreateAudienceUseCase
-  implements IUseCase<CreateAudienceInput, AudienceOutput>
-{
+export class CreateAudienceUseCase implements IUseCase<
+  CreateAudienceInput,
+  AudienceOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: CreateAudienceInput): Promise<AudienceOutput> {

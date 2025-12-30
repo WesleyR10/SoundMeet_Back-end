@@ -1,7 +1,7 @@
 import {
   IsNotEmpty,
   IsString,
-  IsUuid,
+  IsUUID,
   IsOptional,
   IsArray,
   IsObject,
@@ -10,7 +10,7 @@ import {
 export class CompleteProfileInput {
   @IsString()
   @IsNotEmpty()
-  @IsUuid()
+  @IsUUID()
   audience_id: string;
 
   @IsString()

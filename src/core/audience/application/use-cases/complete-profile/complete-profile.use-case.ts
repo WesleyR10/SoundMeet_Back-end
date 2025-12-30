@@ -9,9 +9,10 @@ import {
 } from "../common/audience-output";
 import { CompleteProfileInput } from "./complete-profile.input";
 
-export class CompleteProfileUseCase
-  implements IUseCase<CompleteProfileInput, AudienceOutput>
-{
+export class CompleteProfileUseCase implements IUseCase<
+  CompleteProfileInput,
+  AudienceOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: CompleteProfileInput): Promise<AudienceOutput> {

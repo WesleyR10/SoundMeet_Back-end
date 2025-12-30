@@ -1,7 +1,7 @@
-import { RequestId } from "../../../domain/request.aggregate";
+import { Request, RequestId } from "../../../domain/request.aggregate";
 import { IRequestRepository } from "../../../domain/request.repository";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { NotFoundError } from "../../../../shared/domain/errors";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { RequestOutput, RequestOutputMapper } from "../common/request-output";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import {
@@ -11,9 +11,10 @@ import {
 
 export type RespondToRequestOutput = RequestOutput;
 
-export class RespondToRequestUseCase
-  implements IUseCase<RespondToRequestInput, RespondToRequestOutput>
-{
+export class RespondToRequestUseCase implements IUseCase<
+  RespondToRequestInput,
+  RespondToRequestOutput
+> {
   constructor(private requestRepo: IRequestRepository) {}
 
   async execute(input: RespondToRequestInput): Promise<RespondToRequestOutput> {
@@ -21,7 +22,7 @@ export class RespondToRequestUseCase
     const entity = await this.requestRepo.findById(requestId);
 
     if (!entity) {
-      throw new NotFoundError(input.request_id, "Request");
+      throw new NotFoundError(input.request_id, Request);
     }
 
     // Validar que apenas o músico destinatário pode responder

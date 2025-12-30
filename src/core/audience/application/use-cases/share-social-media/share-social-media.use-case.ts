@@ -9,9 +9,10 @@ import {
 } from "../common/audience-output";
 import { ShareSocialMediaInput } from "./share-social-media.input";
 
-export class ShareSocialMediaUseCase
-  implements IUseCase<ShareSocialMediaInput, AudienceOutput>
-{
+export class ShareSocialMediaUseCase implements IUseCase<
+  ShareSocialMediaInput,
+  AudienceOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: ShareSocialMediaInput): Promise<AudienceOutput> {

@@ -9,9 +9,10 @@ import {
 } from "../common/audience-output";
 import { VoteSongInput } from "./vote-song.input";
 
-export class VoteSongUseCase
-  implements IUseCase<VoteSongInput, AudienceOutput>
-{
+export class VoteSongUseCase implements IUseCase<
+  VoteSongInput,
+  AudienceOutput
+> {
   constructor(private audienceRepository: IAudienceRepository) {}
 
   async execute(input: VoteSongInput): Promise<AudienceOutput> {

@@ -15,8 +15,7 @@ import { ValueObject } from "../../../domain/value-object";
 export abstract class InMemoryRepository<
   E extends Entity,
   EntityId extends ValueObject,
-> implements IRepository<E, EntityId>
-{
+> implements IRepository<E, EntityId> {
   items: E[] = [];
 
   async insert(entity: E): Promise<void> {
@@ -94,10 +93,10 @@ export abstract class InMemoryRepository<
 }
 
 export abstract class InMemorySearchableRepository<
-    E extends Entity,
-    EntityId extends ValueObject,
-    Filter = string,
-  >
+  E extends Entity,
+  EntityId extends ValueObject,
+  Filter = string,
+>
   extends InMemoryRepository<E, EntityId>
   implements ISearchableRepository<E, EntityId, Filter>
 {

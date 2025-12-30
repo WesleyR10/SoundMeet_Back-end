@@ -9,9 +9,10 @@ import {
 } from "../common/audience-output";
 import { UpdateAudienceInput } from "./update-audience.input";
 
-export class UpdateAudienceUseCase
-  implements IUseCase<UpdateAudienceInput, UpdateAudienceOutput>
-{
+export class UpdateAudienceUseCase implements IUseCase<
+  UpdateAudienceInput,
+  UpdateAudienceOutput
+> {
   constructor(private readonly audienceRepo: IAudienceRepository) {}
 
   async execute(input: UpdateAudienceInput): Promise<UpdateAudienceOutput> {
@@ -42,8 +43,8 @@ export class UpdateAudienceUseCase
       audience.updateFavoriteGenres(input.favorite_genres);
     }
 
-    if (input.favorite_artists !== undefined) {
-      audience.updateFavoriteArtists(input.favorite_artists);
+    if ((input as any).favorite_artists !== undefined) {
+      audience.updateFavoriteArtists((input as any).favorite_artists);
     }
 
     if (input.favorite_instruments !== undefined) {

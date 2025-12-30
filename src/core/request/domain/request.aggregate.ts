@@ -65,7 +65,7 @@ export class Request extends AggregateRoot {
     this.responded_at = props.responded_at ?? null;
   }
 
-  get entity_id(): ValueObject {
+  get entity_id(): RequestId {
     return this.id;
   }
 
@@ -79,15 +79,17 @@ export class Request extends AggregateRoot {
     });
 
     request.validate();
-    request.applyEvent(new RequestCreatedEvent({
-      request_id: request.id,
-      audience_id: request.audience_id.id,
-      musician_id: request.musician_id.id,
-      song_title: request.song_title.value,
-      artist: request.artist,
-      message: request.message?.value || null,
-      created_at: request.created_at,
-    }));
+    request.applyEvent(
+      new RequestCreatedEvent({
+        request_id: request.id,
+        audience_id: request.audience_id.id,
+        musician_id: request.musician_id.id,
+        song_title: request.song_title.value,
+        artist: request.artist,
+        message: request.message?.value || null,
+        created_at: request.created_at,
+      }),
+    );
     return request;
   }
 
@@ -135,13 +137,15 @@ export class Request extends AggregateRoot {
   }
 
   private dispatchUpdateEvent(): void {
-    this.applyEvent(new RequestUpdatedEvent({
-      request_id: this.id,
-      song_title: this.song_title.value,
-      artist: this.artist,
-      message: this.message?.value || null,
-      updated_at: new Date()
-    }));
+    this.applyEvent(
+      new RequestUpdatedEvent({
+        request_id: this.id,
+        song_title: this.song_title.value,
+        artist: this.artist,
+        message: this.message?.value || null,
+        updated_at: new Date(),
+      }),
+    );
   }
 
   changeSongTitle(song_title: string): void {

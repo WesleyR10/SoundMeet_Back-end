@@ -33,13 +33,13 @@ describe("DeleteRequestUseCase Unit Tests", () => {
     const input = new DeleteRequestInput({ id: request.id.id });
 
     // Verify request exists before deletion
-    const foundRequest = await repository.findById(request.request_id);
+    const foundRequest = await repository.findById(request.id);
     expect(foundRequest).toBeDefined();
 
     await useCase.execute(input);
 
     // Verify request was deleted
-    const deletedRequest = await repository.findById(request.request_id);
+    const deletedRequest = await repository.findById(request.id);
     expect(deletedRequest).toBeNull();
   });
 

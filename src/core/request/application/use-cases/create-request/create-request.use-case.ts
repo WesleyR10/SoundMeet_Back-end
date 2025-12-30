@@ -7,9 +7,10 @@ import { CreateRequestInput } from "./create-request.input";
 
 export type CreateRequestOutput = RequestOutput;
 
-export class CreateRequestUseCase
-  implements IUseCase<CreateRequestInput, CreateRequestOutput>
-{
+export class CreateRequestUseCase implements IUseCase<
+  CreateRequestInput,
+  CreateRequestOutput
+> {
   constructor(private requestRepo: IRequestRepository) {}
 
   async execute(input: CreateRequestInput): Promise<CreateRequestOutput> {
