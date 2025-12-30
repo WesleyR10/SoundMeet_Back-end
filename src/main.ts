@@ -12,8 +12,8 @@ async function bootstrap() {
       "http://localhost:3000",
       "http://localhost:3001",
       "http://localhost:8080",
-      process.env.FRONTEND_URL,
-    ].filter(Boolean),
+      process.env.FRONTEND_URL as string,
+    ].filter((v): v is string => Boolean(v)),
     credentials: true,
   });
 
@@ -50,6 +50,7 @@ async function bootstrap() {
     )
     .addTag("Auth", "Autenticação e autorização")
     .addTag("Musicians", "Gestão de músicos")
+    .addTag("Bands", "Gestão de bandas")
     .addTag("Establishments", "Gestão de estabelecimentos")
     .addTag("Audience", "Gestão do público")
     .addTag("Requests", "Pedidos musicais")
