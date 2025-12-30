@@ -4,8 +4,14 @@ import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
+import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
+import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
+import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
+import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { IBandRepository } from "../../core/musician/domain/band.repository";
 
 export const REPOSITORIES = {
   MUSICIAN_REPOSITORY: {
@@ -16,6 +22,17 @@ export const REPOSITORIES = {
     provide: MusicianPrismaRepository,
     useFactory: (prismaService: PrismaService) => {
       return new MusicianPrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  BAND_REPOSITORY: {
+    provide: "BandRepository",
+    useExisting: BandPrismaRepository,
+  },
+  BAND_PRISMA_REPOSITORY: {
+    provide: BandPrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new BandPrismaRepository(prismaService);
     },
     inject: [PrismaService],
   },
@@ -56,6 +73,40 @@ export const USE_CASES = {
       return new DeleteMusicianUseCase(musicianRepo);
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+  CREATE_BAND_USE_CASE: {
+    provide: CreateBandUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new CreateBandUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  GET_BAND_USE_CASE: {
+    provide: GetBandUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new GetBandUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  ADD_BAND_MEMBER_USE_CASE: {
+    provide: AddBandMemberUseCase,
+    useFactory: (
+      bandRepo: IBandRepository,
+      musicianRepo: IMusicianRepository,
+    ) => {
+      return new AddBandMemberUseCase(bandRepo, musicianRepo);
+    },
+    inject: [
+      REPOSITORIES.BAND_REPOSITORY.provide,
+      REPOSITORIES.MUSICIAN_REPOSITORY.provide,
+    ],
+  },
+  REMOVE_BAND_MEMBER_USE_CASE: {
+    provide: RemoveBandMemberUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new RemoveBandMemberUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
   },
 };
 
