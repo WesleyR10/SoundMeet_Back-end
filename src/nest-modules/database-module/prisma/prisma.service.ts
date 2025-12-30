@@ -8,7 +8,8 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { queryTags } from "@prisma/sqlcommenter-query-tags";
 import { traceContext } from "@prisma/sqlcommenter-trace-context";
-import { ConfigSchemaType } from "../../config-module/config.schema";
+import { ConfigService } from "@nestjs/config";
+import { EnvConfig } from "../../config-module/config.schema";
 
 @Injectable()
 export class PrismaService
@@ -20,7 +21,7 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor(private configService: ConfigSchemaType) {
+  constructor(private readonly configService: ConfigService<EnvConfig>) {
     const adapter = new PrismaPg({
       connectionString: configService.get<string>("DATABASE_URL")!,
     });
