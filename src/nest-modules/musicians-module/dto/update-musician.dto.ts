@@ -3,7 +3,7 @@ import { UpdateMusicianInput } from "../../../core/musician/application/use-case
 
 export class UpdateMusicianInputWithoutId extends OmitType(
   UpdateMusicianInput,
-  ["id"] as const
+  ["id"] as const,
 ) {}
 
 export class UpdateMusicianDto extends UpdateMusicianInputWithoutId {}
