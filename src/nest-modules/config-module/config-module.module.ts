@@ -9,7 +9,7 @@ import { CONFIG_SCHEMA_TYPE } from "./config.schema";
 
 export type ConfigSchemaType = typeof CONFIG_SCHEMA_TYPE;
 
-const CONFIG_ENV_SCHEMA = {
+export const CONFIG_ENV_SCHEMA = {
   NODE_ENV: Joi.string()
     .valid("development", "production", "test")
     .default("development"),
@@ -17,13 +17,13 @@ const CONFIG_ENV_SCHEMA = {
   APP_URL: Joi.string().default("https://soundmeet.app"),
 };
 
-const CONFIG_DATABASE_CACHE_SCHEMA = {
+export const CONFIG_DATABASE_CACHE_SCHEMA = {
   DATABASE_URL: Joi.string().required(),
   MONGODB_URL: Joi.string().required(),
   REDIS_URL: Joi.string().required(),
 };
 
-const CONFIG_RABBITMQ_SCHEMA = {
+export const CONFIG_RABBITMQ_SCHEMA = {
   RABBITMQ_URL: Joi.string().required(),
   RABBITMQ_EXCHANGE: Joi.string().default("soundmeet.exchange"),
   RABBITMQ_QUEUE_REQUESTS: Joi.string().default("soundmeet.requests"),
@@ -32,7 +32,7 @@ const CONFIG_RABBITMQ_SCHEMA = {
   RABBITMQ_QUEUE_GAMIFICATION: Joi.string().default("soundmeet.gamification"),
 };
 
-const CONFIG_AUTH_SCHEMA = {
+export const CONFIG_AUTH_SCHEMA = {
   KEYCLOAK_URL: Joi.string().required(),
   KEYCLOAK_REALM: Joi.string().default("soundmeet"),
   KEYCLOAK_CLIENT_ID: Joi.string().required(),
@@ -43,7 +43,7 @@ const CONFIG_AUTH_SCHEMA = {
   JWT_REFRESH_EXPIRES_IN: Joi.string().default("7d"),
 };
 
-const CONFIG_STORAGE_SCHEMA = {
+export const CONFIG_STORAGE_SCHEMA = {
   AWS_REGION: Joi.string().default("us-east-1"),
   AWS_ACCESS_KEY_ID: Joi.string().when("NODE_ENV", {
     is: "production",
@@ -64,27 +64,27 @@ const CONFIG_STORAGE_SCHEMA = {
   MINIO_BUCKET: Joi.string().default("soundmeet-media"),
 };
 
-const CONFIG_EXTERNAL_APIS_SCHEMA = {
+export const CONFIG_EXTERNAL_APIS_SCHEMA = {
   CIFRA_CLUB_API_KEY: Joi.string().optional(),
   ULTIMATE_GUITAR_API_KEY: Joi.string().optional(),
   SPOTIFY_CLIENT_ID: Joi.string().optional(),
   SPOTIFY_CLIENT_SECRET: Joi.string().optional(),
 };
 
-const CONFIG_PAYMENT_SCHEMA = {
+export const CONFIG_PAYMENT_SCHEMA = {
   PIX_PROVIDER_URL: Joi.string().optional(),
   PIX_PROVIDER_TOKEN: Joi.string().optional(),
   PIX_WEBHOOK_SECRET: Joi.string().optional(),
 };
 
-const CONFIG_NOTIFICATIONS_SCHEMA = {
+export const CONFIG_NOTIFICATIONS_SCHEMA = {
   FIREBASE_PROJECT_ID: Joi.string().optional(),
   FIREBASE_PRIVATE_KEY: Joi.string().optional(),
   FIREBASE_CLIENT_EMAIL: Joi.string().optional(),
   FIREBASE_SERVICE_ACCOUNT_KEY: Joi.string().optional(),
 };
 
-const CONFIG_LIMITS_SCHEMA = {
+export const CONFIG_LIMITS_SCHEMA = {
   RATE_LIMIT_TTL: Joi.number().default(60),
   RATE_LIMIT_MAX: Joi.number().default(100),
   MAX_FILE_SIZE: Joi.number().default(10485760),
@@ -101,7 +101,7 @@ const CONFIG_LIMITS_SCHEMA = {
   VOTING_INTERVAL_MINUTES: Joi.number().default(3),
 };
 
-const CONFIG_PRISMA_SCHEMA = {
+export const CONFIG_PRISMA_SCHEMA = {
   PRISMA_LOG_QUERIES: Joi.boolean().default(false),
 };
 
