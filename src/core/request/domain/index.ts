@@ -8,8 +8,8 @@ export * from "./request.repository";
 export * from "./request.validator";
 
 // Value Objects
-export * from "./value-objects/request-status.vo";
 export * from "./value-objects/request-message.vo";
+export * from "./value-objects/request-status.vo";
 export * from "./value-objects/song-title.vo";
 
 // Events

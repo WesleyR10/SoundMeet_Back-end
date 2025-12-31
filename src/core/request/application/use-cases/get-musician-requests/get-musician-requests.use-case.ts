@@ -1,6 +1,6 @@
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { IRequestRepository } from "../../../domain/request.repository";
 import { RequestOutput, RequestOutputMapper } from "../common/request-output";
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { GetMusicianRequestsInput } from "./get-musician-requests.input";
 
 export type GetMusicianRequestsOutput = {

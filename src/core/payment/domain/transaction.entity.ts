@@ -1,13 +1,11 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Money } from "../../shared/domain/value-objects/money.vo";
-import { PaymentMethod } from "./tip-enums";
-import { TransactionType, TransactionStatus } from "./transaction-enums";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
-import { TransactionValidatorFactory } from "./validators/transaction.validator";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { TransactionCreatedEvent } from "./events/transaction-created.event";
+import { PaymentMethod } from "./tip-enums";
+import { TransactionStatus, TransactionType } from "./transaction-enums";
 import { TransactionFakeBuilder } from "./transaction-fake.builder";
-
+import { TransactionValidatorFactory } from "./validators/transaction.validator";
 
 export type TransactionConstructorProps = {
   transaction_id?: Uuid;

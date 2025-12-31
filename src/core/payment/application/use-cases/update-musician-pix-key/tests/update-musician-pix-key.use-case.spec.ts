@@ -1,6 +1,10 @@
-import { MusicianWallet, MusicianWalletInMemoryRepository } from "@core/payment";
-import { UpdateMusicianPixKeyUseCase } from "../update-musician-pix-key.use-case";
+import {
+  MusicianWallet,
+  MusicianWalletInMemoryRepository,
+} from "@core/payment";
 import { Money, Uuid } from "@core/shared/domain/value-objects";
+
+import { UpdateMusicianPixKeyUseCase } from "../update-musician-pix-key.use-case";
 
 describe("UpdateMusicianPixKeyUseCase Unit Tests", () => {
   let useCase: UpdateMusicianPixKeyUseCase;
@@ -47,7 +51,7 @@ describe("UpdateMusicianPixKeyUseCase Unit Tests", () => {
 
     expect(output.musician_id).toBe(musicianId.id);
     expect(output.pix_key).toBe(pixKey);
-    
+
     const createdWallet = await repository.findByMusicianId(musicianId.id);
     expect(createdWallet).toBeDefined();
     expect(createdWallet?.pix_key?.key).toBe(pixKey);

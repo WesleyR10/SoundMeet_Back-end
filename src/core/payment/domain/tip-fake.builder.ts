@@ -1,8 +1,9 @@
 import { Chance } from "chance";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+
 import { Money } from "../../shared/domain/value-objects/money.vo";
-import { PixKey, PixKeyType } from "./value-objects/pix-key.vo";
-import { Tip, TipStatus, PaymentMethod } from "./tip.entity";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+import { PaymentMethod, Tip, TipStatus } from "./tip.entity";
+import { PixKey } from "./value-objects/pix-key.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
@@ -116,9 +117,13 @@ export class TipFakeBuilder<TBuild = any> {
         audience_id: this.callFactory(this._audience_id, index) ?? new Uuid(),
         musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
         event_id: this.callFactory(this._event_id, index) ?? null,
-        amount: this.callFactory(this._amount, index) ?? new Money(this.chance.floating({ min: 1, max: 100 })),
-        message: this.callFactory(this._message, index) ?? this.chance.sentence(),
-        payment_method: this.callFactory(this._payment_method, index) ?? PaymentMethod.PIX,
+        amount:
+          this.callFactory(this._amount, index) ??
+          new Money(this.chance.floating({ min: 1, max: 100 })),
+        message:
+          this.callFactory(this._message, index) ?? this.chance.sentence(),
+        payment_method:
+          this.callFactory(this._payment_method, index) ?? PaymentMethod.PIX,
         status: this.callFactory(this._status, index) ?? TipStatus.PENDING,
         transaction_id: this.callFactory(this._transaction_id, index) ?? null,
         pix_key: this.callFactory(this._pix_key, index) ?? null,
@@ -192,7 +197,9 @@ export class TipFakeBuilder<TBuild = any> {
     const optional = ["tip_id", "created_at", "updated_at"];
     const privateProp = `_${prop}` as keyof this;
     if (!this[privateProp] && optional.includes(prop)) {
-      throw new Error(`Property ${prop} not have a factory, use 'with' methods`);
+      throw new Error(
+        `Property ${prop} not have a factory, use 'with' methods`,
+      );
     }
     return this.callFactory(this[privateProp], 0);
   }

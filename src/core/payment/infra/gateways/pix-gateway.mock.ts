@@ -1,4 +1,8 @@
-import { IPixGateway, PixPaymentRequest, PixPaymentResponse } from "./pix-gateway.interface";
+import {
+  IPixGateway,
+  PixPaymentRequest,
+  PixPaymentResponse,
+} from "./pix-gateway.interface";
 
 export class PixGatewayMock implements IPixGateway {
   async generatePayment(input: PixPaymentRequest): Promise<PixPaymentResponse> {

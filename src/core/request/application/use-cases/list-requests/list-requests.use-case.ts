@@ -1,14 +1,14 @@
 import {
+  PaginationOutput,
+  PaginationOutputMapper,
+} from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
+import {
   IRequestRepository,
   RequestFilter,
   RequestSearchParams,
 } from "../../../domain/request.repository";
-import {
-  PaginationOutput,
-  PaginationOutputMapper,
-} from "../../../../shared/application/pagination-output";
 import { RequestOutput, RequestOutputMapper } from "../common/request-output";
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { ListRequestsInput } from "./list-requests.input";
 
 export type ListRequestsOutput = PaginationOutput<RequestOutput>;

@@ -1,10 +1,10 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { Money } from "../../shared/domain/value-objects/money.vo";
-import { PixKey } from "./value-objects/pix-key.vo";
-import { MusicianWalletValidatorFactory } from "./validators/musician-wallet.validator";
 import { EntityValidationError } from "../../shared/domain/validators/validation.error";
+import { Money } from "../../shared/domain/value-objects/money.vo";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { MusicianWalletFakeBuilder } from "./musician-wallet-fake.builder";
+import { MusicianWalletValidatorFactory } from "./validators/musician-wallet.validator";
+import { PixKey } from "./value-objects/pix-key.vo";
 
 export type MusicianWalletConstructorProps = {
   wallet_id?: Uuid;
@@ -99,9 +99,7 @@ export class MusicianWallet extends AggregateRoot {
     }
     const amountMoney = new Money(amount);
     if (this.balance.isLessThan(amountMoney)) {
-      throw new EntityValidationError([
-        { balance: ["Insufficient funds"] },
-      ]);
+      throw new EntityValidationError([{ balance: ["Insufficient funds"] }]);
     }
     this.balance = this.balance.subtract(amountMoney);
     this.total_withdrawn = this.total_withdrawn.add(amountMoney);

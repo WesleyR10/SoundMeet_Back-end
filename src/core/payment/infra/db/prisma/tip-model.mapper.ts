@@ -1,9 +1,10 @@
-import { Tip } from "../../../domain/tip.entity";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
-import { Money } from "../../../../shared/domain/value-objects/money.vo";
-import { PixKey } from "../../../domain/value-objects/pix-key.vo";
-import { PaymentMethod, TipStatus } from "../../../domain/tip-enums";
 import { Tip as PrismaTip } from "@prisma/client";
+
+import { Money } from "../../../../shared/domain/value-objects/money.vo";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { Tip } from "../../../domain/tip.entity";
+import { PaymentMethod, TipStatus } from "../../../domain/tip-enums";
+import { PixKey } from "../../../domain/value-objects/pix-key.vo";
 
 export type TipModelProps = {
   id: string;
@@ -49,7 +50,7 @@ export class TipModelMapper {
     // No caso do musicianId e outros relacionamentos opcionais, o Prisma espera que sejam undefined se não existirem na criação
     // ou que a tipagem do mapper corresponda exatamente aos tipos gerados
     // No caso específico do erro relatado, o Prisma pode estar esperando um tipo específico
-    
+
     // Uma abordagem mais segura é retornar exatamente o que o Prisma espera
     // Se musicianId for null, passamos null explicitamente, mas garantimos que a tipagem esteja correta
     return model;

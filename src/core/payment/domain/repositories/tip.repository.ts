@@ -1,8 +1,8 @@
 import { ISearchableRepository } from "../../../shared/domain/repository/repository-interface";
 import { SearchParams } from "../../../shared/domain/repository/search-params";
 import { SearchResult } from "../../../shared/domain/repository/search-result";
-import { Tip } from "../tip.entity";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
+import { Tip } from "../tip.entity";
 
 export type TipFilter = {
   musician_id?: string;
@@ -26,14 +26,13 @@ export class TipSearchParams extends SearchParams<TipFilter> {
 
 export class TipSearchResult extends SearchResult<Tip> {}
 
-export interface ITipRepository
-  extends ISearchableRepository<
-    Tip,
-    Uuid,
-    TipFilter,
-    TipSearchParams,
-    TipSearchResult
-  > {
+export interface ITipRepository extends ISearchableRepository<
+  Tip,
+  Uuid,
+  TipFilter,
+  TipSearchParams,
+  TipSearchResult
+> {
   findById(id: Uuid): Promise<Tip | null>;
   findByMusicianId(musicianId: string): Promise<Tip[]>;
 }

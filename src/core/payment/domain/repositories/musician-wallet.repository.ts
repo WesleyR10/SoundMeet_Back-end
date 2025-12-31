@@ -1,8 +1,8 @@
 import { ISearchableRepository } from "../../../shared/domain/repository/repository-interface";
 import { SearchParams } from "../../../shared/domain/repository/search-params";
 import { SearchResult } from "../../../shared/domain/repository/search-result";
-import { MusicianWallet } from "../musician-wallet.entity";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
+import { MusicianWallet } from "../musician-wallet.entity";
 
 export type MusicianWalletFilter = {
   musician_id?: string;
@@ -13,13 +13,12 @@ export class MusicianWalletSearchParams extends SearchParams<MusicianWalletFilte
 
 export class MusicianWalletSearchResult extends SearchResult<MusicianWallet> {}
 
-export interface IMusicianWalletRepository
-  extends ISearchableRepository<
-    MusicianWallet,
-    Uuid,
-    MusicianWalletFilter,
-    MusicianWalletSearchParams,
-    MusicianWalletSearchResult
-  > {
+export interface IMusicianWalletRepository extends ISearchableRepository<
+  MusicianWallet,
+  Uuid,
+  MusicianWalletFilter,
+  MusicianWalletSearchParams,
+  MusicianWalletSearchResult
+> {
   findByMusicianId(musicianId: string): Promise<MusicianWallet | null>;
 }

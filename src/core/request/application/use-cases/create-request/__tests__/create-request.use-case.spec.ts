@@ -1,11 +1,11 @@
-import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
-import { CreateRequestUseCase } from "../create-request.use-case";
-import { CreateRequestInput } from "../create-request.input";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
-import { Request, RequestId } from "../../../../domain/request.aggregate";
-import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request, RequestId } from "../../../../domain/request.aggregate";
+import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
+import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
+import { CreateRequestInput } from "../create-request.input";
+import { CreateRequestUseCase } from "../create-request.use-case";
 
 describe("CreateRequestUseCase Unit Tests", () => {
   let useCase: CreateRequestUseCase;

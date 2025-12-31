@@ -1,9 +1,7 @@
-import { Request } from "../../../../domain/request.aggregate";
-import { RequestInMemoryRepository } from "../request-in-memory.repository";
-import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
-import { SongTitle } from "../../../../domain/value-objects/song-title.vo";
-import { RequestMessage } from "../../../../domain/value-objects/request-message.vo";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request } from "../../../../domain/request.aggregate";
+import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
+import { RequestInMemoryRepository } from "../request-in-memory.repository";
 
 describe("RequestInMemoryRepository", () => {
   let repository: RequestInMemoryRepository;

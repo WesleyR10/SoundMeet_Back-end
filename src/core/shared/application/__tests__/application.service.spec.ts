@@ -1,10 +1,10 @@
+import { AggregateRoot } from "@core/shared/domain/aggregate-root";
+import { DomainEventMediator } from "@core/shared/domain/events/domain-event-mediator";
+import { IUnitOfWork } from "@core/shared/domain/repository/unit-of-work.interface";
+import { ValueObject } from "@core/shared/domain/value-object";
+import { UnitOfWorkFakeInMemory } from "@core/shared/infra/db/in-memory/fake-unit-of-work-in-memory";
 import EventEmitter2 from "eventemitter2";
 
-import { ValueObject } from "@core/shared/domain/value-object";
-import { AggregateRoot } from "@core/shared/domain/aggregate-root";
-import { IUnitOfWork } from "@core/shared/domain/repository/unit-of-work.interface";
-import { DomainEventMediator } from "@core/shared/domain/events/domain-event-mediator";
-import { UnitOfWorkFakeInMemory } from "@core/shared/infra/db/in-memory/fake-unit-of-work-in-memory";
 import { ApplicationService } from "../application.service";
 
 class StubAggregateRoot extends AggregateRoot {

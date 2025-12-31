@@ -1,10 +1,10 @@
 import {
+  IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
-  IsDateString,
-  IsNumber,
   Min,
   validateSync,
 } from "class-validator";

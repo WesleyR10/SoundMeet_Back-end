@@ -1,12 +1,12 @@
-import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
-import { DeleteRequestUseCase } from "../delete-request.use-case";
-import { DeleteRequestInput } from "../delete-request.input";
-import { Request } from "../../../../domain/request.aggregate";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
-  Uuid,
   InvalidUuidError,
+  Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request } from "../../../../domain/request.aggregate";
+import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
+import { DeleteRequestInput } from "../delete-request.input";
+import { DeleteRequestUseCase } from "../delete-request.use-case";
 
 describe("DeleteRequestUseCase Unit Tests", () => {
   let useCase: DeleteRequestUseCase;

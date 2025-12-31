@@ -1,15 +1,16 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { Transaction } from "../../../domain/transaction.entity";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import {
   ITransactionRepository,
   TransactionFilter,
   TransactionSearchParams,
   TransactionSearchResult,
 } from "../../../domain/repositories/transaction.repository";
+import { Transaction } from "../../../domain/transaction.entity";
 import { TransactionModelMapper } from "./transaction-model.mapper";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 
 export class TransactionPrismaRepository implements ITransactionRepository {
   sortableFields: string[] = ["created_at", "amount", "status", "type"];
@@ -106,7 +107,9 @@ export class TransactionPrismaRepository implements ITransactionRepository {
     };
   }
 
-  async search(props: TransactionSearchParams): Promise<TransactionSearchResult> {
+  async search(
+    props: TransactionSearchParams,
+  ): Promise<TransactionSearchResult> {
     const offset = (props.page - 1) * props.per_page;
     const limit = props.per_page;
 
@@ -122,7 +125,9 @@ export class TransactionPrismaRepository implements ITransactionRepository {
       this.prisma.transaction.count({ where }),
     ]);
 
-    const entities = models.map((model) => TransactionModelMapper.toEntity(model));
+    const entities = models.map((model) =>
+      TransactionModelMapper.toEntity(model),
+    );
 
     return new TransactionSearchResult({
       items: entities,

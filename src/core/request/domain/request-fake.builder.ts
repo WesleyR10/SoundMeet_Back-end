@@ -1,8 +1,9 @@
 import { Chance } from "chance";
+import { v4 as uuidv4 } from "uuid";
+
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Request, RequestId } from "./request.aggregate";
 import { RequestStatus } from "./value-objects/request-status.vo";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { v4 as uuidv4 } from "uuid";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

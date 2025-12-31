@@ -1,4 +1,4 @@
-import { IDomainEvent, Uuid, Money } from "../../../shared/domain";
+import { IDomainEvent, Money, Uuid } from "../../../shared/domain";
 
 export class TipCompletedEvent implements IDomainEvent {
   occurred_on: Date;

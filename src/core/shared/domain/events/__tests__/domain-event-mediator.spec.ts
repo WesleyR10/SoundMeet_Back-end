@@ -1,9 +1,10 @@
 import EventEmitter2 from "eventemitter2";
+
 import { AggregateRoot } from "../../aggregate-root";
 import { ValueObject } from "../../value-object";
 import { Uuid } from "../../value-objects/uuid.vo";
-import { DomainEventMediator } from "../domain-event-mediator";
 import { IDomainEvent, IIntegrationEvent } from "../domain-event.interface";
+import { DomainEventMediator } from "../domain-event-mediator";
 
 class StubEvent implements IDomainEvent {
   occurred_on: Date;

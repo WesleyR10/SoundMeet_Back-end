@@ -1,11 +1,23 @@
 import { Transaction } from "@core/payment";
-import { ITransactionRepository, TransactionSearchParams } from "@core/payment/domain/repositories";
-import { TransactionStatus, TransactionType } from "@core/payment/domain/transaction-enums";
-import { PaginationOutput, PaginationOutputMapper } from "@core/shared/application/pagination-output";
+import {
+  ITransactionRepository,
+  TransactionSearchParams,
+} from "@core/payment/domain/repositories";
+import {
+  TransactionStatus,
+  TransactionType,
+} from "@core/payment/domain/transaction-enums";
+import {
+  PaginationOutput,
+  PaginationOutputMapper,
+} from "@core/shared/application/pagination-output";
 import { SearchInput } from "@core/shared/application/search-input";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 
-export type GetMusicianTransactionsInput = SearchInput<{ status?: string; type?: string }> & {
+export type GetMusicianTransactionsInput = SearchInput<{
+  status?: string;
+  type?: string;
+}> & {
   musician_id: string;
 };
 
@@ -22,12 +34,15 @@ export type TransactionOutput = {
 
 export type GetMusicianTransactionsOutput = PaginationOutput<TransactionOutput>;
 
-export class GetMusicianTransactionsUseCase
-  implements IUseCase<GetMusicianTransactionsInput, GetMusicianTransactionsOutput>
-{
+export class GetMusicianTransactionsUseCase implements IUseCase<
+  GetMusicianTransactionsInput,
+  GetMusicianTransactionsOutput
+> {
   constructor(private readonly txRepo: ITransactionRepository) {}
 
-  async execute(input: GetMusicianTransactionsInput): Promise<GetMusicianTransactionsOutput> {
+  async execute(
+    input: GetMusicianTransactionsInput,
+  ): Promise<GetMusicianTransactionsOutput> {
     const params = new TransactionSearchParams({
       page: input.page,
       per_page: input.per_page,

@@ -1,7 +1,11 @@
 import { Band } from "@core/musician/domain/band.aggregate";
 import { IBandRepository } from "@core/musician/domain/band.repository";
 import { MusicianWallet, PaymentMethod, Tip, Transaction } from "@core/payment";
-import {IMusicianWalletRepository, ITipRepository, ITransactionRepository} from "@core/payment/domain/repositories";
+import {
+  IMusicianWalletRepository,
+  ITipRepository,
+  ITransactionRepository,
+} from "@core/payment/domain/repositories";
 import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { Uuid } from "@core/shared/domain";
@@ -24,9 +28,10 @@ export type ConfirmTipPaymentOutput = {
   wallet_balance: number;
 };
 
-export class ConfirmTipPaymentUseCase
-  implements IUseCase<ConfirmTipPaymentInput, ConfirmTipPaymentOutput>
-{
+export class ConfirmTipPaymentUseCase implements IUseCase<
+  ConfirmTipPaymentInput,
+  ConfirmTipPaymentOutput
+> {
   constructor(
     private readonly tipRepo: ITipRepository,
     private readonly txRepo: ITransactionRepository,
@@ -34,7 +39,9 @@ export class ConfirmTipPaymentUseCase
     private readonly bandRepo: IBandRepository,
   ) {}
 
-  async execute(input: ConfirmTipPaymentInput): Promise<ConfirmTipPaymentOutput> {
+  async execute(
+    input: ConfirmTipPaymentInput,
+  ): Promise<ConfirmTipPaymentOutput> {
     const tip = await this.tipRepo.findById(new Uuid(input.tip_id));
     if (!tip) {
       throw new NotFoundError(input.tip_id, Tip);
@@ -65,24 +72,30 @@ export class ConfirmTipPaymentUseCase
       const activeMembers = band.members;
       if (activeMembers.length > 0) {
         // Split amount among band members
-        // For simplicity, splitting equally for now. 
+        // For simplicity, splitting equally for now.
         // Future: Implement customizable percentages as per requirements
-        const memberShare = Math.floor(transaction.net_amount.amount / activeMembers.length);
+        const memberShare = Math.floor(
+          transaction.net_amount.amount / activeMembers.length,
+        );
         const remainder = transaction.net_amount.amount % activeMembers.length;
 
         for (let i = 0; i < activeMembers.length; i++) {
           const member = activeMembers[i];
           let share = memberShare;
-          
+
           // Add remainder to the first member (usually leader)
           if (i === 0) {
             share += remainder;
           }
 
           if (share > 0) {
-            let memberWallet = await this.walletRepo.findByMusicianId(member.musician_id.id);
+            let memberWallet = await this.walletRepo.findByMusicianId(
+              member.musician_id.id,
+            );
             if (!memberWallet) {
-              memberWallet = MusicianWallet.create({ musician_id: member.musician_id.id });
+              memberWallet = MusicianWallet.create({
+                musician_id: member.musician_id.id,
+              });
               await this.walletRepo.insert(memberWallet);
             }
 
@@ -100,8 +113,8 @@ export class ConfirmTipPaymentUseCase
               metadata: {
                 parent_transaction_id: transaction.transaction_id.id,
                 tip_id: tip.tip_id.id,
-                is_split: true
-              }
+                is_split: true,
+              },
             });
             await this.txRepo.insert(memberTx);
           }
@@ -132,14 +145,14 @@ export class ConfirmTipPaymentUseCase
     // Or maybe just 0 if band split
     let displayedBalance = 0;
     if (tip.musician_id) {
-       const w = await this.walletRepo.findByMusicianId(tip.musician_id.id);
-       displayedBalance = w ? w.balance.amount : 0;
+      const w = await this.walletRepo.findByMusicianId(tip.musician_id.id);
+      displayedBalance = w ? w.balance.amount : 0;
     }
 
     return {
       tip_id: tip.tip_id.id,
       transaction_id: transaction.transaction_id.id,
-      wallet_balance: displayedBalance, 
+      wallet_balance: displayedBalance,
     };
   }
 }

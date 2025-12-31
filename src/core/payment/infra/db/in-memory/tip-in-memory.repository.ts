@@ -1,4 +1,7 @@
 import { Uuid } from "@core/shared/domain";
+
+import { SortDirection } from "../../../../shared/domain/repository/search-params";
+import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import {
   ITipRepository,
   TipFilter,
@@ -6,8 +9,6 @@ import {
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
 import { Tip } from "../../../domain/tip.entity";
-import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
-import { SortDirection } from "../../../../shared/domain/repository/search-params";
 
 export class TipInMemoryRepository
   extends InMemorySearchableRepository<Tip, Uuid, TipFilter>
@@ -31,7 +32,7 @@ export class TipInMemoryRepository
 
   protected async applyFilter(
     items: Tip[],
-    filter: TipFilter | null
+    filter: TipFilter | null,
   ): Promise<Tip[]> {
     if (!filter) {
       return items;
@@ -57,7 +58,7 @@ export class TipInMemoryRepository
   protected applySort(
     items: Tip[],
     sort: string | null,
-    sort_dir: SortDirection | null
+    sort_dir: SortDirection | null,
   ) {
     return sort
       ? super.applySort(items, sort, sort_dir)

@@ -1,5 +1,8 @@
 import { MusicianWallet, PaymentMethod, Transaction } from "@core/payment";
-import { IMusicianWalletRepository, ITransactionRepository } from "@core/payment/domain/repositories";
+import {
+  IMusicianWalletRepository,
+  ITransactionRepository,
+} from "@core/payment/domain/repositories";
 import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { NotFoundError } from "@core/shared/domain/errors";
@@ -16,16 +19,17 @@ export type WithdrawToPixOutput = {
   status: string;
 };
 
-export class WithdrawToPixUseCase
-  implements IUseCase<WithdrawToPixInput, WithdrawToPixOutput>
-{
+export class WithdrawToPixUseCase implements IUseCase<
+  WithdrawToPixInput,
+  WithdrawToPixOutput
+> {
   constructor(
     private readonly walletRepo: IMusicianWalletRepository,
     private readonly txRepo: ITransactionRepository,
   ) {}
 
   async execute(input: WithdrawToPixInput): Promise<WithdrawToPixOutput> {
-    let wallet = await this.walletRepo.findByMusicianId(input.musician_id);
+    const wallet = await this.walletRepo.findByMusicianId(input.musician_id);
     if (!wallet) {
       throw new NotFoundError(input.musician_id, MusicianWallet);
     }

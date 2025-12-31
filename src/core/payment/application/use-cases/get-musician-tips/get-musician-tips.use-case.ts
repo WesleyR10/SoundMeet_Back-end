@@ -1,5 +1,15 @@
-import { ITipRepository, TipOutput, TipOutputMapper, TipSearchParams, TipSearchResult, TipFilter } from "@core/payment";
-import { PaginationOutput, PaginationOutputMapper } from "@core/shared/application/pagination-output";
+import {
+  ITipRepository,
+  TipFilter,
+  TipOutput,
+  TipOutputMapper,
+  TipSearchParams,
+  TipSearchResult,
+} from "@core/payment";
+import {
+  PaginationOutput,
+  PaginationOutputMapper,
+} from "@core/shared/application/pagination-output";
 import { SearchInput } from "@core/shared/application/search-input";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 
@@ -9,9 +19,10 @@ export type GetMusicianTipsInput = SearchInput<TipFilter> & {
 
 export type GetMusicianTipsOutput = PaginationOutput<TipOutput>;
 
-export class GetMusicianTipsUseCase
-  implements IUseCase<GetMusicianTipsInput, GetMusicianTipsOutput>
-{
+export class GetMusicianTipsUseCase implements IUseCase<
+  GetMusicianTipsInput,
+  GetMusicianTipsOutput
+> {
   constructor(private readonly tipRepository: ITipRepository) {}
 
   async execute(input: GetMusicianTipsInput): Promise<GetMusicianTipsOutput> {

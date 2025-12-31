@@ -1,8 +1,9 @@
-import { MusicianWallet } from "../../../domain/musician-wallet.entity";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
-import { Money } from "../../../../shared/domain/value-objects/money.vo";
-import { PixKey } from "../../../domain/value-objects/pix-key.vo";
 import { MusicianWallet as PrismaMusicianWallet } from "@prisma/client";
+
+import { Money } from "../../../../shared/domain/value-objects/money.vo";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { MusicianWallet } from "../../../domain/musician-wallet.entity";
+import { PixKey } from "../../../domain/value-objects/pix-key.vo";
 
 export type MusicianWalletModelProps = {
   id: string;
@@ -42,7 +43,9 @@ export class MusicianWalletModelMapper {
       balance: new Money(model.balance),
       total_earned: new Money(model.totalEarned),
       total_withdrawn: new Money(model.totalWithdrawn),
-      pix_key: model.pixKey ? new PixKey(model.pixKey, (model.pixKeyType as any) || "unknown") : null,
+      pix_key: model.pixKey
+        ? new PixKey(model.pixKey, (model.pixKeyType as any) || "unknown")
+        : null,
       bank_account: model.bankAccount,
       is_active: model.is_active,
       created_at: model.created_at,

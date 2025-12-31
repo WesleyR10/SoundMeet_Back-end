@@ -2,10 +2,10 @@ import { SortDirection } from "../../../../shared/domain/repository/search-param
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Request, RequestId } from "../../../domain/request.aggregate";
 import {
+  IRequestRepository,
   RequestFilter,
   RequestSearchParams,
   RequestSearchResult,
-  IRequestRepository,
 } from "../../../domain/request.repository";
 
 export class RequestInMemoryRepository

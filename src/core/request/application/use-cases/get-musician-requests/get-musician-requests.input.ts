@@ -1,9 +1,9 @@
 import {
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsUUID,
-  IsNumber,
   Min,
   validateSync,
 } from "class-validator";

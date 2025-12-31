@@ -1,12 +1,13 @@
 import {
+  IsIn,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
-  IsIn,
-  IsOptional,
   ValidateIf,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { Request } from "./request.aggregate";

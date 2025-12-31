@@ -1,9 +1,9 @@
+import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Request, RequestId } from "../../../domain/request.aggregate";
 import { IRequestRepository } from "../../../domain/request.repository";
 import { RequestOutput, RequestOutputMapper } from "../common/request-output";
-import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { Request, RequestId } from "../../../domain/request.aggregate";
 import { GetRequestInput } from "./get-request.input";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 
 export type GetRequestOutput = RequestOutput;
 

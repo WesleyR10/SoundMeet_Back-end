@@ -1,10 +1,8 @@
-import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
-import { ListRequestsUseCase } from "../list-requests.use-case";
-import { ListRequestsInput, RequestStatusFilter } from "../list-requests.input";
-import { Request } from "../../../../domain/request.aggregate";
-import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { RequestSearchParams } from "../../../../domain/request.repository";
+import { Request } from "../../../../domain/request.aggregate";
+import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
+import { ListRequestsInput, RequestStatusFilter } from "../list-requests.input";
+import { ListRequestsUseCase } from "../list-requests.use-case";
 
 describe("ListRequestsUseCase Unit Tests", () => {
   let useCase: ListRequestsUseCase;

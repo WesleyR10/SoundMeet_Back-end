@@ -1,9 +1,10 @@
-import { ValueObject } from "../value-object";
 import { EntityValidationError } from "../validators/validation.error";
+import { ValueObject } from "../value-object";
 
 export type AudiencePreferencesProps = {
   favoriteGenres: string[];
   favoriteArtists: string[];
+  favoriteInstruments: string[];
   preferredLanguages: string[];
   location?: LocationSettings | null;
   socialLinks?: SocialLinksSettings | null;
@@ -58,6 +59,7 @@ export type MusicDiscoverySettings = {
 export class AudiencePreferences extends ValueObject {
   readonly favoriteGenres: string[];
   readonly favoriteArtists: string[];
+  readonly favoriteInstruments: string[];
   readonly preferredLanguages: string[];
   readonly location: LocationSettings | null;
   readonly socialLinks: SocialLinksSettings | null;
@@ -114,6 +116,9 @@ export class AudiencePreferences extends ValueObject {
     super();
     this.favoriteGenres = props.favoriteGenres;
     this.favoriteArtists = props.favoriteArtists;
+    this.favoriteInstruments = (props.favoriteInstruments ?? [])
+      .map((i) => i?.trim())
+      .filter((i): i is string => !!i && i.length > 0);
     this.preferredLanguages = props.preferredLanguages;
     this.location = props.location ?? null;
     this.socialLinks = props.socialLinks ?? null;
@@ -127,6 +132,7 @@ export class AudiencePreferences extends ValueObject {
     return new AudiencePreferences({
       favoriteGenres: [],
       favoriteArtists: [],
+      favoriteInstruments: [],
       preferredLanguages: ["pt-BR"],
       location: null,
       socialLinks: null,
@@ -193,6 +199,31 @@ export class AudiencePreferences extends ValueObject {
     return new AudiencePreferences({
       ...this.toJSON(),
       favoriteArtists: [...this.favoriteArtists, normalizedArtist],
+    });
+  }
+
+  addFavoriteInstrument(instrument: string): AudiencePreferences {
+    if (!instrument || instrument.trim().length === 0) {
+      throw new Error("Instrument name cannot be empty");
+    }
+
+    const normalizedInstrument = instrument.trim();
+    if (this.favoriteInstruments.includes(normalizedInstrument)) {
+      return this;
+    }
+
+    return new AudiencePreferences({
+      ...this.toJSON(),
+      favoriteInstruments: [...this.favoriteInstruments, normalizedInstrument],
+    });
+  }
+
+  removeFavoriteInstrument(instrument: string): AudiencePreferences {
+    return new AudiencePreferences({
+      ...this.toJSON(),
+      favoriteInstruments: this.favoriteInstruments.filter(
+        (i) => i !== instrument,
+      ),
     });
   }
 
@@ -311,6 +342,20 @@ export class AudiencePreferences extends ValueObject {
       throw new Error("Artist names cannot be empty");
     }
 
+    if (this.favoriteInstruments.length > 15) {
+      throw new EntityValidationError([
+        { favorite_instruments: ["Maximum of 15 instruments allowed"] },
+      ]);
+    }
+
+    if (
+      this.favoriteInstruments.some(
+        (instrument) => !instrument || instrument.trim().length === 0,
+      )
+    ) {
+      throw new Error("Instrument names cannot be empty");
+    }
+
     // Validate notification settings
     if (!this.notificationSettings) {
       throw new Error("Notification settings are required");
@@ -358,6 +403,7 @@ export class AudiencePreferences extends ValueObject {
     return {
       favoriteGenres: this.favoriteGenres,
       favoriteArtists: this.favoriteArtists,
+      favoriteInstruments: this.favoriteInstruments,
       preferredLanguages: this.preferredLanguages,
       location: this.location,
       socialLinks: this.socialLinks,

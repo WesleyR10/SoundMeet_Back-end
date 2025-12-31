@@ -1,10 +1,10 @@
-import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
-import { UpdateRequestUseCase } from "../update-request.use-case";
-import { UpdateRequestInput } from "../update-request.input";
-import { Request } from "../../../../domain/request.aggregate";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request } from "../../../../domain/request.aggregate";
+import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
+import { UpdateRequestInput } from "../update-request.input";
+import { UpdateRequestUseCase } from "../update-request.use-case";
 
 describe("UpdateRequestUseCase Unit Tests", () => {
   let useCase: UpdateRequestUseCase;

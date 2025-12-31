@@ -1,6 +1,10 @@
 import { IMusicianWalletRepository, MusicianWallet } from "@core/payment";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { MusicianWalletOutput, MusicianWalletOutputMapper } from "../common/musician-wallet-output";
+import {
+  MusicianWalletOutput,
+  MusicianWalletOutputMapper,
+} from "../common/musician-wallet-output";
 
 export type UpdateMusicianPixKeyInput = {
   musician_id: string;
@@ -10,13 +14,18 @@ export type UpdateMusicianPixKeyInput = {
 
 export type UpdateMusicianPixKeyOutput = MusicianWalletOutput;
 
-export class UpdateMusicianPixKeyUseCase
-  implements IUseCase<UpdateMusicianPixKeyInput, UpdateMusicianPixKeyOutput>
-{
+export class UpdateMusicianPixKeyUseCase implements IUseCase<
+  UpdateMusicianPixKeyInput,
+  UpdateMusicianPixKeyOutput
+> {
   constructor(private readonly walletRepository: IMusicianWalletRepository) {}
 
-  async execute(input: UpdateMusicianPixKeyInput): Promise<UpdateMusicianPixKeyOutput> {
-    let wallet = await this.walletRepository.findByMusicianId(input.musician_id);
+  async execute(
+    input: UpdateMusicianPixKeyInput,
+  ): Promise<UpdateMusicianPixKeyOutput> {
+    let wallet = await this.walletRepository.findByMusicianId(
+      input.musician_id,
+    );
 
     if (!wallet) {
       // If wallet doesn't exist, create it (lazy creation pattern)

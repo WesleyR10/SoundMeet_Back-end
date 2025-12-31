@@ -1,12 +1,12 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Money } from "../../shared/domain/value-objects/money.vo";
-import { PixKey } from "./value-objects/pix-key.vo";
-import { TipValidatorFactory } from "./validators/tip.validator";
-import { PaymentMethod, TipStatus } from "./tip-enums";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { TipCompletedEvent } from "./events/tip-completed.event";
 import { TipFailedEvent } from "./events/tip-failed.event";
+import { PaymentMethod, TipStatus } from "./tip-enums";
 import { TipFakeBuilder } from "./tip-fake.builder";
+import { TipValidatorFactory } from "./validators/tip.validator";
+import { PixKey } from "./value-objects/pix-key.vo";
 
 // Re-exporting for convenience, but implementation is now in tip-enums.ts
 export { PaymentMethod, TipStatus };
@@ -126,7 +126,7 @@ export class Tip extends AggregateRoot {
         this.amount,
         this.musician_id,
         this.audience_id,
-        this.band_id
+        this.band_id,
       ),
     );
   }
@@ -135,7 +135,15 @@ export class Tip extends AggregateRoot {
     this.status = TipStatus.FAILED;
     this.updated_at = new Date();
     this.validate();
-    this.applyEvent(new TipFailedEvent(this.tip_id, this.musician_id, this.audience_id, null, this.band_id));
+    this.applyEvent(
+      new TipFailedEvent(
+        this.tip_id,
+        this.musician_id,
+        this.audience_id,
+        null,
+        this.band_id,
+      ),
+    );
   }
 
   toJSON() {

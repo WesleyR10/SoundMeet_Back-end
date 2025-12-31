@@ -1,4 +1,5 @@
 import EventEmitter2 from "eventemitter2";
+
 import { AggregateRoot } from "../aggregate-root";
 
 export class DomainEventMediator {

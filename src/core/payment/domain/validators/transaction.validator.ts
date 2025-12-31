@@ -7,11 +7,12 @@ import {
   IsString,
   Min,
 } from "class-validator";
-import { Transaction } from "../transaction.entity";
-import { TransactionStatus, TransactionType } from "../transaction-enums";
-import { PaymentMethod } from "../tip-enums";
+
 import { ClassValidatorFields } from "../../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../../shared/domain/validators/notification";
+import { PaymentMethod } from "../tip-enums";
+import { Transaction } from "../transaction.entity";
+import { TransactionStatus, TransactionType } from "../transaction-enums";
 
 export class TransactionRules {
   @IsString()

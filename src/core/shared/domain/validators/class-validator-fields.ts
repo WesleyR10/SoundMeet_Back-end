@@ -1,6 +1,7 @@
 import { validateSync } from "class-validator";
-import { IValidatorFields } from "./validator-fields-interface";
+
 import { Notification } from "./notification";
+import { IValidatorFields } from "./validator-fields-interface";
 
 export abstract class ClassValidatorFields implements IValidatorFields {
   validate(notification: Notification, data: any, fields: string[]): boolean {

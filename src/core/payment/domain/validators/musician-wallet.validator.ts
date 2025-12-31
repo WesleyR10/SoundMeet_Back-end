@@ -1,6 +1,7 @@
+import { IsBoolean, IsDate, IsNotEmpty, IsOptional } from "class-validator";
+
 import { ClassValidatorFields } from "../../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../../shared/domain/validators/notification";
-import { IsBoolean, IsDate, IsNotEmpty, IsOptional } from "class-validator";
 
 export class MusicianWalletRules {
   @IsNotEmpty()
@@ -38,7 +39,11 @@ export class MusicianWalletRules {
 export class MusicianWalletValidator extends ClassValidatorFields {
   validate(notification: Notification, data: any, fields?: string[]): boolean {
     const newFields = fields?.length ? fields : [];
-    return super.validate(notification, new MusicianWalletRules(data), newFields);
+    return super.validate(
+      notification,
+      new MusicianWalletRules(data),
+      newFields,
+    );
   }
 }
 

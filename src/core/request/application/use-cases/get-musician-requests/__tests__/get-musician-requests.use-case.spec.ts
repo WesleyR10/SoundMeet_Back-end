@@ -1,12 +1,11 @@
+import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request } from "../../../../domain/request.aggregate";
 import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
-import { GetMusicianRequestsUseCase } from "../get-musician-requests.use-case";
 import {
   GetMusicianRequestsInput,
   MusicianRequestsStatusFilter,
 } from "../get-musician-requests.input";
-import { Request } from "../../../../domain/request.aggregate";
-import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
-import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { GetMusicianRequestsUseCase } from "../get-musician-requests.use-case";
 
 describe("GetMusicianRequestsUseCase Unit Tests", () => {
   let useCase: GetMusicianRequestsUseCase;

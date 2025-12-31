@@ -1,14 +1,14 @@
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request } from "../../../../domain/request.aggregate";
+import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
 import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
-import { RespondToRequestUseCase } from "../respond-to-request.use-case";
 import {
   RespondToRequestAction,
   RespondToRequestInput,
 } from "../respond-to-request.input";
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
-import { Request } from "../../../../domain/request.aggregate";
-import { RequestStatus } from "../../../../domain/value-objects/request-status.vo";
-import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { RespondToRequestUseCase } from "../respond-to-request.use-case";
 
 describe("RespondToRequestUseCase Unit Tests", () => {
   let useCase: RespondToRequestUseCase;

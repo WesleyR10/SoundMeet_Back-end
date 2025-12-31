@@ -1,11 +1,21 @@
-import { IMusicianWalletRepository, MusicianWalletFilter, MusicianWalletSearchParams, MusicianWalletSearchResult } from "../../../domain/repositories/musician-wallet.repository";
-import { MusicianWallet } from "../../../domain/musician-wallet.entity";
-import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
-import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { Uuid } from "@core/shared/domain/value-objects";
 
+import { SortDirection } from "../../../../shared/domain/repository/search-params";
+import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
+import { MusicianWallet } from "../../../domain/musician-wallet.entity";
+import {
+  IMusicianWalletRepository,
+  MusicianWalletFilter,
+  MusicianWalletSearchParams,
+  MusicianWalletSearchResult,
+} from "../../../domain/repositories/musician-wallet.repository";
+
 export class MusicianWalletInMemoryRepository
-  extends InMemorySearchableRepository<MusicianWallet, Uuid, MusicianWalletFilter>
+  extends InMemorySearchableRepository<
+    MusicianWallet,
+    Uuid,
+    MusicianWalletFilter
+  >
   implements IMusicianWalletRepository
 {
   sortableFields: string[] = ["created_at"];
@@ -14,7 +24,9 @@ export class MusicianWalletInMemoryRepository
     return MusicianWallet;
   }
 
-  async search(props: MusicianWalletSearchParams): Promise<MusicianWalletSearchResult> {
+  async search(
+    props: MusicianWalletSearchParams,
+  ): Promise<MusicianWalletSearchResult> {
     const result = await super.search(props);
     return new MusicianWalletSearchResult({
       items: result.items,
@@ -26,7 +38,7 @@ export class MusicianWalletInMemoryRepository
 
   protected async applyFilter(
     items: MusicianWallet[],
-    filter: MusicianWalletFilter | null
+    filter: MusicianWalletFilter | null,
   ): Promise<MusicianWallet[]> {
     if (!filter) {
       return items;
@@ -43,7 +55,7 @@ export class MusicianWalletInMemoryRepository
   protected applySort(
     items: MusicianWallet[],
     sort: string | null,
-    sort_dir: SortDirection | null
+    sort_dir: SortDirection | null,
   ) {
     return sort
       ? super.applySort(items, sort, sort_dir)
@@ -51,6 +63,8 @@ export class MusicianWalletInMemoryRepository
   }
 
   async findByMusicianId(musicianId: string): Promise<MusicianWallet | null> {
-    return this.items.find((item) => item.musician_id.id === musicianId) || null;
+    return (
+      this.items.find((item) => item.musician_id.id === musicianId) || null
+    );
   }
 }

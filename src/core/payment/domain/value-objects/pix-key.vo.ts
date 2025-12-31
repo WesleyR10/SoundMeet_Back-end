@@ -66,7 +66,9 @@ export class PixKey extends ValueObject {
     // Formato E.164: +5511999999999
     const phoneRegex = /^\+\d{12,13}$/;
     if (!phoneRegex.test(this.key)) {
-      throw new Error("Invalid phone format. Use E.164 format (e.g., +5511999999999)");
+      throw new Error(
+        "Invalid phone format. Use E.164 format (e.g., +5511999999999)",
+      );
     }
   }
 

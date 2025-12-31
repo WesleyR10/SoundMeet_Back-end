@@ -1,7 +1,11 @@
-import { MusicianWallet, MusicianWalletInMemoryRepository } from "@core/payment";
-import { GetMusicianWalletUseCase } from "../get-musician-wallet.use-case";
+import {
+  MusicianWallet,
+  MusicianWalletInMemoryRepository,
+} from "@core/payment";
 import { Money, Uuid } from "@core/shared/domain";
 import { NotFoundError } from "@core/shared/domain/errors";
+
+import { GetMusicianWalletUseCase } from "../get-musician-wallet.use-case";
 
 describe("GetMusicianWalletUseCase Unit Tests", () => {
   let useCase: GetMusicianWalletUseCase;
@@ -31,8 +35,8 @@ describe("GetMusicianWalletUseCase Unit Tests", () => {
 
   it("should throw error when wallet not found", async () => {
     const musicianId = new Uuid();
-    await expect(useCase.execute({ musician_id: musicianId.id })).rejects.toThrow(
-      new NotFoundError(musicianId.id, MusicianWallet)
-    );
+    await expect(
+      useCase.execute({ musician_id: musicianId.id }),
+    ).rejects.toThrow(new NotFoundError(musicianId.id, MusicianWallet));
   });
 });

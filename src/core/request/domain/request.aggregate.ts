@@ -1,17 +1,16 @@
-import { ValueObject } from "../../shared/domain/value-object";
+import { AggregateRoot, Points, Uuid } from "../../shared/domain";
+import { RequestAcceptedEvent } from "./events/request-accepted.event";
+import { RequestCreatedEvent } from "./events/request-created.event";
+import { RequestRejectedEvent } from "./events/request-rejected.event";
+import { RequestUpdatedEvent } from "./events/request-updated.event";
 import { RequestValidatorFactory } from "./request.validator";
 import { RequestFakeBuilder } from "./request-fake.builder";
-import { AggregateRoot, Uuid, Points } from "../../shared/domain";
+import { RequestMessage } from "./value-objects/request-message.vo";
 import {
   RequestStatus,
   RequestStatusEnum,
 } from "./value-objects/request-status.vo";
-import { RequestMessage } from "./value-objects/request-message.vo";
 import { SongTitle } from "./value-objects/song-title.vo";
-import { RequestAcceptedEvent } from "./events/request-accepted.event";
-import { RequestRejectedEvent } from "./events/request-rejected.event";
-import { RequestCreatedEvent } from "./events/request-created.event";
-import { RequestUpdatedEvent } from "./events/request-updated.event";
 
 export type RequestConstructorProps = {
   id?: RequestId;

@@ -22,7 +22,10 @@ export type SendTipOutput = {
 };
 
 export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
-  constructor(private tipRepository: ITipRepository, private readonly pixGateway?: IPixGateway) {}
+  constructor(
+    private tipRepository: ITipRepository,
+    private readonly pixGateway?: IPixGateway,
+  ) {}
 
   async execute(input: SendTipInput): Promise<SendTipOutput> {
     const tip = Tip.create({
@@ -43,13 +46,13 @@ export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
     let qr_code, copy_paste_code;
     if (input.payment_method === PaymentMethod.PIX) {
       if (this.pixGateway) {
-        const res = await this.pixGateway.generatePayment({ 
-          amount: input.amount, 
-          metadata: { 
+        const res = await this.pixGateway.generatePayment({
+          amount: input.amount,
+          metadata: {
             musician_id: input.musician_id,
             band_id: input.band_id,
-            tip_id: tip.tip_id.id 
-          } 
+            tip_id: tip.tip_id.id,
+          },
         });
         qr_code = res.qr_code;
         copy_paste_code = res.copy_paste_code;

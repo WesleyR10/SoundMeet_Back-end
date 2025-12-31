@@ -1,6 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { MusicianWallet } from "../../../domain/musician-wallet.entity";
 import {
   IMusicianWalletRepository,
@@ -9,7 +11,6 @@ import {
   MusicianWalletSearchResult,
 } from "../../../domain/repositories/musician-wallet.repository";
 import { MusicianWalletModelMapper } from "./musician-wallet-model.mapper";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 
 export class MusicianWalletPrismaRepository implements IMusicianWalletRepository {
   sortableFields: string[] = ["created_at", "balance", "totalEarned"];
@@ -25,7 +26,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
 
   async bulkInsert(entities: MusicianWallet[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
-      MusicianWalletModelMapper.toModel(entity)
+      MusicianWalletModelMapper.toModel(entity),
     );
     await this.prisma.musicianWallet.createMany({
       data: modelsProps,
@@ -79,11 +80,11 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async existsById(
-    ids: Uuid[]
+    ids: Uuid[],
   ): Promise<{ exists: Uuid[]; not_exists: Uuid[] }> {
     if (!ids.length) {
       throw new InvalidArgumentError(
-        "ids must be an array with at least one element"
+        "ids must be an array with at least one element",
       );
     }
 
@@ -107,7 +108,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async search(
-    props: MusicianWalletSearchParams
+    props: MusicianWalletSearchParams,
   ): Promise<MusicianWalletSearchResult> {
     const offset = (props.page - 1) * props.per_page;
     const limit = props.per_page;
@@ -125,7 +126,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
     ]);
 
     const entities = models.map((model) =>
-      MusicianWalletModelMapper.toEntity(model)
+      MusicianWalletModelMapper.toEntity(model),
     );
 
     return new MusicianWalletSearchResult({
@@ -171,7 +172,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
 
   private buildOrderByClause(
     sort: string | null,
-    sort_dir: "asc" | "desc" | null
+    sort_dir: "asc" | "desc" | null,
   ) {
     if (sort && this.sortableFields.includes(sort)) {
       return { [sort]: sort_dir || "asc" };

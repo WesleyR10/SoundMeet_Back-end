@@ -1,11 +1,11 @@
+import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
 import { Request, RequestCreateCommand } from "../request.aggregate";
+import { RequestMessage } from "../value-objects/request-message.vo";
 import {
   RequestStatus,
   RequestStatusEnum,
 } from "../value-objects/request-status.vo";
-import { RequestMessage } from "../value-objects/request-message.vo";
 import { SongTitle } from "../value-objects/song-title.vo";
-import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
 
 describe("Request Unit Tests", () => {
   describe("constructor", () => {

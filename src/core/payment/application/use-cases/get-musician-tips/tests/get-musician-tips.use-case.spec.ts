@@ -1,6 +1,12 @@
-import { PaymentMethod, Tip, TipInMemoryRepository, TipStatus } from "@core/payment";
-import { GetMusicianTipsUseCase } from "../get-musician-tips.use-case";
+import {
+  PaymentMethod,
+  Tip,
+  TipInMemoryRepository,
+  TipStatus,
+} from "@core/payment";
 import { Money, Uuid } from "@core/shared/domain/value-objects";
+
+import { GetMusicianTipsUseCase } from "../get-musician-tips.use-case";
 
 describe("GetMusicianTipsUseCase Unit Tests", () => {
   let useCase: GetMusicianTipsUseCase;

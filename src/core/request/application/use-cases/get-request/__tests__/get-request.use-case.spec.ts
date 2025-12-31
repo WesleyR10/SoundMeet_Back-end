@@ -1,13 +1,9 @@
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Request } from "../../../../domain/request.aggregate";
+import { RequestStatusEnum } from "../../../../domain/value-objects/request-status.vo";
 import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
 import { GetRequestUseCase } from "../get-request.use-case";
-import { GetRequestInput } from "../get-request.input";
-import { Request } from "../../../../domain/request.aggregate";
-import {
-  RequestStatus,
-  RequestStatusEnum,
-} from "../../../../domain/value-objects/request-status.vo";
-import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 
 describe("GetRequestUseCase Unit Tests", () => {
   let useCase: GetRequestUseCase;

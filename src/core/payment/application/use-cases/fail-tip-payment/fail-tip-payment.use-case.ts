@@ -1,8 +1,7 @@
-import { Tip, ITipRepository } from "@core/payment";
+import { ITipRepository, Tip } from "@core/payment";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { NotFoundError } from "@core/shared/domain/errors";
 import { Uuid } from "@core/shared/domain/value-objects";
-
 
 export type FailTipPaymentInput = {
   tip_id: string;
@@ -14,9 +13,10 @@ export type FailTipPaymentOutput = {
   status: string;
 };
 
-export class FailTipPaymentUseCase
-  implements IUseCase<FailTipPaymentInput, FailTipPaymentOutput>
-{
+export class FailTipPaymentUseCase implements IUseCase<
+  FailTipPaymentInput,
+  FailTipPaymentOutput
+> {
   constructor(private readonly tipRepo: ITipRepository) {}
 
   async execute(input: FailTipPaymentInput): Promise<FailTipPaymentOutput> {

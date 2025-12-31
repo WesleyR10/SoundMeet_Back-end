@@ -1,8 +1,9 @@
 import { Chance } from "chance";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+
 import { Money } from "../../shared/domain/value-objects/money.vo";
-import { PixKey } from "./value-objects/pix-key.vo";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { MusicianWallet } from "./musician-wallet.entity";
+import { PixKey } from "./value-objects/pix-key.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
@@ -86,21 +87,25 @@ export class MusicianWalletFakeBuilder<TBuild = any> {
   }
 
   build(): TBuild {
-    const wallets = new Array(this.countObjs).fill(undefined).map((_, index) => {
-      const wallet = new MusicianWallet({
-        wallet_id: this.callFactory(this._wallet_id, index) ?? new Uuid(),
-        musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
-        balance: this.callFactory(this._balance, index) ?? new Money(0),
-        total_earned: this.callFactory(this._total_earned, index) ?? new Money(0),
-        total_withdrawn: this.callFactory(this._total_withdrawn, index) ?? new Money(0),
-        pix_key: this.callFactory(this._pix_key, index) ?? null,
-        bank_account: this.callFactory(this._bank_account, index) ?? null,
-        is_active: this.callFactory(this._is_active, index) ?? true,
-        created_at: this.callFactory(this._created_at, index) ?? new Date(),
-        updated_at: this.callFactory(this._updated_at, index) ?? new Date(),
+    const wallets = new Array(this.countObjs)
+      .fill(undefined)
+      .map((_, index) => {
+        const wallet = new MusicianWallet({
+          wallet_id: this.callFactory(this._wallet_id, index) ?? new Uuid(),
+          musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
+          balance: this.callFactory(this._balance, index) ?? new Money(0),
+          total_earned:
+            this.callFactory(this._total_earned, index) ?? new Money(0),
+          total_withdrawn:
+            this.callFactory(this._total_withdrawn, index) ?? new Money(0),
+          pix_key: this.callFactory(this._pix_key, index) ?? null,
+          bank_account: this.callFactory(this._bank_account, index) ?? null,
+          is_active: this.callFactory(this._is_active, index) ?? true,
+          created_at: this.callFactory(this._created_at, index) ?? new Date(),
+          updated_at: this.callFactory(this._updated_at, index) ?? new Date(),
+        });
+        return wallet;
       });
-      return wallet;
-    });
     return this.countObjs === 1 ? (wallets[0] as any) : (wallets as any);
   }
 
@@ -148,7 +153,9 @@ export class MusicianWalletFakeBuilder<TBuild = any> {
     const optional = ["wallet_id", "created_at", "updated_at"];
     const privateProp = `_${prop}` as keyof this;
     if (!this[privateProp] && optional.includes(prop)) {
-      throw new Error(`Property ${prop} not have a factory, use 'with' methods`);
+      throw new Error(
+        `Property ${prop} not have a factory, use 'with' methods`,
+      );
     }
     return this.callFactory(this[privateProp], 0);
   }

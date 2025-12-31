@@ -1,15 +1,16 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { Tip } from "../../../domain/tip.entity";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import {
   ITipRepository,
   TipFilter,
   TipSearchParams,
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
+import { Tip } from "../../../domain/tip.entity";
 import { TipModelMapper } from "./tip-model.mapper";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 
 export class TipPrismaRepository implements ITipRepository {
   sortableFields: string[] = ["created_at", "amount", "status"];

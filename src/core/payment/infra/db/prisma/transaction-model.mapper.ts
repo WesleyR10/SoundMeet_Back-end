@@ -1,9 +1,13 @@
-import { Transaction } from "../../../domain/transaction.entity";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
-import { Money } from "../../../../shared/domain/value-objects/money.vo";
-import { PaymentMethod } from "../../../domain/tip-enums";
+import {
+  TransactionStatus,
+  TransactionType,
+} from "@core/payment/domain/transaction-enums";
 import { Transaction as PrismaTransaction } from "@prisma/client";
-import { TransactionStatus, TransactionType } from "@core/payment/domain/transaction-enums";
+
+import { Money } from "../../../../shared/domain/value-objects/money.vo";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { PaymentMethod } from "../../../domain/tip-enums";
+import { Transaction } from "../../../domain/transaction.entity";
 
 export type TransactionModelProps = {
   id: string;

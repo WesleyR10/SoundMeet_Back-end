@@ -1,5 +1,7 @@
 import "reflect-metadata";
-import { ConfirmTipPaymentUseCase } from "../confirm-tip-payment.use-case";
+
+import { Band } from "@core/musician/domain/band.aggregate";
+import { IBandRepository } from "@core/musician/domain/band.repository";
 import {
   MusicianWallet,
   PaymentMethod,
@@ -8,8 +10,8 @@ import {
   TransactionInMemoryRepository,
 } from "@core/payment";
 import { IMusicianWalletRepository } from "@core/payment/domain/repositories/musician-wallet.repository";
-import { IBandRepository } from "@core/musician/domain/band.repository";
-import { Band } from "@core/musician/domain/band.aggregate";
+
+import { ConfirmTipPaymentUseCase } from "../confirm-tip-payment.use-case";
 
 class MusicianWalletRepoStub implements IMusicianWalletRepository {
   sortableFields: string[] = ["created_at"];
@@ -21,9 +23,7 @@ class MusicianWalletRepoStub implements IMusicianWalletRepository {
     this.items.push(...entities);
   }
   async update(entity: MusicianWallet): Promise<void> {
-    const i = this.items.findIndex((w) =>
-      w.wallet_id.equals(entity.wallet_id)
-    );
+    const i = this.items.findIndex((w) => w.wallet_id.equals(entity.wallet_id));
     if (i !== -1) this.items[i] = entity;
   }
   async delete(): Promise<void> {
@@ -109,7 +109,7 @@ describe("ConfirmTipPaymentUseCase", () => {
       tipRepo,
       txRepo,
       walletRepo,
-      bandRepo
+      bandRepo,
     );
 
     const tip = Tip.create({
