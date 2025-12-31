@@ -1,32 +1,62 @@
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # Aplicação Principal
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
+      target: production
     container_name: soundmeet-app
+    init: true
+    restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - ./envs/.env
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
-      - MONGODB_URL=mongodb://mongo:27017/soundmeet
+      - MONGODB_URL=mongodb://soundmeet:soundmeet123@mongo:27017/soundmeet?authSource=admin
       - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://soundmeet:soundmeet123@rabbitmq:5672
       - KEYCLOAK_URL=http://keycloak:8080
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=soundmeet
+      - MINIO_SECRET_KEY=soundmeet123
     depends_on:
-      - postgres
-      - mongo
-      - redis
-      - rabbitmq
-      - keycloak
-    volumes:
-      - .:/app
-      - /app/node_modules
+      postgres:
+        condition: service_started
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      keycloak:
+        condition: service_started
     networks:
       - soundmeet-network
+    logging: *default-logging
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/v1/health', (r) => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   # PostgreSQL - Banco Principal
   postgres:
@@ -40,9 +70,34 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soundmeet -d soundmeet"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  postgres-keycloak:
+    image: postgres:15-alpine
+    container_name: soundmeet-postgres-keycloak
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: soundmeet
+      POSTGRES_PASSWORD: soundmeet123
+    volumes:
+      - postgres_keycloak_data:/var/lib/postgresql/data
+    networks:
+      - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soundmeet -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   # MongoDB - Analytics e Logs
   mongo:
@@ -58,6 +113,25 @@ services:
       - mongo_data:/data/db
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--username",
+          "soundmeet",
+          "--password",
+          "soundmeet123",
+          "--authenticationDatabase",
+          "admin",
+          "--eval",
+          "db.runCommand({ ping: 1 })",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
 
   # Redis - Cache e Sessões
   redis:
@@ -70,6 +144,13 @@ services:
     command: redis-server --appendonly yes
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   # RabbitMQ - Mensageria
   rabbitmq:
@@ -85,6 +166,13 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
 
   # Keycloak - Autenticação
   keycloak:
@@ -94,7 +182,7 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin123
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
       KC_DB_USERNAME: soundmeet
       KC_DB_PASSWORD: soundmeet123
       KC_HOSTNAME: localhost
@@ -107,10 +195,23 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
+      postgres-keycloak:
+        condition: service_healthy
     command: start-dev
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -lc \"exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q '200'\"",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 30s
 
   # MinIO - Armazenamento S3 Local (para desenvolvimento)
   minio:
@@ -127,6 +228,8 @@ services:
     command: server /data --console-address ":9001"
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
 
   # Adminer - Interface de Banco
   adminer:
@@ -139,13 +242,60 @@ services:
       - mongo
     networks:
       - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: soundmeet-cadvisor
+    profiles: ["ops"]
+    ports:
+      - "8082:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+
+  dozzle:
+    image: amir20/dozzle:v7.0.5
+    container_name: soundmeet-dozzle
+    profiles: ["ops"]
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: soundmeet-uptime-kuma
+    profiles: ["ops"]
+    ports:
+      - "3002:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - soundmeet-network
+    restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   postgres_data:
+  postgres_keycloak_data:
   mongo_data:
   redis_data:
   rabbitmq_data:
   minio_data:
+  uptime_kuma_data:
 
 networks:
   soundmeet-network:

@@ -9,6 +9,7 @@
 .history/
 coverage/
 dist/
+dist-dev/
 envs/
 node_modules/
 *.sqlite

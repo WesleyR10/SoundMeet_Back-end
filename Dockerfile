@@ -1,16 +1,17 @@
 FROM node:20-alpine AS base
 
 # Instalar dependências do sistema
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 # Copiar arquivos de dependências
 COPY package.json ./
+COPY package-lock.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
 # Instalar dependências (inclui dev para permitir geração do Prisma)
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 # Variáveis necessárias para leitura do schema durante a geração
 ENV DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
@@ -27,7 +28,7 @@ CMD ["npm", "run", "start:dev"]
 # Estágio de build
 FROM base AS build
 COPY . .
-RUN npm run build
+RUN rm -f src/metadata.ts && npm run build && npm prune --omit=dev
 
 # Estágio de produção
 FROM node:20-alpine AS production
@@ -47,5 +48,7 @@ COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
 USER nestjs
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 CMD node -e "require('http').get('http://localhost:3000/api/v1/health', (r) => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1));"
 
 CMD ["npm", "run", "start:prod"]
