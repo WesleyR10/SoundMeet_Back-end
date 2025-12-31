@@ -21,10 +21,17 @@ export function createMongoConnectionOptions(
 }
 
 export async function createRedisCacheOptions(configService: ConfigSchemaType) {
-  const redisUrl = configService.get("REDIS_URL");
+  const redisUrl = configService.get<string>("REDIS_URL")!;
+  const parsedUrl = new URL(redisUrl);
+  const host = parsedUrl.hostname;
+  const port = parsedUrl.port ? Number(parsedUrl.port) : 6379;
+  const password = parsedUrl.password || undefined;
   return {
     store: redisStore as any,
     url: redisUrl,
+    host,
+    port,
+    password,
     ttl: 300,
   };
 }
