@@ -262,6 +262,7 @@ model Audience {
   last_points_update    DateTime @default(now())
   favorite_genres       String[] @default([])
   favorite_artists      String[] @default([])
+  favorite_instruments  String[] @default([])
   preferred_languages   String[] @default(["pt-BR"])
   location              Json? // {latitude, longitude, city, state} para descoberta por proximidade
   social_links          Json? // Links para redes sociais
