@@ -41,6 +41,11 @@ export class CreateAudienceInput {
   @IsOptional()
   favorite_artists?: string[];
 
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  favorite_instruments?: string[];
+
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;

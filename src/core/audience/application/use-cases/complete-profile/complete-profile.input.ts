@@ -1,10 +1,10 @@
 import {
+  IsArray,
   IsNotEmpty,
+  IsObject,
+  IsOptional,
   IsString,
   IsUUID,
-  IsOptional,
-  IsArray,
-  IsObject,
 } from "class-validator";
 
 export class CompleteProfileInput {
@@ -36,6 +36,10 @@ export class CompleteProfileInput {
   @IsArray()
   @IsOptional()
   favorite_artists?: string[];
+
+  @IsArray()
+  @IsOptional()
+  favorite_instruments?: string[];
 
   @IsObject()
   @IsOptional()

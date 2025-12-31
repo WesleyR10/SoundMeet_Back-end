@@ -1,5 +1,5 @@
-import { SocialMediaSharedEvent } from "../social-media-shared.event";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { SocialMediaSharedEvent } from "../social-media-shared.event";
 
 describe("SocialMediaSharedEvent Unit Tests", () => {
   test("should create a social media shared event", () => {

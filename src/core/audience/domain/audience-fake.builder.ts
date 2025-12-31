@@ -1,4 +1,5 @@
 import { Chance } from "chance";
+
 import { Audience, AudienceId } from "./audience.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
@@ -19,6 +20,10 @@ export class AudienceFakeBuilder<TBuild = any> {
   private _favorite_artists: PropOrFactory<string[]> = () => [
     "The Beatles",
     "Queen",
+  ];
+  private _favorite_instruments: PropOrFactory<string[]> = () => [
+    "Guitar",
+    "Piano",
   ];
   private _is_active: PropOrFactory<boolean> = () => true;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
@@ -135,6 +140,11 @@ export class AudienceFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withFavoriteInstruments(valueOrFactory: PropOrFactory<string[]>) {
+    this._favorite_instruments = valueOrFactory;
+    return this;
+  }
+
   withTotalPoints(valueOrFactory: PropOrFactory<number>) {
     this._total_points = valueOrFactory;
     return this;
@@ -240,6 +250,10 @@ export class AudienceFakeBuilder<TBuild = any> {
           preferences: {
             favoriteGenres: this.callFactory(this._favorite_genres, index),
             favoriteArtists: this.callFactory(this._favorite_artists, index),
+            favoriteInstruments: this.callFactory(
+              this._favorite_instruments,
+              index,
+            ),
             preferredLanguages: ["pt-BR"],
             notificationSettings: {
               pushNotifications: true,
@@ -310,6 +324,10 @@ export class AudienceFakeBuilder<TBuild = any> {
 
   get favorite_artists() {
     return this.getValue("favorite_artists");
+  }
+
+  get favorite_instruments() {
+    return this.getValue("favorite_instruments");
   }
 
   get total_points() {

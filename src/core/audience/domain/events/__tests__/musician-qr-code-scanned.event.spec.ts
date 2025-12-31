@@ -1,5 +1,5 @@
-import { MusicianQRCodeScannedEvent } from "../musician-qr-code-scanned.event";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { MusicianQRCodeScannedEvent } from "../musician-qr-code-scanned.event";
 
 describe("MusicianQRCodeScannedEvent Unit Tests", () => {
   test("should create a musician QR code scanned event", () => {

@@ -1,12 +1,12 @@
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { MakeMusicRequestUseCase } from "../make-music-request.use-case";
-import { MakeMusicRequestInput } from "../make-music-request.input";
-import { Audience } from "../../../../domain/audience.aggregate";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { MakeMusicRequestInput } from "../make-music-request.input";
+import { MakeMusicRequestUseCase } from "../make-music-request.use-case";
 
 describe("MakeMusicRequestUseCase Unit Tests", () => {
   let useCase: MakeMusicRequestUseCase;

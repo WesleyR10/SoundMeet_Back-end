@@ -3,8 +3,8 @@ import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { DeleteAudienceUseCase } from "../delete-audience.use-case";
 
 describe("DeleteAudienceUseCase Unit Tests", () => {

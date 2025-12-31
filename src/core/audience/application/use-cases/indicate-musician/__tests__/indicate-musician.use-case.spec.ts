@@ -1,12 +1,12 @@
-import { IndicateMusicianUseCase } from "../indicate-musician.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import { IndicateMusicianInput } from "../indicate-musician.input";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { IndicateMusicianInput } from "../indicate-musician.input";
+import { IndicateMusicianUseCase } from "../indicate-musician.use-case";
 
 describe("IndicateMusicianUseCase Unit Tests", () => {
   let useCase: IndicateMusicianUseCase;

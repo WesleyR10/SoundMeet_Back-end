@@ -1,10 +1,10 @@
 import {
   IsNotEmpty,
-  IsString,
-  IsOptional,
   IsNumber,
-  IsPositive,
   IsObject,
+  IsOptional,
+  IsPositive,
+  IsString,
 } from "class-validator";
 
 export type SendTipInput = {

@@ -1,13 +1,13 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Points } from "../../../../shared/domain/value-objects/points.vo";
+import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
-import { AudienceId, Audience } from "../../../domain/audience.aggregate";
-import { ScanQRInput } from "./scan-qr.input";
 import {
   AudienceOutput,
   AudienceOutputMapper,
 } from "../common/audience-output";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { Points } from "../../../../shared/domain/value-objects/points.vo";
+import { ScanQRInput } from "./scan-qr.input";
 
 export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
   constructor(private audienceRepository: IAudienceRepository) {}

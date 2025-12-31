@@ -1,9 +1,9 @@
 import {
+  IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
-  IsEnum,
-  IsOptional,
 } from "class-validator";
 
 export enum SocialMediaPlatform {

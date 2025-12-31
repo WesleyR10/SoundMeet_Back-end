@@ -1,14 +1,14 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { Points } from "../../../../shared/domain/value-objects/points.vo";
+import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
-import { AudienceId, Audience } from "../../../domain/audience.aggregate";
-import { SendTipInput } from "./send-tip.input";
 import {
   AudienceOutput,
   AudienceOutputMapper,
 } from "../common/audience-output";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { Points } from "../../../../shared/domain/value-objects/points.vo";
+import { SendTipInput } from "./send-tip.input";
 
 export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
   constructor(private readonly audienceRepository: IAudienceRepository) {}

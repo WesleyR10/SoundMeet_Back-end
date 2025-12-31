@@ -1,12 +1,12 @@
-import { SendTipUseCase } from "../send-tip.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import { SendTipInput } from "../send-tip.input";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { SendTipInput } from "../send-tip.input";
+import { SendTipUseCase } from "../send-tip.use-case";
 
 describe("SendTipUseCase Unit Tests", () => {
   let useCase: SendTipUseCase;

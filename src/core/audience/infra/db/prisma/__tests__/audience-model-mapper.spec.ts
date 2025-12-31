@@ -36,6 +36,7 @@ describe("AudienceModelMapper", () => {
         badges: audience.badges,
         favorite_genres: audience.favorite_genres,
         favorite_artists: audience.favorite_artists,
+        favorite_instruments: audience.favorite_instruments,
         preferred_languages: audience.preferences.preferredLanguages,
         notification_settings: audience.notification_settings,
         privacy_settings: audience.privacy_settings,
@@ -82,6 +83,7 @@ describe("AudienceModelMapper", () => {
         badges: ["Iniciante", "Sugestor"],
         favorite_genres: ["Rock", "Pop"],
         favorite_artists: ["Beatles", "Queen"],
+        favorite_instruments: ["Guitar", "Piano"],
         preferred_languages: ["pt-BR", "en-US"],
         notification_settings: { email: true, push: true },
         privacy_settings: { profile_visible: true },
@@ -107,6 +109,7 @@ describe("AudienceModelMapper", () => {
       expect(entity.badges).toEqual(model.badges);
       expect(entity.favorite_genres).toEqual(model.favorite_genres);
       expect(entity.favorite_artists).toEqual(model.favorite_artists);
+      expect(entity.favorite_instruments).toEqual(model.favorite_instruments);
       expect(entity.preferences.preferredLanguages).toEqual(
         model.preferred_languages,
       );

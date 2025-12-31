@@ -1,15 +1,15 @@
-import { ShareSocialMediaUseCase } from "../share-social-media.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import {
-  ShareSocialMediaInput,
-  SocialMediaPlatform,
-} from "../share-social-media.input";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import {
+  ShareSocialMediaInput,
+  SocialMediaPlatform,
+} from "../share-social-media.input";
+import { ShareSocialMediaUseCase } from "../share-social-media.use-case";
 
 describe("ShareSocialMediaUseCase Unit Tests", () => {
   let useCase: ShareSocialMediaUseCase;

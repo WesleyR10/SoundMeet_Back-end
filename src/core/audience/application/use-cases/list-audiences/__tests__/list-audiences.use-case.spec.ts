@@ -1,6 +1,6 @@
 import { SortDirection } from "../../../../../shared/domain/repository/search-params";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { ListAudiencesUseCase } from "../list-audiences.use-case";
 
 describe("ListAudiencesUseCase Unit Tests", () => {
@@ -136,6 +136,35 @@ describe("ListAudiencesUseCase Unit Tests", () => {
     expect(output.total).toBe(2);
     expect(output.items[0].preferences.favorite_genres).toContain("Rock");
     expect(output.items[1].preferences.favorite_genres).toContain("Rock");
+  });
+
+  it("should list audiences with instrument filter", async () => {
+    const audience1 = Audience.fake()
+      .withFavoriteInstruments(["Guitar", "Bass"])
+      .build();
+    const audience2 = Audience.fake()
+      .withFavoriteInstruments(["Drums"])
+      .build();
+    const audience3 = Audience.fake()
+      .withFavoriteInstruments(["Guitar", "Piano"])
+      .build();
+
+    await repository.insert(audience1);
+    await repository.insert(audience2);
+    await repository.insert(audience3);
+
+    const output = await useCase.execute({
+      filter: { favorite_instruments: ["Guitar"] },
+    });
+
+    expect(output.items).toHaveLength(2);
+    expect(output.total).toBe(2);
+    expect(output.items[0].preferences.favorite_instruments).toContain(
+      "Guitar",
+    );
+    expect(output.items[1].preferences.favorite_instruments).toContain(
+      "Guitar",
+    );
   });
 
   it("should list audiences with active status filter", async () => {

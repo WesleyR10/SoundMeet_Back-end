@@ -1,5 +1,5 @@
-import { TipSentEvent } from "../tip-sent.event";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { TipSentEvent } from "../tip-sent.event";
 
 describe("TipSentEvent Unit Tests", () => {
   test("should create a tip sent event", () => {

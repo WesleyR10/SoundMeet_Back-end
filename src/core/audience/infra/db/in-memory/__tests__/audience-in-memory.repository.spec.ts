@@ -1,7 +1,8 @@
 import { describe, it } from "@jest/globals";
-import { AudienceInMemoryRepository } from "../audience-in-memory.repository";
-import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
+
 import { AudienceSearchParams } from "../../../../domain/audience.repository";
+import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
+import { AudienceInMemoryRepository } from "../audience-in-memory.repository";
 
 describe("AudienceInMemoryRepository", () => {
   let repository: AudienceInMemoryRepository;
@@ -80,6 +81,26 @@ describe("AudienceInMemoryRepository", () => {
       expect(filteredItems).toHaveLength(2);
       expect(filteredItems[0].favorite_genres).toContain("Rock");
       expect(filteredItems[1].favorite_genres).toContain("Rock");
+    });
+
+    it("should filter by favorite_instruments", async () => {
+      const items = [
+        AudienceFakeBuilder.aAudience()
+          .withFavoriteInstruments(["Guitar", "Bass"])
+          .build(),
+        AudienceFakeBuilder.aAudience()
+          .withFavoriteInstruments(["Drums"])
+          .build(),
+        AudienceFakeBuilder.aAudience()
+          .withFavoriteInstruments(["Guitar", "Piano"])
+          .build(),
+      ];
+      const filteredItems = await repository["applyFilter"](items, {
+        favorite_instruments: ["Guitar"],
+      });
+      expect(filteredItems).toHaveLength(2);
+      expect(filteredItems[0].favorite_instruments).toContain("Guitar");
+      expect(filteredItems[1].favorite_instruments).toContain("Guitar");
     });
 
     it("should apply multiple filters", async () => {

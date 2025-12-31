@@ -2,11 +2,11 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Audience } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
-import { CreateAudienceInput } from "./create-audience.input";
 import {
-  AudienceOutputMapper,
   AudienceOutput,
+  AudienceOutputMapper,
 } from "../common/audience-output";
+import { CreateAudienceInput } from "./create-audience.input";
 
 export class CreateAudienceUseCase implements IUseCase<
   CreateAudienceInput,
@@ -23,6 +23,7 @@ export class CreateAudienceUseCase implements IUseCase<
       phone: input.phone,
       favorite_genres: input.favorite_genres || [],
       favorite_artists: input.favorite_artists || [],
+      favorite_instruments: input.favorite_instruments || [],
       is_active: input.is_active,
     });
 

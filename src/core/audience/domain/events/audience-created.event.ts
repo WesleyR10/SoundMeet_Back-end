@@ -1,6 +1,6 @@
+import { Email, Phone } from "../../../shared/domain";
 import { IDomainEvent } from "../../../shared/domain/events/domain-event.interface";
 import { AudienceId } from "../audience.aggregate";
-import { Email, Phone } from "../../../shared/domain";
 
 export type AudienceCreatedEventProps = {
   audience_id: AudienceId;

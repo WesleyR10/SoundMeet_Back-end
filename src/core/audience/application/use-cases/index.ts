@@ -6,8 +6,9 @@ export * from "./list-audiences";
 export * from "./update-audience";
 
 // Gamification Use Cases
-export * from "./scan-qr";
 export * from "./make-music-request";
+export * from "./recommend-musicians";
+export * from "./scan-qr";
 export * from "./send-tip";
 
 // Common

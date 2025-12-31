@@ -22,6 +22,7 @@ export type AudienceOutput = {
   preferences: {
     favorite_genres: string[];
     favorite_artists: string[];
+    favorite_instruments: string[];
     preferred_languages: string[];
     notification_settings: any;
     privacy_settings: any;
@@ -53,6 +54,7 @@ export class AudienceOutputMapper {
       ...otherProps,
       favorite_genres: entity.favorite_genres,
       favorite_artists: entity.favorite_artists,
+      favorite_instruments: entity.favorite_instruments,
       notification_settings: entity.preferences.notificationSettings,
       privacy_settings: entity.preferences.privacySettings,
       discovery_settings: entity.preferences.musicDiscoverySettings,

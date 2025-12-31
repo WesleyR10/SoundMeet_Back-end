@@ -1,8 +1,8 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import { AudienceSearchParams } from "../../../domain/audience.repository";
 import { AudienceSearchResult } from "../../../domain/audience.repository";

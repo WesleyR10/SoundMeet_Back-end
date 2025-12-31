@@ -1,12 +1,12 @@
+import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import {
-  IAudienceRepository,
+  AudienceFilter,
   AudienceSearchParams,
   AudienceSearchResult,
-  AudienceFilter,
+  IAudienceRepository,
 } from "../../../domain/audience.repository";
-import { SortDirection } from "../../../../shared/domain/repository/search-params";
 
 export class AudienceInMemoryRepository
   extends InMemorySearchableRepository<Audience, AudienceId, AudienceFilter>
@@ -63,6 +63,16 @@ export class AudienceInMemoryRepository
           audience.favorite_genres.includes(genre),
         );
         matches = matches && genreMatch;
+      }
+
+      if (
+        filter.favorite_instruments &&
+        filter.favorite_instruments.length > 0
+      ) {
+        const instrumentMatch = filter.favorite_instruments.some((instrument) =>
+          audience.favorite_instruments.includes(instrument),
+        );
+        matches = matches && instrumentMatch;
       }
 
       if (filter.min_level !== null && filter.min_level !== undefined) {
@@ -141,14 +151,5 @@ export class AudienceInMemoryRepository
 
   async findByLevel(level: number): Promise<Audience[]> {
     return this.items.filter((audience) => audience.currentLevel === level);
-  }
-
-  async incrementTips(audienceId: AudienceId, amount: number): Promise<void> {
-    const audience = await this.findById(audienceId);
-    if (audience) {
-      // O incremento de gorjetas é tratado pelo próprio agregado
-      // Este método pode ser usado para persistir estatísticas adicionais se necessário
-      await this.update(audience);
-    }
   }
 }

@@ -1,8 +1,6 @@
-import { Audience, AudienceId } from "../../../domain/audience.aggregate";
-import { Email } from "../../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
-import { AudienceModel } from "./audience-model";
 import { AudiencePreferences } from "../../../../shared/domain/value-objects/audience-preferences.vo";
+import { Audience, AudienceId } from "../../../domain/audience.aggregate";
+import { AudienceModel } from "./audience-model";
 
 export type AudienceModelProps = AudienceModel;
 
@@ -20,6 +18,7 @@ export class AudienceModelMapper {
       level: entity.level.level,
       favorite_genres: entity.preferences.favoriteGenres,
       favorite_artists: entity.preferences.favoriteArtists,
+      favorite_instruments: entity.preferences.favoriteInstruments,
       preferred_languages: entity.preferences.preferredLanguages,
       location: entity.preferences.location
         ? {
@@ -61,6 +60,7 @@ export class AudienceModelMapper {
     const preferences = new AudiencePreferences({
       favoriteGenres: model.favorite_genres || [],
       favoriteArtists: model.favorite_artists || [],
+      favoriteInstruments: model.favorite_instruments || [],
       preferredLanguages: model.preferred_languages || ["pt-BR"],
       location: model.location
         ? {

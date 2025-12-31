@@ -1,4 +1,5 @@
 import { describe, it } from "@jest/globals";
+
 import { Audience } from "../../../domain/audience.aggregate";
 import { AudienceOutputMapper } from "./audience-output";
 

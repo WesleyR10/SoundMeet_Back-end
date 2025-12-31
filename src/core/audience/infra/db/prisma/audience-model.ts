@@ -11,6 +11,7 @@ export type AudienceModel = {
   badges: string[];
   favorite_genres: string[];
   favorite_artists: string[];
+  favorite_instruments: string[];
   preferred_languages: string[];
   location: any;
   social_links: any;

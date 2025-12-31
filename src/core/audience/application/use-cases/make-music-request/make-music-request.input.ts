@@ -1,9 +1,9 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsObject,
   IsBoolean,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
 } from "class-validator";
 
 export type MakeMusicRequestInput = {

@@ -1,5 +1,5 @@
-import { MusicRequestMadeEvent } from "../music-request-made.event";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { MusicRequestMadeEvent } from "../music-request-made.event";
 
 describe("MusicRequestMadeEvent Unit Tests", () => {
   test("should create a music request made event", () => {

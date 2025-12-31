@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import {
   AudienceFilter,
@@ -30,6 +31,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         level: modelProps.level,
         favorite_genres: modelProps.favorite_genres,
         favorite_artists: modelProps.favorite_artists,
+        favorite_instruments: modelProps.favorite_instruments,
         preferred_languages: modelProps.preferred_languages,
         notification_settings: modelProps.notification_settings,
         privacy_settings: modelProps.privacy_settings,
@@ -56,6 +58,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         level: modelProps.level,
         favorite_genres: modelProps.favorite_genres,
         favorite_artists: modelProps.favorite_artists,
+        favorite_instruments: modelProps.favorite_instruments,
         preferred_languages: modelProps.preferred_languages,
         notification_settings: modelProps.notification_settings,
         privacy_settings: modelProps.privacy_settings,
@@ -88,6 +91,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
           level: modelProps.level,
           favorite_genres: modelProps.favorite_genres,
           favorite_artists: modelProps.favorite_artists,
+          favorite_instruments: modelProps.favorite_instruments,
           preferred_languages: modelProps.preferred_languages,
           notification_settings: modelProps.notification_settings,
           privacy_settings: modelProps.privacy_settings,
@@ -249,6 +253,12 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       };
     }
 
+    if (filter.favorite_instruments && filter.favorite_instruments.length > 0) {
+      where.favorite_instruments = {
+        hasSome: filter.favorite_instruments,
+      };
+    }
+
     if (typeof filter.min_points === "number") {
       where.points = { gte: filter.min_points };
     }
@@ -371,17 +381,6 @@ export class AudiencePrismaRepository implements IAudienceRepository {
     };
   }
 
-  async incrementTips(audienceId: AudienceId, amount: number): Promise<void> {
-    await this.prisma.audience.update({
-      where: { id: audienceId.id },
-      data: {
-        points: {
-          increment: amount, // 1 ponto por real de gorjeta
-        },
-      },
-    });
-  }
-
   getEntity(): new (...args: any[]) => Audience {
     return Audience;
   }
@@ -403,6 +402,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       badges,
       favorite_genres: model.favorite_genres,
       favorite_artists: model.favorite_artists,
+      favorite_instruments: model.favorite_instruments,
       preferred_languages: model.preferred_languages,
       notification_settings: model.notification_settings,
       privacy_settings: model.privacy_settings,

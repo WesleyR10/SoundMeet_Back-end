@@ -1,6 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import {

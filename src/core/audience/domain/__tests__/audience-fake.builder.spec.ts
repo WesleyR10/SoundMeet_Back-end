@@ -1,9 +1,10 @@
 import { Chance } from "chance";
-import { AudienceFakeBuilder } from "../audience-fake.builder";
-import { AudienceId } from "../audience.aggregate";
+
+import { AudiencePoints } from "../../../shared/domain/value-objects/audience-points.vo";
 import { Email } from "../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../shared/domain/value-objects/phone.vo";
-import { AudiencePoints } from "../../../shared/domain/value-objects/audience-points.vo";
+import { AudienceId } from "../audience.aggregate";
+import { AudienceFakeBuilder } from "../audience-fake.builder";
 
 describe("AudienceFakeBuilder Unit Tests", () => {
   describe("id prop", () => {

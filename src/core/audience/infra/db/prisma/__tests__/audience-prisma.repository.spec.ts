@@ -1,11 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
-import { InvalidArgumentError } from "../../../../../shared/domain/errors/invalid-argument.error";
+
 import { Audience, AudienceId } from "../../../../domain/audience.aggregate";
 import { AudienceSearchParams } from "../../../../domain/audience.repository";
-import { AudiencePrismaRepository } from "../audience-prisma.repository";
-import { AudienceModelMapper } from "../audience-model-mapper";
 import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
+import { AudienceModelMapper } from "../audience-model-mapper";
+import { AudiencePrismaRepository } from "../audience-prisma.repository";
 
 describe("AudiencePrismaRepository", () => {
   let repository: AudiencePrismaRepository;
@@ -155,6 +154,7 @@ describe("AudiencePrismaRepository", () => {
         badges: audiences[0].badges,
         favorite_genres: audiences[0].favorite_genres,
         favorite_artists: audiences[0].favorite_artists,
+        favorite_instruments: audiences[0].favorite_instruments,
         is_active: audiences[0].is_active,
       });
       expect(result[1]).toMatchObject({
@@ -167,6 +167,7 @@ describe("AudiencePrismaRepository", () => {
         badges: audiences[1].badges,
         favorite_genres: audiences[1].favorite_genres,
         favorite_artists: audiences[1].favorite_artists,
+        favorite_instruments: audiences[1].favorite_instruments,
         is_active: audiences[1].is_active,
       });
     });
@@ -194,6 +195,7 @@ describe("AudiencePrismaRepository", () => {
           level: modelProps.level,
           favorite_genres: modelProps.favorite_genres,
           favorite_artists: modelProps.favorite_artists,
+          favorite_instruments: modelProps.favorite_instruments,
           preferred_languages: modelProps.preferred_languages,
           notification_settings: modelProps.notification_settings,
           privacy_settings: modelProps.privacy_settings,
@@ -347,6 +349,7 @@ describe("AudiencePrismaRepository", () => {
         badges: audience.badges,
         favorite_genres: audience.favorite_genres,
         favorite_artists: audience.favorite_artists,
+        favorite_instruments: audience.favorite_instruments,
         is_active: audience.is_active,
       });
       expect(result.total).toBe(1);

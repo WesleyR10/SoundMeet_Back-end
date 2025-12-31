@@ -1,8 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { AudiencePrismaRepository } from "../audience-prisma.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
+
 import { AudiencePreferences } from "../../../../../shared/domain/value-objects/audience-preferences.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
 import { AudienceModelMapper } from "../audience-model-mapper";
+import { AudiencePrismaRepository } from "../audience-prisma.repository";
 
 describe("AudiencePrismaRepository - Mapper Integration", () => {
   let repository: AudiencePrismaRepository;
@@ -28,6 +29,7 @@ describe("AudiencePrismaRepository - Mapper Integration", () => {
         preferences: new AudiencePreferences({
           favoriteGenres: ["Rock"],
           favoriteArtists: ["Artist 1"],
+          favoriteInstruments: ["Guitar"],
           preferredLanguages: ["pt-BR"],
           location: {
             latitude: -23.5505,
@@ -107,6 +109,7 @@ describe("AudiencePrismaRepository - Mapper Integration", () => {
         },
         favorite_genres: ["Rock"],
         favorite_artists: ["Artist 1"],
+        favorite_instruments: ["Guitar"],
         preferred_languages: ["pt-BR"],
         notification_settings: {},
         privacy_settings: {},
@@ -137,6 +140,7 @@ describe("AudiencePrismaRepository - Mapper Integration", () => {
         preferences: new AudiencePreferences({
           favoriteGenres: [],
           favoriteArtists: [],
+          favoriteInstruments: [],
           preferredLanguages: ["pt-BR"],
           location: null,
           socialLinks: null,

@@ -1,15 +1,16 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
-  Matches,
-  ArrayMaxSize,
-  IsArray,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { Audience } from "./audience.aggregate";

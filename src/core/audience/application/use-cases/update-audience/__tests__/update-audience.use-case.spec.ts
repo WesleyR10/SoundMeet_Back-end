@@ -1,9 +1,9 @@
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { InvalidPhoneError } from "../../../../../shared/domain/value-objects/phone.vo";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { Audience } from "../../../../domain/audience.aggregate";
 import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { UpdateAudienceUseCase } from "../update-audience.use-case";
 
 describe("UpdateAudienceUseCase Unit Tests", () => {

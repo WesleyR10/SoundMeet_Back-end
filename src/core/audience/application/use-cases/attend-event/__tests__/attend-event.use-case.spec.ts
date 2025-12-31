@@ -1,9 +1,10 @@
-import { AttendEventUseCase } from "../attend-event.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import { AttendEventInput } from "../attend-event.input";
 import { InvalidUuidError, Uuid } from "@core/shared/domain";
 import { NotFoundError } from "@core/shared/domain/errors";
+
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { AttendEventInput } from "../attend-event.input";
+import { AttendEventUseCase } from "../attend-event.use-case";
 
 describe("AttendEventUseCase Unit Tests", () => {
   let useCase: AttendEventUseCase;
@@ -18,10 +19,7 @@ describe("AttendEventUseCase Unit Tests", () => {
     const audienceId = new Uuid();
     const input: AttendEventInput = {
       audience_id: audienceId.id,
-      event_id: "event_123",
-      establishment_id: "establishment_123",
-      event_date: "2024-12-31T20:00:00Z",
-      notes: "Looking forward to this event!",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -32,10 +30,7 @@ describe("AttendEventUseCase Unit Tests", () => {
   it("should throw error when audience_id is not valid", async () => {
     const input: AttendEventInput = {
       audience_id: "invalid-id",
-      event_id: "event_123",
-      establishment_id: "establishment_123",
-      event_date: "2024-12-31T20:00:00Z",
-      notes: "Looking forward to this event!",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -49,10 +44,7 @@ describe("AttendEventUseCase Unit Tests", () => {
 
     const input: AttendEventInput = {
       audience_id: audience.id.id,
-      event_id: "event_123",
-      establishment_id: "establishment_123",
-      event_date: "2024-12-31T20:00:00Z",
-      notes: "Looking forward to this event!",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -64,10 +56,7 @@ describe("AttendEventUseCase Unit Tests", () => {
     const arrange = [
       {
         input: {
-          event_id: "event_123",
-          establishment_id: "establishment_123",
-          event_date: "2024-12-31T20:00:00Z",
-          notes: "Looking forward to this event!",
+          event_id: "550e8400-e29b-41d4-a716-446655440000",
         },
         expected: {
           points_added: 30,
@@ -75,10 +64,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       },
       {
         input: {
-          event_id: "event_456",
-          establishment_id: "establishment_456",
-          event_date: "2024-12-25T19:30:00Z",
-          notes: "Christmas special event!",
+          event_id: "550e8400-e29b-41d4-a716-446655440001",
         },
         expected: {
           points_added: 30,
@@ -86,10 +72,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       },
       {
         input: {
-          event_id: "event_789",
-          establishment_id: "establishment_789",
-          event_date: "2024-11-15T21:00:00Z",
-          notes: "Jazz night event",
+          event_id: "550e8400-e29b-41d4-a716-446655440002",
         },
         expected: {
           points_added: 30,
@@ -128,9 +111,7 @@ describe("AttendEventUseCase Unit Tests", () => {
 
     const input: AttendEventInput = {
       audience_id: audience.id.id,
-      event_id: "event_123",
-      establishment_id: "establishment_123",
-      event_date: "2024-12-31T20:00:00Z",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
     const output = await useCase.execute(input);
@@ -149,10 +130,7 @@ describe("AttendEventUseCase Unit Tests", () => {
 
     const input: AttendEventInput = {
       audience_id: audience.id.id,
-      event_id: "event_123",
-      establishment_id: "establishment_123",
-      event_date: "2024-12-31T20:00:00Z",
-      notes: "Looking forward to this event!",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
     const output = await useCase.execute(input);
@@ -180,13 +158,9 @@ describe("AttendEventUseCase Unit Tests", () => {
     const audience = Audience.fake().build();
     await repository.insert(audience);
 
-    const pastDate = "2023-01-01T20:00:00Z";
     const input: AttendEventInput = {
       audience_id: audience.id.id,
-      event_id: "event_past",
-      establishment_id: "establishment_123",
-      event_date: pastDate,
-      notes: "Past event attendance",
+      event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
     const output = await useCase.execute(input);

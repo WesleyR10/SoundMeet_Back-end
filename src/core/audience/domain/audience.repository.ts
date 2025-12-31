@@ -11,6 +11,7 @@ export type AudienceFilter = {
   email?: string | null;
   is_active?: boolean | null;
   favorite_genres?: string[] | null;
+  favorite_instruments?: string[] | null;
   min_points?: number | null;
   min_level?: number | null;
   notification_settings?: any | null;
@@ -48,6 +49,10 @@ export class AudienceSearchParams extends SearchParams<AudienceFilter> {
         }),
       ...(_value &&
         _value.favorite_genres && { favorite_genres: _value.favorite_genres }),
+      ...(_value &&
+        _value.favorite_instruments && {
+          favorite_instruments: _value.favorite_instruments,
+        }),
       ...(_value &&
         typeof _value.min_points === "number" && {
           min_points: _value.min_points,
@@ -98,5 +103,4 @@ export interface IAudienceRepository extends ISearchableRepository<
   // Métodos de gamificação
   findTopFans(limit?: number): Promise<Audience[]>;
   findByLevel(level: number): Promise<Audience[]>;
-  incrementTips(audienceId: AudienceId, amount: number): Promise<void>;
 }

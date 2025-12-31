@@ -1,5 +1,5 @@
-import { MusicianIndicatedEvent } from "../musician-indicated.event";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { MusicianIndicatedEvent } from "../musician-indicated.event";
 
 describe("MusicianIndicatedEvent Unit Tests", () => {
   test("should create a musician indicated event", () => {

@@ -1,27 +1,26 @@
 import {
   AggregateRoot,
-  Uuid,
-  Email,
-  Phone,
   AudienceLevel,
   AudiencePoints,
   AudiencePreferences,
+  Email,
+  Phone,
+  Uuid,
 } from "../../shared/domain";
 import { ValueObject } from "../../shared/domain/value-object";
 import { AudienceValidatorFactory } from "./audience.validator";
 import { AudienceFakeBuilder } from "./audience-fake.builder";
-import { MusicianQRCodeScannedEvent } from "./events/musician-qr-code-scanned.event";
-import { MusicRequestMadeEvent } from "./events/music-request-made.event";
-import { TipSentEvent } from "./events/tip-sent.event";
-import { SongVotedEvent } from "./events/song-voted.event";
-import { SocialMediaSharedEvent } from "./events/social-media-shared.event";
-import { MusicianIndicatedEvent } from "./events/musician-indicated.event";
-import { AudienceCreatedEvent } from "./events/audience-created.event";
-
-import { AudienceUpdatedEvent } from "./events/audience-updated.event";
-import { AudiencePreferencesUpdatedEvent } from "./events/audience-preferences-updated.event";
-import { AudienceLevelUpgradedEvent } from "./events/audience-level-upgraded.event";
 import { AudienceBadgeEarnedEvent } from "./events/audience-badge-earned.event";
+import { AudienceCreatedEvent } from "./events/audience-created.event";
+import { AudienceLevelUpgradedEvent } from "./events/audience-level-upgraded.event";
+import { AudiencePreferencesUpdatedEvent } from "./events/audience-preferences-updated.event";
+import { AudienceUpdatedEvent } from "./events/audience-updated.event";
+import { MusicRequestMadeEvent } from "./events/music-request-made.event";
+import { MusicianIndicatedEvent } from "./events/musician-indicated.event";
+import { MusicianQRCodeScannedEvent } from "./events/musician-qr-code-scanned.event";
+import { SocialMediaSharedEvent } from "./events/social-media-shared.event";
+import { SongVotedEvent } from "./events/song-voted.event";
+import { TipSentEvent } from "./events/tip-sent.event";
 
 export type AudienceConstructorProps = {
   id?: AudienceId;
@@ -50,6 +49,7 @@ export type AudienceCreateCommand = {
   phone?: string | null;
   favorite_genres?: string[];
   favorite_artists?: string[];
+  favorite_instruments?: string[];
   preferred_languages?: string[];
   is_active?: boolean;
 };
@@ -131,6 +131,10 @@ export class Audience extends AggregateRoot {
           props.preferences.favoriteArtists ||
           props.preferences.favorite_artists ||
           [],
+        favoriteInstruments:
+          props.preferences.favoriteInstruments ||
+          props.preferences.favorite_instruments ||
+          [],
         preferredLanguages: props.preferences.preferredLanguages ||
           props.preferences.preferred_languages || ["pt-BR"],
         location: props.preferences.location || null,
@@ -172,6 +176,7 @@ export class Audience extends AggregateRoot {
       this.preferences = new AudiencePreferences({
         favoriteGenres: [],
         favoriteArtists: [],
+        favoriteInstruments: [],
         preferredLanguages: ["pt-BR"],
         location: null,
         socialLinks: null,
@@ -231,6 +236,10 @@ export class Audience extends AggregateRoot {
     return this.preferences.favoriteArtists;
   }
 
+  get favorite_instruments(): string[] {
+    return this.preferences.favoriteInstruments;
+  }
+
   get preferred_languages(): string[] {
     return this.preferences.preferredLanguages;
   }
@@ -251,6 +260,7 @@ export class Audience extends AggregateRoot {
     const preferences = new AudiencePreferences({
       favoriteGenres: command.favorite_genres || [],
       favoriteArtists: command.favorite_artists || [],
+      favoriteInstruments: command.favorite_instruments || [],
       preferredLanguages: command.preferred_languages || ["pt-BR"],
       notificationSettings: {
         pushNotifications: true,
@@ -364,6 +374,7 @@ export class Audience extends AggregateRoot {
         audience_id: this.id,
         favorite_genres: this.favorite_genres,
         favorite_artists: this.favorite_artists,
+        favorite_instruments: this.favorite_instruments,
         preferred_languages: this.preferred_languages,
         updated_at: this.updated_at,
       }),
@@ -374,6 +385,7 @@ export class Audience extends AggregateRoot {
     preferences: Partial<{
       favorite_genres: string[];
       favorite_artists: string[];
+      favorite_instruments: string[];
       preferred_languages: string[];
       notification_settings: any;
       privacy_settings: any;
@@ -393,6 +405,13 @@ export class Audience extends AggregateRoot {
       updatedPreferences = new AudiencePreferences({
         ...updatedPreferences.toJSON(),
         favoriteArtists: preferences.favorite_artists,
+      });
+    }
+
+    if (preferences.favorite_instruments) {
+      updatedPreferences = new AudiencePreferences({
+        ...updatedPreferences.toJSON(),
+        favoriteInstruments: preferences.favorite_instruments,
       });
     }
 
@@ -439,6 +458,15 @@ export class Audience extends AggregateRoot {
     this.preferences = new AudiencePreferences({
       ...this.preferences.toJSON(),
       favoriteArtists: artists,
+    });
+    this.updated_at = new Date();
+    this.dispatchPreferencesEvent();
+  }
+
+  updateFavoriteInstruments(instruments: string[]): void {
+    this.preferences = new AudiencePreferences({
+      ...this.preferences.toJSON(),
+      favoriteInstruments: instruments,
     });
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
@@ -722,6 +750,7 @@ export class Audience extends AggregateRoot {
       preferences: {
         favorite_genres: this.preferences.favoriteGenres,
         favorite_artists: this.preferences.favoriteArtists,
+        favorite_instruments: this.preferences.favoriteInstruments,
         preferred_languages: this.preferences.preferredLanguages,
         notification_settings: this.preferences.notificationSettings,
         privacy_settings: this.preferences.privacySettings,

@@ -1,13 +1,13 @@
-import { ScanQRUseCase } from "../scan-qr.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import { ScanQRInput } from "../scan-qr.input";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { Points } from "../../../../../shared/domain/value-objects/points.vo";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { Points } from "../../../../../shared/domain/value-objects/points.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { ScanQRInput } from "../scan-qr.input";
+import { ScanQRUseCase } from "../scan-qr.use-case";
 
 describe("ScanQRUseCase Unit Tests", () => {
   let useCase: ScanQRUseCase;

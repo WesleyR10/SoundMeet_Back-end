@@ -1,6 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import {
@@ -43,14 +43,12 @@ export class UpdateAudienceUseCase implements IUseCase<
       audience.updateFavoriteGenres(input.favorite_genres);
     }
 
-    if ((input as any).favorite_artists !== undefined) {
-      audience.updateFavoriteArtists((input as any).favorite_artists);
+    if (input.favorite_artists !== undefined) {
+      audience.updateFavoriteArtists(input.favorite_artists);
     }
 
     if (input.favorite_instruments !== undefined) {
-      audience.updatePreferences({
-        favorite_artists: input.favorite_instruments, // Note: This might need to be mapped differently based on your domain logic
-      });
+      audience.updateFavoriteInstruments(input.favorite_instruments);
     }
 
     if (input.is_active !== undefined) {

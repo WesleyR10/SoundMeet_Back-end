@@ -1,12 +1,12 @@
-import { CompleteProfileUseCase } from "../complete-profile.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import { CompleteProfileInput } from "../complete-profile.input";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { CompleteProfileInput } from "../complete-profile.input";
+import { CompleteProfileUseCase } from "../complete-profile.use-case";
 
 describe("CompleteProfileUseCase Unit Tests", () => {
   let useCase: CompleteProfileUseCase;

@@ -1,12 +1,12 @@
-import { VoteSongUseCase } from "../vote-song.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { Audience } from "../../../../domain/audience.aggregate";
-import { VoteSongInput } from "../vote-song.input";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { VoteSongInput } from "../vote-song.input";
+import { VoteSongUseCase } from "../vote-song.use-case";
 
 describe("VoteSongUseCase Unit Tests", () => {
   let useCase: VoteSongUseCase;

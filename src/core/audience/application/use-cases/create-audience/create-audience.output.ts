@@ -6,6 +6,7 @@ export type CreateAudienceOutput = {
   avatar: string | null;
   phone: string | null;
   favorite_genres: string[];
+  favorite_artists: string[];
   favorite_instruments: string[];
   total_points: number;
   current_level: number;

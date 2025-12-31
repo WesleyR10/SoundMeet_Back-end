@@ -1,5 +1,6 @@
+import { AudiencePoints, Email, Phone } from "@core/shared/domain";
+
 import { Audience, AudienceId } from "../audience.aggregate";
-import { Email, Phone, AudiencePoints } from "@core/shared/domain";
 
 describe("Audience Without Validator Unit Tests", () => {
   beforeEach(() => {
@@ -161,9 +162,12 @@ describe("Audience Without Validator Unit Tests", () => {
     audience.scanMusicianQRCode(musicianId, musicianName);
 
     expect(audience.points.total).toBeGreaterThan(initialPoints);
-    expect(audience.events.size).toBe(1);
-    const event = Array.from(audience.events)[0];
-    expect(event.constructor.name).toBe("MusicianQRCodeScannedEvent");
+    expect(audience.events.size).toBe(2);
+    const eventNames = Array.from(audience.events).map(
+      (event) => event.constructor.name,
+    );
+    expect(eventNames).toContain("AudienceBadgeEarnedEvent");
+    expect(eventNames).toContain("MusicianQRCodeScannedEvent");
   });
 
   test("should make music request", () => {

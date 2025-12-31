@@ -1,8 +1,8 @@
-import { GetAudienceUseCase } from "../get-audience.use-case";
-import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Audience } from "../../../../domain/audience.aggregate";
 import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { GetAudienceUseCase } from "../get-audience.use-case";
 
 describe("GetAudienceUseCase Unit Tests", () => {
   let useCase: GetAudienceUseCase;
@@ -29,7 +29,7 @@ describe("GetAudienceUseCase Unit Tests", () => {
       badges: audience.badges,
       favorite_genres: audience.favorite_genres,
       favorite_artists: audience.favorite_artists,
-      // favorite_instruments: audience.favorite_instruments, // Removido pois não existe no aggregate
+      favorite_instruments: audience.favorite_instruments,
       points: {
         total: audience.totalPoints,
         monthly: audience.monthlyPoints,
@@ -45,6 +45,7 @@ describe("GetAudienceUseCase Unit Tests", () => {
       preferences: {
         favorite_genres: audience.favorite_genres,
         favorite_artists: audience.favorite_artists,
+        favorite_instruments: audience.favorite_instruments,
         preferred_languages: audience.preferences.preferredLanguages,
         notification_settings: audience.preferences.notificationSettings,
         privacy_settings: audience.preferences.privacySettings,

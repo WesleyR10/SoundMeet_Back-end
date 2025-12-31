@@ -1,5 +1,5 @@
-import { SongVotedEvent } from "../song-voted.event";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { SongVotedEvent } from "../song-voted.event";
 
 describe("SongVotedEvent Unit Tests", () => {
   test("should create a song voted event with up vote", () => {
