@@ -9,6 +9,7 @@
     "target": "ES2020",
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
@@ -24,5 +25,6 @@
         "./src/core/*"
       ]
     }
-  }
+  },
+  "include": ["src/**/*.ts"]
 }
