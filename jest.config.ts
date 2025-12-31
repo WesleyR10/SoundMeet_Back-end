@@ -206,6 +206,7 @@ const config: Config = {
   },
   modulePathIgnorePatterns: [
     '<rootDir>/../dist',
+    '<rootDir>/../dist-dev',
     '<rootDir>/../node_modules',
     '<rootDir>/../.trae-server',
     '<rootDir>/../.cursor-server',

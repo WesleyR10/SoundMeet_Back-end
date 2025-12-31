@@ -6,6 +6,19 @@
     "deleteOutDir": true,
     "builder": "swc",
     "typeCheck": true,
-    "tsConfigPath": "tsconfig.build.json"
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "classValidatorShim": true,
+          "introspectComments": false,
+          "dtoFileNameSuffix": [
+            ".dto.ts",
+            ".input.ts",
+            ".presenter.ts"
+          ]
+        }
+      }
+    ]
   }
 }

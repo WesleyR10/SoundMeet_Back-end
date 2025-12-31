@@ -1,5 +1,6 @@
 # compiled output
 /dist
+/dist-dev
 /node_modules
 
 # Logs
@@ -48,6 +49,9 @@ lerna-debug.log*
 
 # Prisma
 /prisma/migrations/
+
+# Nest Swagger plugin
+/src/metadata.ts
 
 # Docker
 .docker/
