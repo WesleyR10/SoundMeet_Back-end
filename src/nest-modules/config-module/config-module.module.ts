@@ -5,6 +5,7 @@ import {
 } from "@nestjs/config";
 import Joi from "joi";
 import { join } from "path";
+
 import { CONFIG_SCHEMA_TYPE } from "./config.schema";
 
 export type ConfigSchemaType = typeof CONFIG_SCHEMA_TYPE;

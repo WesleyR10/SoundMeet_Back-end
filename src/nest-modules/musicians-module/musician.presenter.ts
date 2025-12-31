@@ -1,4 +1,5 @@
 import { Transform } from "class-transformer";
+
 import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-output";
 import { ListMusiciansOutput } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { CollectionPresenter } from "../shared-module/collection.presenter";

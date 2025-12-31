@@ -31,9 +31,10 @@ jest.mock("@prisma/client", () => {
   };
 });
 
-import { Test } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
+import { Test } from "@nestjs/testing";
 import { PrismaPg } from "@prisma/adapter-pg";
+
 import {
   createMongoConnectionOptions,
   createRedisCacheOptions,

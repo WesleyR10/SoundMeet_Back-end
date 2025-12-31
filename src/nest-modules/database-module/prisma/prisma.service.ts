@@ -1,14 +1,15 @@
 import {
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
-  Logger,
 } from "@nestjs/common";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { queryTags } from "@prisma/sqlcommenter-query-tags";
 import { traceContext } from "@prisma/sqlcommenter-trace-context";
-import { ConfigService } from "@nestjs/config";
+
 import { EnvConfig } from "../../config-module/config.schema";
 
 @Injectable()

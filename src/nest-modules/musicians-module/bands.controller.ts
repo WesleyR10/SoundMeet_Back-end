@@ -9,21 +9,17 @@ import {
   ParseUUIDPipe,
   Post,
 } from "@nestjs/common";
-import {
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from "@nestjs/swagger";
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+
+import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { BandOutput } from "../../core/musician/application/use-cases/common/band-output";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
-import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
-import { BandOutput } from "../../core/musician/application/use-cases/common/band-output";
-import { CreateBandDto } from "./dto/create-band.dto";
-import { AddBandMemberDto } from "./dto/add-band-member.dto";
-import { RemoveBandMemberDto } from "./dto/remove-band-member.dto";
 import { BandPresenter } from "./band.presenter";
+import { AddBandMemberDto } from "./dto/add-band-member.dto";
+import { CreateBandDto } from "./dto/create-band.dto";
+import { RemoveBandMemberDto } from "./dto/remove-band-member.dto";
 
 @ApiTags("Bands")
 @Controller("bands")

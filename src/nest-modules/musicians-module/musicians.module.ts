@@ -1,8 +1,9 @@
 import { Module } from "@nestjs/common";
-import { MusiciansController } from "./musicians.controller";
+
 import { DatabaseModule } from "../database-module/database.module";
-import { MUSICIANS_PROVIDERS } from "./musicians.providers";
 import { BandsController } from "./bands.controller";
+import { MusiciansController } from "./musicians.controller";
+import { MUSICIANS_PROVIDERS } from "./musicians.providers";
 
 @Module({
   imports: [DatabaseModule],

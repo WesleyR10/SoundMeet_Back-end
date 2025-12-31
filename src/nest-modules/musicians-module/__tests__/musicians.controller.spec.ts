@@ -1,14 +1,14 @@
+import { MusicianOutput } from "../../../core/musician/application/use-cases/common/musician-output";
+import { ListMusiciansOutput } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { SortDirection } from "../../../core/shared/domain/repository/search-params";
-import { MusiciansController } from "../musicians.controller";
 import { CreateMusicianDto } from "../dto/create-musician.dto";
-import { UpdateMusicianDto } from "../dto/update-musician.dto";
 import { SearchMusiciansDto } from "../dto/search-musicians.dto";
+import { UpdateMusicianDto } from "../dto/update-musician.dto";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
 } from "../musician.presenter";
-import { MusicianOutput } from "../../../core/musician/application/use-cases/common/musician-output";
-import { ListMusiciansOutput } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
+import { MusiciansController } from "../musicians.controller";
 
 function makeMusicianOutput(
   overrides: Partial<MusicianOutput> = {},

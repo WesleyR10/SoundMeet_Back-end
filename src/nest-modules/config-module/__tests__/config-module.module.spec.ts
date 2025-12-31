@@ -1,5 +1,6 @@
 import Joi from "joi";
 import { join } from "path";
+
 import {
   CONFIG_AUTH_SCHEMA,
   CONFIG_DATABASE_CACHE_SCHEMA,

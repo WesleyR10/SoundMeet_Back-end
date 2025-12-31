@@ -1,17 +1,17 @@
-import { PrismaService } from "../database-module/prisma/prisma.service";
-import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
-import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
-import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
-import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
-import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
-import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
-import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
+import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
+import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
+import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
+import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
+import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
-import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
-import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
-import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
+import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
+import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
+import { PrismaService } from "../database-module/prisma/prisma.service";
 
 export const REPOSITORIES = {
   MUSICIAN_REPOSITORY: {

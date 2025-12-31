@@ -1,13 +1,14 @@
+import { CacheModule } from "@nestjs/cache-manager";
 import { Global, Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   MongooseModule,
   type MongooseModuleFactoryOptions,
 } from "@nestjs/mongoose";
-import { CacheModule } from "@nestjs/cache-manager";
 import { redisStore } from "cache-manager-redis-store";
-import { ConfigService } from "@nestjs/config";
-import { PrismaService } from "./prisma/prisma.service";
+
 import { ConfigSchemaType } from "../config-module/config.schema";
+import { PrismaService } from "./prisma/prisma.service";
 
 export function createMongoConnectionOptions(
   configService: ConfigSchemaType,
@@ -21,13 +22,9 @@ export function createMongoConnectionOptions(
 
 export async function createRedisCacheOptions(configService: ConfigSchemaType) {
   const redisUrl = configService.get("REDIS_URL");
-  const url = new URL(redisUrl);
-
   return {
     store: redisStore as any,
-    host: url.hostname,
-    port: parseInt(url.port) || 6379,
-    password: url.password || undefined,
+    url: redisUrl,
     ttl: 300,
   };
 }

@@ -12,19 +12,20 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { CreateMusicianDto } from "./dto/create-musician.dto";
-import { UpdateMusicianDto } from "./dto/update-musician.dto";
+
+import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-output";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
-import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
+import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
+import { CreateMusicianDto } from "./dto/create-musician.dto";
+import { SearchMusiciansDto } from "./dto/search-musicians.dto";
+import { UpdateMusicianDto } from "./dto/update-musician.dto";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
 } from "./musician.presenter";
-import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-output";
-import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 
 @ApiTags("Musicians")
 @Controller("musicians")

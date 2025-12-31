@@ -1,4 +1,5 @@
 import { Transform } from "class-transformer";
+
 import { BandOutput } from "../../core/musician/application/use-cases/common/band-output";
 
 export class BandPresenter {
