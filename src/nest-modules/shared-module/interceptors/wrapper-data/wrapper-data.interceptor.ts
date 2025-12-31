@@ -4,7 +4,7 @@ import {
   Injectable,
   NestInterceptor,
 } from "@nestjs/common";
-import { Observable, map } from "rxjs"; //reactive x
+import { map, Observable } from "rxjs"; //reactive x
 
 @Injectable()
 export class WrapperDataInterceptor implements NestInterceptor {

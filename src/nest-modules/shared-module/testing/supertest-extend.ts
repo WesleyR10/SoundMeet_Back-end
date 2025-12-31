@@ -2,12 +2,6 @@ import { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Test } from "supertest";
 
-declare module "supertest" {
-  interface Test {
-    authenticate(app: INestApplication, forceAdmin?: boolean);
-  }
-}
-
 //@ts-expect-error - this is a hack to extend the Test class
 Test.prototype.authenticate = function (
   app: INestApplication,
