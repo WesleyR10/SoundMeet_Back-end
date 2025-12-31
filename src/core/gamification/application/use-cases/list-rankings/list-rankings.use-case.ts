@@ -1,22 +1,23 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
-
-import { ListRankingsInput } from "./list-rankings.input";
-import {
-  PaginationOutput,
-  PaginationOutputMapper,
-} from "../../../../shared/application/pagination-output";
 import {
   IRankingRepository,
   RankingSearchParams,
   RankingSearchResult,
 } from "@core/gamification/domain";
 
+import {
+  PaginationOutput,
+  PaginationOutputMapper,
+} from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
+import { ListRankingsInput } from "./list-rankings.input";
+
 export type ListRankingsOutput = PaginationOutput<RankingOutput>;
 
-export class ListRankingsUseCase
-  implements IUseCase<ListRankingsInput, ListRankingsOutput>
-{
+export class ListRankingsUseCase implements IUseCase<
+  ListRankingsInput,
+  ListRankingsOutput
+> {
   constructor(private rankingRepository: IRankingRepository) {}
 
   async execute(input: ListRankingsInput): Promise<ListRankingsOutput> {

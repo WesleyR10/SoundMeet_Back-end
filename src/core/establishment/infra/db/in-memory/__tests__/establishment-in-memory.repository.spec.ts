@@ -1,8 +1,8 @@
-import { EstablishmentInMemoryRepository } from "../establishment-in-memory.repository";
-import { Establishment } from "../../../../domain/establishment.aggregate";
-import { Email } from "../../../../../shared/domain/value-objects/email.vo";
 import { Address } from "../../../../../shared/domain/value-objects/address.vo";
+import { Email } from "../../../../../shared/domain/value-objects/email.vo";
 import { Rating } from "../../../../../shared/domain/value-objects/rating.vo";
+import { Establishment } from "../../../../domain/establishment.aggregate";
+import { EstablishmentInMemoryRepository } from "../establishment-in-memory.repository";
 
 describe("EstablishmentInMemoryRepository", () => {
   let repository: EstablishmentInMemoryRepository;
@@ -558,7 +558,13 @@ describe("EstablishmentInMemoryRepository", () => {
       filter: { name: "bar" },
     };
 
-    const result = await repository.search(searchParams);
+    const result = await repository.search({
+      page: searchParams.page,
+      per_page: searchParams.per_page,
+      sort: searchParams.sort,
+      sort_dir: searchParams.sort_dir,
+      filter: searchParams.filter,
+    } as any);
 
     expect(result.items).toHaveLength(2);
     expect(result.items[0].name).toBe("Blues Bar");

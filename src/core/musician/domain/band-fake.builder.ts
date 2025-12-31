@@ -1,5 +1,5 @@
-
 import { Chance } from "chance";
+
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Band, BandId, BandMemberProps } from "./band.aggregate";
 
@@ -111,7 +111,9 @@ export class BandFakeBuilder<TBuild = any> {
       });
       return band;
     });
-    return this.countObjs === 1 ? (bands[0] as any) : bands;
+    return this.countObjs === 1
+      ? (bands[0] as unknown as TBuild)
+      : (bands as unknown as TBuild);
   }
 
   get band_id() {
@@ -154,9 +156,7 @@ export class BandFakeBuilder<TBuild = any> {
     const optional = ["band_id", "created_at", "updated_at"];
     const privateProp = `_${prop}` as keyof this;
     if (!this[privateProp] && optional.includes(prop)) {
-      throw new Error(
-        `Property ${prop} not has a factory, use 'with' methods`,
-      );
+      throw new Error(`Property ${prop} not has a factory, use 'with' methods`);
     }
     return this.callFactory(this[privateProp], 0);
   }

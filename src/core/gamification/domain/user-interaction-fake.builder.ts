@@ -1,6 +1,7 @@
 import { Chance } from "chance";
-import { UserInteraction } from "./user-interaction.aggregate";
+
 import { Uuid } from "../../shared/domain";
+import { UserInteraction } from "./user-interaction.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

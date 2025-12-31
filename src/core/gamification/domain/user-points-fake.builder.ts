@@ -1,6 +1,7 @@
 import { Chance } from "chance";
-import { UserPoints, UserPointsId } from "./user-points.aggregate";
+
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+import { UserPoints, UserPointsId } from "./user-points.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

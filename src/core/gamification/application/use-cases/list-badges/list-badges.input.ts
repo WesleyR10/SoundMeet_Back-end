@@ -1,14 +1,15 @@
 import {
-  IsOptional,
-  IsNumber,
-  Min,
-  IsString,
   IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
   validateSync,
 } from "class-validator";
+
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
-import { BadgeFilter } from "../../../domain/badge.repository";
 import { BadgeCategory, BadgeRarity } from "../../../domain/badge.aggregate";
+import { BadgeFilter } from "../../../domain/badge.repository";
 
 export type ListBadgesInputConstructorProps = {
   page?: number;

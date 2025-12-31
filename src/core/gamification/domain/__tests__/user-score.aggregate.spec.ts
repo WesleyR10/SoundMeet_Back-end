@@ -1,6 +1,6 @@
+import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
 import { UserScore, UserScoreId } from "../user-score.aggregate";
 import { ScoreTypeEnum } from "../value-objects/score-type.vo";
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
 
 describe("UserScore Unit Tests without validator", () => {
   beforeEach(() => {

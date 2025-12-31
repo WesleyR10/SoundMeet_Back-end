@@ -5,10 +5,10 @@ import {
   UserPointsId,
 } from "../../../domain/user-points.aggregate";
 import {
+  IUserPointsRepository,
   UserPointsFilter,
   UserPointsSearchParams,
   UserPointsSearchResult,
-  IUserPointsRepository,
 } from "../../../domain/user-points.repository";
 
 export class UserPointsInMemoryRepository

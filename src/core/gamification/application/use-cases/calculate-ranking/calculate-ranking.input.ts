@@ -1,4 +1,5 @@
 import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
+
 import {
   RankingPeriodEnum,
   RankingTypeEnum,

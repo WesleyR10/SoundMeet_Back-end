@@ -1,8 +1,5 @@
+import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
-import { Email } from "../../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
-import { QRCode } from "../../../../shared/domain/value-objects/qr-code.vo";
-import { Rating } from "../../../../shared/domain/value-objects/rating.vo";
 
 export type MusicianModelProps = {
   id: string;
@@ -21,6 +18,7 @@ export type MusicianModelProps = {
   is_active: boolean;
   is_verified: boolean;
   created_at: Date;
+  updated_at: Date;
 };
 
 export class MusicianModelMapper {
@@ -42,11 +40,12 @@ export class MusicianModelMapper {
       is_active: entity.is_active,
       is_verified: entity.is_verified,
       created_at: entity.created_at,
+      updated_at: entity.updated_at,
     };
   }
 
   static toEntity(model: MusicianModelProps): Musician {
-    return new Musician({
+    const musician = new Musician({
       id: new MusicianId(model.id),
       email: model.email,
       name: model.name,
@@ -63,6 +62,15 @@ export class MusicianModelMapper {
       is_active: model.is_active,
       is_verified: model.is_verified,
       created_at: model.created_at,
+      updated_at: model.updated_at,
     });
+
+    musician.validate();
+
+    if (musician.notification.hasErrors()) {
+      throw new LoadEntityError(musician.notification.toJSON());
+    }
+
+    return musician;
   }
 }

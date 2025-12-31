@@ -1,6 +1,6 @@
-import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
-import { BadgeType } from "../../../domain/value-objects/badge-type.vo";
 import { Prisma } from "@prisma/client";
+
+import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
 
 // Tipo que reflete o schema Prisma real
 export type UserBadgePrismaModel = {

@@ -5,9 +5,10 @@ import { IBandRepository } from "../../../domain/band.repository";
 import { BandOutput, BandOutputMapper } from "../common/band-output";
 import { CreateBandInput } from "./create-band.input";
 
-export class CreateBandUseCase
-  implements IUseCase<CreateBandInput, BandOutput>
-{
+export class CreateBandUseCase implements IUseCase<
+  CreateBandInput,
+  BandOutput
+> {
   constructor(private readonly bandRepo: IBandRepository) {}
 
   async execute(input: CreateBandInput): Promise<BandOutput> {

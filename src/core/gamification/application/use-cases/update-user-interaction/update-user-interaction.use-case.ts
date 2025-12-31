@@ -1,18 +1,20 @@
+import { UserInteractionId } from "@core/gamification/domain/value-objects/gamification-id.vo";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { UserInteraction } from "../../../domain/user-interaction.aggregate";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { UserInteraction } from "../../../domain/user-interaction.aggregate";
 import { IUserInteractionRepository } from "../../../domain/user-interaction.repository";
 import {
   UserInteractionOutput,
   UserInteractionOutputMapper,
 } from "../common/user-interaction-output";
 import { UpdateUserInteractionInput } from "./update-user-interaction.input";
-import { UserInteractionId } from "@core/gamification/domain/value-objects/gamification-id.vo";
 
-export class UpdateUserInteractionUseCase
-  implements IUseCase<UpdateUserInteractionInput, UpdateUserInteractionOutput>
-{
+export class UpdateUserInteractionUseCase implements IUseCase<
+  UpdateUserInteractionInput,
+  UpdateUserInteractionOutput
+> {
   constructor(
     private readonly userInteractionRepo: IUserInteractionRepository,
   ) {}

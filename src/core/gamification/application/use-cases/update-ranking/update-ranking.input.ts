@@ -1,8 +1,8 @@
 import {
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
-  IsNumber,
   Min,
   validateSync,
 } from "class-validator";

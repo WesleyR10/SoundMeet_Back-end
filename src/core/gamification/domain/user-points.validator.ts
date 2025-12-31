@@ -1,13 +1,14 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsNumber,
-  Min,
-  Max,
-  IsDate,
   IsBoolean,
+  IsDate,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { UserPoints } from "./user-points.aggregate";

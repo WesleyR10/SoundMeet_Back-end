@@ -1,4 +1,5 @@
 import { Chance } from "chance";
+
 import { Musician, MusicianId } from "./musician.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);

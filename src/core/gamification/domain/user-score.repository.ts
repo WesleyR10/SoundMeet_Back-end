@@ -47,14 +47,13 @@ export class UserScoreSearchParams extends DefaultSearchParams<UserScoreFilter> 
 
 export class UserScoreSearchResult extends DefaultSearchResult<UserScore> {}
 
-export interface IUserScoreRepository
-  extends ISearchableRepository<
-    UserScore,
-    UserScoreId,
-    UserScoreFilter,
-    UserScoreSearchParams,
-    UserScoreSearchResult
-  > {
+export interface IUserScoreRepository extends ISearchableRepository<
+  UserScore,
+  UserScoreId,
+  UserScoreFilter,
+  UserScoreSearchParams,
+  UserScoreSearchResult
+> {
   findByUserAndType(user_id: string, score_type: string): Promise<UserScore[]>;
   getTotalPointsByUser(user_id: string): Promise<number>;
   getPointsByUserAndType(user_id: string, score_type: string): Promise<number>;

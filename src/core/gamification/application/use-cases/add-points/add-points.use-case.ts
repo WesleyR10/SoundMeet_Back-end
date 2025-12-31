@@ -2,19 +2,17 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { UserPoints } from "../../../domain/user-points.aggregate";
 import { IUserPointsRepository } from "../../../domain/user-points.repository";
-import {
-  PointsSource,
-  PointsSourceEnum,
-} from "../../../domain/value-objects/points-source.vo";
+import { PointsSourceEnum } from "../../../domain/value-objects/points-source.vo";
 import {
   UserPointsOutput,
   UserPointsOutputMapper,
 } from "../common/user-points-output";
 import { AddPointsInput } from "./add-points.input";
 
-export class AddPointsUseCase
-  implements IUseCase<AddPointsInput, UserPointsOutput>
-{
+export class AddPointsUseCase implements IUseCase<
+  AddPointsInput,
+  UserPointsOutput
+> {
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: AddPointsInput): Promise<UserPointsOutput> {

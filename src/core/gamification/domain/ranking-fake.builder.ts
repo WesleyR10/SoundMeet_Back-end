@@ -1,10 +1,11 @@
 import { Chance } from "chance";
+
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Ranking, RankingId } from "./ranking.aggregate";
 import {
   RankingPeriodEnum,
   RankingTypeEnum,
 } from "./value-objects/ranking-type.vo";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

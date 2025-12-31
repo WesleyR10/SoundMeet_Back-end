@@ -17,6 +17,8 @@ export type MusicianOutput = {
   is_active: boolean;
   is_verified: boolean;
   created_at: Date;
+
+  updated_at: Date;
   display_name: string;
   is_experienced: boolean;
   is_highly_rated: boolean;

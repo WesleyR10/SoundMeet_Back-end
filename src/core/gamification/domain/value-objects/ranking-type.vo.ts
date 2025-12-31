@@ -1,5 +1,5 @@
-import { ValueObject } from "../../../shared/domain/value-object";
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum RankingTypeEnum {
   TOP_FAS = "top_fas",

@@ -1,5 +1,5 @@
-import { UserPoints, UserPointsId } from "../user-points.aggregate";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
+import { UserPoints, UserPointsId } from "../user-points.aggregate";
 import { UserLevel } from "../value-objects/user-level.vo";
 
 describe("UserPoints Unit Tests without validator", () => {

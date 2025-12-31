@@ -1,5 +1,5 @@
-import { ValueObject } from "../../../shared/domain/value-object";
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum BadgeTypeEnum {
   INICIANTE_MUSICAL = "iniciante_musical",

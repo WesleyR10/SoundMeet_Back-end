@@ -1,11 +1,12 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { IRankingRepository } from "../../../domain/ranking.repository";
 import { PeriodType } from "../../../domain/ranking.aggregate";
+import { IRankingRepository } from "../../../domain/ranking.repository";
 import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
 
-export class GetRankingUseCase
-  implements IUseCase<GetRankingInput, GetRankingOutput>
-{
+export class GetRankingUseCase implements IUseCase<
+  GetRankingInput,
+  GetRankingOutput
+> {
   constructor(private readonly rankingRepo: IRankingRepository) {}
 
   async execute(input: GetRankingInput): Promise<GetRankingOutput> {

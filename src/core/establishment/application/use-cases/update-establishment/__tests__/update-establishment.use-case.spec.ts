@@ -1,14 +1,12 @@
-import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
-import { UpdateEstablishmentUseCase } from "../update-establishment.use-case";
-import { UpdateEstablishmentInput } from "../update-establishment.input";
-import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
 import {
   Establishment,
   EstablishmentId,
 } from "../../../../domain/establishment.aggregate";
 import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
+import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
+import { UpdateEstablishmentUseCase } from "../update-establishment.use-case";
 
 describe("UpdateEstablishmentUseCase Unit Tests", () => {
   let useCase: UpdateEstablishmentUseCase;

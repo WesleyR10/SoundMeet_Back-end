@@ -1,12 +1,8 @@
-import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
-import { CreateEstablishmentUseCase } from "../create-establishment.use-case";
-import { CreateEstablishmentInput } from "../create-establishment.input";
 import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
-import {
-  Establishment,
-  EstablishmentId,
-} from "../../../../domain/establishment.aggregate";
+import { EstablishmentId } from "../../../../domain/establishment.aggregate";
+import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
+import { CreateEstablishmentInput } from "../create-establishment.input";
+import { CreateEstablishmentUseCase } from "../create-establishment.use-case";
 
 describe("CreateEstablishmentUseCase Unit Tests", () => {
   let useCase: CreateEstablishmentUseCase;
@@ -18,10 +14,17 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
   });
 
   it("should throw an error when aggregate is not valid", async () => {
-    const input = {
+    const input: CreateEstablishmentInput = {
       name: "t".repeat(256),
       email: "invalid-email",
       cnpj: "12.345.678/0001-90",
+      phone: "+5500000000000",
+      address_street: "",
+      address_number: "",
+      address_city: "",
+      address_state: "",
+      address_zipcode: "",
+      establishment_type: "bar",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -132,7 +135,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
   });
 
   it("should create an establishment successfully", async () => {
-    const input = {
+    const input: CreateEstablishmentInput = {
       name: "QR Bar",
       email: "qr@bar.com",
       phone: "+5511999999999",
@@ -154,7 +157,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
   });
 
   it("should save the establishment in the repository", async () => {
-    const input = {
+    const input: CreateEstablishmentInput = {
       name: "Save Test Bar",
       email: "save@test.com",
       phone: "+5511888888888",
@@ -180,10 +183,17 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
   });
 
   it("should handle validation errors properly", async () => {
-    const input = {
+    const input: CreateEstablishmentInput = {
       name: "",
       email: "invalid-email",
       cnpj: "",
+      phone: "+5500000000000",
+      address_street: "",
+      address_number: "",
+      address_city: "",
+      address_state: "",
+      address_zipcode: "",
+      establishment_type: "bar",
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(

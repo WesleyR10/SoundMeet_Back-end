@@ -4,10 +4,10 @@ import {
   UserInteractionId,
 } from "../../../domain/user-interaction.aggregate";
 import {
+  IUserInteractionRepository,
   UserInteractionFilter,
   UserInteractionSearchParams,
   UserInteractionSearchResult,
-  IUserInteractionRepository,
 } from "../../../domain/user-interaction.repository";
 
 export class UserInteractionInMemoryRepository
@@ -78,9 +78,7 @@ export class UserInteractionInMemoryRepository
     );
   }
 
-  async getInteractionCountByType(
-    interaction_type: string,
-  ): Promise<number> {
+  async getInteractionCountByType(interaction_type: string): Promise<number> {
     return this.items.filter(
       (item) => item.interaction_type === interaction_type,
     ).length;

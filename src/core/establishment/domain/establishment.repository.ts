@@ -55,11 +55,10 @@ export class EstablishmentSearchParams extends DefaultSearchParams<Establishment
 
 export class EstablishmentSearchResult extends DefaultSearchResult<Establishment> {}
 
-export interface IEstablishmentRepository
-  extends ISearchableRepository<
-    Establishment,
-    EstablishmentId,
-    EstablishmentFilter,
-    EstablishmentSearchParams,
-    EstablishmentSearchResult
-  > {}
+export interface IEstablishmentRepository extends ISearchableRepository<
+  Establishment,
+  EstablishmentId,
+  EstablishmentFilter,
+  EstablishmentSearchParams,
+  EstablishmentSearchResult
+> {}

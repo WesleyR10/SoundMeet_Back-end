@@ -1,18 +1,19 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { UserBadgeId } from "../../../domain/value-objects/gamification-id.vo";
-import { IUserBadgeRepository } from "../../../domain/user-badge.repository";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { UserBadge } from "../../../domain/user-badge.aggregate";
+import { IUserBadgeRepository } from "../../../domain/user-badge.repository";
+import { UserBadgeId } from "../../../domain/value-objects/gamification-id.vo";
 import {
   UserBadgeOutput,
   UserBadgeOutputMapper,
 } from "../common/user-badge-output";
 import { UpdateUserBadgeInput } from "./update-user-badge.input";
 
-export class UpdateUserBadgeUseCase
-  implements IUseCase<UpdateUserBadgeInput, UserBadgeOutput>
-{
+export class UpdateUserBadgeUseCase implements IUseCase<
+  UpdateUserBadgeInput,
+  UserBadgeOutput
+> {
   constructor(private readonly userBadgeRepo: IUserBadgeRepository) {}
 
   async execute(input: UpdateUserBadgeInput): Promise<UserBadgeOutput> {

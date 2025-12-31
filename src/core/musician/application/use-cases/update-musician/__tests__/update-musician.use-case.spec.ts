@@ -1,9 +1,9 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { UpdateMusicianUseCase } from "../update-musician.use-case";
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 
 describe("UpdateMusicianUseCase Unit Tests", () => {
   let useCase: UpdateMusicianUseCase;
@@ -62,7 +62,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
-      qr_code: entity.qr_code.code,
+      qr_code: entity.qr_code!.code,
       created_at: entity.created_at,
       display_name: entity.displayName,
       is_experienced: entity.isExperienced,
@@ -123,7 +123,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           total_ratings: entity.total_ratings,
           is_active: entity.is_active,
           is_verified: entity.is_verified,
-          qr_code: entity.qr_code.code,
+          qr_code: entity.qr_code!.code,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -148,7 +148,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           total_ratings: entity.total_ratings,
           is_active: entity.is_active,
           is_verified: entity.is_verified,
-          qr_code: entity.qr_code.code,
+          qr_code: entity.qr_code!.code,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -173,7 +173,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           total_ratings: entity.total_ratings,
           is_active: entity.is_active,
           is_verified: entity.is_verified,
-          qr_code: entity.qr_code.code,
+          qr_code: entity.qr_code!.code,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -198,7 +198,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           total_ratings: entity.total_ratings,
           is_active: entity.is_active,
           is_verified: entity.is_verified,
-          qr_code: entity.qr_code.code,
+          qr_code: entity.qr_code!.code,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -223,7 +223,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           total_ratings: entity.total_ratings,
           is_active: entity.is_active,
           is_verified: entity.is_verified,
-          qr_code: entity.qr_code.code,
+          qr_code: entity.qr_code!.code,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -248,7 +248,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           total_ratings: entity.total_ratings,
           is_active: false,
           is_verified: entity.is_verified,
-          qr_code: entity.qr_code.code,
+          qr_code: entity.qr_code!.code,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -304,7 +304,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           "is_verified" in i.input
             ? i.input.is_verified
             : freshEntity.is_verified,
-        qr_code: freshEntity.qr_code.code,
+        qr_code: freshEntity.qr_code!.code,
         created_at: freshEntity.created_at,
         display_name:
           "stage_name" in i.input

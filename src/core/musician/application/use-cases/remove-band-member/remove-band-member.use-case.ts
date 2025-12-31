@@ -7,9 +7,10 @@ import { MusicianId } from "../../../domain/musician.aggregate";
 import { BandOutput, BandOutputMapper } from "../common/band-output";
 import { RemoveBandMemberInput } from "./remove-band-member.input";
 
-export class RemoveBandMemberUseCase
-  implements IUseCase<RemoveBandMemberInput, BandOutput>
-{
+export class RemoveBandMemberUseCase implements IUseCase<
+  RemoveBandMemberInput,
+  BandOutput
+> {
   constructor(private readonly bandRepo: IBandRepository) {}
 
   async execute(input: RemoveBandMemberInput): Promise<BandOutput> {

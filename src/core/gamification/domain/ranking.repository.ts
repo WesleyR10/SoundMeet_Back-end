@@ -46,14 +46,13 @@ export class RankingSearchParams extends DefaultSearchParams<RankingFilter> {
 
 export class RankingSearchResult extends DefaultSearchResult<Ranking> {}
 
-export interface IRankingRepository
-  extends ISearchableRepository<
-    Ranking,
-    RankingId,
-    RankingFilter,
-    RankingSearchParams,
-    RankingSearchResult
-  > {
+export interface IRankingRepository extends ISearchableRepository<
+  Ranking,
+  RankingId,
+  RankingFilter,
+  RankingSearchParams,
+  RankingSearchResult
+> {
   findByUserAndEstablishment(
     user_id: string,
     establishment_id: string,

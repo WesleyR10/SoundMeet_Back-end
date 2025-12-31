@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsArray, IsOptional } from "class-validator";
+import { IsNotEmpty, IsString } from "class-validator";
 
 export type AddBandMemberInputConstructorProps = {
   band_id: string;

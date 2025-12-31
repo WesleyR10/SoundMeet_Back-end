@@ -5,9 +5,10 @@ import { IBadgeRepository } from "../../../domain/badge.repository";
 import { BadgeOutput, BadgeOutputMapper } from "../common/badge-output";
 import { CreateBadgeInput } from "./create-badge.input";
 
-export class CreateBadgeUseCase
-  implements IUseCase<CreateBadgeInput, CreateBadgeOutput>
-{
+export class CreateBadgeUseCase implements IUseCase<
+  CreateBadgeInput,
+  CreateBadgeOutput
+> {
   constructor(private readonly badgeRepo: IBadgeRepository) {}
 
   async execute(input: CreateBadgeInput): Promise<CreateBadgeOutput> {

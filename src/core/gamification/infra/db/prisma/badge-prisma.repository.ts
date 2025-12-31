@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Badge, BadgeId } from "../../../domain/badge.aggregate";
 import { IBadgeRepository } from "../../../domain/badge.repository";

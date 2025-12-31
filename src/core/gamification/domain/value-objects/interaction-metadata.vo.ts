@@ -1,5 +1,3 @@
-import { ValueObject } from "../../../shared/domain/value-object";
-
 // Base metadata interface
 export interface BaseInteractionMetadata {
   timestamp?: string;

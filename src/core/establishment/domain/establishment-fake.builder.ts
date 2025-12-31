@@ -1,10 +1,11 @@
 import { Chance } from "chance";
-import { Establishment, EstablishmentId } from "./establishment.aggregate";
+
+import { Address } from "../../shared/domain/value-objects/address.vo";
+import { CNPJ } from "../../shared/domain/value-objects/cnpj.vo";
 import { Email } from "../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../shared/domain/value-objects/phone.vo";
-import { Address } from "../../shared/domain/value-objects/address.vo";
 import { Rating } from "../../shared/domain/value-objects/rating.vo";
-import { CNPJ } from "../../shared/domain/value-objects/cnpj.vo";
+import { Establishment, EstablishmentId } from "./establishment.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

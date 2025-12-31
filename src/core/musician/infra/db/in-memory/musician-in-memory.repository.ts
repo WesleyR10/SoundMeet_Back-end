@@ -2,10 +2,10 @@ import { SortDirection } from "../../../../shared/domain/repository/search-param
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
+  IMusicianRepository,
   MusicianFilter,
   MusicianSearchParams,
   MusicianSearchResult,
-  IMusicianRepository,
 } from "../../../domain/musician.repository";
 
 export class MusicianInMemoryRepository

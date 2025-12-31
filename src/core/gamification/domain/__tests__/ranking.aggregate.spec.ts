@@ -1,11 +1,9 @@
+import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
 import { Ranking, RankingId } from "../ranking.aggregate";
 import {
-  RankingType,
-  RankingTypeEnum,
   RankingPeriodEnum,
+  RankingTypeEnum,
 } from "../value-objects/ranking-type.vo";
-import { RankingValidatorFactory } from "../ranking.validator";
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
 
 describe("Ranking Unit Tests without validator", () => {
   beforeEach(() => {

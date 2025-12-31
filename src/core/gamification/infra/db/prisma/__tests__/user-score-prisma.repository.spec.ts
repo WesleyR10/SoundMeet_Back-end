@@ -1,16 +1,14 @@
 import { PrismaClient } from "@prisma/client";
-import { UserScorePrismaRepository } from "../user-score-prisma.repository";
+
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import {
   UserScore,
   UserScoreId,
 } from "../../../../domain/user-score.aggregate";
-import {
-  ScoreType,
-  ScoreTypeEnum,
-} from "../../../../domain/value-objects/score-type.vo";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { UserScoreSearchParams } from "../../../../domain/user-score.repository";
-import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { ScoreTypeEnum } from "../../../../domain/value-objects/score-type.vo";
+import { UserScorePrismaRepository } from "../user-score-prisma.repository";
 
 describe("UserScorePrismaRepository Unit Tests", () => {
   let repository: UserScorePrismaRepository;

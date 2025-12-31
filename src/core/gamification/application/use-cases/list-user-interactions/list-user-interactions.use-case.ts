@@ -1,22 +1,23 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import {
+  IUserInteractionRepository,
   UserInteractionFilter,
   UserInteractionSearchParams,
-  IUserInteractionRepository,
 } from "../../../domain/user-interaction.repository";
 import {
   UserInteractionOutput,
   UserInteractionOutputMapper,
 } from "../common/user-interaction-output";
 
-export class ListUserInteractionsUseCase
-  implements IUseCase<ListUserInteractionsInput, ListUserInteractionsOutput>
-{
+export class ListUserInteractionsUseCase implements IUseCase<
+  ListUserInteractionsInput,
+  ListUserInteractionsOutput
+> {
   constructor(
     private readonly userInteractionRepo: IUserInteractionRepository,
   ) {}

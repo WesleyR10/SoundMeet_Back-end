@@ -1,11 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
-import { UserInteraction } from "../../../../domain/user-interaction.aggregate";
-import { UserInteractionId } from "../../../../domain/value-objects/gamification-id.vo";
-import { UserInteractionSearchParams } from "../../../../domain/user-interaction.repository";
-import { UserInteractionPrismaRepository } from "../user-interaction-prisma.repository";
-import { UserInteractionModelMapper } from "../user-interaction-model-mapper";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { UserInteraction } from "../../../../domain/user-interaction.aggregate";
+import { UserInteractionSearchParams } from "../../../../domain/user-interaction.repository";
+import { UserInteractionId } from "../../../../domain/value-objects/gamification-id.vo";
+import { UserInteractionModelMapper } from "../user-interaction-model-mapper";
+import { UserInteractionPrismaRepository } from "../user-interaction-prisma.repository";
 
 describe("UserInteractionPrismaRepository", () => {
   let repository: UserInteractionPrismaRepository;

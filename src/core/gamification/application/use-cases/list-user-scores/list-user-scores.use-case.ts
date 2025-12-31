@@ -1,24 +1,25 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
-  UserScoreOutput,
-  UserScoreOutputMapper,
-} from "../common/user-score-output";
+  PaginationOutput,
+  PaginationOutputMapper,
+} from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
 import {
   UserScoreSearchParams,
   UserScoreSearchResult,
 } from "../../../domain/user-score.repository";
-import { ListUserScoresInput } from "./list-user-scores.input";
 import {
-  PaginationOutput,
-  PaginationOutputMapper,
-} from "../../../../shared/application/pagination-output";
+  UserScoreOutput,
+  UserScoreOutputMapper,
+} from "../common/user-score-output";
+import { ListUserScoresInput } from "./list-user-scores.input";
 
 export type ListUserScoresOutput = PaginationOutput<UserScoreOutput>;
 
-export class ListUserScoresUseCase
-  implements IUseCase<ListUserScoresInput, ListUserScoresOutput>
-{
+export class ListUserScoresUseCase implements IUseCase<
+  ListUserScoresInput,
+  ListUserScoresOutput
+> {
   constructor(private userScoreRepository: IUserScoreRepository) {}
 
   async execute(input: ListUserScoresInput): Promise<ListUserScoresOutput> {

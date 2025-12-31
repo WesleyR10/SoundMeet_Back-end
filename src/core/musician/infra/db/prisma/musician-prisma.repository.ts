@@ -1,12 +1,13 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
+  IMusicianRepository,
   MusicianFilter,
   MusicianSearchParams,
   MusicianSearchResult,
-  IMusicianRepository,
 } from "../../../domain/musician.repository";
 import { MusicianModelMapper } from "./musician-model-mapper";
 

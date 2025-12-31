@@ -1,11 +1,12 @@
 import {
   IsNotEmpty,
-  IsString,
-  IsOptional,
   IsNumber,
-  Min,
   IsObject,
+  IsOptional,
+  IsString,
+  Min,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 

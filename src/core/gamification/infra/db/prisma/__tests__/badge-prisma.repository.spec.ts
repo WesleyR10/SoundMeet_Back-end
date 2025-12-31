@@ -1,9 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Badge, BadgeId } from "../../../../domain/badge.aggregate";
 import { BadgeSearchParams } from "../../../../domain/badge.repository";
-import { BadgePrismaRepository } from "../badge-prisma.repository";
 import { BadgeModelMapper } from "../badge-model-mapper";
+import { BadgePrismaRepository } from "../badge-prisma.repository";
 
 describe("BadgePrismaRepository", () => {
   let repository: BadgePrismaRepository;

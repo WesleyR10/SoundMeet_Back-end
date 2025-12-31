@@ -8,9 +8,10 @@ import {
 } from "../common/musician-output";
 import { CreateMusicianInput } from "./create-musician.input";
 
-export class CreateMusicianUseCase
-  implements IUseCase<CreateMusicianInput, MusicianOutput>
-{
+export class CreateMusicianUseCase implements IUseCase<
+  CreateMusicianInput,
+  MusicianOutput
+> {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: CreateMusicianInput): Promise<MusicianOutput> {

@@ -1,18 +1,19 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsEmail,
-  IsOptional,
   IsBoolean,
-  MaxLength,
+  IsEmail,
   IsIn,
-  ValidateIf,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
   Matches,
+  MaxLength,
+  ValidateIf,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
-import { Establishment } from "./establishment.aggregate";
 import { CNPJ } from "../../shared/domain/value-objects/cnpj.vo";
+import { Establishment } from "./establishment.aggregate";
 
 export class EstablishmentRules {
   @MaxLength(255, { groups: ["name"] })

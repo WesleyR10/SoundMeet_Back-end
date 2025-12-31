@@ -1,4 +1,6 @@
+import { UserInteractionId } from "@core/gamification/domain/value-objects/gamification-id.vo";
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { UserInteraction } from "../../../domain/user-interaction.aggregate";
 import { IUserInteractionRepository } from "../../../domain/user-interaction.repository";
@@ -7,11 +9,8 @@ import {
   UserInteractionSearchResult,
 } from "../../../domain/user-interaction.repository";
 import { UserInteractionModelMapper } from "./user-interaction-model-mapper";
-import { UserInteractionId } from "@core/gamification/domain/value-objects/gamification-id.vo";
 
-export class UserInteractionPrismaRepository
-  implements IUserInteractionRepository
-{
+export class UserInteractionPrismaRepository implements IUserInteractionRepository {
   sortableFields: string[] = ["points", "created_at"];
 
   constructor(private prismaClient: PrismaClient) {}

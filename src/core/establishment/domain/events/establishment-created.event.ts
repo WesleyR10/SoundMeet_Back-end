@@ -1,6 +1,6 @@
+import { Address, CNPJ, Email, Phone, Rating } from "../../../shared/domain";
 import { IDomainEvent } from "../../../shared/domain/events/domain-event.interface";
 import { EstablishmentId } from "../establishment.aggregate";
-import { Email, Phone, Address, Rating, CNPJ } from "../../../shared/domain";
 
 export type EstablishmentCreatedEventProps = {
   establishment_id: EstablishmentId;

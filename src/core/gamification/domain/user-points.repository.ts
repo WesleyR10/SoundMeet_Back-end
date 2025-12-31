@@ -57,14 +57,13 @@ export class UserPointsSearchParams extends DefaultSearchParams<UserPointsFilter
 
 export class UserPointsSearchResult extends DefaultSearchResult<UserPoints> {}
 
-export interface IUserPointsRepository
-  extends ISearchableRepository<
-    UserPoints,
-    UserPointsId,
-    UserPointsFilter,
-    UserPointsSearchParams,
-    UserPointsSearchResult
-  > {
+export interface IUserPointsRepository extends ISearchableRepository<
+  UserPoints,
+  UserPointsId,
+  UserPointsFilter,
+  UserPointsSearchParams,
+  UserPointsSearchResult
+> {
   findByUserId(user_id: string): Promise<UserPoints | null>;
   findTopUsers(limit?: number): Promise<UserPoints[]>;
   findByLevel(level: number): Promise<UserPoints[]>;

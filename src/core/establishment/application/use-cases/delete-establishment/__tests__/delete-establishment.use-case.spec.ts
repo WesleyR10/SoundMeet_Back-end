@@ -1,11 +1,11 @@
-import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
-import { DeleteEstablishmentUseCase } from "../delete-establishment.use-case";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   Establishment,
   EstablishmentId,
 } from "../../../../domain/establishment.aggregate";
 import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
+import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
+import { DeleteEstablishmentUseCase } from "../delete-establishment.use-case";
 
 describe("DeleteEstablishmentUseCase Unit Tests", () => {
   let useCase: DeleteEstablishmentUseCase;

@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, Min, Max, validateSync } from "class-validator";
+import { IsNumber, IsOptional, Max, Min, validateSync } from "class-validator";
 
 export type GetLeaderboardInputConstructorProps = {
   limit?: number;

@@ -2,10 +2,10 @@ import { SortDirection } from "../../../../shared/domain/repository/search-param
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { UserScore, UserScoreId } from "../../../domain/user-score.aggregate";
 import {
+  IUserScoreRepository,
   UserScoreFilter,
   UserScoreSearchParams,
   UserScoreSearchResult,
-  IUserScoreRepository,
 } from "../../../domain/user-score.repository";
 
 export class UserScoreInMemoryRepository

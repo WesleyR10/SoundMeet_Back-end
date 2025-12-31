@@ -1,4 +1,4 @@
-import { IDomainEvent, Uuid, Rating } from "../../../shared/domain";
+import { IDomainEvent, Rating, Uuid } from "../../../shared/domain";
 
 export class EstablishmentRatedEvent implements IDomainEvent {
   occurred_on: Date;

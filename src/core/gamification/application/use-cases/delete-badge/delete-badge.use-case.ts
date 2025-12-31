@@ -3,9 +3,10 @@ import { NotFoundError } from "../../../../shared/domain/errors/not-found.error"
 import { Badge, BadgeId } from "../../../domain/badge.aggregate";
 import { IBadgeRepository } from "../../../domain/badge.repository";
 
-export class DeleteBadgeUseCase
-  implements IUseCase<DeleteBadgeInput, DeleteBadgeOutput>
-{
+export class DeleteBadgeUseCase implements IUseCase<
+  DeleteBadgeInput,
+  DeleteBadgeOutput
+> {
   constructor(private readonly badgeRepo: IBadgeRepository) {}
 
   async execute(input: DeleteBadgeInput): Promise<DeleteBadgeOutput> {

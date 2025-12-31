@@ -1,14 +1,15 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsNumber,
-  Min,
-  IsObject,
   IsBoolean,
   IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
   validateSync,
 } from "class-validator";
+
 import { BadgeCategory, BadgeRarity } from "../../../domain/badge.aggregate";
 
 export type UpdateBadgeInputConstructorProps = {

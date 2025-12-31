@@ -1,9 +1,7 @@
+import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
+import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { CreateMusicianUseCase } from "../create-musician.use-case";
-import { CreateMusicianInput } from "../create-musician.input";
-import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
-import { Musician } from "../../../../domain/musician.aggregate";
 
 describe("CreateMusicianUseCase Unit Tests", () => {
   let useCase: CreateMusicianUseCase;

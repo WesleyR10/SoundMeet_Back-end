@@ -1,14 +1,15 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsObject,
-  IsNumber,
   IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
   MaxLength,
   Min,
-  IsIn,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { Badge, BadgeCategory, BadgeRarity } from "./badge.aggregate";

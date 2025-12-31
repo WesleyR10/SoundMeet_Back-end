@@ -1,8 +1,8 @@
-import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import { Email } from "../../../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../../../shared/domain/value-objects/phone.vo";
 import { QRCode } from "../../../../../shared/domain/value-objects/qr-code.vo";
 import { Rating } from "../../../../../shared/domain/value-objects/rating.vo";
+import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import {
   MusicianModelMapper,
   MusicianModelProps,
@@ -47,6 +47,7 @@ describe("MusicianModelMapper", () => {
         is_active: musician.is_active,
         is_verified: musician.is_verified,
         created_at: musician.created_at,
+        updated_at: musician.updated_at,
       });
     });
 
@@ -76,6 +77,7 @@ describe("MusicianModelMapper", () => {
         is_active: musician.is_active,
         is_verified: musician.is_verified,
         created_at: musician.created_at,
+        updated_at: musician.updated_at,
       });
     });
 
@@ -88,8 +90,8 @@ describe("MusicianModelMapper", () => {
         bio: undefined,
         avatar: undefined,
         phone: undefined,
-        genres: undefined,
-        instruments: undefined,
+        genres: [],
+        instruments: [],
         experience_years: undefined,
         qr_code: undefined,
         rating: 0,
@@ -116,6 +118,7 @@ describe("MusicianModelMapper", () => {
     it("should convert model to entity with all properties", () => {
       const musicianId = new MusicianId();
       const created_at = new Date();
+      const updated_at = new Date(created_at.getTime() + 1000);
 
       const model: MusicianModelProps = {
         id: musicianId.id,
@@ -134,6 +137,7 @@ describe("MusicianModelMapper", () => {
         is_active: true,
         is_verified: true,
         created_at: created_at,
+        updated_at: updated_at,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
@@ -159,6 +163,7 @@ describe("MusicianModelMapper", () => {
     it("should convert model to entity with minimal properties", () => {
       const musicianId = new MusicianId();
       const created_at = new Date();
+      const updated_at = new Date(created_at.getTime() + 1000);
 
       const model: MusicianModelProps = {
         id: musicianId.id,
@@ -177,6 +182,7 @@ describe("MusicianModelMapper", () => {
         is_active: true,
         is_verified: false,
         created_at: created_at,
+        updated_at: updated_at,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
@@ -200,6 +206,8 @@ describe("MusicianModelMapper", () => {
     });
 
     it("should handle null values correctly", () => {
+      const created_at = new Date();
+      const updated_at = new Date(created_at.getTime() + 1000);
       const model: MusicianModelProps = {
         id: new MusicianId().id,
         email: "test@example.com",
@@ -216,7 +224,8 @@ describe("MusicianModelMapper", () => {
         total_ratings: 0,
         is_active: true,
         is_verified: false,
-        created_at: new Date(),
+        created_at: created_at,
+        updated_at: updated_at,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
@@ -232,6 +241,8 @@ describe("MusicianModelMapper", () => {
     });
 
     it("should create proper value objects", () => {
+      const created_at = new Date();
+      const updated_at = new Date(created_at.getTime() + 1000);
       const model: MusicianModelProps = {
         id: new MusicianId().id,
         email: "test@example.com",
@@ -248,7 +259,8 @@ describe("MusicianModelMapper", () => {
         total_ratings: 0,
         is_active: true,
         is_verified: false,
-        created_at: new Date(),
+        created_at: created_at,
+        updated_at: updated_at,
       };
 
       const entity = MusicianModelMapper.toEntity(model);

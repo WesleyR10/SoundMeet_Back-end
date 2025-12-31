@@ -1,22 +1,23 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import {
+  IMusicianRepository,
   MusicianFilter,
   MusicianSearchParams,
-  IMusicianRepository,
 } from "../../../domain/musician.repository";
 import {
   MusicianOutput,
   MusicianOutputMapper,
 } from "../common/musician-output";
 
-export class ListMusiciansUseCase
-  implements IUseCase<ListMusiciansInput, ListMusiciansOutput>
-{
+export class ListMusiciansUseCase implements IUseCase<
+  ListMusiciansInput,
+  ListMusiciansOutput
+> {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: ListMusiciansInput): Promise<ListMusiciansOutput> {

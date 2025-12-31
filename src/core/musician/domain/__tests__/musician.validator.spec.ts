@@ -1,10 +1,10 @@
+import { Notification } from "../../../shared/domain/validators/notification";
+import { Musician } from "../musician.aggregate";
 import {
   MusicianRules,
   MusicianValidator,
   MusicianValidatorFactory,
 } from "../musician.validator";
-import { Musician } from "../musician.aggregate";
-import { Notification } from "../../../shared/domain/validators/notification";
 
 describe("MusicianValidator Tests", () => {
   let validator: MusicianValidator;

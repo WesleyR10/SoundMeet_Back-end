@@ -1,7 +1,7 @@
+import { EstablishmentSearchResult } from "../../../../domain/establishment.repository";
+import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
 import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
 import { ListEstablishmentsUseCase } from "../list-establishments.use-case";
-import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
-import { EstablishmentSearchResult } from "../../../../domain/establishment.repository";
 
 describe("ListEstablishmentsUseCase Unit Tests", () => {
   let useCase: ListEstablishmentsUseCase;

@@ -6,9 +6,10 @@ import {
 } from "../common/user-badge-output";
 import { GetUserBadgesInput } from "./get-user-badges.input";
 
-export class GetUserBadgesUseCase
-  implements IUseCase<GetUserBadgesInput, UserBadgeOutput[]>
-{
+export class GetUserBadgesUseCase implements IUseCase<
+  GetUserBadgesInput,
+  UserBadgeOutput[]
+> {
   constructor(private readonly userBadgeRepo: IUserBadgeRepository) {}
 
   async execute(input: GetUserBadgesInput): Promise<UserBadgeOutput[]> {

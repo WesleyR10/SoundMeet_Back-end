@@ -1,7 +1,7 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { Musician } from "../../../domain/musician.aggregate";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { Musician } from "../../../domain/musician.aggregate";
 import { MusicianId } from "../../../domain/musician.aggregate";
 import { IMusicianRepository } from "../../../domain/musician.repository";
 import {
@@ -10,9 +10,10 @@ import {
 } from "../common/musician-output";
 import { UpdateMusicianInput } from "./update-musician.input";
 
-export class UpdateMusicianUseCase
-  implements IUseCase<UpdateMusicianInput, UpdateMusicianOutput>
-{
+export class UpdateMusicianUseCase implements IUseCase<
+  UpdateMusicianInput,
+  UpdateMusicianOutput
+> {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: UpdateMusicianInput): Promise<UpdateMusicianOutput> {

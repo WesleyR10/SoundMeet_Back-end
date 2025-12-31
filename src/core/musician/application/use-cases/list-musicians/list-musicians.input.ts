@@ -1,6 +1,7 @@
+import { IsOptional, validateSync } from "class-validator";
+
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { MusicianFilter } from "../../../domain/musician.repository";
-import { IsOptional, validateSync } from "class-validator";
 
 export type ListMusiciansInputConstructorProps = {
   page?: number;

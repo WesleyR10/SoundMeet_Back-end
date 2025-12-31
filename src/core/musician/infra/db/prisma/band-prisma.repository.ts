@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Band, BandId } from "../../../domain/band.aggregate";
 import {
   BandFilter,
@@ -68,7 +69,12 @@ export class BandPrismaRepository implements IBandRepository {
       where: { id: entity_id.id },
     });
 
-    return model ? BandModelMapper.toEntity(model) : null;
+    return model
+      ? BandModelMapper.toEntity({
+          ...model,
+          members: [],
+        } as any)
+      : null;
   }
 
   async findByIds(ids: BandId[]): Promise<Band[]> {
@@ -79,12 +85,22 @@ export class BandPrismaRepository implements IBandRepository {
         },
       },
     });
-    return models.map((m) => BandModelMapper.toEntity(m));
+    return models.map((m) =>
+      BandModelMapper.toEntity({
+        ...m,
+        members: [],
+      } as any),
+    );
   }
 
   async findAll(): Promise<Band[]> {
     const models = await this.prisma.band.findMany();
-    return models.map((model) => BandModelMapper.toEntity(model));
+    return models.map((model) =>
+      BandModelMapper.toEntity({
+        ...model,
+        members: [],
+      } as any),
+    );
   }
 
   async existsById(
@@ -133,7 +149,12 @@ export class BandPrismaRepository implements IBandRepository {
       this.prisma.band.count({ where }),
     ]);
 
-    const entities = bands.map((m) => BandModelMapper.toEntity(m));
+    const entities = bands.map((m) =>
+      BandModelMapper.toEntity({
+        ...m,
+        members: [],
+      } as any),
+    );
 
     return new BandSearchResult({
       items: entities,

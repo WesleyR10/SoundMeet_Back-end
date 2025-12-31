@@ -1,8 +1,8 @@
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import {
   UserPoints,
   UserPointsId,
 } from "../../../domain/user-points.aggregate";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 
 export type UserPointsModelProps = {
   id: string;

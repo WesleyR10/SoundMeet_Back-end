@@ -1,7 +1,6 @@
-
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { EntityValidationError } from "../../shared/domain/validators/validation.error";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { BandValidatorFactory } from "./band.validator";
 import { BandFakeBuilder } from "./band-fake.builder";
 
@@ -32,11 +31,7 @@ export type BandCreateCommand = {
   description?: string | null;
   avatar?: string | null;
   genres: string[];
-  members?: {
-    musician_id: string;
-    role: string;
-    instrument: string;
-  }[];
+  members?: BandMemberProps[];
   is_active?: boolean;
 };
 
@@ -71,12 +66,7 @@ export class Band extends AggregateRoot {
   static create(props: BandCreateCommand): Band {
     const band = new Band({
       ...props,
-      members: props.members?.map((m) => ({
-        musician_id: new Uuid(m.musician_id),
-        role: m.role,
-        instrument: m.instrument,
-        joined_at: new Date(),
-      })),
+      members: props.members ?? [],
     });
     band.validate();
     return band;

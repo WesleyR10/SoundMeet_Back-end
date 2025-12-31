@@ -66,14 +66,13 @@ export class UserInteractionSearchParams extends DefaultSearchParams<UserInterac
 
 export class UserInteractionSearchResult extends DefaultSearchResult<UserInteraction> {}
 
-export interface IUserInteractionRepository
-  extends ISearchableRepository<
-    UserInteraction,
-    UserInteractionId,
-    UserInteractionFilter,
-    UserInteractionSearchParams,
-    UserInteractionSearchResult
-  > {
+export interface IUserInteractionRepository extends ISearchableRepository<
+  UserInteraction,
+  UserInteractionId,
+  UserInteractionFilter,
+  UserInteractionSearchParams,
+  UserInteractionSearchResult
+> {
   findByUserId(user_id: string): Promise<UserInteraction[]>;
   findByInteractionType(interaction_type: string): Promise<UserInteraction[]>;
   findByUserIdAndType(

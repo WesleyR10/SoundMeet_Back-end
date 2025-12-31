@@ -10,9 +10,10 @@ import {
   EstablishmentOutputMapper,
 } from "../common/establishment-output";
 
-export class GetEstablishmentUseCase
-  implements IUseCase<GetEstablishmentInput, GetEstablishmentOutput>
-{
+export class GetEstablishmentUseCase implements IUseCase<
+  GetEstablishmentInput,
+  GetEstablishmentOutput
+> {
   constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
 
   async execute(input: GetEstablishmentInput): Promise<GetEstablishmentOutput> {

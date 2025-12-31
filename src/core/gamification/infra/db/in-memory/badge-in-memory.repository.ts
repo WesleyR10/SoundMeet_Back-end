@@ -1,8 +1,8 @@
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import {
   Badge,
-  BadgeId,
   BadgeCategory,
+  BadgeId,
   BadgeRarity,
 } from "../../../domain/badge.aggregate";
 import {
@@ -82,17 +82,7 @@ export class BadgeInMemoryRepository
       );
     }
 
-    if (filter.points_min !== undefined) {
-      filteredItems = filteredItems.filter(
-        (item) => item.points >= filter.points_min!,
-      );
-    }
-
-    if (filter.points_max !== undefined) {
-      filteredItems = filteredItems.filter(
-        (item) => item.points <= filter.points_max!,
-      );
-    }
+    // points_min/points_max não fazem parte de BadgeFilter; removidos para alinhar contrato
 
     return filteredItems;
   }

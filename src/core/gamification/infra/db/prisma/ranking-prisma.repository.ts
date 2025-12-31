@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Ranking, RankingId } from "../../../domain/ranking.aggregate";
 import { IRankingRepository } from "../../../domain/ranking.repository";
@@ -6,7 +7,7 @@ import {
   RankingSearchParams,
   RankingSearchResult,
 } from "../../../domain/ranking.repository";
-import { RankingModelMapper, RankingModelProps } from "./ranking-model-mapper";
+import { RankingModelMapper } from "./ranking-model-mapper";
 
 export class RankingPrismaRepository implements IRankingRepository {
   sortableFields: string[] = ["type", "period", "created_at"];

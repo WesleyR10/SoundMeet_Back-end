@@ -1,13 +1,14 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import {
   Establishment,
   EstablishmentId,
 } from "../../../../domain/establishment.aggregate";
 import { EstablishmentSearchParams } from "../../../../domain/establishment.repository";
-import { EstablishmentPrismaRepository } from "../establishment-prisma.repository";
 import { EstablishmentModelMapper } from "../establishment-model-mapper";
+import { EstablishmentPrismaRepository } from "../establishment-prisma.repository";
 
 describe("EstablishmentPrismaRepository", () => {
   let repository: EstablishmentPrismaRepository;

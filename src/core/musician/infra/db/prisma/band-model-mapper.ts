@@ -1,5 +1,12 @@
 import { Band, BandId } from "../../../domain/band.aggregate";
-import { BandMemberProps } from "../../../domain/band.aggregate";
+
+export type BandMemberModelProps = {
+  id?: string;
+  musician_id: string;
+  role: string;
+  instrument: string;
+  joined_at: Date;
+};
 
 export type BandModelProps = {
   id: string;
@@ -7,7 +14,6 @@ export type BandModelProps = {
   description?: string | null;
   avatar?: string | null;
   genres: string[];
-  members: any[];
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -21,7 +27,6 @@ export class BandModelMapper {
       description: entity.description,
       avatar: entity.avatar,
       genres: entity.genres,
-      members: entity.members,
       is_active: entity.is_active,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
@@ -35,7 +40,7 @@ export class BandModelMapper {
       description: model.description ?? undefined,
       avatar: model.avatar ?? undefined,
       genres: model.genres,
-      members: model.members as BandMemberProps[],
+      members: [],
       is_active: model.is_active,
       created_at: model.created_at,
       updated_at: model.updated_at,

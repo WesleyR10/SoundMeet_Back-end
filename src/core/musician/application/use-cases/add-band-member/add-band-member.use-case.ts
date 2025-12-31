@@ -3,14 +3,15 @@ import { NotFoundError } from "../../../../shared/domain/errors/not-found.error"
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Band, BandId } from "../../../domain/band.aggregate";
 import { IBandRepository } from "../../../domain/band.repository";
-import { IMusicianRepository } from "../../../domain/musician.repository";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
+import { IMusicianRepository } from "../../../domain/musician.repository";
 import { BandOutput, BandOutputMapper } from "../common/band-output";
 import { AddBandMemberInput } from "./add-band-member.input";
 
-export class AddBandMemberUseCase
-  implements IUseCase<AddBandMemberInput, BandOutput>
-{
+export class AddBandMemberUseCase implements IUseCase<
+  AddBandMemberInput,
+  BandOutput
+> {
   constructor(
     private readonly bandRepo: IBandRepository,
     private readonly musicianRepo: IMusicianRepository,
@@ -25,14 +26,37 @@ export class AddBandMemberUseCase
     }
 
     const musicianId = new MusicianId(input.musician_id);
+    if (band.members.some((m) => m.musician_id.equals(musicianId))) {
+      throw new EntityValidationError([
+        {
+          musician_id: ["Musician is already a member of this band"],
+        },
+      ]);
+    }
     const musician = await this.musicianRepo.findById(musicianId);
 
     if (!musician) {
-      // We check if musician exists before adding
       throw new NotFoundError(input.musician_id, Musician);
     }
 
-    band.addMember(musicianId, input.role, input.instrument);
+    if (!band.is_active) {
+      throw new EntityValidationError([
+        {
+          band_id: ["Band is not active"],
+        },
+      ]);
+    }
+
+    if (!musician.is_active) {
+      throw new EntityValidationError([
+        {
+          musician_id: ["Musician is not active"],
+        },
+      ]);
+    }
+
+    band.addMember(musicianId, input.role.trim(), input.instrument.trim());
+    band.validate(["members"]);
 
     if (band.notification.hasErrors()) {
       throw new EntityValidationError(band.notification.toJSON());

@@ -4,7 +4,7 @@ import {
   SearchParamsConstructorProps,
 } from "../../shared/domain/repository/search-params";
 import { SearchResult as DefaultSearchResult } from "../../shared/domain/repository/search-result";
-import { Badge, BadgeId, BadgeCategory, BadgeRarity } from "./badge.aggregate";
+import { Badge, BadgeCategory, BadgeId, BadgeRarity } from "./badge.aggregate";
 
 export type BadgeFilter = {
   name?: string | null;
@@ -48,11 +48,10 @@ export class BadgeSearchParams extends DefaultSearchParams<BadgeFilter> {
 
 export class BadgeSearchResult extends DefaultSearchResult<Badge> {}
 
-export interface IBadgeRepository
-  extends ISearchableRepository<
-    Badge,
-    BadgeId,
-    BadgeFilter,
-    BadgeSearchParams,
-    BadgeSearchResult
-  > {}
+export interface IBadgeRepository extends ISearchableRepository<
+  Badge,
+  BadgeId,
+  BadgeFilter,
+  BadgeSearchParams,
+  BadgeSearchResult
+> {}

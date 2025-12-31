@@ -1,4 +1,5 @@
 import { IUserPointsRepository } from "@core/gamification/domain";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { UserPoints } from "../../../domain/user-points.aggregate";
 import { PointsSourceEnum } from "../../../domain/value-objects/points-source.vo";
@@ -15,9 +16,10 @@ export type CalculatePointsOutput = {
   current_level: number;
 };
 
-export class CalculatePointsUseCase
-  implements IUseCase<CalculatePointsInput, CalculatePointsOutput>
-{
+export class CalculatePointsUseCase implements IUseCase<
+  CalculatePointsInput,
+  CalculatePointsOutput
+> {
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: CalculatePointsInput): Promise<CalculatePointsOutput> {

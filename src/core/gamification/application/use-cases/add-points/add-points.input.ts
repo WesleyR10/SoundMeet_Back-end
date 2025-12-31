@@ -1,11 +1,12 @@
 import {
-  IsNotEmpty,
-  IsString,
   IsEnum,
-  IsOptional,
+  IsNotEmpty,
   IsObject,
+  IsOptional,
+  IsString,
   validateSync,
 } from "class-validator";
+
 import { PointsSourceEnum } from "../../../domain/value-objects/points-source.vo";
 
 export type AddPointsInputConstructorProps = {

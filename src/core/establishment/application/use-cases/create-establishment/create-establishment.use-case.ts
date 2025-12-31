@@ -8,9 +8,10 @@ import {
 } from "../common/establishment-output";
 import { CreateEstablishmentInput } from "./create-establishment.input";
 
-export class CreateEstablishmentUseCase
-  implements IUseCase<CreateEstablishmentInput, CreateEstablishmentOutput>
-{
+export class CreateEstablishmentUseCase implements IUseCase<
+  CreateEstablishmentInput,
+  CreateEstablishmentOutput
+> {
   constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
 
   async execute(

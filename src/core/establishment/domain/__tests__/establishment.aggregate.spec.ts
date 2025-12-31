@@ -1,9 +1,9 @@
-import { Establishment, EstablishmentId } from "../establishment.aggregate";
+import { Address } from "../../../shared/domain/value-objects/address.vo";
 import { Email } from "../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
-import { Address } from "../../../shared/domain/value-objects/address.vo";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
+import { Establishment, EstablishmentId } from "../establishment.aggregate";
 
 describe("Establishment Unit Tests without validator", () => {
   beforeEach(() => {

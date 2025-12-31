@@ -1,15 +1,16 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { RankingId } from "../../../domain/value-objects/gamification-id.vo";
-import { IRankingRepository } from "../../../domain/ranking.repository";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Ranking } from "../../../domain/ranking.aggregate";
+import { IRankingRepository } from "../../../domain/ranking.repository";
+import { RankingId } from "../../../domain/value-objects/gamification-id.vo";
 import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
 import { UpdateRankingInput } from "./update-ranking.input";
 
-export class UpdateRankingUseCase
-  implements IUseCase<UpdateRankingInput, RankingOutput>
-{
+export class UpdateRankingUseCase implements IUseCase<
+  UpdateRankingInput,
+  RankingOutput
+> {
   constructor(private readonly rankingRepo: IRankingRepository) {}
 
   async execute(input: UpdateRankingInput): Promise<RankingOutput> {

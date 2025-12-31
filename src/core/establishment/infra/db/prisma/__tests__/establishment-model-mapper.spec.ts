@@ -1,6 +1,6 @@
 import { Establishment } from "../../../../domain/establishment.aggregate";
-import { EstablishmentModelMapper } from "../establishment-model-mapper";
 import { EstablishmentModel } from "../establishment-model";
+import { EstablishmentModelMapper } from "../establishment-model-mapper";
 
 describe("EstablishmentModelMapper Unit Tests", () => {
   describe("toModel", () => {

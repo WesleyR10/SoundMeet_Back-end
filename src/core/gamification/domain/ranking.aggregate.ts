@@ -1,14 +1,14 @@
+import { AggregateRoot, Uuid } from "../../shared/domain";
+import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { RankingValidatorFactory } from "./ranking.validator";
 import { RankingFakeBuilder } from "./ranking-fake.builder";
-import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { RankingId } from "./value-objects/gamification-id.vo";
 import {
-  RankingType,
   RankingPeriod,
-  RankingTypeEnum,
   RankingPeriodEnum,
+  RankingType,
+  RankingTypeEnum,
 } from "./value-objects/ranking-type.vo";
 
 // Export RankingId for use in tests

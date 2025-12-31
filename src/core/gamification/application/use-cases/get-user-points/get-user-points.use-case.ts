@@ -6,9 +6,10 @@ import {
 } from "../common/user-points-output";
 import { GetUserPointsInput } from "./get-user-points.input";
 
-export class GetUserPointsUseCase
-  implements IUseCase<GetUserPointsInput, UserPointsOutput | null>
-{
+export class GetUserPointsUseCase implements IUseCase<
+  GetUserPointsInput,
+  UserPointsOutput | null
+> {
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: GetUserPointsInput): Promise<UserPointsOutput | null> {

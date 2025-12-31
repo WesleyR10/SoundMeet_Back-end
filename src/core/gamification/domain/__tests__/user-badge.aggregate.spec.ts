@@ -1,7 +1,6 @@
-import { UserBadge, UserBadgeId } from "../user-badge.aggregate";
-import { BadgeType, BadgeTypeEnum } from "../value-objects/badge-type.vo";
-import { UserBadgeValidatorFactory } from "../user-badge.validator";
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { UserBadge, UserBadgeId } from "../user-badge.aggregate";
+import { BadgeTypeEnum } from "../value-objects/badge-type.vo";
 
 describe("UserBadge Unit Tests without validator", () => {
   beforeEach(() => {
@@ -155,7 +154,7 @@ describe("UserBadge Unit Tests with validator", () => {
     expect(() => {
       UserBadge.create({
         user_id: "",
-        badge_type: BadgeTypeEnum.FIRST_TIP,
+        badge_type: BadgeTypeEnum.APOIADOR,
       });
     }).toThrow(EntityValidationError);
   });

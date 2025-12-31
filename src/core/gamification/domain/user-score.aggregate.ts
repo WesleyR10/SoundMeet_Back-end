@@ -1,10 +1,10 @@
+import { AggregateRoot, Uuid } from "../../shared/domain";
+import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { UserScoreValidatorFactory } from "./user-score.validator";
 import { UserScoreFakeBuilder } from "./user-score-fake.builder";
-import { AggregateRoot, Uuid } from "../../shared/domain";
 import { UserScoreId } from "./value-objects/gamification-id.vo";
 import { ScoreType, ScoreTypeEnum } from "./value-objects/score-type.vo";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 
 export { UserScoreId } from "./value-objects/gamification-id.vo";
 

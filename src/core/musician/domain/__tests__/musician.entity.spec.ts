@@ -1,10 +1,8 @@
-import { Musician, MusicianId } from "../musician.aggregate";
 import { Email } from "../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { QRCode } from "../../../shared/domain/value-objects/qr-code.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
-import { MusicianValidatorFactory } from "../musician.validator";
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { Musician, MusicianId } from "../musician.aggregate";
 
 describe("Musician Unit Tests without validator", () => {
   beforeEach(() => {
@@ -447,7 +445,7 @@ describe("Musician Unit Tests with validator", () => {
     test("should change phone when valid", () => {
       const musician = Musician.fake().aMusician().build();
       expect(() => musician.changePhone("+5511888888888")).not.toThrow();
-      expect(musician.phone.value).toBe("+5511888888888");
+      expect(musician.phone!.value).toBe("+5511888888888");
     });
   });
 

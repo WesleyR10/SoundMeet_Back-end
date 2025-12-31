@@ -1,6 +1,6 @@
+import { Email, Phone, QRCode, Rating } from "../../../shared/domain";
 import { IDomainEvent } from "../../../shared/domain/events/domain-event.interface";
 import { MusicianId } from "../musician.aggregate";
-import { Email, Phone, QRCode, Rating } from "../../../shared/domain";
 
 export type MusicianCreatedEventProps = {
   musician_id: MusicianId;

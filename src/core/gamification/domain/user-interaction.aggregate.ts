@@ -1,8 +1,8 @@
+import { AggregateRoot, Uuid } from "../../shared/domain";
+import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { UserInteractionValidatorFactory } from "./user-interaction.validator";
 import { UserInteractionFakeBuilder } from "./user-interaction-fake.builder";
-import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { UserInteractionId } from "./value-objects/gamification-id.vo";
 import { InteractionMetadata } from "./value-objects/interaction-metadata.vo";
 

@@ -4,9 +4,10 @@ import { Establishment } from "../../../domain/establishment.aggregate";
 import { EstablishmentId } from "../../../domain/establishment.aggregate";
 import { IEstablishmentRepository } from "../../../domain/establishment.repository";
 
-export class DeleteEstablishmentUseCase
-  implements IUseCase<DeleteEstablishmentInput, DeleteEstablishmentOutput>
-{
+export class DeleteEstablishmentUseCase implements IUseCase<
+  DeleteEstablishmentInput,
+  DeleteEstablishmentOutput
+> {
   constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
 
   async execute(

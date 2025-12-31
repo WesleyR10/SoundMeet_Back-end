@@ -1,10 +1,10 @@
+import { Notification } from "../../../shared/domain/validators/notification";
 import {
   EstablishmentRules,
   EstablishmentValidator,
   EstablishmentValidatorFactory,
 } from "../establishment.validator";
 import { EstablishmentFakeBuilder } from "../establishment-fake.builder";
-import { Notification } from "../../../shared/domain/validators/notification";
 
 describe("EstablishmentValidator Tests", () => {
   let validator: EstablishmentValidator;

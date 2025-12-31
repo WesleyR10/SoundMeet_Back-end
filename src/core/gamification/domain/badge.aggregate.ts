@@ -1,6 +1,6 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { EntityValidationError } from "../../shared/domain/validators/validation.error";
+import { ValueObject } from "../../shared/domain/value-object";
 import { BadgeValidatorFactory } from "./badge.validator";
 import { BadgeFakeBuilder } from "./badge-fake.builder";
 

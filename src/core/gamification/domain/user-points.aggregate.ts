@@ -2,11 +2,9 @@ import { AggregateRoot } from "../../shared/domain/aggregate-root";
 import { ValueObject } from "../../shared/domain/value-object";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { UserPointsValidatorFactory } from "./user-points.validator";
-import { UserLevel } from "./value-objects/user-level.vo";
-import { PointsSource } from "./value-objects/points-source.vo";
 import { UserPointsFakeBuilder } from "./user-points-fake.builder";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
-import { Notification } from "../../shared/domain/validators/notification";
+import { PointsSource } from "./value-objects/points-source.vo";
+import { UserLevel } from "./value-objects/user-level.vo";
 
 export type UserPointsConstructorProps = {
   id?: UserPointsId;

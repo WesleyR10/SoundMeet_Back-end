@@ -1,10 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+
 import { InvalidArgumentError } from "../../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import { MusicianSearchParams } from "../../../../domain/musician.repository";
-import { MusicianPrismaRepository } from "../musician-prisma.repository";
 import { MusicianModelMapper } from "../musician-model-mapper";
+import { MusicianPrismaRepository } from "../musician-prisma.repository";
 
 describe("MusicianPrismaRepository", () => {
   let repository: MusicianPrismaRepository;
@@ -209,7 +210,7 @@ describe("MusicianPrismaRepository", () => {
       (prisma.musician.findMany as jest.Mock).mockResolvedValue(models);
       (prisma.musician.count as jest.Mock).mockResolvedValue(10);
 
-      const searchParams = new MusicianSearchParams({
+      const searchParams = MusicianSearchParams.create({
         page: 1,
         per_page: 2,
         sort: "name",

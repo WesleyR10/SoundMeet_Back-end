@@ -1,4 +1,5 @@
 import { UserInteractionId } from "@core/gamification/domain/value-objects/gamification-id.vo";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { UserInteraction } from "../../../domain/user-interaction.aggregate";
@@ -8,9 +9,10 @@ import {
   UserInteractionOutputMapper,
 } from "../common/user-interaction-output";
 
-export class GetUserInteractionUseCase
-  implements IUseCase<GetUserInteractionInput, GetUserInteractionOutput>
-{
+export class GetUserInteractionUseCase implements IUseCase<
+  GetUserInteractionInput,
+  GetUserInteractionOutput
+> {
   constructor(
     private readonly userInteractionRepo: IUserInteractionRepository,
   ) {}

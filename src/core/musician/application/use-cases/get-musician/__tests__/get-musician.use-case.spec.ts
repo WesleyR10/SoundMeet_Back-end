@@ -5,8 +5,8 @@ import {
 } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
-import { GetMusicianUseCase } from "../get-musician.use-case";
 import { GetMusicianInput } from "../get-musician.input";
+import { GetMusicianUseCase } from "../get-musician.use-case";
 
 describe("GetMusicianUseCase Unit Tests", () => {
   let useCase: GetMusicianUseCase;
@@ -65,7 +65,7 @@ describe("GetMusicianUseCase Unit Tests", () => {
       total_ratings: musician.total_ratings,
       is_active: musician.is_active,
       is_verified: musician.is_verified,
-      qr_code: musician.qr_code.code,
+      qr_code: musician.qr_code!.code,
       created_at: musician.created_at,
       display_name: musician.displayName,
       is_experienced: musician.isExperienced,

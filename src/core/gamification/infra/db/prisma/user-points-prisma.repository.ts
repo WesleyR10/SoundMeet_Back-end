@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import {
   UserPoints,

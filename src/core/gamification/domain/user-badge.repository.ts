@@ -52,14 +52,13 @@ export class UserBadgeSearchParams extends DefaultSearchParams<UserBadgeFilter> 
 
 export class UserBadgeSearchResult extends DefaultSearchResult<UserBadge> {}
 
-export interface IUserBadgeRepository
-  extends ISearchableRepository<
-    UserBadge,
-    UserBadgeId,
-    UserBadgeFilter,
-    UserBadgeSearchParams,
-    UserBadgeSearchResult
-  > {
+export interface IUserBadgeRepository extends ISearchableRepository<
+  UserBadge,
+  UserBadgeId,
+  UserBadgeFilter,
+  UserBadgeSearchParams,
+  UserBadgeSearchResult
+> {
   findByUserId(user_id: string): Promise<UserBadge[]>;
   findByUserAndBadgeType(
     user_id: string,

@@ -1,11 +1,12 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsNumber,
   IsDate,
-  Min,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
   IsUUID,
+  Min,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { Ranking } from "./ranking.aggregate";

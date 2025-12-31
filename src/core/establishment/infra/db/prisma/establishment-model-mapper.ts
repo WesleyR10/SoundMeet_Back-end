@@ -1,11 +1,11 @@
+import { Address } from "../../../../shared/domain/value-objects/address.vo";
+import { Email } from "../../../../shared/domain/value-objects/email.vo";
+import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
+import { Rating } from "../../../../shared/domain/value-objects/rating.vo";
 import {
   Establishment,
   EstablishmentId,
 } from "../../../domain/establishment.aggregate";
-import { Email } from "../../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
-import { Rating } from "../../../../shared/domain/value-objects/rating.vo";
-import { Address } from "../../../../shared/domain/value-objects/address.vo";
 import { EstablishmentModel } from "./establishment-model";
 
 export type EstablishmentModelProps = EstablishmentModel;
@@ -23,8 +23,8 @@ export class EstablishmentModelMapper {
       is_active: entity.is_active,
       isVerified: entity.is_verified,
       created_at: entity.created_at,
-      updated_at: new Date(), // Prisma handles updatedAt automatically, but we can set it here explicitly
-      
+      updated_at: entity.created_at,
+
       // Mapeamento do Endereço (Flattened)
       address_street: entity.address.street,
       address_number: entity.address.number,

@@ -1,15 +1,16 @@
 import { PrismaClient } from "@prisma/client";
+
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { UserScore, UserScoreId } from "../../../domain/user-score.aggregate";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
-import {
-  UserScoreModelMapper,
-  UserScoreModelProps,
-} from "./user-score-model-mapper";
 import {
   UserScoreSearchParams,
   UserScoreSearchResult,
 } from "../../../domain/user-score.repository";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import {
+  UserScoreModelMapper,
+  UserScoreModelProps,
+} from "./user-score-model-mapper";
 
 export class UserScorePrismaRepository implements IUserScoreRepository {
   sortableFields: string[] = ["created_at", "points"];

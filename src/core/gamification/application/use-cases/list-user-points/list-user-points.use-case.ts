@@ -1,22 +1,23 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import {
+  IUserPointsRepository,
   UserPointsFilter,
   UserPointsSearchParams,
-  IUserPointsRepository,
 } from "../../../domain/user-points.repository";
 import {
   UserPointsOutput,
   UserPointsOutputMapper,
 } from "../common/user-points-output";
 
-export class ListUserPointsUseCase
-  implements IUseCase<ListUserPointsInput, ListUserPointsOutput>
-{
+export class ListUserPointsUseCase implements IUseCase<
+  ListUserPointsInput,
+  ListUserPointsOutput
+> {
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: ListUserPointsInput): Promise<ListUserPointsOutput> {

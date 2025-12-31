@@ -5,8 +5,8 @@ import {
 } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
-import { DeleteMusicianUseCase } from "../delete-musician.use-case";
 import { DeleteMusicianInput } from "../delete-musician.input";
+import { DeleteMusicianUseCase } from "../delete-musician.use-case";
 
 describe("DeleteMusicianUseCase Unit Tests", () => {
   let useCase: DeleteMusicianUseCase;

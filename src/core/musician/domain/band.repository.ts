@@ -46,11 +46,10 @@ export class BandSearchParams extends DefaultSearchParams<BandFilter> {
 
 export class BandSearchResult extends DefaultSearchResult<Band> {}
 
-export interface IBandRepository
-  extends ISearchableRepository<
-    Band,
-    BandId,
-    BandFilter,
-    BandSearchParams,
-    BandSearchResult
-  > {}
+export interface IBandRepository extends ISearchableRepository<
+  Band,
+  BandId,
+  BandFilter,
+  BandSearchParams,
+  BandSearchResult
+> {}

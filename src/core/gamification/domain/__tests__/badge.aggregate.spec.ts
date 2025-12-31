@@ -1,6 +1,5 @@
-import { Badge, BadgeId } from "../badge.aggregate";
-import { BadgeValidatorFactory } from "../badge.validator";
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { Badge, BadgeId } from "../badge.aggregate";
 
 describe("Badge Unit Tests without validator", () => {
   beforeEach(() => {

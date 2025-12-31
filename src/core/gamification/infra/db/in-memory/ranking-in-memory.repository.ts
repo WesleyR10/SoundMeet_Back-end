@@ -2,10 +2,10 @@ import { SortDirection } from "../../../../shared/domain/repository/search-param
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Ranking, RankingId } from "../../../domain/ranking.aggregate";
 import {
+  IRankingRepository,
   RankingFilter,
   RankingSearchParams,
   RankingSearchResult,
-  IRankingRepository,
 } from "../../../domain/ranking.repository";
 
 export class RankingInMemoryRepository

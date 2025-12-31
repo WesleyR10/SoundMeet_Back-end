@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, IsOptional, IsArray, IsBoolean } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from "class-validator";
+
 import { BandMemberProps } from "../../../domain/band.aggregate";
 
 export type CreateBandInputConstructorProps = {

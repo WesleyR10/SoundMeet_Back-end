@@ -3,14 +3,14 @@ import {
   BadgeRarity,
 } from "@core/gamification/domain/badge.aggregate";
 import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsNumber,
-  Min,
-  IsObject,
   IsBoolean,
   IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
   validateSync,
 } from "class-validator";
 

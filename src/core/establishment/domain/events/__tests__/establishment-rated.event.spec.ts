@@ -1,6 +1,6 @@
-import { EstablishmentRatedEvent } from "../establishment-rated.event";
 import { Rating } from "../../../../shared/domain/value-objects/rating.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { EstablishmentRatedEvent } from "../establishment-rated.event";
 
 describe("EstablishmentRatedEvent Unit Tests", () => {
   test("should create an establishment rated event", () => {

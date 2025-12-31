@@ -1,8 +1,8 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import {
   EstablishmentFilter,
@@ -14,15 +14,16 @@ import {
   EstablishmentOutputMapper,
 } from "../common/establishment-output";
 
-export class ListEstablishmentsUseCase
-  implements IUseCase<ListEstablishmentsInput, ListEstablishmentsOutput>
-{
+export class ListEstablishmentsUseCase implements IUseCase<
+  ListEstablishmentsInput,
+  ListEstablishmentsOutput
+> {
   constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
 
   async execute(
     input: ListEstablishmentsInput,
   ): Promise<ListEstablishmentsOutput> {
-    const params = new EstablishmentSearchParams(input);
+    const params = EstablishmentSearchParams.create(input);
     const searchResult = await this.establishmentRepo.search(params);
 
     return this.toOutput(searchResult);

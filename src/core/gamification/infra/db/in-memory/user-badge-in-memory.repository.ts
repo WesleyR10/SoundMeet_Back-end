@@ -1,12 +1,10 @@
-import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
-import { BadgeType } from "../../../../shared/domain/value-objects/badge.vo";
 import {
+  IUserBadgeRepository,
   UserBadgeFilter,
   UserBadgeSearchParams,
   UserBadgeSearchResult,
-  IUserBadgeRepository,
 } from "../../../domain/user-badge.repository";
 
 export class UserBadgeInMemoryRepository
@@ -80,7 +78,10 @@ export class UserBadgeInMemoryRepository
         return false;
       }
 
-      if (filter.badge_rarity && item.badge_type.value !== filter.badge_rarity) {
+      if (
+        filter.badge_rarity &&
+        item.badge_type.value !== filter.badge_rarity
+      ) {
         // TODO: Implement rarity
         return false;
       }

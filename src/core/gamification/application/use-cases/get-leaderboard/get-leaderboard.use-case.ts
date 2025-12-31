@@ -6,9 +6,10 @@ import {
 } from "../common/user-points-output";
 import { GetLeaderboardInput } from "./get-leaderboard.input";
 
-export class GetLeaderboardUseCase
-  implements IUseCase<GetLeaderboardInput, UserPointsOutput[]>
-{
+export class GetLeaderboardUseCase implements IUseCase<
+  GetLeaderboardInput,
+  UserPointsOutput[]
+> {
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: GetLeaderboardInput): Promise<UserPointsOutput[]> {

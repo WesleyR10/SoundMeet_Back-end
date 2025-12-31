@@ -1,13 +1,13 @@
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
-  IsArray,
-  IsNumber,
-  Min,
   Max,
+  Min,
   validateSync,
 } from "class-validator";
 

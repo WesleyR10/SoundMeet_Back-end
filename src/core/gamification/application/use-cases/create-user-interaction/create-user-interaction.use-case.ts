@@ -8,9 +8,10 @@ import {
 } from "../common/user-interaction-output";
 import { CreateUserInteractionInput } from "./create-user-interaction.input";
 
-export class CreateUserInteractionUseCase
-  implements IUseCase<CreateUserInteractionInput, UserInteractionOutput>
-{
+export class CreateUserInteractionUseCase implements IUseCase<
+  CreateUserInteractionInput,
+  UserInteractionOutput
+> {
   constructor(
     private readonly userInteractionRepo: IUserInteractionRepository,
   ) {}

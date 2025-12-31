@@ -1,8 +1,8 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   BadgeSearchParams,
   IBadgeRepository,
@@ -10,9 +10,10 @@ import {
 import { BadgeOutput, BadgeOutputMapper } from "../common/badge-output";
 import { ListBadgesInput } from "./list-badges.input";
 
-export class ListBadgesUseCase
-  implements IUseCase<ListBadgesInput, ListBadgesOutput>
-{
+export class ListBadgesUseCase implements IUseCase<
+  ListBadgesInput,
+  ListBadgesOutput
+> {
   constructor(private readonly badgeRepo: IBadgeRepository) {}
 
   async execute(input: ListBadgesInput): Promise<ListBadgesOutput> {

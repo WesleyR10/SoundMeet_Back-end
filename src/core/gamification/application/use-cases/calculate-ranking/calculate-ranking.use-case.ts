@@ -1,10 +1,10 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { Ranking } from "../../../domain/ranking.aggregate";
 import { IRankingRepository } from "../../../domain/ranking.repository";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
-import { Ranking } from "../../../domain/ranking.aggregate";
 import {
-  RankingTypeEnum,
   RankingPeriodEnum,
+  RankingTypeEnum,
 } from "../../../domain/value-objects/ranking-type.vo";
 import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
 import { CalculateRankingInput } from "./calculate-ranking.input";
@@ -15,9 +15,10 @@ function startEndOfMonth(month: number, year: number) {
   return { start, end };
 }
 
-export class CalculateRankingUseCase
-  implements IUseCase<CalculateRankingInput, RankingOutput[]>
-{
+export class CalculateRankingUseCase implements IUseCase<
+  CalculateRankingInput,
+  RankingOutput[]
+> {
   constructor(
     private readonly rankingRepo: IRankingRepository,
     private readonly userScoreRepo: IUserScoreRepository,

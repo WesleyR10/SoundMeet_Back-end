@@ -1,11 +1,10 @@
 import { Chance } from "chance";
-import { EstablishmentFakeBuilder } from "../establishment-fake.builder";
-import { Establishment, EstablishmentId } from "../establishment.aggregate";
-import { Email } from "../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../shared/domain/value-objects/phone.vo";
-import { QRCode } from "../../../shared/domain/value-objects/qr-code.vo";
-import { Rating } from "../../../shared/domain/value-objects/rating.vo";
+
 import { CNPJ } from "../../../shared/domain/value-objects/cnpj.vo";
+import { Email } from "../../../shared/domain/value-objects/email.vo";
+import { Rating } from "../../../shared/domain/value-objects/rating.vo";
+import { EstablishmentId } from "../establishment.aggregate";
+import { EstablishmentFakeBuilder } from "../establishment-fake.builder";
 
 describe("EstablishmentFakeBuilder Unit Tests", () => {
   describe("establishment_id prop", () => {

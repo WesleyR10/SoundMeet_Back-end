@@ -1,15 +1,16 @@
 import {
-  IsNotEmpty,
-  IsString,
-  IsEmail,
-  IsOptional,
   IsArray,
-  IsNumber,
   IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
   MaxLength,
   Min,
-  Max,
 } from "class-validator";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { Musician } from "./musician.aggregate";

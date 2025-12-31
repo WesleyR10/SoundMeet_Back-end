@@ -1,13 +1,13 @@
+import { ScoreTypeEnum } from "@core/gamification/domain/value-objects/score-type.vo";
 import {
+  IsIn,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
-  IsNumber,
   Min,
-  IsIn,
   validateSync,
 } from "class-validator";
-import { ScoreTypeEnum } from "@core/gamification/domain/value-objects/score-type.vo";
 
 export type CreateUserScoreInputConstructorProps = {
   user_id: string;

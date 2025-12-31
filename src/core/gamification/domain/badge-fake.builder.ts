@@ -1,5 +1,6 @@
 import { Chance } from "chance";
-import { Badge, BadgeId, BadgeCategory, BadgeRarity } from "./badge.aggregate";
+
+import { Badge, BadgeCategory, BadgeId, BadgeRarity } from "./badge.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

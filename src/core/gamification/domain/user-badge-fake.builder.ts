@@ -1,6 +1,7 @@
 import { Chance } from "chance";
-import { UserBadge, UserBadgeId } from "./user-badge.aggregate";
+
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+import { UserBadge, UserBadgeId } from "./user-badge.aggregate";
 import { BadgeTypeEnum } from "./value-objects/badge-type.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);

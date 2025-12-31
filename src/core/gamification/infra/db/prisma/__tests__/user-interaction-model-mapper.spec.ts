@@ -1,5 +1,4 @@
 import { UserInteraction } from "../../../../domain/user-interaction.aggregate";
-import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import {
   UserInteractionModelMapper,
   UserInteractionModelProps,

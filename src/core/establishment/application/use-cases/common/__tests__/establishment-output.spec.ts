@@ -1,5 +1,5 @@
-import { EstablishmentOutputMapper } from "../establishment-output";
 import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
+import { EstablishmentOutputMapper } from "../establishment-output";
 
 describe("EstablishmentOutputMapper Unit Tests", () => {
   it("should convert an establishment in output", () => {

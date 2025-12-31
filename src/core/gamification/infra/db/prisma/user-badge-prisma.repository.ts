@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
 import { IUserBadgeRepository } from "../../../domain/user-badge.repository";
@@ -6,10 +7,7 @@ import {
   UserBadgeSearchParams,
   UserBadgeSearchResult,
 } from "../../../domain/user-badge.repository";
-import {
-  UserBadgeModelMapper,
-  UserBadgePrismaModel,
-} from "./user-badge-model-mapper";
+import { UserBadgeModelMapper } from "./user-badge-model-mapper";
 
 export class UserBadgePrismaRepository implements IUserBadgeRepository {
   sortableFields: string[] = ["earnedAt", "progress"];

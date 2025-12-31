@@ -1,9 +1,8 @@
 // Common outputs
-export * from "./common";
-
 export * from "./add-points/add-points.use-case";
 export * from "./award-badge/award-badge.use-case";
 export * from "./calculate-ranking/calculate-ranking.use-case";
+export * from "./common";
 export * from "./create-badge/create-badge.use-case";
 export * from "./create-user-interaction/create-user-interaction.use-case";
 export * from "./create-user-points/create-user-points.use-case";

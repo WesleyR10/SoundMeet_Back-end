@@ -1,7 +1,7 @@
-import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
-import { CreateMusicianUseCase } from "../create-musician.use-case";
-import { CreateMusicianInput } from "../create-musician.input";
 import { Musician } from "../../../../domain/musician.aggregate";
+import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
+import { CreateMusicianInput } from "../create-musician.input";
+import { CreateMusicianUseCase } from "../create-musician.use-case";
 
 describe("CreateMusicianUseCase Integration Tests", () => {
   let useCase: CreateMusicianUseCase;

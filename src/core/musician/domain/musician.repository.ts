@@ -60,11 +60,10 @@ export class MusicianSearchParams extends DefaultSearchParams<MusicianFilter> {
 
 export class MusicianSearchResult extends DefaultSearchResult<Musician> {}
 
-export interface IMusicianRepository
-  extends ISearchableRepository<
-    Musician,
-    MusicianId,
-    MusicianFilter,
-    MusicianSearchParams,
-    MusicianSearchResult
-  > {}
+export interface IMusicianRepository extends ISearchableRepository<
+  Musician,
+  MusicianId,
+  MusicianFilter,
+  MusicianSearchParams,
+  MusicianSearchResult
+> {}

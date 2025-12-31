@@ -1,18 +1,18 @@
-
+import { Type } from "class-transformer";
 import {
+  IsArray,
   IsBoolean,
   IsDate,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
-  IsArray,
   ValidateNested,
 } from "class-validator";
-import { Band } from "./band.aggregate";
+
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
-import { Type } from "class-transformer";
+import { Band } from "./band.aggregate";
 
 export class BandMemberRules {
   @IsNotEmpty()
@@ -78,19 +78,22 @@ export class BandRules {
     this.description = entity.description;
     this.avatar = entity.avatar;
     this.genres = entity.genres;
-    this.members = entity.members.map((m) => new BandMemberRules({
-      musician_id: m.musician_id.id,
-      role: m.role,
-      instrument: m.instrument,
-      joined_at: m.joined_at,
-    }));
+    this.members = entity.members.map(
+      (m) =>
+        new BandMemberRules({
+          musician_id: m.musician_id.id,
+          role: m.role,
+          instrument: m.instrument,
+          joined_at: m.joined_at,
+        }),
+    );
     this.is_active = entity.is_active;
     this.created_at = entity.created_at;
     this.updated_at = entity.updated_at;
   }
 }
 
-export class BandValidator extends ClassValidatorFields<BandRules> {
+export class BandValidator extends ClassValidatorFields {
   validate(notification: Notification, data: any, fields?: string[]): boolean {
     const newFields = fields?.length ? fields : [];
     return super.validate(notification, new BandRules(data), newFields);

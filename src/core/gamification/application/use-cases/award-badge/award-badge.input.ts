@@ -1,13 +1,13 @@
+import { BadgeType } from "@core/gamification/domain/value-objects/badge-type.vo";
 import {
-  IsNotEmpty,
-  IsString,
   IsEnum,
-  IsOptional,
+  IsNotEmpty,
   IsNumber,
   IsObject,
+  IsOptional,
+  IsString,
   validateSync,
 } from "class-validator";
-import { BadgeType } from "@core/gamification/domain/value-objects/badge-type.vo";
 
 export type AwardBadgeInputConstructorProps = {
   user_id: string;

@@ -4,9 +4,10 @@ import { Musician } from "../../../domain/musician.aggregate";
 import { MusicianId } from "../../../domain/musician.aggregate";
 import { IMusicianRepository } from "../../../domain/musician.repository";
 
-export class DeleteMusicianUseCase
-  implements IUseCase<DeleteMusicianInput, DeleteMusicianOutput>
-{
+export class DeleteMusicianUseCase implements IUseCase<
+  DeleteMusicianInput,
+  DeleteMusicianOutput
+> {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: DeleteMusicianInput): Promise<DeleteMusicianOutput> {

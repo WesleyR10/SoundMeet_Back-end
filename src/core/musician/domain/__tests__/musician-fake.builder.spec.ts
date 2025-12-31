@@ -1,10 +1,10 @@
 import { Chance } from "chance";
-import { MusicianFakeBuilder } from "../musician-fake.builder";
-import { Musician, MusicianId } from "../musician.aggregate";
+
 import { Email } from "../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { QRCode } from "../../../shared/domain/value-objects/qr-code.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
+import { MusicianId } from "../musician.aggregate";
+import { MusicianFakeBuilder } from "../musician-fake.builder";
 
 describe("MusicianFakeBuilder Unit Tests", () => {
   describe("id prop", () => {
@@ -171,7 +171,7 @@ describe("MusicianFakeBuilder Unit Tests", () => {
     test("invalid too long case", () => {
       const $this = faker.withInvalidStageNameTooLong();
       expect($this).toBeInstanceOf(MusicianFakeBuilder);
-      expect(faker["_stage_name"].length).toBe(256);
+      expect((faker["_stage_name"] as string).length).toBe(256);
 
       const tooLong = "a".repeat(256);
       faker.withInvalidStageNameTooLong(tooLong);
@@ -212,7 +212,7 @@ describe("MusicianFakeBuilder Unit Tests", () => {
     test("invalid too long case", () => {
       const $this = faker.withInvalidBioTooLong();
       expect($this).toBeInstanceOf(MusicianFakeBuilder);
-      expect(faker["_bio"].length).toBe(1001);
+      expect((faker["_bio"] as string).length).toBe(1001);
 
       const tooLong = "a".repeat(1001);
       faker.withInvalidBioTooLong(tooLong);

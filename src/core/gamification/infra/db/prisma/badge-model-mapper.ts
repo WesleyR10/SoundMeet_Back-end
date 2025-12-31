@@ -1,10 +1,11 @@
+import { Prisma } from "@prisma/client";
+
 import {
   Badge,
-  BadgeId,
   BadgeCategory,
+  BadgeId,
   BadgeRarity,
 } from "../../../domain/badge.aggregate";
-import { Prisma } from "@prisma/client";
 
 export type BadgeModelProps = {
   id: string;

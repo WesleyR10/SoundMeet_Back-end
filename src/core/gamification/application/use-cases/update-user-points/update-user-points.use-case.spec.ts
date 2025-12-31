@@ -1,8 +1,8 @@
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { UserPoints } from "../../../domain/user-points.aggregate";
+import { InvalidUserLevelError } from "../../../domain/value-objects/user-level.vo";
 import { UserPointsInMemoryRepository } from "../../../infra/db/in-memory/user-points-in-memory.repository";
 import { UpdateUserPointsUseCase } from "./update-user-points.use-case";
-import { InvalidUserLevelError } from "../../../domain/value-objects/user-level.vo";
 
 describe("UpdateUserPointsUseCase Unit Tests", () => {
   let useCase: UpdateUserPointsUseCase;

@@ -1,20 +1,19 @@
+import {
+  Address,
+  AggregateRoot,
+  CNPJ,
+  Email,
+  InvalidCNPJError,
+  Phone,
+  QRCode,
+  Rating,
+  Uuid,
+} from "../../shared/domain";
 import { ValueObject } from "../../shared/domain/value-object";
-
 import { EstablishmentValidatorFactory } from "./establishment.validator";
 import { EstablishmentFakeBuilder } from "./establishment-fake.builder";
-import {
-  AggregateRoot,
-  Uuid,
-  Email,
-  Phone,
-  Address,
-  Rating,
-  CNPJ,
-  InvalidCNPJError,
-  QRCode,
-} from "../../shared/domain";
-import { EstablishmentRatedEvent } from "./events/establishment-rated.event";
 import { EstablishmentCreatedEvent } from "./events/establishment-created.event";
+import { EstablishmentRatedEvent } from "./events/establishment-rated.event";
 import { EstablishmentVerifiedEvent } from "./events/establishment-verified.event";
 
 export type EstablishmentConstructorProps = {
@@ -24,7 +23,7 @@ export type EstablishmentConstructorProps = {
   avatar?: string | null;
   cnpj?: string | null;
   email: Email;
-  phone: Phone | null;
+  phone?: Phone | null;
   website?: string | null;
   address: Address;
   establishment_type: string;
@@ -123,21 +122,23 @@ export class Establishment extends AggregateRoot {
     });
     establishment.validate(["name", "email", "address", "establishment_type"]);
     establishment.generateQRCode();
-    establishment.applyEvent(new EstablishmentCreatedEvent({
-      establishment_id: establishment.id,
-      name: establishment.name,
-      email: establishment.email,
-      cnpj: establishment.cnpj,
-      phone: establishment.phone,
-      address: establishment.address,
-      description: establishment.description,
-      avatar: establishment.avatar,
-      cover: null, // Assuming cover is not in command yet
-      rating: establishment.rating,
-      is_active: establishment.is_active,
-      is_verified: establishment.is_verified,
-      created_at: establishment.created_at,
-    }));
+    establishment.applyEvent(
+      new EstablishmentCreatedEvent({
+        establishment_id: establishment.id,
+        name: establishment.name,
+        email: establishment.email,
+        cnpj: establishment.cnpj,
+        phone: establishment.phone,
+        address: establishment.address,
+        description: establishment.description,
+        avatar: establishment.avatar,
+        cover: null, // Assuming cover is not in command yet
+        rating: establishment.rating,
+        is_active: establishment.is_active,
+        is_verified: establishment.is_verified,
+        created_at: establishment.created_at,
+      }),
+    );
     return establishment;
   }
 
@@ -154,7 +155,7 @@ export class Establishment extends AggregateRoot {
     this.avatar = avatar;
   }
 
-  changeCnpj(cnpj: string ): void {
+  changeCnpj(cnpj: string): void {
     try {
       this.cnpj = new CNPJ(cnpj);
       this.validate(["cnpj"]);
@@ -242,10 +243,12 @@ export class Establishment extends AggregateRoot {
 
   verify(): void {
     this.is_verified = true;
-    this.applyEvent(new EstablishmentVerifiedEvent({
-      establishment_id: this.id,
-      verified_at: new Date()
-    }));
+    this.applyEvent(
+      new EstablishmentVerifiedEvent({
+        establishment_id: this.id,
+        verified_at: new Date(),
+      }),
+    );
   }
 
   unverify(): void {

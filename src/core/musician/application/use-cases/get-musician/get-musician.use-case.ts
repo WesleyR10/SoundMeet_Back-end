@@ -7,9 +7,10 @@ import {
   MusicianOutputMapper,
 } from "../common/musician-output";
 
-export class GetMusicianUseCase
-  implements IUseCase<GetMusicianInput, GetMusicianOutput>
-{
+export class GetMusicianUseCase implements IUseCase<
+  GetMusicianInput,
+  GetMusicianOutput
+> {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: GetMusicianInput): Promise<GetMusicianOutput> {

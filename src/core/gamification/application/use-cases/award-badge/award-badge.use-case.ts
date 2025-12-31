@@ -8,9 +8,10 @@ import {
 } from "../common/user-badge-output";
 import { AwardBadgeInput } from "./award-badge.input";
 
-export class AwardBadgeUseCase
-  implements IUseCase<AwardBadgeInput, UserBadgeOutput>
-{
+export class AwardBadgeUseCase implements IUseCase<
+  AwardBadgeInput,
+  UserBadgeOutput
+> {
   constructor(private readonly userBadgeRepo: IUserBadgeRepository) {}
 
   async execute(input: AwardBadgeInput): Promise<UserBadgeOutput> {

@@ -12,9 +12,10 @@ import {
 } from "../common/user-points-output";
 import { UpdateUserPointsInput } from "./update-user-points.input";
 
-export class UpdateUserPointsUseCase
-  implements IUseCase<UpdateUserPointsInput, UpdateUserPointsOutput>
-{
+export class UpdateUserPointsUseCase implements IUseCase<
+  UpdateUserPointsInput,
+  UpdateUserPointsOutput
+> {
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: UpdateUserPointsInput): Promise<UpdateUserPointsOutput> {

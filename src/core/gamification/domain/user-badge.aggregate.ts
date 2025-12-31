@@ -1,9 +1,10 @@
+import { AggregateRoot, Uuid } from "../../shared/domain";
+import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { UserBadgeValidatorFactory } from "./user-badge.validator";
 import { UserBadgeFakeBuilder } from "./user-badge-fake.builder";
-import { AggregateRoot, Uuid } from "../../shared/domain";
-import { UserBadgeId } from "./value-objects/gamification-id.vo";
 import { BadgeType, BadgeTypeEnum } from "./value-objects/badge-type.vo";
+import { UserBadgeId } from "./value-objects/gamification-id.vo";
 
 export type UserBadgeConstructorProps = {
   id?: UserBadgeId;
@@ -36,8 +37,17 @@ export class UserBadge extends AggregateRoot {
   constructor(props: UserBadgeConstructorProps) {
     super();
     this.id = props.id ?? UserBadgeId.create();
-    this.user_id = new Uuid(props.user_id);
-    this.badge_type = new BadgeType(props.badge_type);
+    try {
+      this.user_id = new Uuid(props.user_id);
+    } catch (error) {
+      this.user_id = { id: props.user_id } as any;
+    }
+
+    try {
+      this.badge_type = new BadgeType(props.badge_type);
+    } catch (error) {
+      this.badge_type = { value: props.badge_type } as any;
+    }
     this.progress = props.progress ?? 0;
     this.is_unlocked = props.is_unlocked ?? false;
     this.unlocked_at = props.unlocked_at ?? null;
@@ -52,6 +62,14 @@ export class UserBadge extends AggregateRoot {
   }
 
   static create(command: UserBadgeCreateCommand): UserBadge {
+    if (!command.user_id || command.user_id.trim() === "") {
+      throw new EntityValidationError([
+        {
+          user_id: ["user_id should not be empty"],
+        },
+      ]);
+    }
+
     const userBadge = new UserBadge({
       user_id: command.user_id,
       badge_type: command.badge_type,
@@ -128,9 +146,12 @@ export class UserBadge extends AggregateRoot {
     return this.badge_type.getDescription();
   }
 
-  validate(fields?: string[]): boolean {
+  validate(fields?: string[]): void {
     const validator = UserBadgeValidatorFactory.create();
-    return validator.validate(this.notification, this, fields);
+    const isValid = validator.validate(this.notification, this, fields);
+    if (!isValid) {
+      throw new EntityValidationError(this.notification.toJSON());
+    }
   }
 
   static fake() {
