@@ -1,9 +1,12 @@
 import { Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ScheduleModule } from "@nestjs/schedule";
-import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
-import { DatabaseModule } from "./nest-modules/database-module/database.module";
+
+import { HealthController } from "./health.controller";
+import { AudiencesModule } from "./nest-modules/audiences-module/audiences.module";
 import { ConfigModuleRoot } from "./nest-modules/config-module/config-module.module";
+import { DatabaseModule } from "./nest-modules/database-module/database.module";
+import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
 
 // Nest Modules
 // External Nest modules removed from project
@@ -11,10 +14,11 @@ import { ConfigModuleRoot } from "./nest-modules/config-module/config-module.mod
 @Module({
   imports: [
     ConfigModuleRoot.forRoot(),
-    
+
     // Module
     DatabaseModule,
     MusiciansModule,
+    AudiencesModule,
 
     // Event System
     EventEmitterModule.forRoot({
@@ -33,7 +37,7 @@ import { ConfigModuleRoot } from "./nest-modules/config-module/config-module.mod
     // Infrastructure
     // Domain modules removed
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule {}
