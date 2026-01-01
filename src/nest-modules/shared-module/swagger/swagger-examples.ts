@@ -124,10 +124,27 @@ function isPlainObject(value: any): value is Record<string, any> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function deepMergeExamples(a: any, b: any): any {
+  if (!isPlainObject(a) || !isPlainObject(b)) return b;
+  const out: Record<string, any> = { ...a };
+  for (const [key, value] of Object.entries(b)) {
+    if (key in out) {
+      out[key] = deepMergeExamples(out[key], value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function isExampleCompatible(schema: OpenApiSchema, example: any) {
   if (schema.enum?.length) return schema.enum.includes(example);
 
-  if (!schema.type) return true;
+  if (!schema.type) {
+    if (schema.properties) return isPlainObject(example);
+    if (schema.items) return Array.isArray(example);
+    return true;
+  }
 
   if (schema.type === "object") return isPlainObject(example);
   if (schema.type === "array") return Array.isArray(example);
@@ -150,9 +167,30 @@ function numberExampleForSchema(name: string, schema: OpenApiSchema) {
     return val;
   };
 
-  if (key.includes("year")) return safeClamp(5);
+  if (key.includes("experience_years")) return safeClamp(5);
+
+  if (key.includes("per_page") || key.includes("perpage")) return safeClamp(15);
+  if (key === "page" || key.includes("current_page") || key.includes("last_page"))
+    return safeClamp(1);
+  if (key === "limit") return safeClamp(15);
+
+  if (key.includes("points_earned")) return safeClamp(25);
+  if (key.includes("points_to_next_level")) return safeClamp(75);
+  if (key === "monthly" || key.includes("monthly_points")) return safeClamp(40);
+  if (key === "total" || key.includes("total_points")) return safeClamp(250);
+
+  if (key.includes("min_points")) return safeClamp(0);
+  if (key.includes("max_points")) return safeClamp(1000);
+
+  if (key === "level" || key.includes("current_level")) return safeClamp(2);
+  if (key.includes("total_ratings")) return safeClamp(128);
+
+  if (key.includes("year")) {
+    if (max !== null && max <= 100) return safeClamp(5);
+    return safeClamp(new Date().getFullYear());
+  }
   if (key.includes("amount") || key.includes("valor") || key.includes("price"))
-    return safeClamp(10);
+    return safeClamp(20);
 
   if (min !== null && max !== null) return safeClamp(Math.max(min, 1));
   if (min !== null) return min;
@@ -189,11 +227,20 @@ function resolveExampleValue(params: {
   if (schema.default !== undefined) return schema.default;
   if (schema.enum?.length) return schema.enum[0];
 
-  const fromRegistry = pickFromRegistry(name, schema, options.registry);
-  if (fromRegistry !== null) {
-    if (typeof fromRegistry === "string")
-      return clampStringByLength(fromRegistry, schema);
-    return fromRegistry;
+  const isStructuredObjectSchema =
+    (schema.type === "object" || schema.type === undefined) &&
+    (Boolean(schema.properties) ||
+      Boolean(schema.allOf?.length) ||
+      Boolean(schema.oneOf?.length) ||
+      Boolean(schema.anyOf?.length));
+
+  if (!isStructuredObjectSchema) {
+    const fromRegistry = pickFromRegistry(name, schema, options.registry);
+    if (fromRegistry !== null) {
+      if (typeof fromRegistry === "string")
+        return clampStringByLength(fromRegistry, schema);
+      return fromRegistry;
+    }
   }
 
   if (schema.pattern && schema.type === "string") {
@@ -207,11 +254,44 @@ function resolveExampleValue(params: {
     const refSchema = refName ? schemas[refName] : null;
     if (refName && refSchema) {
       ensureSchemaExamples(refName, refSchema, schemas, seen, options);
-      return refSchema.example ?? {};
+      return (
+        refSchema.example ??
+        resolveExampleValue({
+          name: refName,
+          schema: refSchema,
+          schemas,
+          seen,
+          options,
+        })
+      );
     }
   }
 
-  const composite = schema.allOf ?? schema.oneOf ?? schema.anyOf;
+  if (schema.allOf?.length) {
+    let merged: any = {};
+    let mergedAnyObject = false;
+
+    for (const subSchema of schema.allOf) {
+      const sub = resolveExampleValue({
+        name,
+        schema: subSchema,
+        schemas,
+        seen,
+        options,
+      });
+
+      if (isPlainObject(sub)) {
+        merged = deepMergeExamples(merged, sub);
+        mergedAnyObject = true;
+      } else if (!mergedAnyObject) {
+        merged = sub;
+      }
+    }
+
+    return merged;
+  }
+
+  const composite = schema.oneOf ?? schema.anyOf;
   if (composite?.length) {
     return resolveExampleValue({
       name,
@@ -248,7 +328,7 @@ function resolveExampleValue(params: {
     return clampStringByLength(value, schema);
   }
 
-  if (schema.type === "object" && schema.properties) {
+  if ((schema.type === "object" || schema.type === undefined) && schema.properties) {
     const example: Record<string, any> = {};
     const required = new Set(schema.required ?? []);
     for (const [propName, propSchema] of Object.entries(schema.properties)) {
@@ -283,7 +363,18 @@ function ensureSchemaExamples(
   if (seen.has(schemaName)) return;
   seen.add(schemaName);
 
-  const composite = schema.allOf ?? schema.oneOf ?? schema.anyOf;
+  if (schema.allOf?.length) {
+    schema.example = resolveExampleValue({
+      name: schemaName,
+      schema,
+      schemas,
+      seen,
+      options,
+    });
+    return;
+  }
+
+  const composite = schema.oneOf ?? schema.anyOf;
   if (composite?.length) {
     schema.example = resolveExampleValue({
       name: schemaName,
@@ -295,7 +386,7 @@ function ensureSchemaExamples(
     return;
   }
 
-  if (schema.type === "object" && schema.properties) {
+  if ((schema.type === "object" || schema.type === undefined) && schema.properties) {
     schema.example = resolveExampleValue({
       name: schemaName,
       schema,
@@ -306,11 +397,73 @@ function ensureSchemaExamples(
   }
 }
 
+function renamePaginationPresenterToMeta(
+  schemas: Record<string, OpenApiSchema>,
+) {
+  for (const schema of Object.values(schemas)) {
+    if (!schema.properties) continue;
+    const paginationProp = schema.properties.paginationPresenter;
+    if (!paginationProp || schema.properties.meta) continue;
+
+    schema.properties.meta = paginationProp;
+    delete schema.properties.paginationPresenter;
+
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.map((propName) =>
+        propName === "paginationPresenter" ? "meta" : propName,
+      );
+    }
+  }
+}
+
 export function defaultSwaggerExampleRegistry(): SwaggerExampleRegistryItem[] {
   return [
     { pattern: /^email$/i, build: () => "email@example.com" },
     { pattern: /password|senha/i, build: () => "ExampleSenha123!" },
     { pattern: /phone|telefone/i, build: () => "+5511999999999" },
+    { pattern: /^platform$/i, build: () => "instagram" },
+    { pattern: /^vote$/i, build: () => "up" },
+    { pattern: /sort_dir/i, build: () => "asc" },
+    { pattern: /^sort$/i, build: () => "created_at" },
+    { pattern: /nickname/i, build: () => "Jão" },
+    { pattern: /stage_name/i, build: () => "DJ Fulano" },
+    { pattern: /preferred_languages/i, build: () => ["pt-BR", "en-US"] },
+    {
+      pattern: /benefits/i,
+      build: () => ["Pedidos prioritários", "Acesso VIP"],
+    },
+    {
+      pattern: /^badges$/i,
+      build: () => ["Iniciante", "Fã de Carteirinha"],
+    },
+    { pattern: /is_anonymous/i, build: () => false },
+    {
+      pattern: /notification_settings/i,
+      build: () => ({
+        push_notifications: true,
+        email_notifications: true,
+        sms_notifications: false,
+        marketing_emails: false,
+      }),
+    },
+    {
+      pattern: /privacy_settings/i,
+      build: () => ({
+        profile_visibility: "public",
+        show_activity: true,
+        show_favorites: true,
+        allow_friend_requests: true,
+      }),
+    },
+    {
+      pattern: /discovery_settings/i,
+      build: () => ({
+        discoverable_by_email: true,
+        discoverable_by_phone: false,
+        show_in_suggestions: true,
+        location_based_suggestions: true,
+      }),
+    },
     {
       pattern: /days/i,
       build: ({ schema }) =>
@@ -473,6 +626,8 @@ export function applySwaggerExamples(
   const schemas: Record<string, OpenApiSchema> | undefined =
     document?.components?.schemas;
   if (!schemas) return;
+
+  renamePaginationPresenterToMeta(schemas);
 
   const seen = new Set<string>();
   for (const [name, schema] of Object.entries(schemas)) {
