@@ -1,0 +1,7 @@
+{
+  "eslint.validate": ["typescript"],
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  }
+}
