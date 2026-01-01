@@ -2,13 +2,12 @@ import { Chance } from "chance";
 
 import { AudiencePoints } from "../../../shared/domain/value-objects/audience-points.vo";
 import { Email } from "../../../shared/domain/value-objects/email.vo";
-import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { AudienceId } from "../audience.aggregate";
 import { AudienceFakeBuilder } from "../audience-fake.builder";
 
 describe("AudienceFakeBuilder Unit Tests", () => {
   describe("id prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
 
     test("should throw error when any with methods has called", () => {
       expect(() => faker.id).toThrow(
@@ -52,7 +51,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("name prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_name"]).toBe("function");
     });
@@ -105,7 +104,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("email prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_email"]).toBe("function");
     });
@@ -149,7 +148,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("nickname prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_nickname"]).toBe("function");
     });
@@ -181,7 +180,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("avatar prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_avatar"]).toBe("function");
     });
@@ -213,7 +212,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("phone prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_phone"]).toBe("function");
     });
@@ -245,7 +244,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("favorite_genres prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_favorite_genres"]).toBe("function");
     });
@@ -278,7 +277,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("is_active prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     test("should be a function", () => {
       expect(typeof faker["_is_active"]).toBe("function");
     });
@@ -324,10 +323,10 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   describe("created_at prop", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
 
     test("should throw error when any with methods has called", () => {
-      const fakerAudience = AudienceFakeBuilder.anAudience();
+      const fakerAudience = AudienceFakeBuilder.aAudience();
       expect(() => fakerAudience.created_at).toThrow(
         new Error("Property created_at not have a factory, use 'with' methods"),
       );
@@ -365,7 +364,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
   });
 
   test("should create an audience", () => {
-    const faker = AudienceFakeBuilder.anAudience();
+    const faker = AudienceFakeBuilder.aAudience();
     let audience = faker.build();
 
     expect(audience.id).toBeInstanceOf(AudienceId);

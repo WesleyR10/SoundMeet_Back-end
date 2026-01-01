@@ -49,10 +49,6 @@ export class AudienceFakeBuilder<TBuild = any> {
     return new AudienceFakeBuilder<Audience>();
   }
 
-  static anAudience() {
-    return new AudienceFakeBuilder<Audience>();
-  }
-
   static anInactiveAudience() {
     return new AudienceFakeBuilder<Audience>().deactivate();
   }

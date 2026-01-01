@@ -27,7 +27,7 @@ describe("AudiencePrismaRepository", () => {
 
   describe("insert", () => {
     it("should insert a new audience", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
       const { badges, location, social_links, ...dataWithoutBadges } =
         modelProps;
@@ -45,8 +45,8 @@ describe("AudiencePrismaRepository", () => {
   describe("bulkInsert", () => {
     it("should insert multiple audiences", async () => {
       const audiences = [
-        AudienceFakeBuilder.anAudience().build(),
-        AudienceFakeBuilder.anAudience().build(),
+        AudienceFakeBuilder.aAudience().build(),
+        AudienceFakeBuilder.aAudience().build(),
       ];
       const modelsProps = audiences.map((entity) => {
         const modelProps = AudienceModelMapper.toModel(entity);
@@ -69,7 +69,7 @@ describe("AudiencePrismaRepository", () => {
 
   describe("findById", () => {
     it("should find audience by id", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
 
       // Mock the badges structure as it would come from Prisma
@@ -124,8 +124,8 @@ describe("AudiencePrismaRepository", () => {
   describe("findAll", () => {
     it("should find all audiences", async () => {
       const audiences = [
-        AudienceFakeBuilder.anAudience().build(),
-        AudienceFakeBuilder.anAudience().build(),
+        AudienceFakeBuilder.aAudience().build(),
+        AudienceFakeBuilder.aAudience().build(),
       ];
       const modelsProps = audiences.map((entity) => {
         const modelProps = AudienceModelMapper.toModel(entity);
@@ -175,7 +175,7 @@ describe("AudiencePrismaRepository", () => {
 
   describe("update", () => {
     it("should update an audience", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
 
       (prisma.audience.update as jest.Mock).mockResolvedValue(modelProps);
@@ -223,7 +223,7 @@ describe("AudiencePrismaRepository", () => {
 
   describe("getEntity", () => {
     it("should get audience by id", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
 
       (prisma.audience.findUnique as jest.Mock).mockResolvedValue(modelProps);
@@ -247,8 +247,8 @@ describe("AudiencePrismaRepository", () => {
   describe("search", () => {
     it("should search audiences with default params", async () => {
       const audiences = [
-        AudienceFakeBuilder.anAudience().build(),
-        AudienceFakeBuilder.anAudience().build(),
+        AudienceFakeBuilder.aAudience().build(),
+        AudienceFakeBuilder.aAudience().build(),
       ];
       const modelsProps = audiences.map((entity) => {
         const modelProps = AudienceModelMapper.toModel(entity);
@@ -304,7 +304,7 @@ describe("AudiencePrismaRepository", () => {
     });
 
     it("should search audiences with filter", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
       const modelWithBadges = {
         ...modelProps,
@@ -356,7 +356,7 @@ describe("AudiencePrismaRepository", () => {
     });
 
     it("should search audiences with pagination", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
       const modelWithBadges = {
         ...modelProps,
@@ -388,7 +388,7 @@ describe("AudiencePrismaRepository", () => {
     });
 
     it("should search audiences with sort", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
       const modelWithBadges = {
         ...modelProps,
@@ -422,7 +422,7 @@ describe("AudiencePrismaRepository", () => {
     });
 
     it("should handle invalid sort field by using default sort", async () => {
-      const audience = AudienceFakeBuilder.anAudience().build();
+      const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
       const modelWithBadges = {
         ...modelProps,

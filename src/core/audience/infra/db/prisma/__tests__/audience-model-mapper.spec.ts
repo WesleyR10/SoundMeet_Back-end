@@ -7,7 +7,7 @@ import {
 describe("AudienceModelMapper", () => {
   describe("toModel", () => {
     it("should convert entity to model with all properties", () => {
-      const audience = AudienceFakeBuilder.anAudience()
+      const audience = AudienceFakeBuilder.aAudience()
         .withName("John Doe")
         .withNickname("Johnny")
         .withEmail("john@example.com")
@@ -50,7 +50,7 @@ describe("AudienceModelMapper", () => {
     });
 
     it("should convert entity to model with minimal properties", () => {
-      const audience = AudienceFakeBuilder.anAudience()
+      const audience = AudienceFakeBuilder.aAudience()
         .withName("Jane Doe")
         .withEmail("jane@example.com")
         .build();
@@ -141,6 +141,7 @@ describe("AudienceModelMapper", () => {
         badges: [],
         favorite_genres: [],
         favorite_artists: [],
+        favorite_instruments: [],
         preferred_languages: [],
         notification_settings: {},
         privacy_settings: {},
@@ -180,6 +181,7 @@ describe("AudienceModelMapper", () => {
         badges: [],
         favorite_genres: [],
         favorite_artists: [],
+        favorite_instruments: [],
         preferred_languages: [],
         notification_settings: {},
         privacy_settings: {},
@@ -208,6 +210,7 @@ describe("AudienceModelMapper", () => {
         badges: [],
         favorite_genres: [],
         favorite_artists: [],
+        favorite_instruments: [],
         preferred_languages: [],
         notification_settings: {},
         privacy_settings: {},

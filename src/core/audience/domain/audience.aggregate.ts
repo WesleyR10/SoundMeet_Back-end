@@ -722,8 +722,8 @@ export class Audience extends AggregateRoot {
     return validator.validate(this.notification, this, fields);
   }
 
-  static fake(): AudienceFakeBuilder<Audience> {
-    return AudienceFakeBuilder.anAudience();
+  static fake() {
+    return AudienceFakeBuilder;
   }
 
   toJSON() {

@@ -15,18 +15,19 @@ import { Notification } from "../../shared/domain/validators/notification";
 import { Band } from "./band.aggregate";
 
 export class BandMemberRules {
-  @IsNotEmpty()
+  @IsNotEmpty({ groups: ["members"] })
+  @IsString({ groups: ["members"] })
   musician_id: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ groups: ["members"] })
+  @IsNotEmpty({ groups: ["members"] })
   role: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ groups: ["members"] })
+  @IsNotEmpty({ groups: ["members"] })
   instrument: string;
 
-  @IsDate()
+  @IsDate({ groups: ["members"] })
   joined_at: Date;
 
   constructor(data: any) {
@@ -38,39 +39,39 @@ export class BandMemberRules {
 }
 
 export class BandRules {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
+  @IsString({ groups: ["name"] })
+  @IsNotEmpty({ groups: ["name"] })
+  @MaxLength(255, { groups: ["name"] })
   name: string;
 
-  @IsString()
-  @IsOptional()
+  @IsString({ groups: ["description"] })
+  @IsOptional({ groups: ["description"] })
   description?: string | null;
 
-  @IsString()
-  @IsOptional()
+  @IsString({ groups: ["avatar"] })
+  @IsOptional({ groups: ["avatar"] })
   avatar?: string | null;
 
-  @IsArray()
-  @IsString({ each: true })
+  @IsArray({ groups: ["genres"] })
+  @IsString({ each: true, groups: ["genres"] })
   genres: string[];
 
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
+  @IsOptional({ groups: ["members"] })
+  @IsArray({ groups: ["members"] })
+  @ValidateNested({ each: true, groups: ["members"] })
   @Type(() => BandMemberRules)
   members: BandMemberRules[];
 
-  @IsBoolean()
-  @IsOptional()
+  @IsBoolean({ groups: ["is_active"] })
+  @IsOptional({ groups: ["is_active"] })
   is_active: boolean;
 
-  @IsDate()
-  @IsOptional()
+  @IsDate({ groups: ["created_at"] })
+  @IsOptional({ groups: ["created_at"] })
   created_at: Date;
 
-  @IsDate()
-  @IsOptional()
+  @IsDate({ groups: ["updated_at"] })
+  @IsOptional({ groups: ["updated_at"] })
   updated_at: Date;
 
   constructor(entity: Band) {
@@ -95,7 +96,9 @@ export class BandRules {
 
 export class BandValidator extends ClassValidatorFields {
   validate(notification: Notification, data: any, fields?: string[]): boolean {
-    const newFields = fields?.length ? fields : [];
+    const newFields = fields?.length
+      ? fields
+      : ["name", "genres", "is_active", "members"];
     return super.validate(notification, new BandRules(data), newFields);
   }
 }

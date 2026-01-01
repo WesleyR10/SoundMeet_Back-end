@@ -1,7 +1,6 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { InvalidPhoneError } from "../../../../../shared/domain/value-objects/phone.vo";
-import { Audience } from "../../../../domain/audience.aggregate";
 import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
 import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
 import { UpdateAudienceUseCase } from "../update-audience.use-case";
@@ -16,7 +15,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
   });
 
   it("should update audience name", async () => {
-    const audience = AudienceFakeBuilder.anAudience().build();
+    const audience = AudienceFakeBuilder.aAudience().build();
     await repository.insert(audience);
 
     const input = {
@@ -32,7 +31,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
   });
 
   it("should update audience nickname", async () => {
-    const audience = AudienceFakeBuilder.anAudience().build();
+    const audience = AudienceFakeBuilder.aAudience().build();
     await repository.insert(audience);
 
     const input = {
