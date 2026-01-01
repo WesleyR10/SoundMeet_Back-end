@@ -16,6 +16,8 @@ export const CONFIG_ENV_SCHEMA = {
     .default("development"),
   PORT: Joi.number().default(3000),
   APP_URL: Joi.string().default("https://soundmeet.app"),
+  SWAGGER_EXAMPLES_ENABLED: Joi.boolean().default(true),
+  SWAGGER_EXAMPLES_REQUIRED_ONLY: Joi.boolean().default(false),
 };
 
 export const CONFIG_DATABASE_CACHE_SCHEMA = {

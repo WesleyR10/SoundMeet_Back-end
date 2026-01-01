@@ -20,7 +20,7 @@ services:
     env_file:
       - ./envs/.env
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
       - MONGODB_URL=mongodb://soundmeet:soundmeet123@mongo:27017/soundmeet?authSource=admin
       - REDIS_URL=redis://redis:6379
@@ -30,6 +30,8 @@ services:
       - MINIO_PORT=9000
       - MINIO_ACCESS_KEY=soundmeet
       - MINIO_SECRET_KEY=soundmeet123
+      - SWAGGER_EXAMPLES_ENABLED=true
+      - SWAGGER_EXAMPLES_REQUIRED_ONLY=false
     depends_on:
       postgres:
         condition: service_started

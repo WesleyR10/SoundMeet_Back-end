@@ -3,6 +3,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
 import { applyGlobalConfig } from "./nest-modules/global-config";
+import { applySwaggerExamples } from "./nest-modules/shared-module/swagger/swagger-examples";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -50,6 +51,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
+  applySwaggerExamples(document);
   SwaggerModule.setup("api/docs", app, document, {
     swaggerOptions: {
       persistAuthorization: true,
