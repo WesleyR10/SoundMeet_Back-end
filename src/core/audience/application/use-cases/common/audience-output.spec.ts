@@ -5,7 +5,7 @@ import { AudienceOutputMapper } from "./audience-output";
 
 describe("AudienceOutputMapper Unit Tests", () => {
   it("should convert an audience to output", () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const output = AudienceOutputMapper.toOutput(audience);
 
     expect(output.id).toBe(audience.id.id);
@@ -28,7 +28,11 @@ describe("AudienceOutputMapper Unit Tests", () => {
   });
 
   it("should handle audience without phone and nickname", () => {
-    const audience = Audience.fake().withNickname(null).withPhone(null).build();
+    const audience = Audience.fake()
+      .aAudience()
+      .withNickname(null)
+      .withPhone(null)
+      .build();
     const output = AudienceOutputMapper.toOutput(audience);
 
     expect(output.phone).toBeNull();

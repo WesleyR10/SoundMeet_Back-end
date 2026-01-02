@@ -45,7 +45,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
   });
 
   it("should throw error when audience is not active", async () => {
-    const audience = Audience.fake().deactivate().build();
+    const audience = Audience.fake().aAudience().deactivate().build();
     await repository.insert(audience);
 
     const input: IndicateMusicianInput = {
@@ -95,7 +95,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().build();
+      const audience = Audience.fake().aAudience().build();
       const initialPoints = audience.totalPoints;
       await repository.insert(audience);
 
@@ -119,7 +119,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
   });
 
   it("should indicate musician without message", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const initialPoints = audience.totalPoints;
     await repository.insert(audience);
 
@@ -138,6 +138,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
 
   it("should indicate musician and return correct output structure", async () => {
     const audience = Audience.fake()
+      .aAudience()
       .withName("Test User")
       .withEmail("test@example.com")
       .build();

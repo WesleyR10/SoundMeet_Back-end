@@ -48,7 +48,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
   });
 
   it("should throw error when audience is not active", async () => {
-    const audience = Audience.fake().deactivate().build();
+    const audience = Audience.fake().aAudience().deactivate().build();
     await repository.insert(audience);
 
     const input: ShareSocialMediaInput = {
@@ -72,7 +72,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
           message: "Check out this amazing song!",
         },
         expected: {
-          points_added: 2,
+          points_added: 50,
         },
       },
       {
@@ -82,7 +82,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
           message: "Great music here!",
         },
         expected: {
-          points_added: 2,
+          points_added: 50,
         },
       },
       {
@@ -92,7 +92,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
           message: "Amazing performance! 🎵",
         },
         expected: {
-          points_added: 2,
+          points_added: 50,
         },
       },
       {
@@ -102,13 +102,13 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
           message: "You should listen to this!",
         },
         expected: {
-          points_added: 2,
+          points_added: 50,
         },
       },
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().build();
+      const audience = Audience.fake().aAudience().build();
       const initialPoints = audience.totalPoints;
       await repository.insert(audience);
 
@@ -133,6 +133,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
 
   it("should share on social media and return correct output structure", async () => {
     const audience = Audience.fake()
+      .aAudience()
       .withName("Test User")
       .withEmail("test@example.com")
       .build();

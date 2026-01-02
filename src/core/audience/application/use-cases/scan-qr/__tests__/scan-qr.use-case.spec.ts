@@ -5,17 +5,22 @@ import {
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Audience } from "../../../../domain/audience.aggregate";
+import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
 import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
+import { UserInteraction } from "../../../../../gamification/domain/user-interaction.aggregate";
+import { UserInteractionInMemoryRepository } from "../../../../../gamification/infra/db/in-memory/user-interaction-in-memory.repository";
 import { ScanQRInput } from "../scan-qr.input";
 import { ScanQRUseCase } from "../scan-qr.use-case";
 
 describe("ScanQRUseCase Unit Tests", () => {
   let useCase: ScanQRUseCase;
   let repository: AudienceInMemoryRepository;
+  let userInteractionRepo: UserInteractionInMemoryRepository;
 
   beforeEach(() => {
     repository = new AudienceInMemoryRepository();
-    useCase = new ScanQRUseCase(repository);
+    userInteractionRepo = new UserInteractionInMemoryRepository();
+    useCase = new ScanQRUseCase(repository, userInteractionRepo);
   });
 
   it("should throw error when audience not found", async () => {
@@ -94,7 +99,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().withBadges([]).build();
+      const audience = AudienceFakeBuilder.aAudience().withBadges([]).build();
       repository.items = [audience];
       const spyUpdate = jest.spyOn(repository, "update");
 
@@ -121,8 +126,76 @@ describe("ScanQRUseCase Unit Tests", () => {
     });
   });
 
+  it("should register a user interaction when scanning QR code", async () => {
+    const audience = AudienceFakeBuilder.aAudience().withBadges([]).build();
+    repository.items = [audience];
+
+    const input: ScanQRInput = {
+      id: audience.id.id,
+      qr_code: "musician_123",
+      musician_id: "musician_123",
+      establishment_id: "establishment_1",
+      location: {
+        latitude: -23.5505,
+        longitude: -46.6333,
+      },
+    };
+
+    const output = await useCase.execute(input);
+
+    expect(output.points_earned).toBeInstanceOf(Points);
+    expect(userInteractionRepo.items).toHaveLength(1);
+
+    const interaction = userInteractionRepo.items[0];
+    expect(interaction.user_id.id).toBe(audience.id.id);
+    expect(interaction.interaction_type).toBe("scan_qr");
+    expect(interaction.target_id).toBe(input.musician_id);
+    expect(interaction.points_earned).toBe(output.points_earned.value);
+    expect(interaction.metadata).toMatchObject({
+      establishment_id: input.establishment_id,
+      location: input.location,
+    } as any);
+  });
+
+  it("should not block scan when daily limit is reached and should not earn points", async () => {
+    const audience = AudienceFakeBuilder.aAudience()
+      .withBadges(["iniciante"])
+      .withTotalPoints(50)
+      .build();
+    repository.items = [audience];
+
+    const musicianId = "musician_limit";
+
+    for (let i = 0; i < 5; i++) {
+      userInteractionRepo.items.push(
+        UserInteraction.create({
+          user_id: audience.id.id,
+          interaction_type: "scan_qr",
+          target_id: musicianId,
+          metadata: {
+            timestamp: new Date().toISOString(),
+          } as any,
+          points_earned: 10,
+        }),
+      );
+    }
+
+    const input: ScanQRInput = {
+      id: audience.id.id,
+      qr_code: "qr_code_limit",
+      musician_id: musicianId,
+    };
+
+    const output = await useCase.execute(input);
+
+    expect(output.points_earned).toBeInstanceOf(Points);
+    expect(output.points_earned.value).toBe(0);
+    expect(output.audience.points.total).toBe(50);
+    expect(userInteractionRepo.items).toHaveLength(6);
+  });
+
   it("should handle multiple QR scans and accumulate points", async () => {
-    const audience = Audience.fake().build();
+    const audience = AudienceFakeBuilder.aAudience().build();
     repository.items = [audience];
 
     const input1: ScanQRInput = {
@@ -153,7 +226,7 @@ describe("ScanQRUseCase Unit Tests", () => {
   });
 
   it("should update level when points threshold is reached", async () => {
-    const audience = Audience.fake().build();
+    const audience = AudienceFakeBuilder.aAudience().build();
     // Set initial points close to level threshold
     audience.addPoints(90); // Assuming level threshold is at 100 points
     repository.items = [audience];

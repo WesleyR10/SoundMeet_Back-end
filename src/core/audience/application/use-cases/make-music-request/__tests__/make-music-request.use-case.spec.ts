@@ -89,7 +89,7 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().build();
+      const audience = Audience.fake().aAudience().build();
       repository.items = [audience];
       const spyUpdate = jest.spyOn(repository, "update");
 
@@ -115,7 +115,7 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
   });
 
   it("should handle multiple music requests and accumulate points", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     repository.items = [audience];
 
     const input1: MakeMusicRequestInput = {
@@ -145,7 +145,7 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
   });
 
   it("should handle request with all optional fields", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     repository.items = [audience];
 
     const input: MakeMusicRequestInput = {

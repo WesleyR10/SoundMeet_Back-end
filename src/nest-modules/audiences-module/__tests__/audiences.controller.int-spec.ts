@@ -21,6 +21,8 @@ import {
 } from "../../../core/audience/domain/audience.aggregate";
 import { IAudienceRepository } from "../../../core/audience/domain/audience.repository";
 import { AudienceInMemoryRepository } from "../../../core/audience/infra/db/in-memory/audience-in-memory.repository";
+import { IUserInteractionRepository } from "../../../core/gamification/domain/user-interaction.repository";
+import { UserInteractionInMemoryRepository } from "../../../core/gamification/infra/db/in-memory/user-interaction-in-memory.repository";
 import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
@@ -43,10 +45,13 @@ describe("AudiencesController Integration Tests", () => {
   let controller: AudiencesController;
   let audienceRepository: IAudienceRepository;
   let musicianRepository: IMusicianRepository;
+  let userInteractionRepository: IUserInteractionRepository;
 
   beforeEach(async () => {
     const audienceRepositoryInstance = new AudienceInMemoryRepository();
     const musicianRepositoryInstance = new MusicianInMemoryRepository();
+    const userInteractionRepositoryInstance =
+      new UserInteractionInMemoryRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AudiencesController],
@@ -58,6 +63,10 @@ describe("AudiencesController Integration Tests", () => {
         {
           provide: "MusicianRepository",
           useValue: musicianRepositoryInstance,
+        },
+        {
+          provide: "UserInteractionRepository",
+          useValue: userInteractionRepositoryInstance,
         },
         {
           provide: CreateAudienceUseCase,
@@ -91,8 +100,11 @@ describe("AudiencesController Integration Tests", () => {
         },
         {
           provide: ScanQRUseCase,
-          useFactory: (repo: IAudienceRepository) => new ScanQRUseCase(repo),
-          inject: ["AudienceRepository"],
+          useFactory: (
+            repo: IAudienceRepository,
+            userInteractionRepo: IUserInteractionRepository,
+          ) => new ScanQRUseCase(repo, userInteractionRepo),
+          inject: ["AudienceRepository", "UserInteractionRepository"],
         },
         {
           provide: CompleteProfileUseCase,
@@ -148,6 +160,9 @@ describe("AudiencesController Integration Tests", () => {
     controller = module.get<AudiencesController>(AudiencesController);
     audienceRepository = module.get<IAudienceRepository>("AudienceRepository");
     musicianRepository = module.get<IMusicianRepository>("MusicianRepository");
+    userInteractionRepository = module.get<IUserInteractionRepository>(
+      "UserInteractionRepository",
+    );
   });
 
   it("should be defined", () => {
@@ -337,6 +352,12 @@ describe("AudiencesController Integration Tests", () => {
     expect(presenter.audience.id).toBe(audience.id.id);
     expect(presenter.points_earned.value).toBe(10);
     expect(presenter.scan_metadata.qr_code).toBe("qr_code");
+
+    const interactions = await userInteractionRepository.findByUserId(
+      audience.id.id,
+    );
+    expect(interactions).toHaveLength(1);
+    expect(interactions[0].interaction_type).toBe("scan_qr");
   });
 
   it("should make music request and return MakeMusicRequestPresenter", async () => {

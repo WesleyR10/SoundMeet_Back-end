@@ -92,7 +92,7 @@ describe("SendTipUseCase Unit Tests", () => {
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().build();
+      const audience = Audience.fake().aAudience().build();
       repository.items = [audience];
       const spyUpdate = jest.spyOn(repository, "update");
 
@@ -118,7 +118,7 @@ describe("SendTipUseCase Unit Tests", () => {
   });
 
   it("should handle multiple tips and accumulate points", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     repository.items = [audience];
 
     const input1: SendTipInput = {
@@ -148,7 +148,7 @@ describe("SendTipUseCase Unit Tests", () => {
   });
 
   it("should handle tip with all optional fields", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     repository.items = [audience];
 
     const input: SendTipInput = {
@@ -183,7 +183,7 @@ describe("SendTipUseCase Unit Tests", () => {
   });
 
   it("should handle large tip amounts correctly", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     repository.items = [audience];
 
     const input: SendTipInput = {

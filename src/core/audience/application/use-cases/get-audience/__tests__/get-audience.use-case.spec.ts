@@ -14,7 +14,7 @@ describe("GetAudienceUseCase Unit Tests", () => {
   });
 
   it("should get an audience by id", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     await repository.insert(audience);
 
     const output = await useCase.execute({ id: audience.id.id });

@@ -63,7 +63,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
   });
 
   it("should throw error when audience is not active", async () => {
-    const audience = Audience.fake().deactivate().build();
+    const audience = Audience.fake().aAudience().deactivate().build();
     await repository.insert(audience);
 
     const input: CompleteProfileInput = {
@@ -131,7 +131,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().build();
+      const audience = Audience.fake().aAudience().build();
       const initialPoints = audience.totalPoints;
       await repository.insert(audience);
 
@@ -171,7 +171,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
   });
 
   it("should complete profile with minimal data", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const initialPoints = audience.totalPoints;
     await repository.insert(audience);
 
@@ -190,6 +190,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
 
   it("should complete profile and return correct output structure", async () => {
     const audience = Audience.fake()
+      .aAudience()
       .withName("Original Name")
       .withEmail("test@example.com")
       .build();
@@ -250,7 +251,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
   });
 
   it("should handle empty arrays for preferences", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     await repository.insert(audience);
 
     const input: CompleteProfileInput = {

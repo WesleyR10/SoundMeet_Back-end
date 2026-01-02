@@ -17,7 +17,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
   });
 
   it("should delete an audience", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     await repository.insert(audience);
 
     expect(repository.items).toHaveLength(1);
@@ -44,7 +44,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
   });
 
   it("should delete audience with points and interactions", async () => {
-    const audience = Audience.fake().withTotalPoints(100).build();
+    const audience = Audience.fake().aAudience().withTotalPoints(100).build();
     await repository.insert(audience);
 
     expect(repository.items).toHaveLength(1);
@@ -56,7 +56,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
   });
 
   it("should delete inactive audience", async () => {
-    const audience = Audience.fake().deactivate().build();
+    const audience = Audience.fake().aAudience().deactivate().build();
     await repository.insert(audience);
 
     expect(repository.items).toHaveLength(1);
@@ -68,7 +68,11 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
   });
 
   it("should delete audience without phone and nickname", async () => {
-    const audience = Audience.fake().withNickname(null).withPhone(null).build();
+    const audience = Audience.fake()
+      .aAudience()
+      .withNickname(null)
+      .withPhone(null)
+      .build();
     await repository.insert(audience);
 
     expect(repository.items).toHaveLength(1);

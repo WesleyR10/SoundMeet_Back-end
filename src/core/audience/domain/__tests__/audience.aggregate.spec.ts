@@ -154,12 +154,11 @@ describe("Audience Without Validator Unit Tests", () => {
   });
 
   test("should scan musician QR code", () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const musicianId = "musician-123";
-    const musicianName = "John Doe";
 
     const initialPoints = audience.points.total;
-    audience.scanMusicianQRCode(musicianId, musicianName);
+    audience.scanMusicianQRCode(musicianId);
 
     expect(audience.points.total).toBeGreaterThan(initialPoints);
     expect(audience.events.size).toBe(2);
@@ -171,7 +170,7 @@ describe("Audience Without Validator Unit Tests", () => {
   });
 
   test("should make music request", () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const musicianId = "musician-123";
     const songTitle = "Bohemian Rhapsody";
     const artist = "Queen";
@@ -186,7 +185,7 @@ describe("Audience Without Validator Unit Tests", () => {
   });
 
   test("should send tip", () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const musicianId = "musician-123";
     const amount = 10.5;
     const message = "Great performance!";
@@ -201,7 +200,10 @@ describe("Audience Without Validator Unit Tests", () => {
   });
 
   test("should create audience with fake data", () => {
-    const audience = Audience.fake().withNickname("test_nickname").build();
+    const audience = Audience.fake()
+      .aAudience()
+      .withNickname("test_nickname")
+      .build();
 
     expect(audience.id).toBeInstanceOf(AudienceId);
     expect(audience.name).toBeTruthy();
@@ -259,7 +261,7 @@ describe("Audience Without Validator Unit Tests", () => {
   });
 
   test("should return json", () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
 
     const json = audience.toJSON();
     expect(json).toMatchObject({

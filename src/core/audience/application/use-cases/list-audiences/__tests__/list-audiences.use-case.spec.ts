@@ -24,9 +24,9 @@ describe("ListAudiencesUseCase Unit Tests", () => {
 
   it("should list audiences with pagination", async () => {
     const audiences = [
-      Audience.fake().build(),
-      Audience.fake().build(),
-      Audience.fake().build(),
+      Audience.fake().aAudience().build(),
+      Audience.fake().aAudience().build(),
+      Audience.fake().aAudience().build(),
     ];
 
     for (const audience of audiences) {
@@ -43,9 +43,9 @@ describe("ListAudiencesUseCase Unit Tests", () => {
   });
 
   it("should list audiences with filter", async () => {
-    const audience1 = Audience.fake().withName("John Doe").build();
-    const audience2 = Audience.fake().withName("Jane Smith").build();
-    const audience3 = Audience.fake().withName("Bob Johnson").build();
+    const audience1 = Audience.fake().aAudience().withName("John Doe").build();
+    const audience2 = Audience.fake().aAudience().withName("Jane Smith").build();
+    const audience3 = Audience.fake().aAudience().withName("Bob Johnson").build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);
@@ -60,9 +60,9 @@ describe("ListAudiencesUseCase Unit Tests", () => {
   });
 
   it("should list audiences with sort", async () => {
-    const audience1 = Audience.fake().withName("Charlie").build();
-    const audience2 = Audience.fake().withName("Alpha").build();
-    const audience3 = Audience.fake().withName("Beta").build();
+    const audience1 = Audience.fake().aAudience().withName("Charlie").build();
+    const audience2 = Audience.fake().aAudience().withName("Alpha").build();
+    const audience3 = Audience.fake().aAudience().withName("Beta").build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);
@@ -80,9 +80,9 @@ describe("ListAudiencesUseCase Unit Tests", () => {
   });
 
   it("should list audiences with email filter", async () => {
-    const audience1 = Audience.fake().withEmail("user1@example.com").build();
-    const audience2 = Audience.fake().withEmail("user2@example.com").build();
-    const audience3 = Audience.fake().withEmail("other@domain.com").build();
+    const audience1 = Audience.fake().aAudience().withEmail("user1@example.com").build();
+    const audience2 = Audience.fake().aAudience().withEmail("user2@example.com").build();
+    const audience3 = Audience.fake().aAudience().withEmail("other@domain.com").build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);
@@ -97,9 +97,9 @@ describe("ListAudiencesUseCase Unit Tests", () => {
   });
 
   it("should list audiences with level filter", async () => {
-    const audience1 = Audience.fake().withCurrentLevel(1).build();
-    const audience2 = Audience.fake().withCurrentLevel(2).build();
-    const audience3 = Audience.fake().withCurrentLevel(3).build();
+    const audience1 = Audience.fake().aAudience().withCurrentLevel(1).build();
+    const audience2 = Audience.fake().aAudience().withCurrentLevel(2).build();
+    const audience3 = Audience.fake().aAudience().withCurrentLevel(3).build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);
@@ -115,12 +115,15 @@ describe("ListAudiencesUseCase Unit Tests", () => {
 
   it("should list audiences with genre filter", async () => {
     const audience1 = Audience.fake()
+      .aAudience()
       .withFavoriteGenres(["Rock", "Pop"])
       .build();
     const audience2 = Audience.fake()
+      .aAudience()
       .withFavoriteGenres(["Jazz", "Blues"])
       .build();
     const audience3 = Audience.fake()
+      .aAudience()
       .withFavoriteGenres(["Rock", "Metal"])
       .build();
 
@@ -140,12 +143,15 @@ describe("ListAudiencesUseCase Unit Tests", () => {
 
   it("should list audiences with instrument filter", async () => {
     const audience1 = Audience.fake()
+      .aAudience()
       .withFavoriteInstruments(["Guitar", "Bass"])
       .build();
     const audience2 = Audience.fake()
+      .aAudience()
       .withFavoriteInstruments(["Drums"])
       .build();
     const audience3 = Audience.fake()
+      .aAudience()
       .withFavoriteInstruments(["Guitar", "Piano"])
       .build();
 
@@ -168,9 +174,9 @@ describe("ListAudiencesUseCase Unit Tests", () => {
   });
 
   it("should list audiences with active status filter", async () => {
-    const audience1 = Audience.fake().withIsActive(true).build();
-    const audience2 = Audience.fake().withIsActive(false).build();
-    const audience3 = Audience.fake().withIsActive(true).build();
+    const audience1 = Audience.fake().aAudience().withIsActive(true).build();
+    const audience2 = Audience.fake().aAudience().withIsActive(false).build();
+    const audience3 = Audience.fake().aAudience().withIsActive(true).build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);

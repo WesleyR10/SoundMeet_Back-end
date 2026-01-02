@@ -39,7 +39,7 @@ describe("AttendEventUseCase Unit Tests", () => {
   });
 
   it("should throw error when audience is not active", async () => {
-    const audience = Audience.fake().deactivate().build();
+    const audience = Audience.fake().aAudience().deactivate().build();
     await repository.insert(audience);
 
     const input: AttendEventInput = {
@@ -81,7 +81,7 @@ describe("AttendEventUseCase Unit Tests", () => {
     ];
 
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
-      const audience = Audience.fake().build();
+      const audience = Audience.fake().aAudience().build();
       const initialPoints = audience.totalPoints;
       await repository.insert(audience);
 
@@ -105,7 +105,7 @@ describe("AttendEventUseCase Unit Tests", () => {
   });
 
   it("should attend event without notes", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     const initialPoints = audience.totalPoints;
     await repository.insert(audience);
 
@@ -123,6 +123,7 @@ describe("AttendEventUseCase Unit Tests", () => {
 
   it("should attend event and return correct output structure", async () => {
     const audience = Audience.fake()
+      .aAudience()
       .withName("Test User")
       .withEmail("test@example.com")
       .build();
@@ -155,7 +156,7 @@ describe("AttendEventUseCase Unit Tests", () => {
   });
 
   it("should handle past event dates", async () => {
-    const audience = Audience.fake().build();
+    const audience = Audience.fake().aAudience().build();
     await repository.insert(audience);
 
     const input: AttendEventInput = {
