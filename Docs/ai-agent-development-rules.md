@@ -28,7 +28,7 @@ Este agente de IA deve auxiliar no desenvolvimento do backend da plataforma Soun
 ### Documentação de Requisitos:
 
 - **Features**: `/home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/Docs/Features-SoundMeet.md`
-- **Backend Guidelines**: `/home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/Docs/prompt-desenvolvimento-backend.md`
+- **Backend Tecnologias**: `/home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/Docs/Tecnologias.md`
 
 ## 🔍 ANÁLISE OBRIGATÓRIA ANTES DE QUALQUER MODIFICAÇÃO
 
