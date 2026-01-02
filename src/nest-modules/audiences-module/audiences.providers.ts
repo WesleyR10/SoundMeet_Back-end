@@ -14,6 +14,8 @@ import { UpdateAudienceUseCase } from "../../core/audience/application/use-cases
 import { VoteSongUseCase } from "../../core/audience/application/use-cases/vote-song/vote-song.use-case";
 import { IAudienceRepository } from "../../core/audience/domain/audience.repository";
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
+import { IUserInteractionRepository } from "../../core/gamification/domain/user-interaction.repository";
+import { UserInteractionPrismaRepository } from "../../core/gamification/infra/db/prisma/user-interaction-prisma.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
@@ -26,6 +28,17 @@ export const REPOSITORIES = {
     provide: AudiencePrismaRepository,
     useFactory: (prismaService: PrismaService) => {
       return new AudiencePrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  USER_INTERACTION_REPOSITORY: {
+    provide: "UserInteractionRepository",
+    useExisting: UserInteractionPrismaRepository,
+  },
+  USER_INTERACTION_PRISMA_REPOSITORY: {
+    provide: UserInteractionPrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new UserInteractionPrismaRepository(prismaService);
     },
     inject: [PrismaService],
   },
@@ -83,10 +96,16 @@ export const USE_CASES = {
   },
   SCAN_QR_USE_CASE: {
     provide: ScanQRUseCase,
-    useFactory: (audienceRepo: IAudienceRepository) => {
-      return new ScanQRUseCase(audienceRepo);
+    useFactory: (
+      audienceRepo: IAudienceRepository,
+      userInteractionRepo: IUserInteractionRepository,
+    ) => {
+      return new ScanQRUseCase(audienceRepo, userInteractionRepo);
     },
-    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.AUDIENCE_REPOSITORY.provide,
+      REPOSITORIES.USER_INTERACTION_REPOSITORY.provide,
+    ],
   },
   MAKE_MUSIC_REQUEST_USE_CASE: {
     provide: MakeMusicRequestUseCase,

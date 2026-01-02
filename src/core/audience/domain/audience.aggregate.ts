@@ -568,8 +568,13 @@ export class Audience extends AggregateRoot {
   }
 
   // Business methods for audience interactions
-  scanMusicianQRCode(musicianId: string, musicianName: string): void {
-    this.addPointsForAction("scan_qr_code");
+  scanMusicianQRCode(
+    musicianId: string,
+    earnPoints: boolean = true,
+  ): void {
+    if (earnPoints) {
+      this.addPointsForAction("scan_qr_code");
+    }
 
     // Atribuir badge "iniciante" se for o primeiro scan
     if (!this.badges.includes("iniciante")) {

@@ -27,7 +27,7 @@ export class AudiencePoints extends ValueObject {
     make_request: 25,
     correct_guess: 50,
     send_tip: 1, // 1 ponto por real
-    share_social: 2,
+    share_social: 50,
     indicate_musician: 3,
     attend_event: 30,
     vote_song: 1,
