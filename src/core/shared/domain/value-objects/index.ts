@@ -41,3 +41,5 @@ export * from "./points.vo";
 export * from "./audience-level.vo";
 export * from "./audience-points.vo";
 export * from "./audience-preferences.vo";
+export * from "./booking-status.vo";
+export * from "./inquiry-status.vo";
