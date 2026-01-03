@@ -33,14 +33,19 @@ model Musician {
   updated_at       DateTime @updatedAt
 
   // Relacionamentos
-  profile      MusicianProfile?
-  bands        BandMember[]
-  requests     MusicRequest[]
-  tips         Tip[]
-  events       EventMusician[]
-  analytics    MusicianAnalytics[]
-  library      MusicLibrary[]
-  interactions UserInteraction[]
+  profile            MusicianProfile?
+  bands              BandMember[]
+  requests           MusicRequest[]
+  tips               Tip[]
+  events             EventMusician[]
+  analytics          MusicianAnalytics[]
+  library            MusicLibrary[]
+  interactions       UserInteraction[]
+  bookings           Booking[]
+  inquiries          Inquiry[]
+  calendar_settings  MusicianCalendarSettings?
+  availability_rules MusicianAvailabilityRule[]
+  unavailabilities   MusicianUnavailability[]
 
   @@map("musicians")
 }
@@ -53,7 +58,6 @@ model MusicianProfile {
   experience   Int // anos de experiência
   priceRange   Json // {min: 500, max: 2000}
   location     Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
-  availability Json // {days: ["monday", "friday"], hours: {start: "19:00", end: "23:00"}}
   socialLinks  Json? // {instagram: "@musician", youtube: "channel"}
   rating       Float    @default(0)
   totalRatings Int      @default(0)
@@ -75,9 +79,13 @@ model Band {
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
-  members BandMember[]
-  events  EventMusician[]
-  tips    Tip[]
+  members           BandMember[]
+  events            EventMusician[]
+  tips              Tip[]
+  bookings          Booking[]
+  inquiries         Inquiry[]
+  calendar_settings BandCalendarSettings?
+  unavailabilities  BandUnavailability[]
 
   @@map("bands")
 }
@@ -126,14 +134,14 @@ model MusicLibrary {
 // ========================================
 
 model Establishment {
-  id          String   @id @default(uuid())
-  email       String   @unique
+  id          String  @id @default(uuid())
+  email       String  @unique
   name        String
   description String?
   avatar      String?
-  cnpj        String?  @unique
+  cnpj        String? @unique
   phone       String?
-  
+
   // Endereço (Flattened Address Value Object)
   address_street       String?
   address_number       String?
@@ -145,15 +153,16 @@ model Establishment {
   address_lat          Float?
   address_long         Float?
 
-  is_active   Boolean  @default(true)
-  isVerified  Boolean  @default(false)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  is_active  Boolean  @default(true)
+  isVerified Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   // Relacionamentos
   profile   EstablishmentProfile?
   events    Event[]
   bookings  Booking[]
+  inquiries Inquiry[]
   analytics EstablishmentAnalytics[]
 
   @@map("establishments")
@@ -201,6 +210,7 @@ model Event {
   requests      MusicRequest[]
   attendees     EventAttendee[]
   bookings      Booking[]
+  inquiries     Inquiry[]
   tips          Tip[]
 
   @@map("events")
@@ -225,24 +235,139 @@ model EventMusician {
 }
 
 model Booking {
-  id              String   @id @default(uuid())
-  establishmentId String
-  eventId         String?
-  musicianId      String?
-  bandId          String?
-  date            DateTime
-  startTime       DateTime
-  endTime         DateTime
-  fee             Float
-  status          String   @default("pending") // "pending", "confirmed", "cancelled", "completed"
-  notes           String?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                      String    @id @default(uuid())
+  establishmentId         String
+  eventId                 String?
+  musicianId              String?
+  bandId                  String?
+  start_at                DateTime
+  end_at                  DateTime
+  fee                     Float? // Custo da reserva
+  status                  String    @default("pending") // "pending", "confirmed", "cancelled", "completed"
+  notes                   String? // Notas adicionais sobre a reserva
+  buffer_minutes          Int       @default(0)
+  expires_at              DateTime?
+  free_cancellation_hours Int       @default(72)
+  confirmed_at            DateTime?
+  cancelled_at            DateTime?
+  completed_at            DateTime?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   event         Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  musician      Musician?     @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band          Band?         @relation(fields: [bandId], references: [id], onDelete: SetNull)
+  inquiry       Inquiry?      @relation("InquiryBooking")
 
+  @@index([musicianId, start_at, end_at])
+  @@index([bandId, start_at, end_at])
+  @@index([establishmentId, start_at, end_at])
   @@map("bookings")
+}
+
+model Inquiry {
+  id               String    @id @default(uuid())
+  establishmentId  String
+  eventId          String?
+  musicianId       String?
+  bandId           String?
+  subject          String?
+  initial_message  String?
+  status           String    @default("open") // "open", "accepted", "rejected", "converted", "expired"
+  expires_at       DateTime?
+  accepted_at      DateTime?
+  rejected_at      DateTime?
+  rejection_reason String?
+  converted_at     DateTime?
+  bookingId        String?   @unique
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  event         Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  musician      Musician?     @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band          Band?         @relation(fields: [bandId], references: [id], onDelete: SetNull)
+  booking       Booking?      @relation("InquiryBooking", fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([musicianId, status, created_at])
+  @@index([bandId, status, created_at])
+  @@index([establishmentId, status, created_at])
+  @@map("inquiries")
+}
+
+model MusicianCalendarSettings {
+  id                     String   @id @default(uuid())
+  musicianId             String   @unique
+  timezone               String   @default("UTC")
+  default_buffer_minutes Int      @default(0)
+  max_shows_per_day      Int?
+  is_active              Boolean  @default(true)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@map("musician_calendar_settings")
+}
+
+model MusicianAvailabilityRule {
+  id           String   @id @default(uuid())
+  musicianId   String
+  weekday      Int
+  start_time   String
+  end_time     String
+  is_available Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@index([musicianId, weekday])
+  @@map("musician_availability_rules")
+}
+
+model MusicianUnavailability {
+  id         String   @id @default(uuid())
+  musicianId String
+  start_at   DateTime
+  end_at     DateTime
+  reason     String?
+  created_at DateTime @default(now())
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@index([musicianId, start_at, end_at])
+  @@map("musician_unavailability")
+}
+
+model BandCalendarSettings {
+  id                     String   @id @default(uuid())
+  bandId                 String   @unique
+  timezone               String   @default("UTC")
+  default_buffer_minutes Int      @default(0)
+  max_shows_per_day      Int?
+  is_active              Boolean  @default(true)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
+
+  @@map("band_calendar_settings")
+}
+
+model BandUnavailability {
+  id         String   @id @default(uuid())
+  bandId     String
+  start_at   DateTime
+  end_at     DateTime
+  reason     String?
+  created_at DateTime @default(now())
+
+  band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
+
+  @@index([bandId, start_at, end_at])
+  @@map("band_unavailability")
 }
 
 // ========================================
