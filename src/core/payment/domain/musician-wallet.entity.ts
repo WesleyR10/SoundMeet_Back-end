@@ -1,5 +1,4 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { MusicianWalletFakeBuilder } from "./musician-wallet-fake.builder";
@@ -81,9 +80,8 @@ export class MusicianWallet extends AggregateRoot {
 
   receiveFunds(amount: number): void {
     if (amount <= 0) {
-      throw new EntityValidationError([
-        { amount: ["Amount must be greater than 0"] },
-      ]);
+      this.notification.addError("Amount must be greater than 0", "amount");
+      return;
     }
     const amountMoney = new Money(amount);
     this.balance = this.balance.add(amountMoney);
@@ -93,13 +91,13 @@ export class MusicianWallet extends AggregateRoot {
 
   withdrawFunds(amount: number): void {
     if (amount <= 0) {
-      throw new EntityValidationError([
-        { amount: ["Amount must be greater than 0"] },
-      ]);
+      this.notification.addError("Amount must be greater than 0", "amount");
+      return;
     }
     const amountMoney = new Money(amount);
     if (this.balance.isLessThan(amountMoney)) {
-      throw new EntityValidationError([{ balance: ["Insufficient funds"] }]);
+      this.notification.addError("Insufficient funds", "balance");
+      return;
     }
     this.balance = this.balance.subtract(amountMoney);
     this.total_withdrawn = this.total_withdrawn.add(amountMoney);

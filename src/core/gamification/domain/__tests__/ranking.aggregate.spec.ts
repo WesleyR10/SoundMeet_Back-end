@@ -1,4 +1,4 @@
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
 import { Ranking, RankingId } from "../ranking.aggregate";
 import {
   RankingPeriodEnum,
@@ -14,7 +14,7 @@ describe("Ranking Unit Tests without validator", () => {
 
   test("constructor of ranking", () => {
     const ranking = new Ranking({
-      user_id: "550e8400-e29b-41d4-a716-446655440000",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       ranking_type: RankingTypeEnum.TOP_FAS,
       period: RankingPeriodEnum.WEEKLY,
       position: 1,
@@ -25,8 +25,8 @@ describe("Ranking Unit Tests without validator", () => {
 
     expect(ranking.id).toBeInstanceOf(RankingId);
     expect(ranking.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440000");
-    expect(ranking.ranking_type.value).toBe(RankingTypeEnum.TOP_FAS);
-    expect(ranking.period.value).toBe(RankingPeriodEnum.WEEKLY);
+    expect(ranking.ranking_type).toBe(RankingTypeEnum.TOP_FAS);
+    expect(ranking.period).toBe(RankingPeriodEnum.WEEKLY);
     expect(ranking.position).toBe(1);
     expect(ranking.score).toBe(500);
     expect(ranking.period_start).toEqual(new Date("2024-01-01"));
@@ -40,7 +40,7 @@ describe("Ranking Unit Tests without validator", () => {
     const updatedAt = new Date();
     const ranking = new Ranking({
       id: new RankingId(),
-      user_id: "550e8400-e29b-41d4-a716-446655440001",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       ranking_type: RankingTypeEnum.TOP_APOIADORES,
       period: RankingPeriodEnum.MONTHLY,
       position: 3,
@@ -53,8 +53,8 @@ describe("Ranking Unit Tests without validator", () => {
 
     expect(ranking.id).toBeInstanceOf(RankingId);
     expect(ranking.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440001");
-    expect(ranking.ranking_type.value).toBe(RankingTypeEnum.TOP_APOIADORES);
-    expect(ranking.period.value).toBe(RankingPeriodEnum.MONTHLY);
+    expect(ranking.ranking_type).toBe(RankingTypeEnum.TOP_APOIADORES);
+    expect(ranking.period).toBe(RankingPeriodEnum.MONTHLY);
     expect(ranking.position).toBe(3);
     expect(ranking.score).toBe(250);
     expect(ranking.created_at).toBe(createdAt);
@@ -63,7 +63,7 @@ describe("Ranking Unit Tests without validator", () => {
 
   test("should create ranking with create method", () => {
     const ranking = Ranking.create({
-      user_id: "550e8400-e29b-41d4-a716-446655440002",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440002"),
       ranking_type: RankingTypeEnum.TOP_FAS,
       period: RankingPeriodEnum.DAILY,
       position: 2,
@@ -74,8 +74,8 @@ describe("Ranking Unit Tests without validator", () => {
 
     expect(ranking.id).toBeInstanceOf(RankingId);
     expect(ranking.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440002");
-    expect(ranking.ranking_type.value).toBe(RankingTypeEnum.TOP_FAS);
-    expect(ranking.period.value).toBe(RankingPeriodEnum.DAILY);
+    expect(ranking.ranking_type).toBe(RankingTypeEnum.TOP_FAS);
+    expect(ranking.period).toBe(RankingPeriodEnum.DAILY);
     expect(ranking.position).toBe(2);
     expect(ranking.score).toBe(150);
     expect(ranking.validate).toHaveBeenCalledWith([
@@ -175,8 +175,8 @@ describe("Ranking Unit Tests without validator", () => {
     expect(json).toMatchObject({
       id: ranking.id.id,
       user_id: ranking.user_id.id,
-      ranking_type: ranking.ranking_type.value,
-      period: ranking.period.value,
+      ranking_type: ranking.ranking_type,
+      period: ranking.period,
       position: ranking.position,
       score: ranking.score,
       period_start: ranking.period_start,
@@ -192,10 +192,8 @@ describe("Ranking Unit Tests without validator", () => {
     expect(ranking).toBeInstanceOf(Ranking);
     expect(ranking.id).toBeInstanceOf(RankingId);
     expect(ranking.user_id).toBeTruthy();
-    expect(Object.values(RankingTypeEnum)).toContain(
-      ranking.ranking_type.value,
-    );
-    expect(Object.values(RankingPeriodEnum)).toContain(ranking.period.value);
+    expect(Object.values(RankingTypeEnum)).toContain(ranking.ranking_type);
+    expect(Object.values(RankingPeriodEnum)).toContain(ranking.period);
     expect(ranking.position).toBeGreaterThan(0);
     expect(ranking.score).toBeGreaterThanOrEqual(0);
     expect(ranking.period_start).toBeInstanceOf(Date);
@@ -221,87 +219,124 @@ describe("Ranking Unit Tests without validator", () => {
 });
 
 describe("Ranking Unit Tests with validator", () => {
-  test("should throw EntityValidationError with invalid user_id", () => {
-    expect(() => {
-      Ranking.create({
-        user_id: "",
-        ranking_type: RankingTypeEnum.TOP_FAS,
-        period: RankingPeriodEnum.WEEKLY,
-        position: 1,
-        score: 500,
-        period_start: new Date("2024-01-01"),
-        period_end: new Date("2024-01-07"),
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid user_id", () => {
+    const ranking = Ranking.create({
+      user_id: new Uuid(),
+      ranking_type: RankingTypeEnum.TOP_FAS,
+      period: RankingPeriodEnum.WEEKLY,
+      position: 1,
+      score: 500,
+      period_start: new Date("2024-01-01"),
+      period_end: new Date("2024-01-07"),
+    });
+    ranking.user_id = null as any;
+    ranking.validate(["user_id"]);
+    expect(ranking.notification.hasErrors()).toBe(true);
+    expect(ranking.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          user_id: expect.arrayContaining(["user_id should not be empty"]),
+        }),
+      ]),
+    );
   });
 
-  test("should throw EntityValidationError with invalid position", () => {
-    expect(() => {
-      Ranking.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        ranking_type: RankingTypeEnum.TOP_FAS,
-        period: RankingPeriodEnum.WEEKLY,
-        position: 0,
-        score: 500,
-        period_start: new Date("2024-01-01"),
-        period_end: new Date("2024-01-07"),
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid position", () => {
+    const ranking = Ranking.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      ranking_type: RankingTypeEnum.TOP_FAS,
+      period: RankingPeriodEnum.WEEKLY,
+      position: 0,
+      score: 500,
+      period_start: new Date("2024-01-01"),
+      period_end: new Date("2024-01-07"),
+    });
+    expect(ranking.notification.hasErrors()).toBe(true);
+    expect(ranking.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          position: expect.arrayContaining([
+            "position must not be less than 1",
+          ]),
+        }),
+      ]),
+    );
   });
 
-  test("should throw EntityValidationError with negative points", () => {
-    expect(() => {
-      Ranking.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        ranking_type: RankingTypeEnum.TOP_FAS,
-        period: RankingPeriodEnum.WEEKLY,
-        position: 1,
-        score: -10,
-        period_start: new Date("2024-01-01"),
-        period_end: new Date("2024-01-07"),
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with negative points", () => {
+    const ranking = Ranking.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      ranking_type: RankingTypeEnum.TOP_FAS,
+      period: RankingPeriodEnum.WEEKLY,
+      position: 1,
+      score: -10,
+      period_start: new Date("2024-01-01"),
+      period_end: new Date("2024-01-07"),
+    });
+    expect(ranking.notification.hasErrors()).toBe(true);
+    expect(ranking.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          score: expect.arrayContaining(["score must not be less than 0"]),
+        }),
+      ]),
+    );
   });
 
-  test("should throw EntityValidationError with invalid ranking_type", () => {
-    expect(() => {
-      Ranking.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        ranking_type: "INVALID_TYPE" as RankingTypeEnum,
-        period: RankingPeriodEnum.WEEKLY,
-        position: 1,
-        score: 500,
-        period_start: new Date("2024-01-01"),
-        period_end: new Date("2024-01-07"),
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid ranking_type", () => {
+    const ranking = Ranking.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      ranking_type: "INVALID_TYPE" as RankingTypeEnum,
+      period: RankingPeriodEnum.WEEKLY,
+      position: 1,
+      score: 500,
+      period_start: new Date("2024-01-01"),
+      period_end: new Date("2024-01-07"),
+    });
+    expect(ranking.notification.hasErrors()).toBe(true);
+    expect(ranking.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ranking_type: expect.arrayContaining([
+            "ranking_type must be a valid RankingType",
+          ]),
+        }),
+      ]),
+    );
   });
 
-  test("should throw EntityValidationError when period_end is before period_start", () => {
-    expect(() => {
-      Ranking.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        ranking_type: RankingTypeEnum.TOP_FAS,
-        period: RankingPeriodEnum.WEEKLY,
-        position: 1,
-        score: 500,
-        period_start: new Date("2024-01-07"),
-        period_end: new Date("2024-01-01"),
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors when period_end is before period_start", () => {
+    const ranking = Ranking.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      ranking_type: RankingTypeEnum.TOP_FAS,
+      period: RankingPeriodEnum.WEEKLY,
+      position: 1,
+      score: 500,
+      period_start: new Date("2024-01-07"),
+      period_end: new Date("2024-01-01"),
+    });
+    expect(ranking.notification.hasErrors()).toBe(true);
+    expect(ranking.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          period_end: expect.arrayContaining([
+            "Period end must be after period start",
+          ]),
+        }),
+      ]),
+    );
   });
 
   test("should validate successfully with valid data", () => {
-    expect(() => {
-      Ranking.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        ranking_type: RankingTypeEnum.TOP_FAS,
-        period: RankingPeriodEnum.WEEKLY,
-        position: 1,
-        score: 500,
-        period_start: new Date("2024-01-01"),
-        period_end: new Date("2024-01-07"),
-      });
-    }).not.toThrow();
+    const ranking = Ranking.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      ranking_type: RankingTypeEnum.TOP_FAS,
+      period: RankingPeriodEnum.WEEKLY,
+      position: 1,
+      score: 500,
+      period_start: new Date("2024-01-01"),
+      period_end: new Date("2024-01-07"),
+    });
+    expect(ranking.notification.hasErrors()).toBe(false);
   });
 });

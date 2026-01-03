@@ -1,3 +1,5 @@
+import { InvalidArgumentError } from "./errors/invalid-argument.error";
+
 type Flatten<Type> = Type extends Array<infer Item> ? Item : Type;
 
 type Value<Ok, Error> = Ok | Error;
@@ -90,7 +92,9 @@ export class Either<Ok = unknown, ErrorType = Error> implements Iterable<
   ): Either<NewOk, NewError> {
     if (this.isOk()) {
       if (!Array.isArray(this.ok)) {
-        throw new Error("Method chainEach only works with arrays");
+        throw new InvalidArgumentError(
+          "Method chainEach only works with arrays",
+        );
       }
       const result = this.ok.map((o) => {
         return fn(o);

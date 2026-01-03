@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { UserBadgeValidatorFactory } from "./user-badge.validator";
 import { UserBadgeFakeBuilder } from "./user-badge-fake.builder";
@@ -8,7 +7,7 @@ import { UserBadgeId } from "./value-objects/gamification-id.vo";
 
 export type UserBadgeConstructorProps = {
   id?: UserBadgeId;
-  user_id: string;
+  user_id: Uuid;
   badge_type: BadgeTypeEnum;
   progress?: number;
   is_unlocked?: boolean;
@@ -18,7 +17,7 @@ export type UserBadgeConstructorProps = {
 };
 
 export type UserBadgeCreateCommand = {
-  user_id: string;
+  user_id: Uuid;
   badge_type: BadgeTypeEnum;
   progress?: number;
   is_unlocked?: boolean;
@@ -37,24 +36,13 @@ export class UserBadge extends AggregateRoot {
   constructor(props: UserBadgeConstructorProps) {
     super();
     this.id = props.id ?? UserBadgeId.create();
-    try {
-      this.user_id = new Uuid(props.user_id);
-    } catch (error) {
-      this.user_id = { id: props.user_id } as any;
-    }
-
-    try {
-      this.badge_type = new BadgeType(props.badge_type);
-    } catch (error) {
-      this.badge_type = { value: props.badge_type } as any;
-    }
+    this.user_id = props.user_id;
+    this.badge_type = new BadgeType(props.badge_type);
     this.progress = props.progress ?? 0;
     this.is_unlocked = props.is_unlocked ?? false;
     this.unlocked_at = props.unlocked_at ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
-
-    this.validate();
   }
 
   get entity_id(): ValueObject {
@@ -62,14 +50,6 @@ export class UserBadge extends AggregateRoot {
   }
 
   static create(command: UserBadgeCreateCommand): UserBadge {
-    if (!command.user_id || command.user_id.trim() === "") {
-      throw new EntityValidationError([
-        {
-          user_id: ["user_id should not be empty"],
-        },
-      ]);
-    }
-
     const userBadge = new UserBadge({
       user_id: command.user_id,
       badge_type: command.badge_type,
@@ -146,12 +126,9 @@ export class UserBadge extends AggregateRoot {
     return this.badge_type.getDescription();
   }
 
-  validate(fields?: string[]): void {
+  validate(fields?: string[]): boolean {
     const validator = UserBadgeValidatorFactory.create();
-    const isValid = validator.validate(this.notification, this, fields);
-    if (!isValid) {
-      throw new EntityValidationError(this.notification.toJSON());
-    }
+    return validator.validate(this.notification, this, fields);
   }
 
   static fake() {

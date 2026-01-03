@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../errors/invalid-argument.error";
 import { ValueObject } from "../value-object";
 
 export class QRCode extends ValueObject {
@@ -23,22 +24,24 @@ export class QRCode extends ValueObject {
 
   private validate(): void {
     if (!this.code || this.code.trim().length === 0) {
-      throw new Error("QR Code cannot be empty");
+      throw new InvalidArgumentError("QR Code cannot be empty");
     }
 
     if (!this.url || this.url.trim().length === 0) {
-      throw new Error("QR Code URL cannot be empty");
+      throw new InvalidArgumentError("QR Code URL cannot be empty");
     }
 
     // Validar formato de URL
     try {
       new URL(this.url);
     } catch {
-      throw new Error("QR Code URL must be a valid URL");
+      throw new InvalidArgumentError("QR Code URL must be a valid URL");
     }
 
     if (this.expiresAt && this.expiresAt <= new Date()) {
-      throw new Error("QR Code expiration date must be in the future");
+      throw new InvalidArgumentError(
+        "QR Code expiration date must be in the future",
+      );
     }
   }
 

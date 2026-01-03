@@ -36,7 +36,11 @@ export class UserScoreRules {
   description?: string;
 
   constructor(entity: UserScore | any) {
-    Object.assign(this, entity);
+    this.user_id = entity?.user_id?.id ?? entity?.user_id;
+    this.score_type = entity?.score_type;
+    this.points = entity?.points;
+    this.reference_id = entity?.reference_id;
+    this.description = entity?.description;
   }
 }
 

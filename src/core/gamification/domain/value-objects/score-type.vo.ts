@@ -1,4 +1,4 @@
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum ScoreTypeEnum {
@@ -19,11 +19,7 @@ export class ScoreType extends ValueObject {
 
   private validate(): void {
     if (!Object.values(ScoreTypeEnum).includes(this.value)) {
-      throw new EntityValidationError([
-        {
-          score_type: [`Invalid score type: ${this.value}`],
-        },
-      ]);
+      throw new InvalidArgumentError(`Invalid score type: ${this.value}`);
     }
   }
 

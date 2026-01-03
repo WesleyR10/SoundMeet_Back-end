@@ -1,11 +1,12 @@
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Band, BandId } from "../../../domain/band.aggregate";
 
 export type BandMemberModelProps = {
-  id?: string;
-  musician_id: string;
+  id: string;
+  musicianId: string;
   role: string;
   instrument: string;
-  joined_at: Date;
+  joinedAt: Date;
 };
 
 export type BandModelProps = {
@@ -33,14 +34,22 @@ export class BandModelMapper {
     };
   }
 
-  static toEntity(model: BandModelProps): Band {
+  static toEntity(
+    model: BandModelProps & { members?: BandMemberModelProps[] },
+  ): Band {
     return new Band({
       band_id: new BandId(model.id),
       name: model.name,
       description: model.description ?? undefined,
       avatar: model.avatar ?? undefined,
       genres: model.genres,
-      members: [],
+      members: (model.members ?? []).map((m) => ({
+        member_id: new Uuid(m.id),
+        musician_id: new Uuid(m.musicianId),
+        role: m.role,
+        instrument: m.instrument,
+        joined_at: m.joinedAt,
+      })),
       is_active: model.is_active,
       created_at: model.created_at,
       updated_at: model.updated_at,

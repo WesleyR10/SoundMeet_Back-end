@@ -2,15 +2,15 @@ import { Chance } from "chance";
 
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { UserScore, UserScoreId } from "./user-score.aggregate";
-import { ScoreType, ScoreTypeEnum } from "./value-objects/score-type.vo";
+import { ScoreTypeEnum } from "./value-objects/score-type.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class UserScoreFakeBuilder<TBuild = any> {
   private _id: PropOrFactory<UserScoreId> | undefined = undefined;
   private _user_id: PropOrFactory<Uuid> = (_index) => new Uuid();
-  private _score_type: PropOrFactory<ScoreType> = (_index) =>
-    new ScoreType(this.chance.pickone(Object.values(ScoreTypeEnum)));
+  private _score_type: PropOrFactory<ScoreTypeEnum> = (_index) =>
+    this.chance.pickone(Object.values(ScoreTypeEnum));
   private _points: PropOrFactory<number> = (_index) =>
     this.chance.integer({ min: 1, max: 100 });
   private _reference_id: PropOrFactory<string | null> = (_index) =>
@@ -46,7 +46,7 @@ export class UserScoreFakeBuilder<TBuild = any> {
     return this;
   }
 
-  withScoreType(valueOrFactory: PropOrFactory<ScoreType>) {
+  withScoreType(valueOrFactory: PropOrFactory<ScoreTypeEnum>) {
     this._score_type = valueOrFactory;
     return this;
   }
@@ -72,7 +72,7 @@ export class UserScoreFakeBuilder<TBuild = any> {
   }
 
   withInvalidUserId(value?: any) {
-    this._user_id = value ?? "invalid-uuid";
+    this._user_id = value ?? ("invalid-uuid" as any);
     return this;
   }
 
@@ -92,8 +92,8 @@ export class UserScoreFakeBuilder<TBuild = any> {
       .map((_, index) => {
         const userScore = new UserScore({
           id: !this._id ? undefined : this.callFactory(this._id, index),
-          user_id: this.callFactory(this._user_id, index).id,
-          score_type: this.callFactory(this._score_type, index).value,
+          user_id: this.callFactory(this._user_id, index),
+          score_type: this.callFactory(this._score_type, index),
           points: this.callFactory(this._points, index),
           reference_id: this.callFactory(this._reference_id, index),
           description: this.callFactory(this._description, index),

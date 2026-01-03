@@ -44,8 +44,14 @@ describe("ListAudiencesUseCase Unit Tests", () => {
 
   it("should list audiences with filter", async () => {
     const audience1 = Audience.fake().aAudience().withName("John Doe").build();
-    const audience2 = Audience.fake().aAudience().withName("Jane Smith").build();
-    const audience3 = Audience.fake().aAudience().withName("Bob Johnson").build();
+    const audience2 = Audience.fake()
+      .aAudience()
+      .withName("Jane Smith")
+      .build();
+    const audience3 = Audience.fake()
+      .aAudience()
+      .withName("Bob Johnson")
+      .build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);
@@ -80,9 +86,18 @@ describe("ListAudiencesUseCase Unit Tests", () => {
   });
 
   it("should list audiences with email filter", async () => {
-    const audience1 = Audience.fake().aAudience().withEmail("user1@example.com").build();
-    const audience2 = Audience.fake().aAudience().withEmail("user2@example.com").build();
-    const audience3 = Audience.fake().aAudience().withEmail("other@domain.com").build();
+    const audience1 = Audience.fake()
+      .aAudience()
+      .withEmail("user1@example.com")
+      .build();
+    const audience2 = Audience.fake()
+      .aAudience()
+      .withEmail("user2@example.com")
+      .build();
+    const audience3 = Audience.fake()
+      .aAudience()
+      .withEmail("other@domain.com")
+      .build();
 
     await repository.insert(audience1);
     await repository.insert(audience2);

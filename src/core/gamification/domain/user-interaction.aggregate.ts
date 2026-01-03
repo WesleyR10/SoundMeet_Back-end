@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { UserInteractionValidatorFactory } from "./user-interaction.validator";
 import { UserInteractionFakeBuilder } from "./user-interaction-fake.builder";
@@ -134,12 +133,9 @@ export class UserInteraction extends AggregateRoot {
     return descriptions[this.interaction_type] || "Unknown Interaction";
   }
 
-  validate(fields?: string[]): void {
+  validate(fields?: string[]): boolean {
     const validator = UserInteractionValidatorFactory.create();
-    const isValid = validator.validate(this.notification, this, fields);
-    if (!isValid) {
-      throw new EntityValidationError(this.notification.toJSON());
-    }
+    return validator.validate(this.notification, this, fields);
   }
 
   static fake() {

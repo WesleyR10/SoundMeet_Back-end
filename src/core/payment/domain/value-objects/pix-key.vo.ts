@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum PixKeyType {
@@ -19,7 +20,7 @@ export class PixKey extends ValueObject {
 
   private validate(): void {
     if (!this.key) {
-      throw new Error("Pix key cannot be empty");
+      throw new InvalidArgumentError("Pix key cannot be empty");
     }
 
     switch (this.type) {
@@ -44,21 +45,21 @@ export class PixKey extends ValueObject {
   private validateCPF(): void {
     const cpfRegex = /^\d{11}$/;
     if (!cpfRegex.test(this.key.replace(/\D/g, ""))) {
-      throw new Error("Invalid CPF format");
+      throw new InvalidArgumentError("Invalid CPF format");
     }
   }
 
   private validateCNPJ(): void {
     const cnpjRegex = /^\d{14}$/;
     if (!cnpjRegex.test(this.key.replace(/\D/g, ""))) {
-      throw new Error("Invalid CNPJ format");
+      throw new InvalidArgumentError("Invalid CNPJ format");
     }
   }
 
   private validateEmail(): void {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(this.key)) {
-      throw new Error("Invalid email format");
+      throw new InvalidArgumentError("Invalid email format");
     }
   }
 
@@ -66,7 +67,7 @@ export class PixKey extends ValueObject {
     // Formato E.164: +5511999999999
     const phoneRegex = /^\+\d{12,13}$/;
     if (!phoneRegex.test(this.key)) {
-      throw new Error(
+      throw new InvalidArgumentError(
         "Invalid phone format. Use E.164 format (e.g., +5511999999999)",
       );
     }
@@ -77,7 +78,9 @@ export class PixKey extends ValueObject {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(this.key)) {
-      throw new Error("Invalid random key format (must be UUID)");
+      throw new InvalidArgumentError(
+        "Invalid random key format (must be UUID)",
+      );
     }
   }
 

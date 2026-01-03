@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../errors/invalid-argument.error";
 import { ValueObject } from "../value-object";
 
 export type AudienceLevelProps = {
@@ -146,19 +147,21 @@ export class AudienceLevel extends ValueObject {
 
   private validate(): void {
     if (this.level < 1 || this.level > 6) {
-      throw new Error("Level must be between 1 and 6");
+      throw new InvalidArgumentError("Level must be between 1 and 6");
     }
     if (this.minPoints < 0) {
-      throw new Error("Min points cannot be negative");
+      throw new InvalidArgumentError("Min points cannot be negative");
     }
     if (this.maxPoints < this.minPoints) {
-      throw new Error("Max points must be greater than min points");
+      throw new InvalidArgumentError(
+        "Max points must be greater than min points",
+      );
     }
     if (!this.name || this.name.trim().length === 0) {
-      throw new Error("Level name is required");
+      throw new InvalidArgumentError("Level name is required");
     }
     if (!Array.isArray(this.benefits) || this.benefits.length === 0) {
-      throw new Error("Level benefits are required");
+      throw new InvalidArgumentError("Level benefits are required");
     }
   }
 

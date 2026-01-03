@@ -21,7 +21,7 @@ export type UserPointsConstructorProps = {
 };
 
 export type UserPointsCreateCommand = {
-  user_id: string;
+  user_id: Uuid;
   total_points?: number;
   total_scans?: number;
   total_requests?: number;
@@ -70,12 +70,26 @@ export class UserPoints extends AggregateRoot {
   }
 
   static create(command: UserPointsCreateCommand): UserPoints {
-    const props: UserPointsConstructorProps = {
-      ...command,
-      user_id: new Uuid(command.user_id),
-    };
-    const userPoints = new UserPoints(props);
-    userPoints.validate(["user_id"]);
+    const userPoints = new UserPoints({
+      user_id: command.user_id,
+      total_points: command.total_points,
+      total_scans: command.total_scans,
+      total_requests: command.total_requests,
+      total_tips: command.total_tips,
+      total_social_shares: command.total_social_shares,
+      current_level: command.current_level,
+      is_active: command.is_active,
+    });
+    userPoints.validate([
+      "user_id",
+      "total_points",
+      "total_scans",
+      "total_requests",
+      "total_tips",
+      "total_social_shares",
+      "current_level",
+      "is_active",
+    ]);
     return userPoints;
   }
 
@@ -121,7 +135,8 @@ export class UserPoints extends AggregateRoot {
 
   addPoints(points: number): void {
     if (points < 0) {
-      throw new Error("Points cannot be negative");
+      this.notification.addError("Points cannot be negative", "points");
+      return;
     }
     this.total_points += points;
     this.updateLevel();

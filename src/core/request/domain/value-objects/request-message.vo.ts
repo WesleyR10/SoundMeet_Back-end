@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export class RequestMessage extends ValueObject {
@@ -15,19 +16,21 @@ export class RequestMessage extends ValueObject {
       this.value === undefined ||
       typeof this.value !== "string"
     ) {
-      throw new Error("Request message is required and must be a string");
+      throw new InvalidArgumentError(
+        "Request message is required and must be a string",
+      );
     }
 
     const trimmedValue = this.value.trim();
 
     if (trimmedValue.length < RequestMessage.MIN_LENGTH) {
-      throw new Error(
+      throw new InvalidArgumentError(
         `Request message must have at least ${RequestMessage.MIN_LENGTH} character`,
       );
     }
 
     if (trimmedValue.length > RequestMessage.MAX_LENGTH) {
-      throw new Error(
+      throw new InvalidArgumentError(
         `Request message cannot exceed ${RequestMessage.MAX_LENGTH} characters`,
       );
     }

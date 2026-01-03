@@ -1,5 +1,4 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { BandValidatorFactory } from "./band.validator";
 import { BandFakeBuilder } from "./band-fake.builder";
@@ -115,11 +114,11 @@ export class Band extends AggregateRoot {
 
   addMember(musician_id: Uuid, role: string, instrument: string): void {
     if (this.members.some((m) => m.musician_id.equals(musician_id))) {
-      throw new EntityValidationError([
-        {
-          musician_id: ["Musician is already a member of this band"],
-        },
-      ]);
+      this.notification.addError(
+        "Musician is already a member of this band",
+        "musician_id",
+      );
+      return;
     }
 
     this.members.push({
@@ -138,11 +137,11 @@ export class Band extends AggregateRoot {
     );
 
     if (this.members.length === initialLength) {
-      throw new EntityValidationError([
-        {
-          musician_id: ["Musician is not a member of this band"],
-        },
-      ]);
+      this.notification.addError(
+        "Musician is not a member of this band",
+        "musician_id",
+      );
+      return;
     }
     this.updated_at = new Date();
   }
@@ -150,11 +149,11 @@ export class Band extends AggregateRoot {
   updateMemberRole(musician_id: Uuid, role: string): void {
     const member = this.members.find((m) => m.musician_id.equals(musician_id));
     if (!member) {
-      throw new EntityValidationError([
-        {
-          musician_id: ["Musician is not a member of this band"],
-        },
-      ]);
+      this.notification.addError(
+        "Musician is not a member of this band",
+        "musician_id",
+      );
+      return;
     }
     member.role = role;
     this.updated_at = new Date();

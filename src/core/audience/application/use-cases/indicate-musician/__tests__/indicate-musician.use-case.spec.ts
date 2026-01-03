@@ -1,4 +1,5 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import {
   InvalidUuidError,
   Uuid,
@@ -55,9 +56,14 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
       message: "This musician is amazing!",
     };
 
-    await expect(() => useCase.execute(input)).rejects.toThrow(
-      "Audience is not active",
-    );
+    await expect(useCase.execute(input)).rejects.toThrow(EntityValidationError);
+    await expect(useCase.execute(input)).rejects.toMatchObject({
+      error: expect.arrayContaining([
+        expect.objectContaining({
+          is_active: expect.arrayContaining(["Audience is not active"]),
+        }),
+      ]),
+    });
   });
 
   describe("should indicate musician", () => {

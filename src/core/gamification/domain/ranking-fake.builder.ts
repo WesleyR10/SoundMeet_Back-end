@@ -12,7 +12,6 @@ type PropOrFactory<T> = T | ((index: number) => T);
 export class RankingFakeBuilder<TBuild = any> {
   private _id: PropOrFactory<RankingId> | undefined = undefined;
   private _user_id: PropOrFactory<Uuid> = (_index) => new Uuid();
-  private _establishment_id: PropOrFactory<Uuid> = (_index) => new Uuid();
   private _position: PropOrFactory<number> = (_index) =>
     this.chance.integer({ min: 1, max: 100 });
   private _points: PropOrFactory<number> = (_index) =>
@@ -56,11 +55,6 @@ export class RankingFakeBuilder<TBuild = any> {
 
   withUserId(valueOrFactory: PropOrFactory<Uuid>) {
     this._user_id = valueOrFactory;
-    return this;
-  }
-
-  withEstablishmentId(valueOrFactory: PropOrFactory<Uuid>) {
-    this._establishment_id = valueOrFactory;
     return this;
   }
 
@@ -110,7 +104,7 @@ export class RankingFakeBuilder<TBuild = any> {
   }
 
   withInvalidUserId(value?: any) {
-    this._user_id = value ?? "invalid-uuid";
+    this._user_id = value ?? ("invalid-uuid" as any);
     return this;
   }
 
@@ -182,7 +176,7 @@ export class RankingFakeBuilder<TBuild = any> {
       .map((_, index) => {
         const ranking = new Ranking({
           id: !this._id ? undefined : this.callFactory(this._id, index),
-          user_id: this.callFactory(this._user_id, index).id,
+          user_id: this.callFactory(this._user_id, index),
           ranking_type: this.callFactory(this._ranking_type, index),
           period: this.callFactory(this._period_type, index),
           position: this.callFactory(this._position, index),
@@ -208,10 +202,6 @@ export class RankingFakeBuilder<TBuild = any> {
 
   get user_id() {
     return this.getValue("user_id");
-  }
-
-  get establishment_id() {
-    return this.getValue("establishment_id");
   }
 
   get position() {

@@ -1,4 +1,4 @@
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
 import { UserBadge, UserBadgeId } from "../user-badge.aggregate";
 import { BadgeTypeEnum } from "../value-objects/badge-type.vo";
 
@@ -11,7 +11,7 @@ describe("UserBadge Unit Tests without validator", () => {
 
   test("constructor of user badge", () => {
     const userBadge = new UserBadge({
-      user_id: "550e8400-e29b-41d4-a716-446655440003",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440003"),
       badge_type: BadgeTypeEnum.INICIANTE_MUSICAL,
     });
 
@@ -26,7 +26,7 @@ describe("UserBadge Unit Tests without validator", () => {
   test("should create user badge with constructor", () => {
     const userBadge = new UserBadge({
       id: UserBadgeId.create(),
-      user_id: "550e8400-e29b-41d4-a716-446655440000",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       badge_type: BadgeTypeEnum.APOIADOR,
       progress: 50,
       is_unlocked: false,
@@ -48,7 +48,7 @@ describe("UserBadge Unit Tests without validator", () => {
     const updatedAt = new Date();
     const userBadge = new UserBadge({
       id: UserBadgeId.create(),
-      user_id: "550e8400-e29b-41d4-a716-446655440001",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       badge_type: BadgeTypeEnum.APOIADOR,
       progress: 50,
       is_unlocked: true,
@@ -69,7 +69,7 @@ describe("UserBadge Unit Tests without validator", () => {
 
   test("should create user badge with create method", () => {
     const userBadge = UserBadge.create({
-      user_id: "550e8400-e29b-41d4-a716-446655440002",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440002"),
       badge_type: BadgeTypeEnum.MECENAS,
       progress: 25,
       is_unlocked: false,
@@ -150,30 +150,54 @@ describe("UserBadge Unit Tests without validator", () => {
 });
 
 describe("UserBadge Unit Tests with validator", () => {
-  test("should throw EntityValidationError with invalid user_id", () => {
-    expect(() => {
-      UserBadge.create({
-        user_id: "",
-        badge_type: BadgeTypeEnum.APOIADOR,
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid user_id", () => {
+    const userBadge = UserBadge.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      badge_type: BadgeTypeEnum.APOIADOR,
+    });
+
+    (userBadge as any).user_id = null;
+    userBadge.validate(["user_id"]);
+
+    expect(userBadge.notification.hasErrors()).toBe(true);
+    expect(userBadge.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          user_id: expect.arrayContaining(["user_id must be a UUID"]),
+        }),
+      ]),
+    );
   });
 
-  test("should throw EntityValidationError with invalid badge_type", () => {
-    expect(() => {
-      UserBadge.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        badge_type: "INVALID_TYPE" as BadgeTypeEnum,
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid badge_type", () => {
+    const userBadge = UserBadge.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      badge_type: BadgeTypeEnum.INICIANTE_MUSICAL,
+    });
+
+    (userBadge as any).badge_type = { value: "INVALID_TYPE" };
+    userBadge.validate(["badge_type"]);
+
+    expect(userBadge.notification.hasErrors()).toBe(true);
+    expect(userBadge.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          badge_type: expect.arrayContaining([
+            expect.stringContaining(
+              "badge_type must be one of the following values",
+            ),
+          ]),
+        }),
+      ]),
+    );
   });
 
   test("should validate successfully with valid data", () => {
-    expect(() => {
-      UserBadge.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        badge_type: BadgeTypeEnum.INICIANTE_MUSICAL,
-      });
-    }).not.toThrow();
+    const userBadge = UserBadge.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      badge_type: BadgeTypeEnum.INICIANTE_MUSICAL,
+    });
+    userBadge.validate();
+    expect(userBadge.notification.hasErrors()).toBe(false);
   });
 });

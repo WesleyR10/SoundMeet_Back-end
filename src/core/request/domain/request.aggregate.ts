@@ -94,7 +94,11 @@ export class Request extends AggregateRoot {
 
   accept(): void {
     if (!this.status.isPending()) {
-      throw new Error("Only pending requests can be accepted");
+      this.notification.addError(
+        "Only pending requests can be accepted",
+        "status",
+      );
+      return;
     }
 
     this.status = RequestStatus.accepted();
@@ -115,7 +119,11 @@ export class Request extends AggregateRoot {
 
   reject(reason?: string): void {
     if (!this.status.isPending()) {
-      throw new Error("Only pending requests can be rejected");
+      this.notification.addError(
+        "Only pending requests can be rejected",
+        "status",
+      );
+      return;
     }
 
     this.status = RequestStatus.rejected();

@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../errors/invalid-argument.error";
 import { ValueObject } from "../value-object";
 
 export type AudiencePointsProps = {
@@ -161,16 +162,18 @@ export class AudiencePoints extends ValueObject {
 
   private validate(): void {
     if (this.total < 0) {
-      throw new Error("Total points cannot be negative");
+      throw new InvalidArgumentError("Total points cannot be negative");
     }
     if (this.monthly < 0) {
-      throw new Error("Monthly points cannot be negative");
+      throw new InvalidArgumentError("Monthly points cannot be negative");
     }
     if (!this.lastUpdated) {
-      throw new Error("Last updated date is required");
+      throw new InvalidArgumentError("Last updated date is required");
     }
     if (this.lastUpdated > new Date()) {
-      throw new Error("Last updated date cannot be in the future");
+      throw new InvalidArgumentError(
+        "Last updated date cannot be in the future",
+      );
     }
   }
 

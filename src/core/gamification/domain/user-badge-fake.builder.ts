@@ -8,7 +8,7 @@ type PropOrFactory<T> = T | ((index: number) => T);
 
 export class UserBadgeFakeBuilder<TBuild = any> {
   private _id: PropOrFactory<UserBadgeId> | undefined = undefined;
-  private _user_id: PropOrFactory<string> = (_index) => new Uuid().id;
+  private _user_id: PropOrFactory<Uuid> = (_index) => new Uuid();
   private _badge_type: PropOrFactory<BadgeTypeEnum> = (_index) =>
     BadgeTypeEnum.INICIANTE_MUSICAL;
   private _progress: PropOrFactory<number> = (_index) =>
@@ -40,7 +40,7 @@ export class UserBadgeFakeBuilder<TBuild = any> {
     return this;
   }
 
-  withUserId(valueOrFactory: PropOrFactory<string>) {
+  withUserId(valueOrFactory: PropOrFactory<Uuid>) {
     this._user_id = valueOrFactory;
     return this;
   }
@@ -76,7 +76,7 @@ export class UserBadgeFakeBuilder<TBuild = any> {
   }
 
   withInvalidUserId(value?: any) {
-    this._user_id = value ?? "invalid-uuid";
+    this._user_id = value ?? ("invalid-uuid" as any);
     return this;
   }
 

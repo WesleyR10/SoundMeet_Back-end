@@ -1,4 +1,5 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Ranking } from "../../../domain/ranking.aggregate";
 import { IRankingRepository } from "../../../domain/ranking.repository";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
@@ -6,6 +7,7 @@ import {
   RankingPeriodEnum,
   RankingTypeEnum,
 } from "../../../domain/value-objects/ranking-type.vo";
+import { ScoreTypeEnum } from "../../../domain/value-objects/score-type.vo";
 import { RankingOutput, RankingOutputMapper } from "../common/ranking-output";
 import { CalculateRankingInput } from "./calculate-ranking.input";
 
@@ -44,7 +46,7 @@ export class CalculateRankingUseCase implements IUseCase<
     };
 
     for (const score of periodScores) {
-      const userId = (score.user_id as any).id ?? score.user_id;
+      const userId = score.user_id.id;
       switch (input.type) {
         case RankingTypeEnum.TOP_FAS:
           // Soma todos os pontos do período
@@ -52,18 +54,17 @@ export class CalculateRankingUseCase implements IUseCase<
           break;
         case RankingTypeEnum.TOP_APOIADORES:
           // Considera apenas pontos provenientes de TIP_GIVEN
-          if (
-            String(score.score_type?.value ?? score.score_type) === "tip_given"
-          ) {
+          if (score.score_type === ScoreTypeEnum.TIP_GIVEN) {
             accumulate(userId, score.points);
           }
           break;
         case RankingTypeEnum.TOP_SUGESTOES:
           // Considera REQUEST_SENT e REQUEST_ACCEPTED
           if (
-            ["request_sent", "request_accepted"].includes(
-              String(score.score_type?.value ?? score.score_type),
-            )
+            [
+              ScoreTypeEnum.REQUEST_SENT,
+              ScoreTypeEnum.REQUEST_ACCEPTED,
+            ].includes(score.score_type)
           ) {
             accumulate(userId, score.points);
           }
@@ -86,7 +87,7 @@ export class CalculateRankingUseCase implements IUseCase<
 
     const entities: Ranking[] = sorted.map((row) =>
       Ranking.create({
-        user_id: row.user_id,
+        user_id: new Uuid(row.user_id),
         ranking_type: input.type,
         period: input.period ?? RankingPeriodEnum.MONTHLY,
         position: row.position,

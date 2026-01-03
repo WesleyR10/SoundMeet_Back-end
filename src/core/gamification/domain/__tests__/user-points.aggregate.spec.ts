@@ -51,7 +51,7 @@ describe("UserPoints Unit Tests without validator", () => {
 
   test("should create user points with create method", () => {
     const userPoints = UserPoints.create({
-      user_id: "550e8400-e29b-41d4-a716-446655440000",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       total_points: 50,
       current_level: 1,
     });
@@ -199,7 +199,7 @@ describe("UserPoints Unit Tests with validator", () => {
   test("should have validation errors with invalid user_id", () => {
     // Testamos com um UUID válido mas depois modificamos diretamente o campo
     const userPoints = UserPoints.create({
-      user_id: "550e8400-e29b-41d4-a716-446655440000",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       total_points: 100,
       current_level: 2,
     });
@@ -212,7 +212,7 @@ describe("UserPoints Unit Tests with validator", () => {
 
   test("should have validation errors with negative total_points", () => {
     const userPoints = UserPoints.create({
-      user_id: "550e8400-e29b-41d4-a716-446655440000",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       total_points: -10,
       current_level: 2,
     });
@@ -222,7 +222,7 @@ describe("UserPoints Unit Tests with validator", () => {
 
   test("should have validation errors with invalid current_level", () => {
     const userPoints = UserPoints.create({
-      user_id: "550e8400-e29b-41d4-a716-446655440000",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       total_points: 100,
       current_level: 0,
     });
@@ -233,7 +233,7 @@ describe("UserPoints Unit Tests with validator", () => {
   test("should validate successfully with valid data", () => {
     expect(() => {
       UserPoints.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
+        user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
         total_points: 100,
         current_level: 1,
       });

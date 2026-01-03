@@ -1,5 +1,7 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { ConflictError } from "../../../../shared/domain/errors/conflict.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { UserBadge } from "../../../domain/user-badge.aggregate";
 import { IUserBadgeRepository } from "../../../domain/user-badge.repository";
 import {
@@ -22,14 +24,14 @@ export class AwardBadgeUseCase implements IUseCase<
     );
 
     if (existingBadge) {
-      throw new Error(
+      throw new ConflictError(
         `User already has badge of type ${input.badge_type.value}`,
       );
     }
 
     // Criar a entidade UserBadge
     const userBadge = UserBadge.create({
-      user_id: input.user_id,
+      user_id: new Uuid(input.user_id),
       badge_type: input.badge_type.value,
       progress: input.points_earned || 0,
       is_unlocked: true,

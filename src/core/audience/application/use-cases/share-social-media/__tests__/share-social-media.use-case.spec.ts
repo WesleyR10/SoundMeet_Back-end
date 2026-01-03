@@ -1,4 +1,5 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import {
   InvalidUuidError,
   Uuid,
@@ -58,9 +59,14 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
       message: "Check out this amazing song!",
     };
 
-    await expect(() => useCase.execute(input)).rejects.toThrow(
-      "Audience is not active",
-    );
+    await expect(useCase.execute(input)).rejects.toThrow(EntityValidationError);
+    await expect(useCase.execute(input)).rejects.toMatchObject({
+      error: expect.arrayContaining([
+        expect.objectContaining({
+          is_active: expect.arrayContaining(["Audience is not active"]),
+        }),
+      ]),
+    });
   });
 
   describe("should share on social media", () => {

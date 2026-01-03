@@ -1,4 +1,10 @@
+import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Ranking, RankingId } from "../../../domain/ranking.aggregate";
+import {
+  RankingPeriodEnum,
+  RankingTypeEnum,
+} from "../../../domain/value-objects/ranking-type.vo";
 
 export type RankingModelProps = {
   id: string;
@@ -12,8 +18,8 @@ export class RankingModelMapper {
   static toModel(entity: Ranking): RankingModelProps {
     return {
       id: entity.id.id,
-      type: entity.ranking_type.value,
-      period: entity.period.value,
+      type: entity.ranking_type,
+      period: entity.period,
       data: {
         user_id: entity.user_id.id,
         position: entity.position,
@@ -29,11 +35,18 @@ export class RankingModelMapper {
 
   static toEntity(model: RankingModelProps): Ranking {
     const data = model.data || {};
+    if (!data.user_id) {
+      throw new LoadEntityError([
+        {
+          user_id: [`Ranking ${model.id} has missing user_id data in database`],
+        },
+      ]);
+    }
     return new Ranking({
       id: new RankingId(model.id),
-      user_id: data.user_id || "",
-      ranking_type: model.type as any,
-      period: model.period as any,
+      user_id: new Uuid(data.user_id),
+      ranking_type: model.type as RankingTypeEnum,
+      period: model.period as RankingPeriodEnum,
       position: data.position || 0,
       score: data.score || 0,
       period_start: data.period_start

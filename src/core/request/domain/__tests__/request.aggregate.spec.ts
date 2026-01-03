@@ -102,7 +102,7 @@ describe("Request Unit Tests", () => {
       expect(request.rejection_reason).toBeNull();
     });
 
-    test("should throw error when accepting non-pending request", () => {
+    test("should add error when accepting non-pending request", () => {
       const request = Request.create({
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
@@ -111,9 +111,8 @@ describe("Request Unit Tests", () => {
 
       request.accept();
 
-      expect(() => request.accept()).toThrow(
-        "Only pending requests can be accepted",
-      );
+      request.accept();
+      expect(request.notification.hasErrors()).toBe(true);
     });
   });
 
@@ -146,7 +145,7 @@ describe("Request Unit Tests", () => {
       expect(request.rejection_reason).toBeNull();
     });
 
-    test("should throw error when rejecting non-pending request", () => {
+    test("should add error when rejecting non-pending request", () => {
       const request = Request.create({
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
@@ -155,9 +154,8 @@ describe("Request Unit Tests", () => {
 
       request.reject();
 
-      expect(() => request.reject()).toThrow(
-        "Only pending requests can be rejected",
-      );
+      request.reject();
+      expect(request.notification.hasErrors()).toBe(true);
     });
   });
 

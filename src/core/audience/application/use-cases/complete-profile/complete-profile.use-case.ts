@@ -22,9 +22,9 @@ export class CompleteProfileUseCase implements IUseCase<
       throw new NotFoundError(input.audience_id, Audience);
     }
 
-    // Verificar se o audience está ativo
-    if (!audience.is_active) {
-      throw new Error("Audience is not active");
+    audience.ensureIsActive();
+    if (audience.notification.hasErrors()) {
+      throw new EntityValidationError(audience.notification.toJSON());
     }
 
     // Atualizar dados do perfil se fornecidos

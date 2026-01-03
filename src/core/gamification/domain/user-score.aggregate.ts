@@ -1,16 +1,15 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { UserScoreValidatorFactory } from "./user-score.validator";
 import { UserScoreFakeBuilder } from "./user-score-fake.builder";
 import { UserScoreId } from "./value-objects/gamification-id.vo";
-import { ScoreType, ScoreTypeEnum } from "./value-objects/score-type.vo";
+import { ScoreTypeEnum } from "./value-objects/score-type.vo";
 
 export { UserScoreId } from "./value-objects/gamification-id.vo";
 
 export type UserScoreConstructorProps = {
   id?: UserScoreId;
-  user_id: string;
+  user_id: Uuid;
   score_type: ScoreTypeEnum;
   points: number;
   reference_id?: string | null;
@@ -19,7 +18,7 @@ export type UserScoreConstructorProps = {
 };
 
 export type UserScoreCreateCommand = {
-  user_id: string;
+  user_id: Uuid;
   score_type: ScoreTypeEnum;
   points?: number;
   reference_id?: string | null;
@@ -29,7 +28,7 @@ export type UserScoreCreateCommand = {
 export class UserScore extends AggregateRoot {
   id: UserScoreId;
   user_id: Uuid;
-  score_type: ScoreType;
+  score_type: ScoreTypeEnum;
   points: number;
   reference_id: string | null;
   description: string | null;
@@ -38,21 +37,8 @@ export class UserScore extends AggregateRoot {
   constructor(props: UserScoreConstructorProps) {
     super();
     this.id = props.id ?? UserScoreId.create();
-
-    try {
-      this.user_id = new Uuid(props.user_id);
-    } catch (error) {
-      // Create a temporary invalid Uuid-like object for validation
-      this.user_id = { id: props.user_id } as any;
-    }
-
-    try {
-      this.score_type = new ScoreType(props.score_type);
-    } catch (error) {
-      // Create a temporary invalid ScoreType-like object for validation
-      this.score_type = { value: props.score_type } as any;
-    }
-
+    this.user_id = props.user_id;
+    this.score_type = props.score_type;
     this.points = props.points;
     this.reference_id = props.reference_id ?? null;
     this.description = props.description ?? null;
@@ -64,51 +50,25 @@ export class UserScore extends AggregateRoot {
   }
 
   static create(props: UserScoreCreateCommand): UserScore {
-    // Validar user_id antes de criar o Uuid
-    if (!props.user_id || props.user_id.trim() === "") {
-      throw new EntityValidationError([
-        {
-          user_id: ["user_id should not be empty"],
-        },
-      ]);
-    }
-
-    // Validar score_type antes de criar o ScoreType
-    if (
-      !props.score_type ||
-      !Object.values(ScoreTypeEnum).includes(props.score_type)
-    ) {
-      throw new EntityValidationError([
-        {
-          score_type: ["score_type must be a valid ScoreType"],
-        },
-      ]);
-    }
-
-    // Validar points se fornecido
-    if (props.points !== undefined && props.points < 0) {
-      throw new EntityValidationError([
-        {
-          points: ["points must be greater than or equal to 0"],
-        },
-      ]);
-    }
-
     const userScore = new UserScore({
       user_id: props.user_id,
       score_type: props.score_type,
-      points: props.points ?? 0, // Will be set to correct value after ScoreType validation
+      points: props.points ?? 0,
       reference_id: props.reference_id,
       description: props.description,
     });
 
-    // Set correct points after validation passes
-    if (
-      !userScore.notification.hasErrors() &&
-      props.points === undefined &&
-      userScore.score_type instanceof ScoreType
-    ) {
-      userScore.points = userScore.score_type.getPoints();
+    userScore.validate(["user_id", "score_type", "points"]);
+
+    if (!Object.values(ScoreTypeEnum).includes(userScore.score_type)) {
+      userScore.notification.addError(
+        "score_type must be a valid ScoreType",
+        "score_type",
+      );
+    }
+
+    if (!userScore.notification.hasErrors() && props.points === undefined) {
+      userScore.points = UserScore.getDefaultPoints(userScore.score_type);
     }
 
     return userScore;
@@ -116,10 +76,7 @@ export class UserScore extends AggregateRoot {
 
   changePoints(points: number): void {
     this.points = points;
-    const isValid = this.validate(["points"]);
-    if (!isValid) {
-      throw new EntityValidationError(this.notification.toJSON());
-    }
+    this.validate(["points"]);
   }
 
   changeDescription(description: string | null): void {
@@ -131,7 +88,10 @@ export class UserScore extends AggregateRoot {
   }
 
   isValidForScoreType(): boolean {
-    return this.points === this.score_type.getPoints();
+    if (this.score_type === ScoreTypeEnum.TIP_GIVEN) {
+      return this.points >= 0;
+    }
+    return this.points === UserScore.getDefaultPoints(this.score_type);
   }
 
   getScoreTypeDescription(): string {
@@ -145,7 +105,7 @@ export class UserScore extends AggregateRoot {
       [ScoreTypeEnum.EVENT_ATTENDANCE]: "Participou de evento",
     };
 
-    return descriptions[this.score_type.value];
+    return descriptions[this.score_type] ?? "";
   }
 
   validate(fields?: string[]): boolean {
@@ -153,8 +113,8 @@ export class UserScore extends AggregateRoot {
     return validator.validate(
       this.notification,
       {
-        user_id: this.user_id?.id,
-        score_type: this.score_type?.value,
+        user_id: this.user_id.id,
+        score_type: this.score_type,
         points: this.points,
         reference_id: this.reference_id,
         description: this.description,
@@ -170,12 +130,25 @@ export class UserScore extends AggregateRoot {
   toJSON() {
     return {
       id: this.id.id,
-      user_id: this.user_id?.id || this.user_id,
-      score_type: this.score_type?.value || this.score_type,
+      user_id: this.user_id.id,
+      score_type: this.score_type,
       points: this.points,
       reference_id: this.reference_id,
       description: this.description,
       created_at: this.created_at,
     };
+  }
+
+  private static getDefaultPoints(score_type: ScoreTypeEnum): number {
+    const pointsMap = {
+      [ScoreTypeEnum.QR_SCAN]: 10,
+      [ScoreTypeEnum.REQUEST_SENT]: 25,
+      [ScoreTypeEnum.REQUEST_ACCEPTED]: 50,
+      [ScoreTypeEnum.TIP_GIVEN]: 1,
+      [ScoreTypeEnum.SOCIAL_SHARE]: 50,
+      [ScoreTypeEnum.PROFILE_VIEW]: 5,
+      [ScoreTypeEnum.EVENT_ATTENDANCE]: 20,
+    };
+    return pointsMap[score_type] ?? 0;
   }
 }

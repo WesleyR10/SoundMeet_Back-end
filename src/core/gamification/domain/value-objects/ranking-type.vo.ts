@@ -1,4 +1,4 @@
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum RankingTypeEnum {
@@ -26,11 +26,7 @@ export class RankingType extends ValueObject {
 
   private validate(): void {
     if (!Object.values(RankingTypeEnum).includes(this.value)) {
-      throw new EntityValidationError([
-        {
-          ranking_type: [`Invalid ranking type: ${this.value}`],
-        },
-      ]);
+      throw new InvalidArgumentError(`Invalid ranking type: ${this.value}`);
     }
   }
 
@@ -92,7 +88,7 @@ export class RankingPeriod extends ValueObject {
 
   private validate(): void {
     if (!Object.values(RankingPeriodEnum).includes(this.value)) {
-      throw new Error(`Invalid ranking period: ${this.value}`);
+      throw new InvalidArgumentError(`Invalid ranking period: ${this.value}`);
     }
   }
 

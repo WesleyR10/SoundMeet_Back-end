@@ -1,11 +1,17 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { Points } from "../../../../shared/domain/value-objects/points.vo";
 import { UserInteraction } from "../../../../gamification/domain/user-interaction.aggregate";
 import {
   IUserInteractionRepository,
   UserInteractionSearchParams,
 } from "../../../../gamification/domain/user-interaction.repository";
+import {
+  Musician,
+  MusicianId,
+} from "../../../../musician/domain/musician.aggregate";
+import { IMusicianRepository } from "../../../../musician/domain/musician.repository";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Points } from "../../../../shared/domain/value-objects/points.vo";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import {
@@ -18,6 +24,7 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
   constructor(
     private audienceRepository: IAudienceRepository,
     private userInteractionRepo: IUserInteractionRepository,
+    private musicianRepository: IMusicianRepository,
   ) {}
 
   async execute(input: ScanQRInput): Promise<ScanQROutput> {
@@ -30,6 +37,15 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
 
     // Verificar se o QR code é válido (implementar validação específica)
     await this.validateQRCode(input.qr_code);
+
+    if (input.musician_id) {
+      const musicianId = new MusicianId(input.musician_id);
+      const musician = await this.musicianRepository.findById(musicianId);
+
+      if (!musician) {
+        throw new NotFoundError(input.musician_id, Musician);
+      }
+    }
 
     let earnPoints = true;
     if (input.musician_id) {
@@ -60,21 +76,13 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
     const previousBadges = [...audience.badges];
 
     // Usar o método do aggregate para escanear QR code do músico
-    audience.scanMusicianQRCode(
-      input.musician_id || "",
-      earnPoints,
-    );
+    audience.scanMusicianQRCode(input.musician_id || "", earnPoints);
 
     const points = earnPoints
       ? Points.createScanQR({ musician_id: input.musician_id })
-      : Points.create(
-          0,
-          "scan_qr",
-          "QR code escaneado",
-          {
-            musician_id: input.musician_id,
-          },
-        );
+      : Points.create(0, "scan_qr", "QR code escaneado", {
+          musician_id: input.musician_id,
+        });
     await this.userInteractionRepo.insert(
       UserInteraction.create({
         user_id: input.id,
@@ -120,7 +128,7 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
     // Implementar validação do QR code
     // Por exemplo: verificar formato, verificar se existe no sistema, etc.
     if (!qrCode || qrCode.trim().length === 0) {
-      throw new Error("QR code inválido");
+      throw new InvalidArgumentError("QR code inválido");
     }
 
     // Adicionar mais validações conforme necessário

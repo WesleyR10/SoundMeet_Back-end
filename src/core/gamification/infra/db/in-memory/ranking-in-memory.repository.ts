@@ -45,11 +45,11 @@ export class RankingInMemoryRepository
       }
 
       if (filter.ranking_type) {
-        matches = matches && ranking.ranking_type.value === filter.ranking_type;
+        matches = matches && ranking.ranking_type === filter.ranking_type;
       }
 
       if (filter.period) {
-        matches = matches && ranking.period.value === filter.period;
+        matches = matches && ranking.period === filter.period;
       }
 
       return matches;
@@ -76,8 +76,8 @@ export class RankingInMemoryRepository
     const ranking = this.items.find(
       (item) =>
         item.user_id.id === user_id &&
-        item.ranking_type.value === ranking_type &&
-        item.period.value === period &&
+        item.ranking_type === ranking_type &&
+        item.period === period &&
         item.period_start.getTime() === period_start.getTime() &&
         item.period_end.getTime() === period_end.getTime(),
     );
@@ -98,8 +98,8 @@ export class RankingInMemoryRepository
   ): Promise<Ranking[]> {
     return this.items.filter(
       (item) =>
-        item.ranking_type.value === ranking_type &&
-        item.period.value === period &&
+        item.ranking_type === ranking_type &&
+        item.period === period &&
         item.isCurrentPeriod(),
     );
   }

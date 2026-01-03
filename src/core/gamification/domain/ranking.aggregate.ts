@@ -1,13 +1,10 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { RankingValidatorFactory } from "./ranking.validator";
 import { RankingFakeBuilder } from "./ranking-fake.builder";
 import { RankingId } from "./value-objects/gamification-id.vo";
 import {
-  RankingPeriod,
   RankingPeriodEnum,
-  RankingType,
   RankingTypeEnum,
 } from "./value-objects/ranking-type.vo";
 
@@ -22,7 +19,7 @@ export {
 
 export type RankingConstructorProps = {
   id?: RankingId;
-  user_id: string;
+  user_id: Uuid;
   ranking_type: RankingTypeEnum;
   period: RankingPeriodEnum;
   position: number;
@@ -35,7 +32,7 @@ export type RankingConstructorProps = {
 };
 
 export type RankingCreateCommand = {
-  user_id: string;
+  user_id: Uuid;
   ranking_type: RankingTypeEnum;
   period: RankingPeriodEnum;
   position: number;
@@ -47,8 +44,8 @@ export type RankingCreateCommand = {
 export class Ranking extends AggregateRoot {
   id: RankingId;
   user_id: Uuid;
-  ranking_type: RankingType;
-  period: RankingPeriod;
+  ranking_type: RankingTypeEnum;
+  period: RankingPeriodEnum;
   position: number;
   score: number;
   period_start: Date;
@@ -60,9 +57,9 @@ export class Ranking extends AggregateRoot {
   constructor(props: RankingConstructorProps) {
     super();
     this.id = props.id ?? RankingId.create();
-    this.user_id = new Uuid(props.user_id);
-    this.ranking_type = new RankingType(props.ranking_type);
-    this.period = new RankingPeriod(props.period);
+    this.user_id = props.user_id;
+    this.ranking_type = props.ranking_type;
+    this.period = props.period;
     this.position = props.position;
     this.score = props.score;
     this.period_start = props.period_start;
@@ -77,24 +74,6 @@ export class Ranking extends AggregateRoot {
   }
 
   static create(command: RankingCreateCommand): Ranking {
-    // Validar se period_end é depois de period_start
-    if (command.period_end <= command.period_start) {
-      throw new EntityValidationError([
-        {
-          period_end: ["Period end must be after period start"],
-        },
-      ]);
-    }
-
-    // Validar user_id antes de criar o Uuid
-    if (!command.user_id || command.user_id.trim() === "") {
-      throw new EntityValidationError([
-        {
-          user_id: ["user_id should not be empty"],
-        },
-      ]);
-    }
-
     const ranking = new Ranking({
       user_id: command.user_id,
       ranking_type: command.ranking_type,
@@ -114,10 +93,6 @@ export class Ranking extends AggregateRoot {
       "period_start",
       "period_end",
     ]);
-
-    if (ranking.notification.hasErrors()) {
-      throw new EntityValidationError(ranking.notification.toJSON());
-    }
 
     return ranking;
   }
@@ -165,7 +140,13 @@ export class Ranking extends AggregateRoot {
   }
 
   getRankingDescription(): string {
-    return this.ranking_type.getDescription();
+    const rankingMap = {
+      [RankingTypeEnum.TOP_FAS]: "Top Fãs",
+      [RankingTypeEnum.TOP_SUGESTOES]: "Top Sugestões",
+      [RankingTypeEnum.TOP_APOIADORES]: "Top Apoiadores",
+      [RankingTypeEnum.TOP_DISCOVERERS]: "Top Discoverers",
+    };
+    return rankingMap[this.ranking_type] ?? "";
   }
 
   getPeriodDescription(): string {
@@ -177,7 +158,7 @@ export class Ranking extends AggregateRoot {
       [RankingPeriodEnum.ALL_TIME]: "Todos os Tempos",
     };
 
-    return periodMap[this.period.value];
+    return periodMap[this.period] ?? "";
   }
 
   updatePeriod(start: Date, end: Date): void {
@@ -206,7 +187,34 @@ export class Ranking extends AggregateRoot {
 
   validate(fields?: string[]): boolean {
     const validator = RankingValidatorFactory.create();
-    return validator.validate(this.notification, this, fields);
+    const isValid = validator.validate(this.notification, this, fields);
+
+    if (!Object.values(RankingTypeEnum).includes(this.ranking_type)) {
+      this.notification.addError(
+        "ranking_type must be a valid RankingType",
+        "ranking_type",
+      );
+    }
+
+    if (!Object.values(RankingPeriodEnum).includes(this.period)) {
+      this.notification.addError(
+        "period must be a valid RankingPeriod",
+        "period",
+      );
+    }
+
+    if (
+      this.period_start instanceof Date &&
+      this.period_end instanceof Date &&
+      this.period_end <= this.period_start
+    ) {
+      this.notification.addError(
+        "Period end must be after period start",
+        "period_end",
+      );
+    }
+
+    return isValid;
   }
 
   static fake() {
@@ -217,8 +225,8 @@ export class Ranking extends AggregateRoot {
     return {
       id: this.id.id,
       user_id: this.user_id.id,
-      ranking_type: this.ranking_type.value,
-      period: this.period.value,
+      ranking_type: this.ranking_type,
+      period: this.period,
       position: this.position,
       score: this.score,
       period_start: this.period_start,

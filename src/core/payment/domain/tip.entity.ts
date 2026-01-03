@@ -83,10 +83,6 @@ export class Tip extends AggregateRoot {
   }
 
   static create(command: TipCreateCommand): Tip {
-    if (!command.musician_id && !command.band_id) {
-      throw new Error("Either musician_id or band_id must be provided");
-    }
-
     const tip = new Tip({
       audience_id: new Uuid(command.audience_id),
       musician_id: command.musician_id ? new Uuid(command.musician_id) : null,
@@ -101,6 +97,13 @@ export class Tip extends AggregateRoot {
       is_anonymous: command.is_anonymous,
       show_in_wall: command.show_in_wall,
     });
+
+    if (!command.musician_id && !command.band_id) {
+      tip.notification.addError(
+        "Either musician_id or band_id must be provided",
+        "target",
+      );
+    }
 
     tip.validate();
     return tip;
@@ -120,6 +123,9 @@ export class Tip extends AggregateRoot {
     this.transaction_id = transactionId;
     this.updated_at = new Date();
     this.validate();
+    if (this.notification.hasErrors()) {
+      return;
+    }
     this.applyEvent(
       new TipCompletedEvent(
         this.tip_id,
@@ -135,6 +141,9 @@ export class Tip extends AggregateRoot {
     this.status = TipStatus.FAILED;
     this.updated_at = new Date();
     this.validate();
+    if (this.notification.hasErrors()) {
+      return;
+    }
     this.applyEvent(
       new TipFailedEvent(
         this.tip_id,

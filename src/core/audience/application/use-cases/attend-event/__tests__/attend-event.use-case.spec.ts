@@ -1,5 +1,6 @@
 import { InvalidUuidError, Uuid } from "@core/shared/domain";
 import { NotFoundError } from "@core/shared/domain/errors";
+import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
 
 import { Audience } from "../../../../domain/audience.aggregate";
 import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
@@ -47,9 +48,14 @@ describe("AttendEventUseCase Unit Tests", () => {
       event_id: "550e8400-e29b-41d4-a716-446655440000",
     };
 
-    await expect(() => useCase.execute(input)).rejects.toThrow(
-      "Audience is not active",
-    );
+    await expect(useCase.execute(input)).rejects.toThrow(EntityValidationError);
+    await expect(useCase.execute(input)).rejects.toMatchObject({
+      error: expect.arrayContaining([
+        expect.objectContaining({
+          is_active: expect.arrayContaining(["Audience is not active"]),
+        }),
+      ]),
+    });
   });
 
   describe("should attend event", () => {

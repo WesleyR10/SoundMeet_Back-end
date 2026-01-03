@@ -1,5 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import {
@@ -29,6 +30,10 @@ export class MakeMusicRequestUseCase implements IUseCase<
       input.song_title,
       input.artist_name,
     );
+
+    if (audience.notification.hasErrors()) {
+      throw new EntityValidationError(audience.notification.toJSON());
+    }
 
     // Check if audience should get "Sugestor" badge
     const currentBadges = audience.getBadges();

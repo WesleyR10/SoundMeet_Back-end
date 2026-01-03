@@ -1,6 +1,7 @@
 import { IMusicianWalletRepository, MusicianWallet } from "@core/payment";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import {
   MusicianWalletOutput,
   MusicianWalletOutputMapper,
@@ -34,6 +35,10 @@ export class UpdateMusicianPixKeyUseCase implements IUseCase<
     }
 
     wallet.updatePixKey(input.pix_key, input.pix_key_type);
+
+    if (wallet.notification.hasErrors()) {
+      throw new EntityValidationError(wallet.notification.toJSON());
+    }
     await this.walletRepository.update(wallet);
 
     return MusicianWalletOutputMapper.toOutput(wallet);

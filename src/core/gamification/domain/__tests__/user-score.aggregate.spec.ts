@@ -1,4 +1,7 @@
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import {
+  InvalidUuidError,
+  Uuid,
+} from "../../../shared/domain/value-objects/uuid.vo";
 import { UserScore, UserScoreId } from "../user-score.aggregate";
 import { ScoreTypeEnum } from "../value-objects/score-type.vo";
 
@@ -11,14 +14,14 @@ describe("UserScore Unit Tests without validator", () => {
 
   test("constructor of user score", () => {
     const userScore = new UserScore({
-      user_id: "user-123",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       score_type: ScoreTypeEnum.QR_SCAN,
       points: 10,
     });
 
     expect(userScore.id).toBeInstanceOf(UserScoreId);
-    expect(userScore.user_id.id).toBe("user-123");
-    expect(userScore.score_type.value).toBe(ScoreTypeEnum.QR_SCAN);
+    expect(userScore.user_id).toBeInstanceOf(Uuid);
+    expect(userScore.score_type).toBe(ScoreTypeEnum.QR_SCAN);
     expect(userScore.points).toBe(10);
     expect(userScore.reference_id).toBeNull();
     expect(userScore.description).toBeNull();
@@ -30,7 +33,7 @@ describe("UserScore Unit Tests without validator", () => {
     const validUuid = "550e8400-e29b-41d4-a716-446655440000";
     const userScore = new UserScore({
       id: new UserScoreId(validUuid),
-      user_id: "user-456",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       score_type: ScoreTypeEnum.TIP_GIVEN,
       points: 5,
       reference_id: "tip-789",
@@ -39,8 +42,8 @@ describe("UserScore Unit Tests without validator", () => {
     });
 
     expect(userScore.id.id).toBe(validUuid);
-    expect(userScore.user_id.id).toBe("user-456");
-    expect(userScore.score_type.value).toBe(ScoreTypeEnum.TIP_GIVEN);
+    expect(userScore.user_id).toBeInstanceOf(Uuid);
+    expect(userScore.score_type).toBe(ScoreTypeEnum.TIP_GIVEN);
     expect(userScore.points).toBe(5);
     expect(userScore.reference_id).toBe("tip-789");
     expect(userScore.description).toBe("Tip for great performance");
@@ -49,15 +52,15 @@ describe("UserScore Unit Tests without validator", () => {
 
   test("should create user score with create method", () => {
     const userScore = UserScore.create({
-      user_id: "user-123",
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440002"),
       score_type: ScoreTypeEnum.REQUEST_SENT,
       points: 25,
       description: "Request sent to musician",
     });
 
     expect(userScore.id).toBeInstanceOf(UserScoreId);
-    expect(userScore.user_id.id).toBe("user-123");
-    expect(userScore.score_type.value).toBe(ScoreTypeEnum.REQUEST_SENT);
+    expect(userScore.user_id).toBeInstanceOf(Uuid);
+    expect(userScore.score_type).toBe(ScoreTypeEnum.REQUEST_SENT);
     expect(userScore.points).toBe(25);
     expect(userScore.description).toBe("Request sent to musician");
   });
@@ -95,7 +98,7 @@ describe("UserScore Unit Tests without validator", () => {
     expect(json).toMatchObject({
       id: userScore.id.id,
       user_id: userScore.user_id.id,
-      score_type: userScore.score_type.value,
+      score_type: userScore.score_type,
       points: userScore.points,
       reference_id: userScore.reference_id,
       description: userScore.description,
@@ -109,50 +112,57 @@ describe("UserScore Unit Tests without validator", () => {
     expect(userScore).toBeInstanceOf(UserScore);
     expect(userScore.id).toBeInstanceOf(UserScoreId);
     expect(userScore.user_id).toBeTruthy();
-    expect(Object.values(ScoreTypeEnum)).toContain(userScore.score_type.value);
+    expect(Object.values(ScoreTypeEnum)).toContain(userScore.score_type);
     expect(userScore.points).toBeGreaterThanOrEqual(0);
   });
 });
 
 describe("UserScore Unit Tests with validator", () => {
-  test("should throw EntityValidationError with invalid user_id", () => {
-    expect(() => {
-      UserScore.create({
-        user_id: "",
-        score_type: ScoreTypeEnum.QR_SCAN,
-        points: 10,
-      });
-    }).toThrow(EntityValidationError);
+  test("should throw with invalid uuid", () => {
+    expect(() => new Uuid("invalid-uuid")).toThrow(InvalidUuidError);
   });
 
-  test("should throw EntityValidationError with invalid points", () => {
-    expect(() => {
-      UserScore.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        score_type: ScoreTypeEnum.QR_SCAN,
-        points: -1,
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid points", () => {
+    const userScore = UserScore.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      score_type: ScoreTypeEnum.QR_SCAN,
+      points: -1,
+    });
+    expect(userScore.notification.hasErrors()).toBe(true);
+    expect(userScore.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          points: expect.arrayContaining(["points must not be less than 0"]),
+        }),
+      ]),
+    );
   });
 
-  test("should throw EntityValidationError with invalid score_type", () => {
-    expect(() => {
-      UserScore.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        score_type: "INVALID_TYPE" as ScoreTypeEnum,
-        points: 10,
-      });
-    }).toThrow(EntityValidationError);
+  test("should include errors with invalid score_type", () => {
+    const userScore = UserScore.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      score_type: "INVALID_TYPE" as ScoreTypeEnum,
+      points: 10,
+    });
+    expect(userScore.notification.hasErrors()).toBe(true);
+    expect(userScore.notification.toJSON()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          score_type: expect.arrayContaining([
+            "score_type must be a valid ScoreType",
+          ]),
+        }),
+      ]),
+    );
   });
 
   test("should validate successfully with valid data", () => {
-    expect(() => {
-      UserScore.create({
-        user_id: "550e8400-e29b-41d4-a716-446655440000",
-        score_type: ScoreTypeEnum.QR_SCAN,
-        points: 10,
-        description: "Valid description",
-      });
-    }).not.toThrow();
+    const userScore = UserScore.create({
+      user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
+      score_type: ScoreTypeEnum.QR_SCAN,
+      points: 10,
+      description: "Valid description",
+    });
+    expect(userScore.notification.hasErrors()).toBe(false);
   });
 });

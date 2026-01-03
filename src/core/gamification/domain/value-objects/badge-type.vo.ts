@@ -1,4 +1,4 @@
-import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum BadgeTypeEnum {
@@ -20,11 +20,7 @@ export class BadgeType extends ValueObject {
 
   private validate(): void {
     if (!Object.values(BadgeTypeEnum).includes(this.value)) {
-      throw new EntityValidationError([
-        {
-          badge_type: [`Invalid badge type: ${this.value}`],
-        },
-      ]);
+      throw new InvalidArgumentError(`Invalid badge type: ${this.value}`);
     }
   }
 

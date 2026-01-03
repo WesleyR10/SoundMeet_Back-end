@@ -1,4 +1,4 @@
-import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { UserPointsInMemoryRepository } from "../../../../infra/db/in-memory/user-points-in-memory.repository";
 import { CreateUserPointsUseCase } from "../create-user-points.use-case";
 
@@ -17,7 +17,7 @@ describe("CreateUserPointsUseCase Unit Tests", () => {
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
-      InvalidUuidError,
+      EntityValidationError,
     );
   });
 

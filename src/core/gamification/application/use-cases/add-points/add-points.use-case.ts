@@ -1,5 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { UserPoints } from "../../../domain/user-points.aggregate";
 import { IUserPointsRepository } from "../../../domain/user-points.repository";
 import { PointsSourceEnum } from "../../../domain/value-objects/points-source.vo";
@@ -21,7 +22,7 @@ export class AddPointsUseCase implements IUseCase<
     if (!userPoints) {
       // Criar novo registro de pontos para o usuário
       userPoints = UserPoints.create({
-        user_id: input.user_id,
+        user_id: new Uuid(input.user_id),
         total_points: 0,
         total_scans: 0,
         total_requests: 0,

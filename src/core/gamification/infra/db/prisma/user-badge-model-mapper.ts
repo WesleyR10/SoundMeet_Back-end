@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
+import { BadgeTypeEnum } from "../../../domain/value-objects/badge-type.vo";
 
 // Tipo que reflete o schema Prisma real
 export type UserBadgePrismaModel = {
@@ -44,8 +46,8 @@ export class UserBadgeModelMapper {
 
     return new UserBadge({
       id: new UserBadgeId(model.id),
-      user_id: model.audienceId, // audienceId do Prisma vira user_id na entidade
-      badge_type: model.badgeId as any, // Temporário - precisa mapear badgeId para BadgeType
+      user_id: new Uuid(model.audienceId),
+      badge_type: model.badgeId as BadgeTypeEnum,
       progress: progressValue,
       is_unlocked: progressValue >= 100, // Lógica de negócio: unlocked se progress >= 100
       unlocked_at: progressValue >= 100 ? model.earnedAt : null,

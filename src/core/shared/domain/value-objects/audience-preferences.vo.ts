@@ -1,4 +1,4 @@
-import { EntityValidationError } from "../validators/validation.error";
+import { InvalidArgumentError } from "../errors/invalid-argument.error";
 import { ValueObject } from "../value-object";
 
 export type AudiencePreferencesProps = {
@@ -166,7 +166,7 @@ export class AudiencePreferences extends ValueObject {
 
   addFavoriteGenre(genre: string): AudiencePreferences {
     if (!AudiencePreferences.VALID_GENRES.includes(genre)) {
-      throw new Error(`Invalid genre: ${genre}`);
+      throw new InvalidArgumentError(`Invalid genre: ${genre}`);
     }
 
     if (this.favoriteGenres.includes(genre)) {
@@ -188,7 +188,7 @@ export class AudiencePreferences extends ValueObject {
 
   addFavoriteArtist(artist: string): AudiencePreferences {
     if (!artist || artist.trim().length === 0) {
-      throw new Error("Artist name cannot be empty");
+      throw new InvalidArgumentError("Artist name cannot be empty");
     }
 
     const normalizedArtist = artist.trim();
@@ -204,7 +204,7 @@ export class AudiencePreferences extends ValueObject {
 
   addFavoriteInstrument(instrument: string): AudiencePreferences {
     if (!instrument || instrument.trim().length === 0) {
-      throw new Error("Instrument name cannot be empty");
+      throw new InvalidArgumentError("Instrument name cannot be empty");
     }
 
     const normalizedInstrument = instrument.trim();
@@ -314,9 +314,9 @@ export class AudiencePreferences extends ValueObject {
       (genre) => !AudiencePreferences.VALID_GENRES.includes(genre),
     );
     if (invalidGenres.length > 0) {
-      throw new EntityValidationError([
-        { favorite_genres: [`Invalid genres: ${invalidGenres.join(", ")}`] },
-      ]);
+      throw new InvalidArgumentError(
+        `Invalid genres: ${invalidGenres.join(", ")}`,
+      );
     }
 
     // Validate languages
@@ -324,13 +324,9 @@ export class AudiencePreferences extends ValueObject {
       (lang) => !AudiencePreferences.VALID_LANGUAGES.includes(lang),
     );
     if (invalidLanguages.length > 0) {
-      throw new EntityValidationError([
-        {
-          preferred_languages: [
-            `Invalid languages: ${invalidLanguages.join(", ")}`,
-          ],
-        },
-      ]);
+      throw new InvalidArgumentError(
+        `Invalid languages: ${invalidLanguages.join(", ")}`,
+      );
     }
 
     // Validate artists
@@ -339,13 +335,11 @@ export class AudiencePreferences extends ValueObject {
         (artist) => !artist || artist.trim().length === 0,
       )
     ) {
-      throw new Error("Artist names cannot be empty");
+      throw new InvalidArgumentError("Artist names cannot be empty");
     }
 
     if (this.favoriteInstruments.length > 15) {
-      throw new EntityValidationError([
-        { favorite_instruments: ["Maximum of 15 instruments allowed"] },
-      ]);
+      throw new InvalidArgumentError("Maximum of 15 instruments allowed");
     }
 
     if (
@@ -353,17 +347,17 @@ export class AudiencePreferences extends ValueObject {
         (instrument) => !instrument || instrument.trim().length === 0,
       )
     ) {
-      throw new Error("Instrument names cannot be empty");
+      throw new InvalidArgumentError("Instrument names cannot be empty");
     }
 
     // Validate notification settings
     if (!this.notificationSettings) {
-      throw new Error("Notification settings are required");
+      throw new InvalidArgumentError("Notification settings are required");
     }
 
     // Validate privacy settings
     if (!this.privacySettings) {
-      throw new Error("Privacy settings are required");
+      throw new InvalidArgumentError("Privacy settings are required");
     }
 
     if (
@@ -371,12 +365,12 @@ export class AudiencePreferences extends ValueObject {
         this.privacySettings.profileVisibility,
       )
     ) {
-      throw new Error("Invalid profile visibility setting");
+      throw new InvalidArgumentError("Invalid profile visibility setting");
     }
 
     // Validate music discovery settings
     if (!this.musicDiscoverySettings) {
-      throw new Error("Music discovery settings are required");
+      throw new InvalidArgumentError("Music discovery settings are required");
     }
 
     if (
@@ -384,14 +378,16 @@ export class AudiencePreferences extends ValueObject {
         this.musicDiscoverySettings.discoverySensitivity,
       )
     ) {
-      throw new Error("Invalid discovery sensitivity setting");
+      throw new InvalidArgumentError("Invalid discovery sensitivity setting");
     }
 
     if (
       this.musicDiscoverySettings.maxSuggestionsPerSession < 1 ||
       this.musicDiscoverySettings.maxSuggestionsPerSession > 50
     ) {
-      throw new Error("Max suggestions per session must be between 1 and 50");
+      throw new InvalidArgumentError(
+        "Max suggestions per session must be between 1 and 50",
+      );
     }
   }
 

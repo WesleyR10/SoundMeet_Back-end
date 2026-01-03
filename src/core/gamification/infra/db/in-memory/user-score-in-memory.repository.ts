@@ -40,7 +40,7 @@ export class UserScoreInMemoryRepository
       }
 
       if (filter.score_type) {
-        matches = matches && userScore.score_type.value === filter.score_type;
+        matches = matches && userScore.score_type === filter.score_type;
       }
 
       if (filter.reference_id) {
@@ -58,8 +58,7 @@ export class UserScoreInMemoryRepository
     score_type: string,
   ): Promise<UserScore[]> {
     return this.items.filter(
-      (item) =>
-        item.user_id.id === user_id && item.score_type.value === score_type,
+      (item) => item.user_id.id === user_id && item.score_type === score_type,
     );
   }
 
@@ -75,8 +74,7 @@ export class UserScoreInMemoryRepository
   ): Promise<number> {
     return this.items
       .filter(
-        (item) =>
-          item.user_id.id === user_id && item.score_type.value === score_type,
+        (item) => item.user_id.id === user_id && item.score_type === score_type,
       )
       .reduce((total, item) => total + item.points, 0);
   }

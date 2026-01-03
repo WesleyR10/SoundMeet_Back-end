@@ -312,40 +312,37 @@ describe("Badge Unit Tests with validator", () => {
       expect(badge.name).toBe("Iniciante Musical");
     });
 
-    test("should throw EntityValidationError with invalid name", () => {
-      expect(() =>
-        Badge.create({
-          name: "",
-          description: "Test description",
-          icon: "🎵",
-          category: "engagement",
-          requirement: { scans: 1 },
-        }),
-      ).toThrow(EntityValidationError);
+    test("should include errors with invalid name", () => {
+      const badge = Badge.create({
+        name: "",
+        description: "Test description",
+        icon: "🎵",
+        category: "engagement",
+        requirement: { scans: 1 },
+      });
+      expect(badge.notification.hasErrors()).toBe(true);
     });
 
-    test("should throw EntityValidationError with invalid description", () => {
-      expect(() =>
-        Badge.create({
-          name: "Test Badge",
-          description: "",
-          icon: "🎵",
-          category: "engagement",
-          requirement: { scans: 1 },
-        }),
-      ).toThrow(EntityValidationError);
+    test("should include errors with invalid description", () => {
+      const badge = Badge.create({
+        name: "Test Badge",
+        description: "",
+        icon: "🎵",
+        category: "engagement",
+        requirement: { scans: 1 },
+      });
+      expect(badge.notification.hasErrors()).toBe(true);
     });
 
-    test("should throw EntityValidationError with invalid category", () => {
-      expect(() =>
-        Badge.create({
-          name: "Test Badge",
-          description: "Test description",
-          icon: "🎵",
-          category: "invalid" as any,
-          requirement: { scans: 1 },
-        }),
-      ).toThrow(EntityValidationError);
+    test("should include errors with invalid category", () => {
+      const badge = Badge.create({
+        name: "Test Badge",
+        description: "Test description",
+        icon: "🎵",
+        category: "invalid" as any,
+        requirement: { scans: 1 },
+      });
+      expect(badge.notification.hasErrors()).toBe(true);
     });
   });
 
@@ -362,16 +359,19 @@ describe("Badge Unit Tests with validator", () => {
       });
     });
 
-    test("changeName should throw error with invalid name", () => {
-      expect(() => badge.changeName("")).toThrow(EntityValidationError);
+    test("changeName should include errors with invalid name", () => {
+      badge.changeName("");
+      expect(badge.notification.hasErrors()).toBe(true);
     });
 
-    test("changeDescription should throw error with invalid description", () => {
-      expect(() => badge.changeDescription("")).toThrow(EntityValidationError);
+    test("changeDescription should include errors with invalid description", () => {
+      badge.changeDescription("");
+      expect(badge.notification.hasErrors()).toBe(true);
     });
 
-    test("updatePoints should throw error with negative points", () => {
-      expect(() => badge.updatePoints(-1)).toThrow(EntityValidationError);
+    test("updatePoints should include errors with negative points", () => {
+      badge.updatePoints(-1);
+      expect(badge.notification.hasErrors()).toBe(true);
     });
   });
 });

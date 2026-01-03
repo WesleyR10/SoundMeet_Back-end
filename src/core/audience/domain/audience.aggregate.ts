@@ -446,46 +446,97 @@ export class Audience extends AggregateRoot {
   }
 
   updateFavoriteGenres(genres: string[]): void {
-    this.preferences = new AudiencePreferences({
-      ...this.preferences.toJSON(),
-      favoriteGenres: genres,
-    });
+    try {
+      this.preferences = new AudiencePreferences({
+        ...this.preferences.toJSON(),
+        favoriteGenres: genres,
+      });
+    } catch (error) {
+      this.notification.addError(
+        error instanceof Error ? error.message : "Invalid favorite genres",
+        "favorite_genres",
+      );
+      return;
+    }
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
   }
 
   updateFavoriteArtists(artists: string[]): void {
-    this.preferences = new AudiencePreferences({
-      ...this.preferences.toJSON(),
-      favoriteArtists: artists,
-    });
+    try {
+      this.preferences = new AudiencePreferences({
+        ...this.preferences.toJSON(),
+        favoriteArtists: artists,
+      });
+    } catch (error) {
+      this.notification.addError(
+        error instanceof Error ? error.message : "Invalid favorite artists",
+        "favorite_artists",
+      );
+      return;
+    }
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
   }
 
   updateFavoriteInstruments(instruments: string[]): void {
-    this.preferences = new AudiencePreferences({
-      ...this.preferences.toJSON(),
-      favoriteInstruments: instruments,
-    });
+    try {
+      this.preferences = new AudiencePreferences({
+        ...this.preferences.toJSON(),
+        favoriteInstruments: instruments,
+      });
+    } catch (error) {
+      this.notification.addError(
+        error instanceof Error ? error.message : "Invalid favorite instruments",
+        "favorite_instruments",
+      );
+      return;
+    }
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
   }
 
   updateNotificationSettings(settings: any): void {
-    this.preferences = this.preferences.updateNotificationSettings(settings);
+    try {
+      this.preferences = this.preferences.updateNotificationSettings(settings);
+    } catch (error) {
+      this.notification.addError(
+        error instanceof Error
+          ? error.message
+          : "Invalid notification settings",
+        "notification_settings",
+      );
+      return;
+    }
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
   }
 
   updatePrivacySettings(settings: any): void {
-    this.preferences = this.preferences.updatePrivacySettings(settings);
+    try {
+      this.preferences = this.preferences.updatePrivacySettings(settings);
+    } catch (error) {
+      this.notification.addError(
+        error instanceof Error ? error.message : "Invalid privacy settings",
+        "privacy_settings",
+      );
+      return;
+    }
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
   }
 
   updateDiscoverySettings(settings: any): void {
-    this.preferences = this.preferences.updateMusicDiscoverySettings(settings);
+    try {
+      this.preferences =
+        this.preferences.updateMusicDiscoverySettings(settings);
+    } catch (error) {
+      this.notification.addError(
+        error instanceof Error ? error.message : "Invalid discovery settings",
+        "discovery_settings",
+      );
+      return;
+    }
     this.updated_at = new Date();
     this.dispatchPreferencesEvent();
   }
@@ -568,10 +619,7 @@ export class Audience extends AggregateRoot {
   }
 
   // Business methods for audience interactions
-  scanMusicianQRCode(
-    musicianId: string,
-    earnPoints: boolean = true,
-  ): void {
+  scanMusicianQRCode(musicianId: string, earnPoints: boolean = true): void {
     if (earnPoints) {
       this.addPointsForAction("scan_qr_code");
     }
@@ -594,7 +642,11 @@ export class Audience extends AggregateRoot {
     artist: string,
   ): void {
     if (!this.canMakeRequest()) {
-      throw new Error("Insufficient level to make music requests");
+      this.notification.addError(
+        "Insufficient level to make music requests",
+        "level",
+      );
+      return;
     }
 
     this.addPointsForAction("make_request");
@@ -635,6 +687,12 @@ export class Audience extends AggregateRoot {
   attendEvent(eventId: string): void {
     this.addPointsForAction("attend_event");
     this.updated_at = new Date();
+  }
+
+  ensureIsActive(): void {
+    if (!this.is_active) {
+      this.notification.addError("Audience is not active", "is_active");
+    }
   }
 
   completeProfile(): void {

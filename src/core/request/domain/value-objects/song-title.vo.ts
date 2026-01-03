@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export class SongTitle extends ValueObject {
@@ -15,26 +16,28 @@ export class SongTitle extends ValueObject {
       this.value === undefined ||
       typeof this.value !== "string"
     ) {
-      throw new Error("Song title is required and must be a string");
+      throw new InvalidArgumentError(
+        "Song title is required and must be a string",
+      );
     }
 
     const trimmedValue = this.value.trim();
 
     if (trimmedValue.length < SongTitle.MIN_LENGTH) {
-      throw new Error(
+      throw new InvalidArgumentError(
         `Song title must have at least ${SongTitle.MIN_LENGTH} character`,
       );
     }
 
     if (trimmedValue.length > SongTitle.MAX_LENGTH) {
-      throw new Error(
+      throw new InvalidArgumentError(
         `Song title cannot exceed ${SongTitle.MAX_LENGTH} characters`,
       );
     }
 
     const dangerousChars = /[<>"'&]/;
     if (dangerousChars.test(trimmedValue)) {
-      throw new Error("Song title contains invalid characters");
+      throw new InvalidArgumentError("Song title contains invalid characters");
     }
   }
 

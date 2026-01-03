@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from "class-validator";
@@ -16,6 +17,7 @@ import { UserPoints } from "./user-points.aggregate";
 export class UserPointsRules {
   @IsNotEmpty({ groups: ["user_id"] })
   @IsString({ groups: ["user_id"] })
+  @IsUUID(4, { groups: ["user_id"] })
   user_id: string;
 
   @Min(0, { groups: ["total_points"] })
@@ -62,7 +64,7 @@ export class UserPointsRules {
   updated_at?: Date;
 
   constructor(entity: UserPoints | any) {
-    this.user_id = entity?.user_id?.value || entity?.user_id;
+    this.user_id = entity?.user_id?.id ?? entity?.user_id;
     this.total_points = entity?.total_points;
     this.total_scans = entity?.total_scans;
     this.total_requests = entity?.total_requests;
@@ -72,15 +74,6 @@ export class UserPointsRules {
     this.is_active = entity?.is_active;
     this.created_at = entity?.created_at;
     this.updated_at = entity?.updated_at;
-
-    // Convert Uuid objects to strings for validation
-    if (
-      entity.user_id &&
-      typeof entity.user_id === "object" &&
-      entity.user_id.id
-    ) {
-      this.user_id = entity.user_id.id;
-    }
   }
 }
 

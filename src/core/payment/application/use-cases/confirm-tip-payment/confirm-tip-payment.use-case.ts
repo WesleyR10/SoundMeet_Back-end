@@ -10,6 +10,7 @@ import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { Uuid } from "@core/shared/domain";
 import { NotFoundError } from "@core/shared/domain/errors";
+import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
 
 export type ConfirmTipPaymentInput = {
   tip_id: string;
@@ -61,6 +62,10 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
     await this.txRepo.insert(transaction);
 
     tip.complete(transaction.transaction_id.id);
+
+    if (tip.notification.hasErrors()) {
+      throw new EntityValidationError(tip.notification.toJSON());
+    }
     await this.tipRepo.update(tip);
 
     if (tip.band_id) {
@@ -100,6 +105,12 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
             }
 
             memberWallet.receiveFunds(share);
+
+            if (memberWallet.notification.hasErrors()) {
+              throw new EntityValidationError(
+                memberWallet.notification.toJSON(),
+              );
+            }
             await this.walletRepo.update(memberWallet);
 
             // Create individual transaction record for member share
@@ -128,7 +139,13 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
     } else {
       // Direct musician tip
       if (!tip.musician_id) {
-        throw new Error("Tip must have a musician_id if no band_id is present");
+        throw new EntityValidationError([
+          {
+            musician_id: [
+              "musician_id is required when band_id is not present",
+            ],
+          },
+        ]);
       }
 
       let wallet = await this.walletRepo.findByMusicianId(tip.musician_id.id);
@@ -138,6 +155,10 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
       }
 
       wallet.receiveFunds(transaction.net_amount.amount);
+
+      if (wallet.notification.hasErrors()) {
+        throw new EntityValidationError(wallet.notification.toJSON());
+      }
       await this.walletRepo.update(wallet);
     }
 

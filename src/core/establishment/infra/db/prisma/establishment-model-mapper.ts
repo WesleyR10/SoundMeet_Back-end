@@ -1,3 +1,4 @@
+import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { Address } from "../../../../shared/domain/value-objects/address.vo";
 import { Email } from "../../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
@@ -64,9 +65,13 @@ export class EstablishmentModelMapper {
       // Como estamos em desenvolvimento/migração, o ideal é garantir que o banco tenha constraints
       // ou tratar como erro de integridade de dados se o domínio exigir Address.
       // Por enquanto, para evitar crash se o banco estiver inconsistente com o domínio:
-      throw new Error(
-        `Establishment ${model.id} has invalid/missing address data in database`,
-      );
+      throw new LoadEntityError([
+        {
+          address: [
+            `Establishment ${model.id} has invalid/missing address data in database`,
+          ],
+        },
+      ]);
     }
 
     return new Establishment({

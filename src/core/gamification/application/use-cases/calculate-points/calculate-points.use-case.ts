@@ -1,6 +1,7 @@
 import { IUserPointsRepository } from "@core/gamification/domain";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { UserPoints } from "../../../domain/user-points.aggregate";
 import { PointsSourceEnum } from "../../../domain/value-objects/points-source.vo";
 
@@ -27,7 +28,7 @@ export class CalculatePointsUseCase implements IUseCase<
 
     if (!userPoints) {
       userPoints = UserPoints.create({
-        user_id: input.user_id,
+        user_id: new Uuid(input.user_id),
         total_points: 0,
         current_level: 1,
       });

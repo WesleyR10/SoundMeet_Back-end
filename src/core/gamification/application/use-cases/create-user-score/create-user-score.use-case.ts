@@ -1,5 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { UserScore } from "../../../domain/user-score.aggregate";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
 import {
@@ -16,7 +17,7 @@ export class CreateUserScoreUseCase implements IUseCase<
 
   async execute(input: CreateUserScoreInput): Promise<UserScoreOutput> {
     const entity = UserScore.create({
-      user_id: input.user_id,
+      user_id: new Uuid(input.user_id),
       score_type: input.score_type,
       points: input.points,
       reference_id: input.reference_id,

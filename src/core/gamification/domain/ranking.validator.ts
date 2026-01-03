@@ -9,6 +9,7 @@ import {
 
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Ranking } from "./ranking.aggregate";
 
 export class RankingRules {
@@ -43,14 +44,11 @@ export class RankingRules {
   @IsNotEmpty({ groups: ["period_end"] })
   period_end: Date;
 
-  constructor(entity: Ranking | any) {
-    this.user_id = entity?.user_id?.id || entity?.user_id;
-    this.ranking_type = entity?.ranking_type?.value || entity?.ranking_type;
-    this.period = entity?.period?.value || entity?.period;
-    this.position = entity?.position;
-    this.score = entity?.score;
-    this.period_start = entity?.period_start;
-    this.period_end = entity?.period_end;
+  constructor(entity: Ranking) {
+    Object.assign(this, entity);
+    if (entity.user_id instanceof Uuid) {
+      this.user_id = entity.user_id.id;
+    }
   }
 }
 

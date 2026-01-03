@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { ValueObject } from "../../shared/domain/value-object";
 import { BadgeValidatorFactory } from "./badge.validator";
 import { BadgeFakeBuilder } from "./badge-fake.builder";
@@ -78,30 +77,19 @@ export class Badge extends AggregateRoot {
       is_active: props.is_active,
     });
     badge.validate();
-
-    if (badge.notification.hasErrors()) {
-      throw new EntityValidationError(badge.notification.toJSON());
-    }
-
     return badge;
   }
 
   changeName(name: string): void {
     this.name = name;
     this.updated_at = new Date();
-    const isValid = this.validate(["name"]);
-    if (!isValid) {
-      throw new EntityValidationError(this.notification.toJSON());
-    }
+    this.validate(["name"]);
   }
 
   changeDescription(description: string): void {
     this.description = description;
     this.updated_at = new Date();
-    const isValid = this.validate(["description"]);
-    if (!isValid) {
-      throw new EntityValidationError(this.notification.toJSON());
-    }
+    this.validate(["description"]);
   }
 
   changeIcon(icon: string): void {
@@ -123,10 +111,7 @@ export class Badge extends AggregateRoot {
   updatePoints(points: number): void {
     this.points = points;
     this.updated_at = new Date();
-    const isValid = this.validate(["points"]);
-    if (!isValid) {
-      throw new EntityValidationError(this.notification.toJSON());
-    }
+    this.validate(["points"]);
   }
 
   changePoints(points: number): void {

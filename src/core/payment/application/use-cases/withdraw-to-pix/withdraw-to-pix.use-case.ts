@@ -6,6 +6,7 @@ import {
 import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { NotFoundError } from "@core/shared/domain/errors";
+import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
 
 export type WithdrawToPixInput = {
   musician_id: string;
@@ -36,6 +37,10 @@ export class WithdrawToPixUseCase implements IUseCase<
 
     wallet.updatePixKey(input.pix_key.key, input.pix_key.type);
     wallet.withdrawFunds(input.amount);
+
+    if (wallet.notification.hasErrors()) {
+      throw new EntityValidationError(wallet.notification.toJSON());
+    }
     await this.walletRepo.update(wallet);
 
     const tx = Transaction.create({

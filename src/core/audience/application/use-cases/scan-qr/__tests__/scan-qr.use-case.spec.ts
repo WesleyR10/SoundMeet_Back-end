@@ -1,3 +1,7 @@
+import { UserInteraction } from "../../../../../gamification/domain/user-interaction.aggregate";
+import { UserInteractionInMemoryRepository } from "../../../../../gamification/infra/db/in-memory/user-interaction-in-memory.repository";
+import { Musician } from "../../../../../musician/domain/musician.aggregate";
+import { MusicianInMemoryRepository } from "../../../../../musician/infra/db/in-memory/musician-in-memory.repository";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Points } from "../../../../../shared/domain/value-objects/points.vo";
 import {
@@ -7,8 +11,6 @@ import {
 import { Audience } from "../../../../domain/audience.aggregate";
 import { AudienceFakeBuilder } from "../../../../domain/audience-fake.builder";
 import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audience-in-memory.repository";
-import { UserInteraction } from "../../../../../gamification/domain/user-interaction.aggregate";
-import { UserInteractionInMemoryRepository } from "../../../../../gamification/infra/db/in-memory/user-interaction-in-memory.repository";
 import { ScanQRInput } from "../scan-qr.input";
 import { ScanQRUseCase } from "../scan-qr.use-case";
 
@@ -16,11 +18,17 @@ describe("ScanQRUseCase Unit Tests", () => {
   let useCase: ScanQRUseCase;
   let repository: AudienceInMemoryRepository;
   let userInteractionRepo: UserInteractionInMemoryRepository;
+  let musicianRepository: MusicianInMemoryRepository;
 
   beforeEach(() => {
     repository = new AudienceInMemoryRepository();
     userInteractionRepo = new UserInteractionInMemoryRepository();
-    useCase = new ScanQRUseCase(repository, userInteractionRepo);
+    musicianRepository = new MusicianInMemoryRepository();
+    useCase = new ScanQRUseCase(
+      repository,
+      userInteractionRepo,
+      musicianRepository,
+    );
   });
 
   it("should throw error when audience not found", async () => {
@@ -101,11 +109,14 @@ describe("ScanQRUseCase Unit Tests", () => {
     test.each(arrange)("when input is $input", async ({ input, expected }) => {
       const audience = AudienceFakeBuilder.aAudience().withBadges([]).build();
       repository.items = [audience];
+      const musician = Musician.fake().aMusician().build();
+      musicianRepository.items = [musician];
       const spyUpdate = jest.spyOn(repository, "update");
 
       const fullInput = {
         id: audience.id.id,
         ...input,
+        musician_id: musician.id.id,
       };
 
       const output = await useCase.execute(fullInput);
@@ -116,10 +127,12 @@ describe("ScanQRUseCase Unit Tests", () => {
       expect(output.points_earned.value).toBe(expected.points_earned.value);
       expect(output.points_earned.source).toBe(expected.points_earned.source);
       expect(output.new_badges).toEqual(expected.new_badges);
-      expect(output.scan_metadata).toMatchObject(expected.scan_metadata);
+      expect(output.scan_metadata).toMatchObject({
+        ...expected.scan_metadata,
+        musician_id: musician.id.id,
+      });
       expect(output.scan_metadata.scanned_at).toBeInstanceOf(Date);
 
-      // Verify audience was updated in repository
       const updatedAudience = await repository.findById(audience.id);
       expect(updatedAudience).toBeDefined();
       expect(updatedAudience!.totalPoints).toBe(expected.points_earned.value);
@@ -129,11 +142,13 @@ describe("ScanQRUseCase Unit Tests", () => {
   it("should register a user interaction when scanning QR code", async () => {
     const audience = AudienceFakeBuilder.aAudience().withBadges([]).build();
     repository.items = [audience];
+    const musician = Musician.fake().aMusician().build();
+    musicianRepository.items = [musician];
 
     const input: ScanQRInput = {
       id: audience.id.id,
       qr_code: "musician_123",
-      musician_id: "musician_123",
+      musician_id: musician.id.id,
       establishment_id: "establishment_1",
       location: {
         latitude: -23.5505,
@@ -164,7 +179,9 @@ describe("ScanQRUseCase Unit Tests", () => {
       .build();
     repository.items = [audience];
 
-    const musicianId = "musician_limit";
+    const musician = Musician.fake().aMusician().build();
+    musicianRepository.items = [musician];
+    const musicianId = musician.id.id;
 
     for (let i = 0; i < 5; i++) {
       userInteractionRepo.items.push(
@@ -197,17 +214,20 @@ describe("ScanQRUseCase Unit Tests", () => {
   it("should handle multiple QR scans and accumulate points", async () => {
     const audience = AudienceFakeBuilder.aAudience().build();
     repository.items = [audience];
+    const musician1 = Musician.fake().aMusician().build();
+    const musician2 = Musician.fake().aMusician().build();
+    musicianRepository.items = [musician1, musician2];
 
     const input1: ScanQRInput = {
       id: audience.id.id,
       qr_code: "musician_123",
-      musician_id: "musician_123",
+      musician_id: musician1.id.id,
     };
 
     const input2: ScanQRInput = {
       id: audience.id.id,
       qr_code: "musician_456",
-      musician_id: "musician_456",
+      musician_id: musician2.id.id,
     };
 
     const output1 = await useCase.execute(input1);
@@ -231,10 +251,13 @@ describe("ScanQRUseCase Unit Tests", () => {
     audience.addPoints(90); // Assuming level threshold is at 100 points
     repository.items = [audience];
 
+    const musician = Musician.fake().aMusician().build();
+    musicianRepository.items = [musician];
+
     const input: ScanQRInput = {
       id: audience.id.id,
       qr_code: "musician_123",
-      musician_id: "musician_123",
+      musician_id: musician.id.id,
     };
 
     const output = await useCase.execute(input);

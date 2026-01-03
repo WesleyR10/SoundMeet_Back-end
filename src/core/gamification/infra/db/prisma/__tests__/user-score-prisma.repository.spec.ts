@@ -36,7 +36,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const modelProps = {
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         reference_id: userScore.reference_id,
         description: userScore.description,
@@ -59,7 +59,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const modelPropsArray = userScores.map((userScore) => ({
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         reference_id: userScore.reference_id,
         description: userScore.description,
@@ -85,7 +85,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
 
       const modelProps = {
         id: userScore.id.id,
-        user_id: "user-1",
+        user_id: userScore.user_id.id,
         score_type: ScoreTypeEnum.QR_SCAN,
         points: userScore.points,
         created_at: userScore.created_at,
@@ -101,7 +101,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
         data: {
           id: userScore.id.id,
           user_id: userScore.user_id.id,
-          score_type: userScore.score_type.value,
+          score_type: userScore.score_type,
           points: userScore.points,
           reference_id: userScore.reference_id,
           description: userScore.description,
@@ -132,7 +132,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       (prisma.userScore.findUnique as jest.Mock).mockResolvedValue({
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         reference_id: userScore.reference_id,
         description: userScore.description,
@@ -164,7 +164,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const modelProps = {
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         created_at: userScore.created_at,
       };
@@ -176,7 +176,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       expect(result).toBeDefined();
       expect(result!.id.id).toBe(userScore.id.id);
       expect(result!.user_id.id).toBe(userScore.user_id.id);
-      expect(result!.score_type.value).toBe(userScore.score_type.value);
+      expect(result!.score_type).toBe(userScore.score_type);
       expect(result!.points).toBe(userScore.points);
     });
 
@@ -197,7 +197,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const modelPropsArray = userScores.map((userScore) => ({
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         reference_id: userScore.reference_id,
         description: userScore.description,
@@ -235,7 +235,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const modelPropsArray = userScores.map((userScore) => ({
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         created_at: userScore.created_at,
       }));
@@ -291,11 +291,12 @@ describe("UserScorePrismaRepository Unit Tests", () => {
 
   describe("search", () => {
     it("should search user scores with filters", async () => {
+      const userId = new Uuid().id;
       const userScores = UserScore.fake().theUserScores(2).build();
       const modelPropsArray = userScores.map((userScore) => ({
         id: userScore.id.id,
         user_id: userScore.user_id.id,
-        score_type: userScore.score_type.value,
+        score_type: userScore.score_type,
         points: userScore.points,
         reference_id: userScore.reference_id,
         description: userScore.description,
@@ -308,7 +309,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       (prisma.userScore.count as jest.Mock).mockResolvedValue(2);
 
       const searchParams = UserScoreSearchParams.create({
-        filter: { user_id: "user-123", score_type: ScoreTypeEnum.QR_SCAN },
+        filter: { user_id: userId, score_type: ScoreTypeEnum.QR_SCAN },
         page: 1,
         per_page: 10,
       });
@@ -319,7 +320,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       expect(result.total).toBe(2);
       expect(prisma.userScore.findMany).toHaveBeenCalledWith({
         where: {
-          user_id: "user-123",
+          user_id: userId,
           score_type: ScoreTypeEnum.QR_SCAN,
         },
         orderBy: { created_at: "desc" },
@@ -338,7 +339,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
         .build();
       const modelProps = {
         id: userScore.id.id,
-        user_id: "user-1",
+        user_id: userId.id,
         score_type: ScoreTypeEnum.QR_SCAN,
         points: userScore.points,
         created_at: userScore.created_at,
@@ -347,16 +348,16 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       (prisma.userScore.findMany as jest.Mock).mockResolvedValue([modelProps]);
 
       const result = await repository.findByUserAndType(
-        "user-1",
+        userId.id,
         ScoreTypeEnum.QR_SCAN,
       );
 
       expect(result).toHaveLength(1);
-      expect(result[0].user_id.id).toBe("user-1");
-      expect(result[0].score_type.value).toBe(ScoreTypeEnum.QR_SCAN);
+      expect(result[0].user_id.id).toBe(userId.id);
+      expect(result[0].score_type).toBe(ScoreTypeEnum.QR_SCAN);
       expect(prisma.userScore.findMany).toHaveBeenCalledWith({
         where: {
-          user_id: "user-1",
+          user_id: userId.id,
           score_type: ScoreTypeEnum.QR_SCAN,
         },
         orderBy: { created_at: "desc" },

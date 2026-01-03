@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Band, BandId } from "../../../domain/band.aggregate";
 import {
   BandFilter,
@@ -19,34 +20,61 @@ export class BandPrismaRepository implements IBandRepository {
   async insert(entity: Band): Promise<void> {
     const modelProps = BandModelMapper.toModel(entity);
     await this.prisma.band.create({
-      data: modelProps,
+      data: {
+        ...modelProps,
+        members: {
+          create: entity.members.map((m) => ({
+            id: m.member_id?.id ?? new Uuid().id,
+            musicianId: m.musician_id.id,
+            role: m.role,
+            instrument: m.instrument,
+            joinedAt: m.joined_at,
+          })),
+        },
+      },
     });
   }
 
   async bulkInsert(entities: Band[]): Promise<void> {
-    const modelsProps = entities.map((entity) =>
-      BandModelMapper.toModel(entity),
-    );
-    await this.prisma.band.createMany({
-      data: modelsProps,
-    });
+    for (const entity of entities) {
+      await this.insert(entity);
+    }
   }
 
   async update(entity: Band): Promise<void> {
     const id = entity.band_id.id;
     const modelProps = BandModelMapper.toModel(entity);
 
-    try {
-      await this.prisma.band.update({
-        where: { id: id },
-        data: modelProps,
-      });
-    } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
+    await this.prisma.$transaction(async (tx) => {
+      try {
+        await tx.band.update({
+          where: { id },
+          data: modelProps,
+        });
+      } catch (error: any) {
+        if (error.code === "P2025") {
+          throw new NotFoundError(id, this.getEntity());
+        }
+        throw error;
       }
-      throw error;
-    }
+
+      await tx.bandMember.deleteMany({
+        where: { bandId: id },
+      });
+
+      if (entity.members.length) {
+        await tx.bandMember.createMany({
+          data: entity.members.map((m) => ({
+            id: m.member_id?.id ?? new Uuid().id,
+            bandId: id,
+            musicianId: m.musician_id.id,
+            role: m.role,
+            instrument: m.instrument,
+            joinedAt: m.joined_at,
+          })),
+        });
+      }
+    });
   }
 
   async delete(id: BandId): Promise<void> {
@@ -67,14 +95,10 @@ export class BandPrismaRepository implements IBandRepository {
   async findById(entity_id: BandId): Promise<Band | null> {
     const model = await this.prisma.band.findUnique({
       where: { id: entity_id.id },
+      include: { members: true },
     });
 
-    return model
-      ? BandModelMapper.toEntity({
-          ...model,
-          members: [],
-        } as any)
-      : null;
+    return model ? BandModelMapper.toEntity(model as any) : null;
   }
 
   async findByIds(ids: BandId[]): Promise<Band[]> {
@@ -84,23 +108,16 @@ export class BandPrismaRepository implements IBandRepository {
           in: ids.map((id) => id.id),
         },
       },
+      include: { members: true },
     });
-    return models.map((m) =>
-      BandModelMapper.toEntity({
-        ...m,
-        members: [],
-      } as any),
-    );
+    return models.map((m) => BandModelMapper.toEntity(m as any));
   }
 
   async findAll(): Promise<Band[]> {
-    const models = await this.prisma.band.findMany();
-    return models.map((model) =>
-      BandModelMapper.toEntity({
-        ...model,
-        members: [],
-      } as any),
-    );
+    const models = await this.prisma.band.findMany({
+      include: { members: true },
+    });
+    return models.map((model) => BandModelMapper.toEntity(model as any));
   }
 
   async existsById(
@@ -145,16 +162,12 @@ export class BandPrismaRepository implements IBandRepository {
         orderBy,
         skip: offset,
         take: limit,
+        include: { members: true },
       }),
       this.prisma.band.count({ where }),
     ]);
 
-    const entities = bands.map((m) =>
-      BandModelMapper.toEntity({
-        ...m,
-        members: [],
-      } as any),
-    );
+    const entities = bands.map((m) => BandModelMapper.toEntity(m as any));
 
     return new BandSearchResult({
       items: entities,

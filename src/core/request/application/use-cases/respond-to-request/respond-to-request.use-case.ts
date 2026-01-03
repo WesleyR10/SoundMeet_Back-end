@@ -86,6 +86,10 @@ export class RespondToRequestUseCase implements IUseCase<
       ]);
     }
 
+    if (entity.notification.hasErrors()) {
+      throw new EntityValidationError(entity.notification.toJSON());
+    }
+
     await this.requestRepo.update(entity);
 
     return RequestOutputMapper.toOutput(entity);

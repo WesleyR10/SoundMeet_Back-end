@@ -1,5 +1,8 @@
+import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { UserScore } from "../../../domain/user-score.aggregate";
 import { UserScoreId } from "../../../domain/user-score.aggregate";
+import { ScoreTypeEnum } from "../../../domain/value-objects/score-type.vo";
 
 export type UserScoreModelProps = {
   id: string;
@@ -16,7 +19,7 @@ export class UserScoreModelMapper {
     return {
       id: entity.id.id,
       user_id: entity.user_id.id,
-      score_type: entity.score_type.value,
+      score_type: entity.score_type,
       points: entity.points,
       reference_id: entity.reference_id,
       description: entity.description,
@@ -25,10 +28,22 @@ export class UserScoreModelMapper {
   }
 
   static toEntity(model: UserScoreModelProps): UserScore {
+    let userId: Uuid;
+    try {
+      userId = new Uuid(model.user_id);
+    } catch (e) {
+      throw new LoadEntityError([
+        {
+          user_id: [
+            `UserScore ${model.id} has invalid user_id data in database`,
+          ],
+        },
+      ]);
+    }
     return new UserScore({
       id: new UserScoreId(model.id),
-      user_id: model.user_id,
-      score_type: model.score_type as any,
+      user_id: userId,
+      score_type: model.score_type as ScoreTypeEnum,
       points: model.points,
       reference_id: model.reference_id,
       description: model.description,

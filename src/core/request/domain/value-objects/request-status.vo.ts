@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
 
 export enum RequestStatusEnum {
@@ -14,11 +15,11 @@ export class RequestStatus extends ValueObject {
 
   private validate(): void {
     if (this.value === null || this.value === undefined) {
-      throw new Error("Request status is required");
+      throw new InvalidArgumentError("Request status is required");
     }
 
     if (!Object.values(RequestStatusEnum).includes(this.value)) {
-      throw new Error(`Invalid request status: ${this.value}`);
+      throw new InvalidArgumentError(`Invalid request status: ${this.value}`);
     }
   }
 
