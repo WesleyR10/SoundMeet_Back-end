@@ -103,8 +103,13 @@ describe("AudiencesController Integration Tests", () => {
           useFactory: (
             repo: IAudienceRepository,
             userInteractionRepo: IUserInteractionRepository,
-          ) => new ScanQRUseCase(repo, userInteractionRepo),
-          inject: ["AudienceRepository", "UserInteractionRepository"],
+            musicianRepo: IMusicianRepository,
+          ) => new ScanQRUseCase(repo, userInteractionRepo, musicianRepo),
+          inject: [
+            "AudienceRepository",
+            "UserInteractionRepository",
+            "MusicianRepository",
+          ],
         },
         {
           provide: CompleteProfileUseCase,
@@ -343,9 +348,12 @@ describe("AudiencesController Integration Tests", () => {
     });
     await audienceRepository.insert(audience);
 
+    const musician = Musician.fake().aMusician().build();
+    await musicianRepository.insert(musician);
+
     const presenter = await controller.scanQR(audience.id.id, {
       qr_code: "qr_code",
-      musician_id: "musician_1",
+      musician_id: musician.id.id,
     } as any);
 
     expect(presenter).toBeInstanceOf(ScanQRPresenter);

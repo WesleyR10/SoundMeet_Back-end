@@ -1,3 +1,5 @@
+import { MusicianPrismaRepository } from "@core/musician/infra/db/prisma/musician-prisma.repository";
+
 import { AttendEventUseCase } from "../../core/audience/application/use-cases/attend-event/attend-event.use-case";
 import { CompleteProfileUseCase } from "../../core/audience/application/use-cases/complete-profile/complete-profile.use-case";
 import { CreateAudienceUseCase } from "../../core/audience/application/use-cases/create-audience/create-audience.use-case";
@@ -39,6 +41,17 @@ export const REPOSITORIES = {
     provide: UserInteractionPrismaRepository,
     useFactory: (prismaService: PrismaService) => {
       return new UserInteractionPrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  MUSICIAN_REPOSITORY: {
+    provide: "MusicianRepository",
+    useExisting: MusicianPrismaRepository,
+  },
+  MUSICIAN_PRISMA_REPOSITORY: {
+    provide: MusicianPrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new MusicianPrismaRepository(prismaService);
     },
     inject: [PrismaService],
   },
@@ -99,12 +112,14 @@ export const USE_CASES = {
     useFactory: (
       audienceRepo: IAudienceRepository,
       userInteractionRepo: IUserInteractionRepository,
+      musicianRepo: IMusicianRepository,
     ) => {
-      return new ScanQRUseCase(audienceRepo, userInteractionRepo);
+      return new ScanQRUseCase(audienceRepo, userInteractionRepo, musicianRepo);
     },
     inject: [
       REPOSITORIES.AUDIENCE_REPOSITORY.provide,
       REPOSITORIES.USER_INTERACTION_REPOSITORY.provide,
+      REPOSITORIES.MUSICIAN_REPOSITORY.provide,
     ],
   },
   MAKE_MUSIC_REQUEST_USE_CASE: {
