@@ -170,7 +170,11 @@ function numberExampleForSchema(name: string, schema: OpenApiSchema) {
   if (key.includes("experience_years")) return safeClamp(5);
 
   if (key.includes("per_page") || key.includes("perpage")) return safeClamp(15);
-  if (key === "page" || key.includes("current_page") || key.includes("last_page"))
+  if (
+    key === "page" ||
+    key.includes("current_page") ||
+    key.includes("last_page")
+  )
     return safeClamp(1);
   if (key === "limit") return safeClamp(15);
 
@@ -328,7 +332,10 @@ function resolveExampleValue(params: {
     return clampStringByLength(value, schema);
   }
 
-  if ((schema.type === "object" || schema.type === undefined) && schema.properties) {
+  if (
+    (schema.type === "object" || schema.type === undefined) &&
+    schema.properties
+  ) {
     const example: Record<string, any> = {};
     const required = new Set(schema.required ?? []);
     for (const [propName, propSchema] of Object.entries(schema.properties)) {
@@ -386,7 +393,10 @@ function ensureSchemaExamples(
     return;
   }
 
-  if ((schema.type === "object" || schema.type === undefined) && schema.properties) {
+  if (
+    (schema.type === "object" || schema.type === undefined) &&
+    schema.properties
+  ) {
     schema.example = resolveExampleValue({
       name: schemaName,
       schema,

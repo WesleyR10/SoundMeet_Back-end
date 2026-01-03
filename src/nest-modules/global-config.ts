@@ -6,6 +6,7 @@ import {
 import { Reflector } from "@nestjs/core";
 
 import { EntityValidationErrorFilter } from "./shared-module/filters/entity-validation-error.filter";
+import { GlobalExceptionFilter } from "./shared-module/filters/global-exception.filter";
 import { NotFoundErrorFilter } from "./shared-module/filters/not-found-error.filter";
 import { WrapperDataInterceptor } from "./shared-module/interceptors/wrapper-data/wrapper-data.interceptor";
 
@@ -14,6 +15,7 @@ export function applyGlobalConfig(app: INestApplication) {
     new ValidationPipe({
       errorHttpStatusCode: 422,
       transform: true,
+      validationError: { target: false, value: false },
     }),
   );
   app.useGlobalInterceptors(
@@ -23,5 +25,6 @@ export function applyGlobalConfig(app: INestApplication) {
   app.useGlobalFilters(
     new EntityValidationErrorFilter(),
     new NotFoundErrorFilter(),
+    new GlobalExceptionFilter(),
   );
 }
