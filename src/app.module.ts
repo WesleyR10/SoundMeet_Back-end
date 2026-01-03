@@ -1,12 +1,13 @@
 import { Module } from "@nestjs/common";
-import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { HealthController } from "./health.controller";
 import { AudiencesModule } from "./nest-modules/audiences-module/audiences.module";
 import { ConfigModuleRoot } from "./nest-modules/config-module/config-module.module";
 import { DatabaseModule } from "./nest-modules/database-module/database.module";
+import { EventModule } from "./nest-modules/events-module/events.module";
 import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
+import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.module";
 
 // Nest Modules
 // External Nest modules removed from project
@@ -19,17 +20,10 @@ import { MusiciansModule } from "./nest-modules/musicians-module/musicians.modul
     DatabaseModule,
     MusiciansModule,
     AudiencesModule,
+    SchedulingModule,
 
     // Event System
-    EventEmitterModule.forRoot({
-      wildcard: false,
-      delimiter: ".",
-      newListener: false,
-      removeListener: false,
-      maxListeners: 10,
-      verboseMemoryLeak: false,
-      ignoreErrors: false,
-    }),
+    EventModule,
 
     // Scheduler
     ScheduleModule.forRoot(),
