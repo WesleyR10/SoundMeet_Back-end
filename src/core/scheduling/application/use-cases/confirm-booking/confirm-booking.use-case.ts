@@ -4,6 +4,7 @@ import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
+import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Availability } from "../../../domain/availability.aggregate";
 import { IAvailabilityRepository } from "../../../domain/availability.repository";
@@ -43,6 +44,8 @@ export class ConfirmBookingUseCase implements IUseCase<
 
     const candidateStart = entity.bufferedStartAt;
     const candidateEnd = entity.bufferedEndAt;
+
+    let bandMembers: Array<{ musician_id: { id: string } }> | null = null;
 
     if (entity.musician_id) {
       if (this.availabilityRepo) {
@@ -112,7 +115,10 @@ export class ConfirmBookingUseCase implements IUseCase<
         throw new NotFoundError(entity.band_id.id, Band);
       }
 
-      for (const member of band.members) {
+      const members = band.members;
+      bandMembers = members as any;
+
+      for (const member of members) {
         const conflicts = await this.bookingRepo.findConfirmedInRangeByMusician(
           member.musician_id.id,
           candidateStart,
@@ -127,53 +133,85 @@ export class ConfirmBookingUseCase implements IUseCase<
           throw new EntityValidationError(entity.notification.toJSON());
         }
       }
-
-      if (this.availabilityRepo) {
-        await Promise.all(
-          band.members.map(async (member) => {
-            const availability = await this.availabilityRepo!.findByMusicianId(
-              member.musician_id.id,
-            );
-
-            if (!availability) {
-              const newAvailability = Availability.create({
-                musician_id: member.musician_id.id,
-                unavailabilities: [
-                  {
-                    start_at: candidateStart,
-                    end_at: candidateEnd,
-                    reason: `Band booking ${entity.id.id}`,
-                  },
-                ],
-              });
-              await this.availabilityRepo!.insert(newAvailability);
-              return;
-            }
-
-            if (!availability.isAvailable(candidateStart, candidateEnd)) {
-              return;
-            }
-
-            availability.addUnavailability(
-              candidateStart,
-              candidateEnd,
-              `Band booking ${entity.id.id}`,
-            );
-            await this.availabilityRepo!.update(availability);
-          }),
-        );
-      }
     }
 
-    entity.confirm(now);
-    await this.bookingRepo.update(entity);
+    const entityToUpdate = new Booking({
+      id: entity.id,
+      establishment_id: entity.establishment_id.id,
+      musician_id: entity.musician_id?.id ?? null,
+      band_id: entity.band_id?.id ?? null,
+      event_id: entity.event_id?.id ?? null,
+      start_at: entity.start_at,
+      end_at: entity.end_at,
+      fee: entity.fee,
+      notes: entity.notes,
+      status: entity.status,
+      buffer_minutes: entity.buffer_minutes,
+      expires_at: entity.expires_at,
+      free_cancellation_hours: entity.free_cancellation_hours,
+      confirmed_at: entity.confirmed_at,
+      cancelled_at: entity.cancelled_at,
+      completed_at: entity.completed_at,
+      created_at: entity.created_at,
+      updated_at: entity.updated_at,
+    });
+
+    entityToUpdate.confirm(now);
+
+    const updated = await this.bookingRepo.updateWithStatus(entityToUpdate, [
+      BookingStatusEnum.PENDING,
+    ]);
+    if (!updated) {
+      entityToUpdate.notification.addError(
+        "Only pending bookings can be confirmed",
+        "status",
+      );
+      throw new EntityValidationError(entityToUpdate.notification.toJSON());
+    }
+
+    if (bandMembers && this.availabilityRepo) {
+      await Promise.all(
+        bandMembers.map(async (member) => {
+          const availability = await this.availabilityRepo!.findByMusicianId(
+            member.musician_id.id,
+          );
+
+          if (!availability) {
+            const newAvailability = Availability.create({
+              musician_id: member.musician_id.id,
+              unavailabilities: [
+                {
+                  start_at: candidateStart,
+                  end_at: candidateEnd,
+                  reason: `Band booking ${entityToUpdate.id.id}`,
+                },
+              ],
+            });
+            await this.availabilityRepo!.insert(newAvailability);
+            return;
+          }
+
+          if (!availability.isAvailable(candidateStart, candidateEnd)) {
+            return;
+          }
+
+          availability.addUnavailability(
+            candidateStart,
+            candidateEnd,
+            `Band booking ${entityToUpdate.id.id}`,
+          );
+          await this.availabilityRepo!.update(availability);
+        }),
+      );
+    }
+
     if (this.domainEventMediator) {
-      await this.domainEventMediator.publish(entity);
-      await this.domainEventMediator.publishIntegrationEvents(entity);
-      entity.clearEvents();
+      await this.domainEventMediator.publish(entityToUpdate);
+      await this.domainEventMediator.publishIntegrationEvents(entityToUpdate);
+      entityToUpdate.clearEvents();
     }
 
-    return BookingOutputMapper.toOutput(entity);
+    return BookingOutputMapper.toOutput(entityToUpdate);
   }
 }
 

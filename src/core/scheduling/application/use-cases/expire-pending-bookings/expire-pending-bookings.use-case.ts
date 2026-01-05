@@ -15,20 +15,7 @@ export class ExpirePendingBookingsUseCase implements IUseCase<
     _input: ExpirePendingBookingsInput = {},
   ): Promise<ExpirePendingBookingsOutput> {
     const now = this.clock.now();
-    const expiredCandidates = await this.bookingRepo.findPendingExpired(now);
-
-    let expired = 0;
-    await Promise.all(
-      expiredCandidates.map(async (booking) => {
-        booking.expire(now);
-        if (!booking.status.isExpired()) {
-          return;
-        }
-        expired += 1;
-        await this.bookingRepo.update(booking);
-      }),
-    );
-
+    const expired = await this.bookingRepo.expirePendingExpired(now);
     return { expired };
   }
 }

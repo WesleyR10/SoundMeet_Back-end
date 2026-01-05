@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 import {
   BookingFilter,
@@ -191,6 +192,40 @@ export class BookingPrismaRepository implements IBookingRepository {
       },
     });
     return models.map((m) => BookingModelMapper.toEntity(m as any));
+  }
+
+  async expirePendingExpired(now: Date): Promise<number> {
+    const result = await this.prisma.booking.updateMany({
+      where: {
+        status: "pending",
+        expires_at: {
+          not: null,
+          lte: now,
+        },
+      },
+      data: {
+        status: "expired",
+        updated_at: now,
+      },
+    });
+    return result.count;
+  }
+
+  async updateWithStatus(
+    entity: Booking,
+    expected_statuses: BookingStatusEnum[],
+  ): Promise<boolean> {
+    const modelProps = BookingModelMapper.toModel(entity);
+    const result = await this.prisma.booking.updateMany({
+      where: {
+        id: entity.id.id,
+        status: {
+          in: expected_statuses,
+        },
+      },
+      data: modelProps,
+    });
+    return result.count === 1;
   }
 
   private buildWhereClause(filter?: BookingFilter | null) {

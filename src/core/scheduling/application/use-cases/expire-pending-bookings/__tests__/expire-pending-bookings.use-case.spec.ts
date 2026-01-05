@@ -49,4 +49,34 @@ describe("ExpirePendingBookingsUseCase Unit Tests", () => {
     const updatedNotExpired = await repo.findById(notExpiredBooking.id);
     expect(updatedNotExpired?.status.isPending()).toBe(true);
   });
+
+  it("should count all expired pending bookings", async () => {
+    const repo = new BookingInMemoryRepository();
+    const now = new Date("2024-01-01T10:00:00.000Z");
+
+    const expiredA = Booking.fake()
+      .aBooking()
+      .pending()
+      .withExpiresAt(new Date("2024-01-01T09:00:00.000Z"))
+      .build();
+
+    const expiredB = Booking.fake()
+      .aBooking()
+      .pending()
+      .withExpiresAt(new Date("2024-01-01T10:00:00.000Z"))
+      .build();
+
+    const expiredC = Booking.fake()
+      .aBooking()
+      .pending()
+      .withExpiresAt(new Date("2023-12-31T10:00:00.000Z"))
+      .build();
+
+    await repo.bulkInsert([expiredA, expiredB, expiredC]);
+
+    const useCase = new ExpirePendingBookingsUseCase(repo, { now: () => now });
+    const output = await useCase.execute({});
+
+    expect(output).toStrictEqual({ expired: 3 });
+  });
 });

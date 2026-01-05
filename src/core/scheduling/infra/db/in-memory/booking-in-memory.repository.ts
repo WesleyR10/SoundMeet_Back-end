@@ -1,4 +1,5 @@
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
+import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 import {
@@ -37,6 +38,39 @@ export class BookingInMemoryRepository
       if (!booking.expires_at) return false;
       return booking.expires_at.getTime() <= nowMs;
     });
+  }
+
+  async expirePendingExpired(now: Date): Promise<number> {
+    let expired = 0;
+    for (const booking of this.items) {
+      if (!booking.status.isPending()) continue;
+      if (!booking.expires_at) continue;
+      if (booking.expires_at.getTime() > now.getTime()) continue;
+      booking.expire(now);
+      if (!booking.status.isExpired()) continue;
+      expired += 1;
+    }
+    return expired;
+  }
+
+  async updateWithStatus(
+    entity: Booking,
+    expected_statuses: BookingStatusEnum[],
+  ): Promise<boolean> {
+    const index = this.items.findIndex((item) => item.id.equals(entity.id));
+    if (index < 0) {
+      return false;
+    }
+
+    const current = this.items[index];
+    if (
+      !expected_statuses.includes(current.status.value as BookingStatusEnum)
+    ) {
+      return false;
+    }
+
+    this.items[index] = entity;
+    return true;
   }
 
   async findConfirmedInRangeByMusician(

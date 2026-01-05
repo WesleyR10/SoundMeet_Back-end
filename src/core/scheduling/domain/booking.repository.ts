@@ -71,6 +71,13 @@ export interface IBookingRepository extends ISearchableRepository<
 > {
   findPendingExpired(now: Date): Promise<Booking[]>;
 
+  expirePendingExpired(now: Date): Promise<number>;
+
+  updateWithStatus(
+    entity: Booking,
+    expected_statuses: BookingStatusEnum[],
+  ): Promise<boolean>;
+
   findConfirmedInRangeByMusician(
     musician_id: string,
     start: Date,
