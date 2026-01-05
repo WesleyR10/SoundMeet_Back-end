@@ -57,8 +57,11 @@ export class QRCode extends ValueObject {
   }
 
   get formatted(): string {
-    // Retorna o código QR como base64 para uso em aplicações
-    return btoa(this.code);
+    const maybeBtoa = (globalThis as any).btoa;
+    if (typeof maybeBtoa === "function") {
+      return maybeBtoa(this.code);
+    }
+    return Buffer.from(this.code, "utf8").toString("base64");
   }
 
   toJSON() {
