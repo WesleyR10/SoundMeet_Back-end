@@ -8,10 +8,10 @@
   "scripts": {
     "build": "npm run prisma:prepare && nest build --builder tsc",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "docker:up": "DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose up -d --build",
+    "docker:up": "sh -lc 'export DOCKER_CONFIG=${DOCKER_CONFIG:-$(mktemp -d)}; DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose up -d --build'",
     "docker:down": "docker compose down --remove-orphans",
     "docker:ps": "docker compose ps -a",
-    "docker:bootstrap": "sh -lc 'set -a; . ./envs/.env; set +a; npm run docker:up && docker exec soundmeet-postgres sh -lc \"until pg_isready -U ${POSTGRES_USER:-soundmeet} -d ${POSTGRES_DB:-soundmeet} >/dev/null 2>&1; do sleep 1; done\" && GW=$(ip route | awk \"/default/ {print \\$3; exit}\") && DATABASE_URL=${DATABASE_URL/localhost:5432/${GW:-localhost}:5432} npx prisma db push'",
+    "docker:bootstrap": "sh -lc 'set -a; . ./envs/.env; set +a; export DOCKER_CONFIG=${DOCKER_CONFIG:-$(mktemp -d)}; npm run docker:up && docker exec soundmeet-postgres sh -lc \"until pg_isready -U ${POSTGRES_USER:-soundmeet} -d ${POSTGRES_DB:-soundmeet} >/dev/null 2>&1; do sleep 1; done\" && GW=$(ip route | awk \"/default/ {print \\\$3; exit}\") && DATABASE_URL=${DATABASE_URL/localhost:5432/${GW:-localhost}:5432} npx prisma db push'",
     "docker:logs:app": "docker logs --tail=200 -f soundmeet-app",
     "docker:restart:app": "docker restart soundmeet-app",
     "start": "nest start",
