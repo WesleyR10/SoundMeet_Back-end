@@ -336,35 +336,49 @@ export class Audience extends AggregateRoot {
     this.name = name;
     this.updated_at = new Date();
     this.validate(["name"]);
+    if (this.notification.hasErrors()) {
+      return;
+    }
     this.dispatchUpdateEvent();
   }
 
   changeEmail(email: string): void {
-    try {
-      this.email = new Email(email);
-      this.updated_at = new Date();
-      this.validate();
-      this.dispatchUpdateEvent();
-    } catch (error) {
-      throw error;
+    this.email = new Email(email);
+    this.updated_at = new Date();
+    this.validate(["email"]);
+    if (this.notification.hasErrors()) {
+      return;
     }
+    this.dispatchUpdateEvent();
   }
 
   changeNickname(nickname: string | null): void {
     this.nickname = nickname;
     this.updated_at = new Date();
+    this.validate(["nickname"]);
+    if (this.notification.hasErrors()) {
+      return;
+    }
     this.dispatchUpdateEvent();
   }
 
   changeAvatar(avatar: string | null): void {
     this.avatar = avatar;
     this.updated_at = new Date();
+    this.validate(["avatar"]);
+    if (this.notification.hasErrors()) {
+      return;
+    }
     this.dispatchUpdateEvent();
   }
 
   changePhone(phone: string | null): void {
     this.phone = phone ? new Phone(phone) : null;
     this.updated_at = new Date();
+    this.validate(["phone"]);
+    if (this.notification.hasErrors()) {
+      return;
+    }
     this.dispatchUpdateEvent();
   }
 
