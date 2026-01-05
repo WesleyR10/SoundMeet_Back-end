@@ -160,11 +160,14 @@ export class Establishment extends AggregateRoot {
       this.cnpj = new CNPJ(cnpj);
       this.validate(["cnpj"]);
     } catch (error) {
-      if (error instanceof InvalidCNPJError) {
-        this.notification.addError(error.message, "cnpj");
-      } else {
-        throw error;
-      }
+      const message =
+        error instanceof InvalidCNPJError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Invalid cnpj";
+      this.notification.addError(message, "cnpj");
+      return;
     }
   }
 
