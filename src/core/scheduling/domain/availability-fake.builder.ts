@@ -1,9 +1,10 @@
 import { Uuid } from "../../shared/domain";
-import { Availability } from "./availability.aggregate";
+import { Availability, AvailabilityId } from "./availability.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class AvailabilityFakeBuilder<TBuild = any> {
+  private _id: PropOrFactory<AvailabilityId> | undefined = undefined;
   private _musician_id: PropOrFactory<Uuid | null> | undefined = undefined;
   private _band_id: PropOrFactory<Uuid | null> | undefined = undefined;
   private _timezone: PropOrFactory<string> | undefined = undefined;
@@ -44,6 +45,11 @@ export class AvailabilityFakeBuilder<TBuild = any> {
 
   constructor(countObjs: number = 1) {
     this.countObjs = countObjs;
+  }
+
+  withAvailabilityId(id: PropOrFactory<AvailabilityId>) {
+    this._id = id;
+    return this;
   }
 
   withMusicianId(musician_id: PropOrFactory<Uuid | null>) {
@@ -151,7 +157,8 @@ export class AvailabilityFakeBuilder<TBuild = any> {
             ? this.callFactory(this._weekly_rules, index)
             : [];
 
-        const entity = Availability.create({
+        const entity = new Availability({
+          id: !this._id ? undefined : this.callFactory(this._id, index),
           musician_id: musician_id?.id ?? null,
           band_id: band_id?.id ?? null,
           timezone,
@@ -161,6 +168,7 @@ export class AvailabilityFakeBuilder<TBuild = any> {
           unavailabilities,
           is_active,
         });
+        entity.validate();
 
         return entity;
       });
