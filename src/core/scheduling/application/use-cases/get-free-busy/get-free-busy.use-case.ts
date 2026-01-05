@@ -115,10 +115,37 @@ export class GetFreeBusyUseCase implements IUseCase<
         if (current.end_at.getTime() > last.end_at.getTime()) {
           last.end_at = current.end_at;
         }
-        last.kind = "unavailability";
-        last.booking_id = undefined;
-        last.status = undefined;
-        last.reason = "merged_busy";
+
+        const mergedKind =
+          last.kind === "unavailability" || current.kind === "unavailability"
+            ? "unavailability"
+            : "booking";
+
+        if (mergedKind === "booking") {
+          last.kind = "booking";
+          if (last.booking_id && current.booking_id) {
+            if (last.booking_id !== current.booking_id) {
+              last.booking_id = undefined;
+              last.status = undefined;
+              last.reason = "merged_booking";
+            }
+          } else {
+            last.booking_id = undefined;
+            last.status = undefined;
+            last.reason = "merged_booking";
+          }
+        } else {
+          last.kind = "unavailability";
+          last.booking_id = undefined;
+          last.status = undefined;
+
+          if (last.reason && current.reason && last.reason !== current.reason) {
+            last.reason = "merged_unavailability";
+          } else {
+            last.reason =
+              last.reason ?? current.reason ?? "merged_unavailability";
+          }
+        }
         continue;
       }
 

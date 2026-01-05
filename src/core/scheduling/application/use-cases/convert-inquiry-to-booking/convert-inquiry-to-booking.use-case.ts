@@ -52,6 +52,10 @@ export class ConvertInquiryToBookingUseCase implements IUseCase<
       free_cancellation_hours: input.free_cancellation_hours ?? 72,
     });
 
+    if (booking.notification.hasErrors()) {
+      throw new EntityValidationError(booking.notification.toJSON());
+    }
+
     await this.bookingRepo.insert(booking);
 
     inquiry.convert(this.clock.now(), booking.id);
