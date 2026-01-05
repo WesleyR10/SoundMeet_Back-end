@@ -40,8 +40,6 @@ export class BookingEventsHandlers {
         event_id: event.event_id,
         start_at: event.start_at,
         end_at: event.end_at,
-        buffer_minutes: event.buffer_minutes,
-        expires_at: event.expires_at,
         occurred_on: event.occurred_on,
       }),
     );
@@ -67,8 +65,6 @@ export class BookingEventsHandlers {
         booking_id: event.aggregate_id.id,
         cancelled_by: event.cancelled_by,
         cancelled_at: event.cancelled_at,
-        reason: event.reason,
-        booking_start_at: event.booking_start_at,
         occurred_on: event.occurred_on,
       }),
     );
@@ -88,22 +84,54 @@ export class BookingEventsHandlers {
 
   @OnEvent(BookingConfirmedIntegrationEvent.name)
   handleBookingConfirmedIntegration(event: BookingConfirmedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        booking_id: event.payload.booking_id,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(BookingCompletedIntegrationEvent.name)
   handleBookingCompletedIntegration(event: BookingCompletedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        booking_id: event.payload.booking_id,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(BookingProposedIntegrationEvent.name)
   handleBookingProposedIntegration(event: BookingProposedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        booking_id: event.payload.booking_id,
+        establishment_id: event.payload.establishment_id,
+        musician_id: event.payload.musician_id,
+        band_id: event.payload.band_id,
+        event_id: event.payload.event_id,
+        start_at: event.payload.start_at,
+        end_at: event.payload.end_at,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(BookingCancelledIntegrationEvent.name)
   handleBookingCancelledIntegration(event: BookingCancelledIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        booking_id: event.payload.booking_id,
+        cancelled_by: event.payload.cancelled_by,
+        cancelled_at: event.payload.cancelled_at,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(InquiryCreatedEvent.name)
@@ -116,8 +144,6 @@ export class BookingEventsHandlers {
         musician_id: event.musician_id,
         band_id: event.band_id,
         event_id: event.event_id,
-        subject: event.subject,
-        expires_at: event.expires_at,
         occurred_on: event.occurred_on,
       }),
     );
@@ -142,7 +168,6 @@ export class BookingEventsHandlers {
         event: "inquiry.rejected",
         inquiry_id: event.aggregate_id.id,
         rejected_at: event.rejected_at,
-        reason: event.reason,
         occurred_on: event.occurred_on,
       }),
     );
@@ -163,21 +188,50 @@ export class BookingEventsHandlers {
 
   @OnEvent(InquiryCreatedIntegrationEvent.name)
   handleInquiryCreatedIntegration(event: InquiryCreatedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        inquiry_id: event.payload.inquiry_id,
+        establishment_id: event.payload.establishment_id,
+        musician_id: event.payload.musician_id,
+        band_id: event.payload.band_id,
+        event_id: event.payload.event_id,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(InquiryAcceptedIntegrationEvent.name)
   handleInquiryAcceptedIntegration(event: InquiryAcceptedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        inquiry_id: event.payload.inquiry_id,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(InquiryRejectedIntegrationEvent.name)
   handleInquiryRejectedIntegration(event: InquiryRejectedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        inquiry_id: event.payload.inquiry_id,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 
   @OnEvent(InquiryConvertedIntegrationEvent.name)
   handleInquiryConvertedIntegration(event: InquiryConvertedIntegrationEvent) {
-    this.logger.log(JSON.stringify(event));
+    this.logger.log(
+      JSON.stringify({
+        event: event.event_name,
+        inquiry_id: event.payload.inquiry_id,
+        booking_id: event.payload.booking_id,
+        occurred_on: event.occurred_on,
+      }),
+    );
   }
 }
