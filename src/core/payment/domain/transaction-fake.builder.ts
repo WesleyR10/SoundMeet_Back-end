@@ -3,14 +3,14 @@ import { Chance } from "chance";
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { PaymentMethod } from "./tip-enums";
-import { Transaction } from "./transaction.entity";
+import { Transaction, TransactionId } from "./transaction.entity";
 import { TransactionStatus, TransactionType } from "./transaction-enums";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class TransactionFakeBuilder<TBuild = any> {
   // Auto generated properties
-  private _transaction_id: PropOrFactory<Uuid> | undefined = undefined;
+  private _transaction_id: PropOrFactory<TransactionId> | undefined = undefined;
   private _user_id: PropOrFactory<Uuid | null> | undefined = undefined;
   private _musician_id: PropOrFactory<Uuid | null> | undefined = undefined;
   private _type: PropOrFactory<TransactionType> | undefined = undefined;
@@ -40,7 +40,7 @@ export class TransactionFakeBuilder<TBuild = any> {
     this.chance = Chance();
   }
 
-  withTransactionId(valueOrFactory: PropOrFactory<Uuid>) {
+  withTransactionId(valueOrFactory: PropOrFactory<TransactionId>) {
     this._transaction_id = valueOrFactory;
     return this;
   }
@@ -106,7 +106,8 @@ export class TransactionFakeBuilder<TBuild = any> {
       .map((_, index) => {
         const transaction = new Transaction({
           transaction_id:
-            this.callFactory(this._transaction_id, index) ?? new Uuid(),
+            this.callFactory(this._transaction_id, index) ??
+            new TransactionId(),
           user_id: this.callFactory(this._user_id, index) ?? new Uuid(),
           musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
           type: this.callFactory(this._type, index) ?? TransactionType.TIP,

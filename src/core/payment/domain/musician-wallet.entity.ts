@@ -6,7 +6,7 @@ import { MusicianWalletValidatorFactory } from "./validators/musician-wallet.val
 import { PixKey } from "./value-objects/pix-key.vo";
 
 export type MusicianWalletConstructorProps = {
-  wallet_id?: Uuid;
+  wallet_id?: MusicianWalletId;
   musician_id: Uuid;
   balance: Money;
   total_earned: Money;
@@ -18,8 +18,10 @@ export type MusicianWalletConstructorProps = {
   updated_at?: Date;
 };
 
+export class MusicianWalletId extends Uuid {}
+
 export class MusicianWallet extends AggregateRoot {
-  wallet_id: Uuid;
+  wallet_id: MusicianWalletId;
   musician_id: Uuid;
   balance: Money;
   total_earned: Money;
@@ -32,7 +34,7 @@ export class MusicianWallet extends AggregateRoot {
 
   constructor(props: MusicianWalletConstructorProps) {
     super();
-    this.wallet_id = props.wallet_id ?? new Uuid();
+    this.wallet_id = props.wallet_id ?? new MusicianWalletId();
     this.musician_id = props.musician_id;
     this.balance = props.balance;
     this.total_earned = props.total_earned;

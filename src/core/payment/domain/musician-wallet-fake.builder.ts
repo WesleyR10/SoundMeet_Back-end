@@ -2,14 +2,14 @@ import { Chance } from "chance";
 
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { MusicianWallet } from "./musician-wallet.entity";
+import { MusicianWallet, MusicianWalletId } from "./musician-wallet.entity";
 import { PixKey } from "./value-objects/pix-key.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class MusicianWalletFakeBuilder<TBuild = any> {
   // Auto generated properties
-  private _wallet_id: PropOrFactory<Uuid> | undefined = undefined;
+  private _wallet_id: PropOrFactory<MusicianWalletId> | undefined = undefined;
   private _musician_id: PropOrFactory<Uuid> | undefined = undefined;
   private _balance: PropOrFactory<Money> | undefined = undefined;
   private _total_earned: PropOrFactory<Money> | undefined = undefined;
@@ -36,7 +36,7 @@ export class MusicianWalletFakeBuilder<TBuild = any> {
     this.chance = Chance();
   }
 
-  withWalletId(valueOrFactory: PropOrFactory<Uuid>) {
+  withWalletId(valueOrFactory: PropOrFactory<MusicianWalletId>) {
     this._wallet_id = valueOrFactory;
     return this;
   }
@@ -91,7 +91,8 @@ export class MusicianWalletFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const wallet = new MusicianWallet({
-          wallet_id: this.callFactory(this._wallet_id, index) ?? new Uuid(),
+          wallet_id:
+            this.callFactory(this._wallet_id, index) ?? new MusicianWalletId(),
           musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
           balance: this.callFactory(this._balance, index) ?? new Money(0),
           total_earned:

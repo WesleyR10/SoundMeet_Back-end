@@ -1,11 +1,15 @@
 import { Chance } from "chance";
 
 import { Uuid } from "../../shared/domain";
-import { UserInteraction } from "./user-interaction.aggregate";
+import {
+  UserInteraction,
+  UserInteractionId,
+} from "./user-interaction.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class UserInteractionFakeBuilder<TBuild = any> {
+  private _id: PropOrFactory<UserInteractionId> | undefined = undefined;
   private _user_id: PropOrFactory<string> | undefined = undefined;
   private _interaction_type: PropOrFactory<string> | undefined = undefined;
   private _target_id: PropOrFactory<string | null> | undefined = undefined;
@@ -30,6 +34,11 @@ export class UserInteractionFakeBuilder<TBuild = any> {
   private constructor(countObjs: number = 1) {
     this.countObjs = countObjs;
     this.chance = Chance();
+  }
+
+  withUserInteractionId(valueOrFactory: PropOrFactory<UserInteractionId>) {
+    this._id = valueOrFactory;
+    return this;
   }
 
   withUserId(valueOrFactory: PropOrFactory<string>) {
@@ -87,6 +96,7 @@ export class UserInteractionFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const userInteraction = new UserInteraction({
+          id: !this._id ? undefined : this.callFactory(this._id, index),
           user_id: this.callFactory(this._user_id, index) ?? new Uuid().id,
           interaction_type:
             this.callFactory(this._interaction_type, index) ??
@@ -114,11 +124,16 @@ export class UserInteractionFakeBuilder<TBuild = any> {
           created_at: this.callFactory(this._created_at, index) ?? new Date(),
           updated_at: this.callFactory(this._updated_at, index) ?? new Date(),
         });
+        userInteraction.validate();
         return userInteraction;
       });
     return this.countObjs === 1
       ? (userInteractions[0] as any)
       : (userInteractions as TBuild);
+  }
+
+  get id() {
+    return this.getValue("id");
   }
 
   get user_id() {
@@ -150,10 +165,18 @@ export class UserInteractionFakeBuilder<TBuild = any> {
   }
 
   private getValue(prop: any) {
-    const optional = ["target_id", "metadata"];
+    const optional = [
+      "id",
+      "target_id",
+      "metadata",
+      "created_at",
+      "updated_at",
+    ];
     const privateProp = `_${prop}` as keyof this;
     if (!this[privateProp] && optional.includes(prop)) {
-      return undefined;
+      throw new Error(
+        `Property ${prop} not have a factory, use 'with' methods`,
+      );
     }
     return this.callFactory(this[privateProp], 0);
   }

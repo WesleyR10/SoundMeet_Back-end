@@ -8,7 +8,7 @@ import { TransactionFakeBuilder } from "./transaction-fake.builder";
 import { TransactionValidatorFactory } from "./validators/transaction.validator";
 
 export type TransactionConstructorProps = {
-  transaction_id?: Uuid;
+  transaction_id?: TransactionId;
   user_id?: Uuid | null;
   musician_id?: Uuid | null;
   band_id?: Uuid | null;
@@ -34,8 +34,10 @@ export type TransactionCreateCommand = {
   metadata?: Record<string, any> | null;
 };
 
+export class TransactionId extends Uuid {}
+
 export class Transaction extends AggregateRoot {
-  transaction_id: Uuid;
+  transaction_id: TransactionId;
   user_id: Uuid | null;
   musician_id: Uuid | null;
   band_id: Uuid | null;
@@ -51,7 +53,7 @@ export class Transaction extends AggregateRoot {
 
   constructor(props: TransactionConstructorProps) {
     super();
-    this.transaction_id = props.transaction_id ?? new Uuid();
+    this.transaction_id = props.transaction_id ?? new TransactionId();
     this.user_id = props.user_id ?? null;
     this.musician_id = props.musician_id ?? null;
     this.band_id = props.band_id ?? null;

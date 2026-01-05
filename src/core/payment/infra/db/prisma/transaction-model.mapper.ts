@@ -7,7 +7,7 @@ import { Transaction as PrismaTransaction } from "@prisma/client";
 import { Money } from "../../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { PaymentMethod } from "../../../domain/tip-enums";
-import { Transaction } from "../../../domain/transaction.entity";
+import { Transaction, TransactionId } from "../../../domain/transaction.entity";
 
 export type TransactionModelProps = {
   id: string;
@@ -46,7 +46,7 @@ export class TransactionModelMapper {
 
   static toEntity(model: PrismaTransaction): Transaction {
     return new Transaction({
-      transaction_id: new Uuid(model.id),
+      transaction_id: new TransactionId(model.id),
       user_id: model.userId ? new Uuid(model.userId) : null,
       musician_id: model.musicianId ? new Uuid(model.musicianId) : null,
       type: model.type as TransactionType,

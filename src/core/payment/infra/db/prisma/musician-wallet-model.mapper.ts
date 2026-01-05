@@ -2,7 +2,10 @@ import { MusicianWallet as PrismaMusicianWallet } from "@prisma/client";
 
 import { Money } from "../../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
-import { MusicianWallet } from "../../../domain/musician-wallet.entity";
+import {
+  MusicianWallet,
+  MusicianWalletId,
+} from "../../../domain/musician-wallet.entity";
 import { PixKey } from "../../../domain/value-objects/pix-key.vo";
 
 export type MusicianWalletModelProps = {
@@ -38,7 +41,7 @@ export class MusicianWalletModelMapper {
 
   static toEntity(model: PrismaMusicianWallet): MusicianWallet {
     return new MusicianWallet({
-      wallet_id: new Uuid(model.id),
+      wallet_id: new MusicianWalletId(model.id),
       musician_id: new Uuid(model.musicianId),
       balance: new Money(model.balance),
       total_earned: new Money(model.totalEarned),
