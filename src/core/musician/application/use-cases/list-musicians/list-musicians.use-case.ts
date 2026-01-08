@@ -3,16 +3,16 @@ import {
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import {
   IMusicianRepository,
-  MusicianFilter,
   MusicianSearchParams,
+  MusicianSearchResult,
 } from "../../../domain/musician.repository";
 import {
   MusicianOutput,
   MusicianOutputMapper,
-} from "../common/musician-output";
+} from "../common/musician-profile-output";
+import { ListMusiciansInput } from "./list-musicians.input";
 
 export class ListMusiciansUseCase implements IUseCase<
   ListMusiciansInput,
@@ -27,21 +27,11 @@ export class ListMusiciansUseCase implements IUseCase<
     return this.toOutput(searchResult);
   }
 
-  private toOutput(searchResult: any): ListMusiciansOutput {
+  private toOutput(searchResult: MusicianSearchResult): ListMusiciansOutput {
     const { items: _items } = searchResult;
-    const items = _items.map((i) => {
-      return MusicianOutputMapper.toOutput(i);
-    });
+    const items = _items.map((item) => MusicianOutputMapper.toOutput(item));
     return PaginationOutputMapper.toOutput(items, searchResult);
   }
 }
-
-export type ListMusiciansInput = {
-  page?: number;
-  per_page?: number;
-  sort?: string | null;
-  sort_dir?: SortDirection | null;
-  filter?: MusicianFilter | null;
-};
 
 export type ListMusiciansOutput = PaginationOutput<MusicianOutput>;

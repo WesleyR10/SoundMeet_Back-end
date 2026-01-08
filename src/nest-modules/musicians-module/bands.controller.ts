@@ -7,19 +7,26 @@ import {
   Inject,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
+  Query,
 } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
 import { BandOutput } from "../../core/musician/application/use-cases/common/band-output";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
+import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
+import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
-import { BandPresenter } from "./band.presenter";
+import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
+import { BandCollectionPresenter, BandPresenter } from "./band.presenter";
 import { AddBandMemberDto } from "./dto/add-band-member.dto";
 import { CreateBandDto } from "./dto/create-band.dto";
 import { RemoveBandMemberDto } from "./dto/remove-band-member.dto";
+import { SearchBandsDto } from "./dto/search-bands.dto";
+import { UpdateBandDto } from "./dto/update-band.dto";
 
 @ApiTags("Bands")
 @Controller("bands")
@@ -27,8 +34,17 @@ export class BandsController {
   @Inject(CreateBandUseCase)
   private createBandUseCase: CreateBandUseCase;
 
+  @Inject(UpdateBandUseCase)
+  private updateBandUseCase: UpdateBandUseCase;
+
+  @Inject(DeleteBandUseCase)
+  private deleteBandUseCase: DeleteBandUseCase;
+
   @Inject(GetBandUseCase)
   private getBandUseCase: GetBandUseCase;
+
+  @Inject(ListBandsUseCase)
+  private listBandsUseCase: ListBandsUseCase;
 
   @Inject(AddBandMemberUseCase)
   private addBandMemberUseCase: AddBandMemberUseCase;
@@ -47,6 +63,17 @@ export class BandsController {
     return BandsController.serialize(output);
   }
 
+  @Get()
+  @ApiOperation({
+    summary: "Listar bandas",
+    description: "Lista bandas com paginação, ordenação e filtros.",
+  })
+  @ApiResponse({ status: 200, type: BandCollectionPresenter })
+  async findAll(@Query() query: SearchBandsDto) {
+    const output = await this.listBandsUseCase.execute(query);
+    return new BandCollectionPresenter(output);
+  }
+
   @Get(":id")
   @ApiOperation({
     summary: "Buscar banda por ID",
@@ -59,6 +86,38 @@ export class BandsController {
   ) {
     const output = await this.getBandUseCase.execute({ id });
     return BandsController.serialize(output);
+  }
+
+  @Patch(":id")
+  @ApiOperation({
+    summary: "Atualizar banda",
+    description: "Atualiza dados da banda.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: BandPresenter })
+  async update(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: UpdateBandDto,
+  ) {
+    const output = await this.updateBandUseCase.execute({
+      ...(dto as any),
+      id,
+    });
+    return BandsController.serialize(output);
+  }
+
+  @HttpCode(204)
+  @Delete(":id")
+  @ApiOperation({
+    summary: "Excluir banda",
+    description: "Exclui uma banda pelo ID.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
+  async remove(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    await this.deleteBandUseCase.execute({ id });
   }
 
   @Post(":id/members")

@@ -14,7 +14,7 @@ export type EstablishmentModelProps = EstablishmentModel;
 export class EstablishmentModelMapper {
   static toModel(entity: Establishment): EstablishmentModel {
     return {
-      id: entity.id.id,
+      id: entity.establishment_id.id,
       email: entity.email.value,
       name: entity.name,
       description: entity.description,
@@ -75,7 +75,7 @@ export class EstablishmentModelMapper {
     }
 
     return new Establishment({
-      id: new EstablishmentId(model.id),
+      establishment_id: new EstablishmentId(model.id),
       name: model.name,
       email: new Email(model.email),
       cnpj: model.cnpj, // Passamos a string direta, o construtor converte para VO

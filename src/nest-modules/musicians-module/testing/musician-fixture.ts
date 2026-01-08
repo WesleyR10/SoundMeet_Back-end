@@ -16,10 +16,12 @@ const _keysInResponse = [
   "total_ratings",
   "is_active",
   "is_verified",
+  "profile",
   "display_name",
   "is_experienced",
   "is_highly_rated",
   "created_at",
+  "updated_at",
 ];
 
 export class GetMusicianFixture {

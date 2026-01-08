@@ -2,14 +2,14 @@ import { Chance } from "chance";
 
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { PaymentMethod, Tip, TipStatus } from "./tip.entity";
+import { PaymentMethod, Tip, TipId, TipStatus } from "./tip.entity";
 import { PixKey } from "./value-objects/pix-key.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class TipFakeBuilder<TBuild = any> {
   // Auto generated properties
-  private _tip_id: PropOrFactory<Uuid> | undefined = undefined;
+  private _tip_id: PropOrFactory<TipId> | undefined = undefined;
   private _audience_id: PropOrFactory<Uuid> | undefined = undefined;
   private _musician_id: PropOrFactory<Uuid> | undefined = undefined;
   private _event_id: PropOrFactory<Uuid | null> | undefined = undefined;
@@ -40,7 +40,7 @@ export class TipFakeBuilder<TBuild = any> {
     this.chance = Chance();
   }
 
-  withTipId(valueOrFactory: PropOrFactory<Uuid>) {
+  withTipId(valueOrFactory: PropOrFactory<TipId>) {
     this._tip_id = valueOrFactory;
     return this;
   }
@@ -113,7 +113,7 @@ export class TipFakeBuilder<TBuild = any> {
   build(): TBuild {
     const tips = new Array(this.countObjs).fill(undefined).map((_, index) => {
       const tip = new Tip({
-        tip_id: this.callFactory(this._tip_id, index) ?? new Uuid(),
+        tip_id: this.callFactory(this._tip_id, index) ?? new TipId(),
         audience_id: this.callFactory(this._audience_id, index) ?? new Uuid(),
         musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
         event_id: this.callFactory(this._event_id, index) ?? null,

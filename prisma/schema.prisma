@@ -10,6 +10,16 @@ datasource db {
 }
 
 // =================== =====================
+// ENUMS COMPARTILHADOS
+// ========================================
+
+enum CurrencyEnum {
+  BRL
+  USD
+  EUR
+}
+
+// =================== =====================
 // DOMÍNIO MUSICIAN
 // ========================================
 
@@ -51,18 +61,22 @@ model Musician {
 }
 
 model MusicianProfile {
-  id           String   @id @default(uuid())
-  musicianId   String   @unique
-  instruments  String[] // ["guitar", "vocals", "piano"]
-  genres       String[] // ["rock", "pop", "jazz"]
-  experience   Int // anos de experiência
-  priceRange   Json // {min: 500, max: 2000}
-  location     Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
-  socialLinks  Json? // {instagram: "@musician", youtube: "channel"}
-  rating       Float    @default(0)
-  totalRatings Int      @default(0)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id             String        @id @default(uuid())
+  musicianId     String        @unique
+  instruments    String[] // ["guitar", "vocals", "piano"]
+  genres         String[] // ["rock", "pop", "jazz"]
+  experience     Int // anos de experiência
+  price_model    String? // "per_event" | "per_hour"
+  price_min      Float?
+  price_max      Float?
+  price_currency CurrencyEnum? @default(BRL)
+  price_notes    String?
+  location       Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
+  socialLinks    Json? // {instagram: "@musician", youtube: "channel"}
+  rating         Float         @default(0)
+  totalRatings   Int           @default(0)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
@@ -70,14 +84,19 @@ model MusicianProfile {
 }
 
 model Band {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  avatar      String?
-  genres      String[]
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  avatar         String?
+  genres         String[]
+  price_model    String? // "per_event" | "per_hour"
+  price_min      Float?
+  price_max      Float?
+  price_currency CurrencyEnum? @default(BRL)
+  price_notes    String?
+  is_active      Boolean       @default(true)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
 
   members           BandMember[]
   events            EventMusician[]
@@ -85,9 +104,26 @@ model Band {
   bookings          Booking[]
   inquiries         Inquiry[]
   calendar_settings BandCalendarSettings?
+  availability_rules BandAvailabilityRule[]
   unavailabilities  BandUnavailability[]
 
   @@map("bands")
+}
+
+model BandAvailabilityRule {
+  id           String   @id @default(uuid())
+  bandId       String
+  weekday      Int
+  start_time   String
+  end_time     String
+  is_available Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
+
+  @@index([bandId, weekday])
+  @@map("band_availability_rules")
 }
 
 model BandMember {

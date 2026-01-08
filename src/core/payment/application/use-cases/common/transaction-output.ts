@@ -1,4 +1,4 @@
-import { Transaction } from "../../../domain/transaction.entity";
+import { Transaction } from "../../../domain/transaction.aggregate";
 
 export type TransactionOutput = {
   id: string;

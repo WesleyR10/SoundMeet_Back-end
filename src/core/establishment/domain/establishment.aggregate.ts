@@ -9,7 +9,6 @@ import {
   Rating,
   Uuid,
 } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { EstablishmentValidatorFactory } from "./establishment.validator";
 import { EstablishmentFakeBuilder } from "./establishment-fake.builder";
 import { EstablishmentCreatedEvent } from "./events/establishment-created.event";
@@ -17,7 +16,7 @@ import { EstablishmentRatedEvent } from "./events/establishment-rated.event";
 import { EstablishmentVerifiedEvent } from "./events/establishment-verified.event";
 
 export type EstablishmentConstructorProps = {
-  id?: EstablishmentId;
+  establishment_id?: EstablishmentId;
   name: string;
   description?: string | null;
   avatar?: string | null;
@@ -58,7 +57,7 @@ export type EstablishmentCreateCommand = {
 export class EstablishmentId extends Uuid {}
 
 export class Establishment extends AggregateRoot {
-  id: EstablishmentId;
+  establishment_id: EstablishmentId;
   name: string;
   description: string | null;
   avatar: string | null;
@@ -77,7 +76,7 @@ export class Establishment extends AggregateRoot {
 
   constructor(props: EstablishmentConstructorProps) {
     super();
-    this.id = props.id ?? new EstablishmentId();
+    this.establishment_id = props.establishment_id ?? new EstablishmentId();
     this.name = props.name;
     this.description = props.description ?? null;
     this.avatar = props.avatar ?? null;
@@ -92,7 +91,7 @@ export class Establishment extends AggregateRoot {
     this.qr_code = props.qr_code
       ? new QRCode({
           code: props.qr_code,
-          url: `https://soundmeet.app/establishment/${this.id.id}`,
+          url: `https://soundmeet.app/establishment/${this.establishment_id.id}`,
         })
       : null;
     this.is_active = props.is_active ?? true;
@@ -124,7 +123,7 @@ export class Establishment extends AggregateRoot {
     establishment.generateQRCode();
     establishment.applyEvent(
       new EstablishmentCreatedEvent({
-        establishment_id: establishment.id,
+        establishment_id: establishment.establishment_id,
         name: establishment.name,
         email: establishment.email,
         cnpj: establishment.cnpj,
@@ -210,10 +209,10 @@ export class Establishment extends AggregateRoot {
   }
 
   generateQRCode(): void {
-    const qrData = `soundmeet://establishment/${this.id.id}`;
+    const qrData = `soundmeet://establishment/${this.establishment_id.id}`;
     this.qr_code = new QRCode({
       code: qrData,
-      url: `https://soundmeet.app/establishment/${this.id.id}`,
+      url: `https://soundmeet.app/establishment/${this.establishment_id.id}`,
     });
   }
 
@@ -228,7 +227,7 @@ export class Establishment extends AggregateRoot {
 
     this.applyEvent(
       new EstablishmentRatedEvent(
-        this.id,
+        this.establishment_id,
         new Rating(ratingValue),
         comment ?? null,
         ratedBy,
@@ -248,7 +247,7 @@ export class Establishment extends AggregateRoot {
     this.is_verified = true;
     this.applyEvent(
       new EstablishmentVerifiedEvent({
-        establishment_id: this.id,
+        establishment_id: this.establishment_id,
         verified_at: new Date(),
       }),
     );
@@ -287,13 +286,13 @@ export class Establishment extends AggregateRoot {
     return EstablishmentFakeBuilder;
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): EstablishmentId {
+    return this.establishment_id;
   }
 
   toJSON() {
     return {
-      establishment_id: this.id.id,
+      establishment_id: this.establishment_id.id,
       name: this.name,
       description: this.description,
       avatar: this.avatar,

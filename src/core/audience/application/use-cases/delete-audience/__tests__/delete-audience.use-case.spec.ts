@@ -22,7 +22,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
 
     expect(repository.items).toHaveLength(1);
 
-    await useCase.execute({ id: audience.id.id });
+    await useCase.execute({ id: audience.audience_id.id });
 
     expect(repository.items).toHaveLength(0);
   });
@@ -50,7 +50,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
     expect(repository.items).toHaveLength(1);
     expect(repository.items[0].totalPoints).toBeGreaterThan(0);
 
-    await useCase.execute({ id: audience.id.id });
+    await useCase.execute({ id: audience.audience_id.id });
 
     expect(repository.items).toHaveLength(0);
   });
@@ -62,7 +62,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
     expect(repository.items).toHaveLength(1);
     expect(repository.items[0].is_active).toBe(false);
 
-    await useCase.execute({ id: audience.id.id });
+    await useCase.execute({ id: audience.audience_id.id });
 
     expect(repository.items).toHaveLength(0);
   });
@@ -79,7 +79,7 @@ describe("DeleteAudienceUseCase Unit Tests", () => {
     expect(repository.items[0].nickname).toBeNull();
     expect(repository.items[0].phone).toBeNull();
 
-    await useCase.execute({ id: audience.id.id });
+    await useCase.execute({ id: audience.audience_id.id });
 
     expect(repository.items).toHaveLength(0);
   });

@@ -85,6 +85,9 @@ export type EnvConfig = {
   REQUEST_COOLDOWN_MINUTES: number;
   VOTING_INTERVAL_MINUTES: number;
 
+  // Scheduling
+  BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: number;
+
   // Prisma
   PRISMA_LOG_QUERIES: boolean;
 };

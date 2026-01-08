@@ -68,7 +68,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: CompleteProfileInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       name: "John Doe",
       nickname: "Johnny",
     };
@@ -142,13 +142,13 @@ describe("CompleteProfileUseCase Unit Tests", () => {
       await repository.insert(audience);
 
       const fullInput: CompleteProfileInput = {
-        audience_id: audience.id.id,
+        audience_id: audience.audience_id.id,
         ...input,
       };
 
       const output = await useCase.execute(fullInput);
 
-      expect(output.id).toBe(audience.id.id);
+      expect(output.id).toBe(audience.audience_id.id);
       expect(output.points.total).toBe(initialPoints + expected.points_added);
       expect(output.is_active).toBe(true);
 
@@ -169,7 +169,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
       }
 
       // Verificar se a audiência foi atualizada no repositório
-      const updatedAudience = await repository.findById(audience.id);
+      const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience!.totalPoints).toBe(
         initialPoints + expected.points_added,
       );
@@ -182,13 +182,13 @@ describe("CompleteProfileUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: CompleteProfileInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       name: "Minimal User",
     };
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
     expect(output.name).toBe("Minimal User");
     expect(output.points.total).toBe(initialPoints + 10);
     expect(output.is_active).toBe(true);
@@ -203,7 +203,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: CompleteProfileInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       name: "Updated Name",
       nickname: "UpdatedNick",
       avatar: "https://example.com/new-avatar.jpg",
@@ -231,7 +231,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output).toMatchObject({
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: "Updated Name",
       email: "test@example.com",
       nickname: "UpdatedNick",
@@ -261,7 +261,7 @@ describe("CompleteProfileUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: CompleteProfileInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       name: "Test User",
       favorite_genres: [],
       favorite_artists: [],

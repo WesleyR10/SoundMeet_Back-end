@@ -30,16 +30,16 @@ describe("DeleteRequestUseCase Unit Tests", () => {
     const request = Request.fake().aRequest().build();
     await repository.insert(request);
 
-    const input = new DeleteRequestInput({ id: request.id.id });
+    const input = new DeleteRequestInput({ id: request.request_id.id });
 
     // Verify request exists before deletion
-    const foundRequest = await repository.findById(request.id);
+    const foundRequest = await repository.findById(request.request_id);
     expect(foundRequest).toBeDefined();
 
     await useCase.execute(input);
 
     // Verify request was deleted
-    const deletedRequest = await repository.findById(request.id);
+    const deletedRequest = await repository.findById(request.request_id);
     expect(deletedRequest).toBeNull();
   });
 
@@ -48,17 +48,17 @@ describe("DeleteRequestUseCase Unit Tests", () => {
     request.accept();
     await repository.insert(request);
 
-    const input = new DeleteRequestInput({ id: request.id.id });
+    const input = new DeleteRequestInput({ id: request.request_id.id });
 
     // Verify request exists before deletion
-    const foundRequest = await repository.findById(request.id);
+    const foundRequest = await repository.findById(request.request_id);
     expect(foundRequest).toBeDefined();
     expect(foundRequest!.isAccepted).toBe(true);
 
     await useCase.execute(input);
 
     // Verify request was deleted
-    const deletedRequest = await repository.findById(request.id);
+    const deletedRequest = await repository.findById(request.request_id);
     expect(deletedRequest).toBeNull();
   });
 
@@ -67,17 +67,17 @@ describe("DeleteRequestUseCase Unit Tests", () => {
     request.reject("Not suitable for the venue");
     await repository.insert(request);
 
-    const input = new DeleteRequestInput({ id: request.id.id });
+    const input = new DeleteRequestInput({ id: request.request_id.id });
 
     // Verify request exists before deletion
-    const foundRequest = await repository.findById(request.id);
+    const foundRequest = await repository.findById(request.request_id);
     expect(foundRequest).toBeDefined();
     expect(foundRequest!.isRejected).toBe(true);
 
     await useCase.execute(input);
 
     // Verify request was deleted
-    const deletedRequest = await repository.findById(request.id);
+    const deletedRequest = await repository.findById(request.request_id);
     expect(deletedRequest).toBeNull();
   });
 
@@ -85,7 +85,7 @@ describe("DeleteRequestUseCase Unit Tests", () => {
     const request = Request.fake().aRequest().build();
     await repository.insert(request);
 
-    const input = new DeleteRequestInput({ id: request.id.id });
+    const input = new DeleteRequestInput({ id: request.request_id.id });
 
     const result = await useCase.execute(input);
 
@@ -99,14 +99,14 @@ describe("DeleteRequestUseCase Unit Tests", () => {
 
     await repository.bulkInsert([request1, request2, request3]);
 
-    const input = new DeleteRequestInput({ id: request2.id.id });
+    const input = new DeleteRequestInput({ id: request2.request_id.id });
 
     await useCase.execute(input);
 
     // Verify only the target request was deleted
-    const foundRequest1 = await repository.findById(request1.id);
-    const deletedRequest2 = await repository.findById(request2.id);
-    const foundRequest3 = await repository.findById(request3.id);
+    const foundRequest1 = await repository.findById(request1.request_id);
+    const deletedRequest2 = await repository.findById(request2.request_id);
+    const foundRequest3 = await repository.findById(request3.request_id);
 
     expect(foundRequest1).toBeDefined();
     expect(deletedRequest2).toBeNull();

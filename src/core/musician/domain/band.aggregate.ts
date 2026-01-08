@@ -1,4 +1,5 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
+import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { BandValidatorFactory } from "./band.validator";
 import { BandFakeBuilder } from "./band-fake.builder";
@@ -20,6 +21,7 @@ export type BandConstructorProps = {
   avatar?: string | null;
   genres: string[];
   members?: BandMemberProps[];
+  priceRange?: PriceRange | null;
   is_active?: boolean;
   created_at?: Date;
   updated_at?: Date;
@@ -31,6 +33,7 @@ export type BandCreateCommand = {
   avatar?: string | null;
   genres: string[];
   members?: BandMemberProps[];
+  priceRange?: PriceRange | null;
   is_active?: boolean;
 };
 
@@ -41,6 +44,7 @@ export class Band extends AggregateRoot {
   avatar: string | null;
   genres: string[];
   members: BandMemberProps[];
+  priceRange: PriceRange | null;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -52,13 +56,17 @@ export class Band extends AggregateRoot {
     this.description = props.description ?? null;
     this.avatar = props.avatar ?? null;
     this.genres = props.genres;
-    this.members = props.members ?? [];
+    this.members = (props.members ?? []).map((member) => ({
+      ...member,
+      member_id: member.member_id ?? new Uuid(),
+    }));
+    this.priceRange = props.priceRange ?? null;
     this.is_active = props.is_active ?? true;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): Uuid {
+  get entity_id(): BandId {
     return this.band_id;
   }
 
@@ -122,6 +130,7 @@ export class Band extends AggregateRoot {
     }
 
     this.members.push({
+      member_id: new Uuid(),
       musician_id,
       role,
       instrument,
@@ -159,6 +168,11 @@ export class Band extends AggregateRoot {
     this.updated_at = new Date();
   }
 
+  changePriceRange(price: PriceRange | null): void {
+    this.priceRange = price;
+    this.updated_at = new Date();
+  }
+
   toJSON() {
     return {
       band_id: this.band_id.id,
@@ -173,6 +187,15 @@ export class Band extends AggregateRoot {
         instrument: m.instrument,
         joined_at: m.joined_at,
       })),
+      priceRange: this.priceRange
+        ? {
+            model: this.priceRange.model,
+            min: this.priceRange.min,
+            max: this.priceRange.max,
+            currency: this.priceRange.currency,
+            notes: this.priceRange.notes,
+          }
+        : null,
       is_active: this.is_active,
       created_at: this.created_at,
       updated_at: this.updated_at,

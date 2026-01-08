@@ -13,9 +13,6 @@ export * from "./phone.vo";
 // Money Value Object
 export * from "./money.vo";
 
-// Phone Value Object
-export * from "./phone.vo";
-
 // Rating Value Object
 export * from "./rating.vo";
 
@@ -34,6 +31,9 @@ export * from "./badge.vo";
 // Social Links Value Object
 export * from "./social-links.vo";
 
+// Location Value Object
+export * from "./location.vo";
+
 // Points Value Object
 export * from "./points.vo";
 
@@ -43,3 +43,4 @@ export * from "./audience-points.vo";
 export * from "./audience-preferences.vo";
 export * from "./booking-status.vo";
 export * from "./inquiry-status.vo";
+export * from "./price-range.vo";

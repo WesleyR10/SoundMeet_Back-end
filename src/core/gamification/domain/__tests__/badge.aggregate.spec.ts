@@ -19,7 +19,7 @@ describe("Badge Unit Tests without validator", () => {
       rarity: "common",
     });
 
-    expect(badge.id).toBeInstanceOf(BadgeId);
+    expect(badge.badge_id).toBeInstanceOf(BadgeId);
     expect(badge.name).toBe("Iniciante Musical");
     expect(badge.description).toBe("Primeira interação com o app");
     expect(badge.icon).toBe("🎵");
@@ -36,7 +36,7 @@ describe("Badge Unit Tests without validator", () => {
     const createdAt = new Date();
     const updatedAt = new Date();
     const badge = new Badge({
-      id: new BadgeId("550e8400-e29b-41d4-a716-446655440002"),
+      badge_id: new BadgeId("550e8400-e29b-41d4-a716-446655440002"),
       name: "Super Fã",
       description: "Fã dedicado com muitas interações",
       icon: "⭐",
@@ -49,7 +49,7 @@ describe("Badge Unit Tests without validator", () => {
       updated_at: updatedAt,
     });
 
-    expect(badge.id.id).toBe("550e8400-e29b-41d4-a716-446655440002");
+    expect(badge.badge_id.id).toBe("550e8400-e29b-41d4-a716-446655440002");
     expect(badge.name).toBe("Super Fã");
     expect(badge.description).toBe("Fã dedicado com muitas interações");
     expect(badge.icon).toBe("⭐");
@@ -72,9 +72,7 @@ describe("Badge Unit Tests without validator", () => {
       points: 0,
       rarity: "common",
     });
-    expect(badge.id).toBeInstanceOf(BadgeId);
-    expect(badge.entity_id).toBeInstanceOf(BadgeId);
-    expect(badge.entity_id).toBe(badge.id);
+    expect(badge.badge_id).toBeInstanceOf(BadgeId);
   });
 
   describe("create command", () => {
@@ -87,7 +85,7 @@ describe("Badge Unit Tests without validator", () => {
         requirement: { first_scan: true },
       });
 
-      expect(badge.id).toBeInstanceOf(BadgeId);
+      expect(badge.badge_id).toBeInstanceOf(BadgeId);
       expect(badge.name).toBe("Explorador");
       expect(badge.description).toBe("Primeira exploração do app");
       expect(badge.icon).toBe("🔍");
@@ -282,7 +280,7 @@ describe("Badge Unit Tests without validator", () => {
 
     const json = badge.toJSON();
     expect(json).toEqual({
-      id: badge.id.id,
+      badge_id: badge.badge_id.id,
       name: "Test Badge",
       description: "Test description",
       icon: "🎵",
@@ -308,7 +306,7 @@ describe("Badge Unit Tests with validator", () => {
         requirement: { scans: 1 },
       });
 
-      expect(badge.id).toBeInstanceOf(BadgeId);
+      expect(badge.badge_id).toBeInstanceOf(BadgeId);
       expect(badge.name).toBe("Iniciante Musical");
     });
 

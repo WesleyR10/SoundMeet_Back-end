@@ -19,14 +19,14 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: "New Name",
     };
 
     const output = await useCase.execute(input);
 
     expect(output.name).toBe("New Name");
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
     expect(repository.items[0].name).toBe("New Name");
   });
 
@@ -35,7 +35,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       nickname: "NewNickname",
     };
 
@@ -50,7 +50,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       nickname: null,
     };
 
@@ -65,7 +65,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       avatar: "new-avatar.jpg",
     };
 
@@ -80,7 +80,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       phone: "+5511888888888",
     };
 
@@ -95,7 +95,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       phone: null,
     };
 
@@ -111,7 +111,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
 
     const newGenres = ["Rock", "Jazz", "Blues"];
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       favorite_genres: newGenres,
     };
 
@@ -126,7 +126,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       is_active: true,
     };
 
@@ -141,7 +141,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       is_active: false,
     };
 
@@ -165,7 +165,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: "A",
     };
 
@@ -177,7 +177,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       phone: "invalid",
     };
 
@@ -190,7 +190,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
 
     const tooManyGenres = Array.from({ length: 21 }, (_, i) => `Genre ${i}`);
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       favorite_genres: tooManyGenres,
     };
 
@@ -202,7 +202,7 @@ describe("UpdateAudienceUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: "Updated Name",
       nickname: "UpdatedNick",
       avatar: "updated-avatar.jpg",

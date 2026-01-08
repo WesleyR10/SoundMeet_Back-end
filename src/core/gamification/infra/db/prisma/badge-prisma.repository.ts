@@ -32,12 +32,12 @@ export class BadgePrismaRepository implements IBadgeRepository {
     const model = BadgeModelMapper.toModel(entity);
     try {
       await this.prismaClient.badge.update({
-        where: { id: entity.id.id },
+        where: { id: entity.badge_id.id },
         data: model,
       });
     } catch (error: any) {
       if (error.code === "P2025") {
-        throw new NotFoundError(entity.id.id, Badge);
+        throw new NotFoundError(entity.badge_id.id, Badge);
       }
       throw error;
     }

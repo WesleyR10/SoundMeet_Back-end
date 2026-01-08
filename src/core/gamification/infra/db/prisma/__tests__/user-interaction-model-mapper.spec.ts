@@ -17,7 +17,7 @@ describe("UserInteractionModelMapper", () => {
       const model = UserInteractionModelMapper.toModel(userInteraction);
 
       expect(model).toEqual({
-        id: userInteraction.id.id,
+        id: userInteraction.user_interaction_id.id,
         audienceId: userInteraction.user_id.id,
         type: userInteraction.interaction_type,
         musicianId: userInteraction.target_id,
@@ -40,13 +40,11 @@ describe("UserInteractionModelMapper", () => {
       const model = UserInteractionModelMapper.toModel(userInteraction);
 
       expect(model).toEqual({
-        id: userInteraction.id.id,
+        id: userInteraction.user_interaction_id.id,
         audienceId: userInteraction.user_id.id,
         type: userInteraction.interaction_type,
-        musicianId: userInteraction.target_id
-          ? userInteraction.target_id
-          : null,
-        metadata: expect.any(Object), // Prisma.DbNull
+        musicianId: userInteraction.target_id,
+        metadata: null,
         points: userInteraction.points_earned,
         created_at: userInteraction.created_at,
       });
@@ -71,7 +69,7 @@ describe("UserInteractionModelMapper", () => {
 
       const entity = UserInteractionModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.user_interaction_id.id).toBe(model.id);
       expect(entity.user_id.id).toBe(model.audienceId);
       expect(entity.interaction_type).toBe(model.type);
       expect(entity.target_id).toBe(model.musicianId);
@@ -93,7 +91,7 @@ describe("UserInteractionModelMapper", () => {
 
       const entity = UserInteractionModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.user_interaction_id.id).toBe(model.id);
       expect(entity.user_id.id).toBe(model.audienceId);
       expect(entity.interaction_type).toBe(model.type);
       expect(entity.target_id).toBe(model.musicianId);
@@ -119,8 +117,8 @@ describe("UserInteractionModelMapper", () => {
       const convertedUserInteraction =
         UserInteractionModelMapper.toEntity(model);
 
-      expect(convertedUserInteraction.id.id).toBe(
-        originalUserInteraction.id.id,
+      expect(convertedUserInteraction.user_interaction_id.id).toBe(
+        originalUserInteraction.user_interaction_id.id,
       );
       expect(convertedUserInteraction.user_id.id).toBe(
         originalUserInteraction.user_id.id,
@@ -156,8 +154,8 @@ describe("UserInteractionModelMapper", () => {
       const convertedUserInteraction =
         UserInteractionModelMapper.toEntity(model);
 
-      expect(convertedUserInteraction.id.id).toBe(
-        originalUserInteraction.id.id,
+      expect(convertedUserInteraction.user_interaction_id.id).toBe(
+        originalUserInteraction.user_interaction_id.id,
       );
       expect(convertedUserInteraction.user_id.id).toBe(
         originalUserInteraction.user_id.id,
@@ -191,8 +189,8 @@ describe("UserInteractionModelMapper", () => {
       const convertedUserInteraction =
         UserInteractionModelMapper.toEntity(model);
 
-      expect(convertedUserInteraction.id.id).toBe(
-        originalUserInteraction.id.id,
+      expect(convertedUserInteraction.user_interaction_id.id).toBe(
+        originalUserInteraction.user_interaction_id.id,
       );
       expect(convertedUserInteraction.user_id.id).toBe(
         originalUserInteraction.user_id.id,

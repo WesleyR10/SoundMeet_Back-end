@@ -48,9 +48,9 @@ export type AudienceOutput = {
 
 export class AudienceOutputMapper {
   static toOutput(entity: Audience): AudienceOutput {
-    const { id, ...otherProps } = entity.toJSON();
+    const { audience_id, ...otherProps } = entity.toJSON();
     return {
-      id,
+      id: audience_id,
       ...otherProps,
       favorite_genres: entity.favorite_genres,
       favorite_artists: entity.favorite_artists,

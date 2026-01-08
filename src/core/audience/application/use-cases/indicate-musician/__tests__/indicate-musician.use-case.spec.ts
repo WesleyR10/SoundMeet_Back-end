@@ -50,7 +50,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: IndicateMusicianInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       musician_id: "musician_123",
       establishment_id: "establishment_123",
       message: "This musician is amazing!",
@@ -106,18 +106,18 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
       await repository.insert(audience);
 
       const fullInput: IndicateMusicianInput = {
-        audience_id: audience.id.id,
+        audience_id: audience.audience_id.id,
         ...input,
       };
 
       const output = await useCase.execute(fullInput);
 
-      expect(output.id).toBe(audience.id.id);
+      expect(output.id).toBe(audience.audience_id.id);
       expect(output.points.total).toBe(initialPoints + expected.points_added);
       expect(output.is_active).toBe(true);
 
       // Verificar se a audiência foi atualizada no repositório
-      const updatedAudience = await repository.findById(audience.id);
+      const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience!.totalPoints).toBe(
         initialPoints + expected.points_added,
       );
@@ -130,14 +130,14 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: IndicateMusicianInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       musician_id: "musician_123",
       establishment_id: "establishment_123",
     };
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
     expect(output.points.total).toBe(initialPoints + 3);
     expect(output.is_active).toBe(true);
   });
@@ -151,7 +151,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: IndicateMusicianInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       musician_id: "musician_123",
       establishment_id: "establishment_123",
       message: "This musician is amazing!",
@@ -160,7 +160,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output).toMatchObject({
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: "Test User",
       email: "test@example.com",
       is_active: true,

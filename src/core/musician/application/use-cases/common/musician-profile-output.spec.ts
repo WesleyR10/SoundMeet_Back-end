@@ -1,5 +1,5 @@
 import { Musician } from "../../../domain/musician.aggregate";
-import { MusicianOutputMapper } from "./musician-output";
+import { MusicianOutputMapper } from "./musician-profile-output";
 
 describe("MusicianOutputMapper Unit Tests", () => {
   it("should convert a musician in output", () => {
@@ -9,11 +9,9 @@ describe("MusicianOutputMapper Unit Tests", () => {
       genres: ["Rock"],
       instruments: ["Guitar"],
     });
-    const spyToJSON = jest.spyOn(entity, "toJSON");
     const output = MusicianOutputMapper.toOutput(entity);
-    expect(spyToJSON).toHaveBeenCalled();
     expect(output).toStrictEqual({
-      id: entity.id.id,
+      id: entity.musician_id.id,
       email: "john@example.com",
       name: "John Doe",
       stage_name: null,
@@ -28,7 +26,9 @@ describe("MusicianOutputMapper Unit Tests", () => {
       total_ratings: 0,
       is_active: true,
       is_verified: false,
+      profile: null,
       created_at: entity.created_at,
+      updated_at: entity.updated_at,
       display_name: "John Doe",
       is_experienced: false,
       is_highly_rated: false,
@@ -48,11 +48,9 @@ describe("MusicianOutputMapper Unit Tests", () => {
       experience_years: 10,
       is_active: true,
     });
-    const spyToJSON = jest.spyOn(entity, "toJSON");
     const output = MusicianOutputMapper.toOutput(entity);
-    expect(spyToJSON).toHaveBeenCalled();
     expect(output).toStrictEqual({
-      id: entity.id.id,
+      id: entity.musician_id.id,
       email: "jane@example.com",
       name: "Jane Smith",
       stage_name: "Jane Rock",
@@ -67,7 +65,9 @@ describe("MusicianOutputMapper Unit Tests", () => {
       total_ratings: 0,
       is_active: true,
       is_verified: false,
+      profile: null,
       created_at: entity.created_at,
+      updated_at: entity.updated_at,
       display_name: "Jane Rock",
       is_experienced: true,
       is_highly_rated: false,

@@ -237,7 +237,9 @@ export class AudienceFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const audience = new Audience({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          audience_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           name: this.callFactory(this._name, index),
           email: this.callFactory(this._email, index),
           nickname: this.callFactory(this._nickname, index),

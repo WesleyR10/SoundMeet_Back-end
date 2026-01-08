@@ -32,12 +32,12 @@ export class RankingPrismaRepository implements IRankingRepository {
     const model = RankingModelMapper.toModel(entity);
     try {
       await this.prismaClient.ranking.update({
-        where: { id: entity.id.id },
+        where: { id: entity.ranking_id.id },
         data: model,
       });
     } catch (error: any) {
       if (error.code === "P2025") {
-        throw new NotFoundError(entity.id.id, Ranking);
+        throw new NotFoundError(entity.ranking_id.id, Ranking);
       }
       throw error;
     }

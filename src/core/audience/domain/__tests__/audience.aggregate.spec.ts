@@ -14,7 +14,7 @@ describe("Audience Without Validator Unit Tests", () => {
       name: "John Doe",
       email: new Email("john@example.com"),
     });
-    expect(audience.id).toBeInstanceOf(AudienceId);
+    expect(audience.audience_id).toBeInstanceOf(AudienceId);
     expect(audience.name).toBe("John Doe");
     expect(audience.email).toBeInstanceOf(Email);
     expect(audience.email.value).toBe("john@example.com");
@@ -40,7 +40,7 @@ describe("Audience Without Validator Unit Tests", () => {
       is_active: false,
       created_at,
     });
-    expect(audience.id).toBeInstanceOf(AudienceId);
+    expect(audience.audience_id).toBeInstanceOf(AudienceId);
     expect(audience.name).toBe("Jane Doe");
     expect(audience.email.value).toBe("jane@example.com");
     expect(audience.nickname).toBe("jane_doe");
@@ -58,7 +58,7 @@ describe("Audience Without Validator Unit Tests", () => {
         name: "John Doe",
         email: "john@example.com",
       });
-      expect(audience.id).toBeInstanceOf(AudienceId);
+      expect(audience.audience_id).toBeInstanceOf(AudienceId);
       expect(audience.name).toBe("John Doe");
       expect(audience.email.value).toBe("john@example.com");
       expect(audience.nickname).toBeNull();
@@ -82,7 +82,7 @@ describe("Audience Without Validator Unit Tests", () => {
         favorite_genres: ["Rock", "Jazz"],
         is_active: false,
       });
-      expect(audience.id).toBeInstanceOf(AudienceId);
+      expect(audience.audience_id).toBeInstanceOf(AudienceId);
       expect(audience.name).toBe("Jane Doe");
       expect(audience.email.value).toBe("jane@example.com");
       expect(audience.nickname).toBe("jane_doe");
@@ -97,7 +97,11 @@ describe("Audience Without Validator Unit Tests", () => {
   });
 
   describe("id field", () => {
-    const arrange = [{ id: null }, { id: undefined }, { id: new AudienceId() }];
+    const arrange = [
+      { audience_id: null },
+      { audience_id: undefined },
+      { audience_id: new AudienceId() },
+    ];
 
     test.each(arrange)("should be is %j", (props) => {
       const audience = new Audience({
@@ -105,7 +109,7 @@ describe("Audience Without Validator Unit Tests", () => {
         email: new Email("john@example.com"),
         ...props,
       } as any);
-      expect(audience.id).toBeInstanceOf(AudienceId);
+      expect(audience.audience_id).toBeInstanceOf(AudienceId);
     });
   });
 
@@ -205,7 +209,7 @@ describe("Audience Without Validator Unit Tests", () => {
       .withNickname("test_nickname")
       .build();
 
-    expect(audience.id).toBeInstanceOf(AudienceId);
+    expect(audience.audience_id).toBeInstanceOf(AudienceId);
     expect(audience.name).toBeTruthy();
     expect(audience.email).toBeInstanceOf(Email);
     expect(audience.nickname).toBeTruthy();
@@ -228,7 +232,7 @@ describe("Audience Without Validator Unit Tests", () => {
       phone: "+5511999999999",
     });
 
-    expect(audience.id).toBeInstanceOf(AudienceId);
+    expect(audience.audience_id).toBeInstanceOf(AudienceId);
     expect(audience.name).toBe("John Doe");
     expect(audience.email.value).toBe("john@example.com");
     expect(audience.nickname).toBe("johndoe");
@@ -265,7 +269,7 @@ describe("Audience Without Validator Unit Tests", () => {
 
     const json = audience.toJSON();
     expect(json).toMatchObject({
-      id: audience.id.id,
+      audience_id: audience.audience_id.id,
       name: audience.name,
       email: audience.email.value,
       nickname: audience.nickname,

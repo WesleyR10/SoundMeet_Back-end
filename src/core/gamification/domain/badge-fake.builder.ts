@@ -146,7 +146,7 @@ export class BadgeFakeBuilder<TBuild = any> {
   build(): TBuild {
     const badges = new Array(this.countObjs).fill(undefined).map((_, index) => {
       const badge = new Badge({
-        id: !this._id ? undefined : this.callFactory(this._id, index),
+        badge_id: !this._id ? undefined : this.callFactory(this._id, index),
         name: this.callFactory(this._name, index),
         description: this.callFactory(this._description, index),
         icon: this.callFactory(this._icon, index),

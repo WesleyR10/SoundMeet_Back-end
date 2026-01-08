@@ -139,7 +139,9 @@ export class UserPointsFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const userPoint = new UserPoints({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          user_points_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           user_id: this.callFactory(this._user_id, index),
           total_points: this.callFactory(this._total_points, index),
           total_scans: this.callFactory(this._total_scans, index),

@@ -3,14 +3,14 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { AddBandMemberUseCase } from "../../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
 import { BandOutputMapper } from "../../../core/musician/application/use-cases/common/band-output";
 import { CreateBandUseCase } from "../../../core/musician/application/use-cases/create-band/create-band.use-case";
+import { DeleteBandUseCase } from "../../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { GetBandUseCase } from "../../../core/musician/application/use-cases/get-band/get-band.use-case";
+import { ListBandsUseCase } from "../../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
+import { UpdateBandUseCase } from "../../../core/musician/application/use-cases/update-band/update-band.use-case";
 import { Band, BandId } from "../../../core/musician/domain/band.aggregate";
 import { IBandRepository } from "../../../core/musician/domain/band.repository";
-import {
-  Musician,
-  MusicianId,
-} from "../../../core/musician/domain/musician.aggregate";
+import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memory/band-in-memory.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
@@ -44,8 +44,23 @@ describe("BandsController Integration Tests", () => {
           inject: ["BandRepository"],
         },
         {
+          provide: UpdateBandUseCase,
+          useFactory: (repo: IBandRepository) => new UpdateBandUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
+          provide: DeleteBandUseCase,
+          useFactory: (repo: IBandRepository) => new DeleteBandUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
           provide: GetBandUseCase,
           useFactory: (repo: IBandRepository) => new GetBandUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
+          provide: ListBandsUseCase,
+          useFactory: (repo: IBandRepository) => new ListBandsUseCase(repo),
           inject: ["BandRepository"],
         },
         {
@@ -73,7 +88,10 @@ describe("BandsController Integration Tests", () => {
   it("should be defined", () => {
     expect(controller).toBeDefined();
     expect(controller["createBandUseCase"]).toBeInstanceOf(CreateBandUseCase);
+    expect(controller["updateBandUseCase"]).toBeInstanceOf(UpdateBandUseCase);
+    expect(controller["deleteBandUseCase"]).toBeInstanceOf(DeleteBandUseCase);
     expect(controller["getBandUseCase"]).toBeInstanceOf(GetBandUseCase);
+    expect(controller["listBandsUseCase"]).toBeInstanceOf(ListBandsUseCase);
     expect(controller["addBandMemberUseCase"]).toBeInstanceOf(
       AddBandMemberUseCase,
     );
@@ -134,21 +152,22 @@ describe("BandsController Integration Tests", () => {
     await bandRepository.insert(band);
 
     const presenterAfterAdd = await controller.addMember(band.band_id.id, {
-      musician_id: musician.id.id,
+      musician_id: musician.musician_id.id,
       role: "member",
       instrument: "Guitar",
     } as any);
 
     expect(presenterAfterAdd.members).toHaveLength(1);
-    expect(presenterAfterAdd.members[0].musician_id).toBeInstanceOf(MusicianId);
-    expect(presenterAfterAdd.members[0].musician_id.id).toBe(musician.id.id);
+    expect(presenterAfterAdd.members[0].musician_id).toBe(
+      musician.musician_id.id,
+    );
 
     const bandAfterAdd = await bandRepository.findById(band.band_id);
     expect(bandAfterAdd!.members).toHaveLength(1);
 
     const response = await controller.removeMember(
       band.band_id.id,
-      musician.id.id,
+      musician.musician_id.id,
     );
     expect(response).not.toBeDefined();
 

@@ -97,21 +97,21 @@ describe("SendTipUseCase Unit Tests", () => {
       const spyUpdate = jest.spyOn(repository, "update");
 
       const fullInput: SendTipInput = {
-        id: audience.id.id,
+        id: audience.audience_id.id,
         ...input,
       } as SendTipInput;
 
       const output = await useCase.execute(fullInput);
 
       expect(spyUpdate).toHaveBeenCalledTimes(1);
-      expect(output.audience.id).toBe(audience.id.id);
+      expect(output.audience.id).toBe(audience.audience_id.id);
       expect(output.points_earned).toBe(expected.points_earned);
       expect(output.new_badges).toEqual(expected.new_badges);
       expect(output.tip_metadata).toMatchObject(expected.tip_metadata);
       expect(output.tip_metadata.sent_at).toBeInstanceOf(Date);
 
       // Verify audience was updated in repository
-      const updatedAudience = await repository.findById(audience.id);
+      const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience).toBeDefined();
       expect(updatedAudience!.totalPoints).toBe(expected.points_earned);
     });
@@ -122,14 +122,14 @@ describe("SendTipUseCase Unit Tests", () => {
     repository.items = [audience];
 
     const input1: SendTipInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       amount: 10.0,
       musician_id: "musician_123",
       payment_method: "pix",
     };
 
     const input2: SendTipInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       amount: 15.0,
       musician_id: "musician_456",
       payment_method: "pix",
@@ -143,7 +143,7 @@ describe("SendTipUseCase Unit Tests", () => {
     expect(output2.audience.points.total).toBe(25); // 10 + 15 points
 
     // Verify final state in repository
-    const finalAudience = await repository.findById(audience.id);
+    const finalAudience = await repository.findById(audience.audience_id);
     expect(finalAudience!.totalPoints).toBe(25);
   });
 
@@ -152,7 +152,7 @@ describe("SendTipUseCase Unit Tests", () => {
     repository.items = [audience];
 
     const input: SendTipInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       amount: 50.0,
       musician_id: "musician_789",
       message: "Amazing show! Keep it up!",
@@ -187,7 +187,7 @@ describe("SendTipUseCase Unit Tests", () => {
     repository.items = [audience];
 
     const input: SendTipInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       amount: 100.0,
       musician_id: "musician_999",
       message: "You deserve this!",

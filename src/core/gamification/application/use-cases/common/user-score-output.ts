@@ -13,9 +13,9 @@ export type UserScoreOutput = {
 
 export class UserScoreOutputMapper {
   static toOutput(entity: UserScore): UserScoreOutput {
-    const { id, ...otherProps } = entity.toJSON();
+    const { user_score_id, ...otherProps } = entity.toJSON();
     return {
-      id: id,
+      id: user_score_id,
       ...otherProps,
     } as UserScoreOutput;
   }

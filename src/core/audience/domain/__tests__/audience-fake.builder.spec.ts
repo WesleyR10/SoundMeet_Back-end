@@ -367,7 +367,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
     const faker = AudienceFakeBuilder.aAudience();
     let audience = faker.build();
 
-    expect(audience.id).toBeInstanceOf(AudienceId);
+    expect(audience.audience_id).toBeInstanceOf(AudienceId);
     expect(typeof audience.name === "string").toBeTruthy();
     expect(audience.email).toBeInstanceOf(Email);
     expect(audience.nickname).toBeNull();
@@ -392,7 +392,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
       .withCreatedAt(created_at)
       .build();
 
-    expect(audience.id.id).toBe(id.id);
+    expect(audience.audience_id.id).toBe(id.id);
     expect(audience.name).toBe("name test");
     expect(audience.email.value).toBe("test@example.com");
     expect(audience.nickname).toBe("test_nickname");
@@ -408,7 +408,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
     let audiences = faker.build();
 
     audiences.forEach((audience) => {
-      expect(audience.id).toBeInstanceOf(AudienceId);
+      expect(audience.audience_id).toBeInstanceOf(AudienceId);
       expect(typeof audience.name === "string").toBeTruthy();
       expect(audience.email).toBeInstanceOf(Email);
       expect(audience.nickname).toBeNull();
@@ -435,7 +435,7 @@ describe("AudienceFakeBuilder Unit Tests", () => {
       .build();
 
     audiences.forEach((audience) => {
-      expect(audience.id.id).toBe(id.id);
+      expect(audience.audience_id.id).toBe(id.id);
       expect(audience.name).toBe("name test");
       expect(audience.email.value).toBe("test@example.com");
       expect(audience.nickname).toBe("test_nickname");

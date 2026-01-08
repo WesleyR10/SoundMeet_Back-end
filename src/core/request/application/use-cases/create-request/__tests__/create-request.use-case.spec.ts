@@ -182,7 +182,7 @@ describe("CreateRequestUseCase Unit Tests", () => {
       expect(output.created_at).toBeDefined();
 
       expect(entity!.toJSON()).toStrictEqual({
-        id: output.id,
+        request_id: output.id,
         audience_id: input.audience_id,
         musician_id: input.musician_id,
         song_title: expected.song_title,

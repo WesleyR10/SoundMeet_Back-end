@@ -53,7 +53,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: ShareSocialMediaInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       request_id: "request_123",
       platform: SocialMediaPlatform.INSTAGRAM,
       message: "Check out this amazing song!",
@@ -119,18 +119,18 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
       await repository.insert(audience);
 
       const fullInput: ShareSocialMediaInput = {
-        audience_id: audience.id.id,
+        audience_id: audience.audience_id.id,
         ...input,
       };
 
       const output = await useCase.execute(fullInput);
 
-      expect(output.id).toBe(audience.id.id);
+      expect(output.id).toBe(audience.audience_id.id);
       expect(output.points.total).toBe(initialPoints + expected.points_added);
       expect(output.is_active).toBe(true);
 
       // Verificar se a audiência foi atualizada no repositório
-      const updatedAudience = await repository.findById(audience.id);
+      const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience!.totalPoints).toBe(
         initialPoints + expected.points_added,
       );
@@ -146,7 +146,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
     await repository.insert(audience);
 
     const input: ShareSocialMediaInput = {
-      audience_id: audience.id.id,
+      audience_id: audience.audience_id.id,
       request_id: "request_123",
       platform: SocialMediaPlatform.INSTAGRAM,
       message: "Check out this amazing song!",
@@ -155,7 +155,7 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output).toMatchObject({
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: "Test User",
       email: "test@example.com",
       is_active: true,

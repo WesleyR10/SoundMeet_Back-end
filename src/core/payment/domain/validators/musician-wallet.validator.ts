@@ -11,7 +11,7 @@ import {
 
 import { ClassValidatorFields } from "../../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../../shared/domain/validators/notification";
-import { MusicianWallet } from "../musician-wallet.entity";
+import { MusicianWallet } from "../musician-wallet.aggregate";
 
 export class MusicianWalletRules {
   @IsNotEmpty({ groups: ["musician_id"] })

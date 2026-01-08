@@ -102,7 +102,9 @@ export class UserBadgeFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const userBadge = new UserBadge({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          user_badge_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           user_id: this.callFactory(this._user_id, index),
           badge_type: this.callFactory(this._badge_type, index),
           progress: this.callFactory(this._progress, index),

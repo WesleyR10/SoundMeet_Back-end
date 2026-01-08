@@ -68,7 +68,7 @@ export class Transaction extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): Uuid {
+  get entity_id(): TransactionId {
     return this.transaction_id;
   }
 

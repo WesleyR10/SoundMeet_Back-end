@@ -13,7 +13,7 @@ describe("Establishment Unit Tests without validator", () => {
   test("constructor of establishment", () => {
     let establishment = Establishment.fake().anEstablishment().build();
 
-    expect(establishment.id).toBeInstanceOf(EstablishmentId);
+    expect(establishment.establishment_id).toBeInstanceOf(EstablishmentId);
     expect(establishment.name).toBeTruthy(); // Nome não vazio
     expect(establishment.email).toBeInstanceOf(Email);
     expect(establishment.email.value).toContain("@"); // Email válido
@@ -64,7 +64,7 @@ describe("Establishment Unit Tests without validator", () => {
       .withcreated_at(created_at)
       .build();
 
-    expect(establishment.id).toBeInstanceOf(EstablishmentId);
+    expect(establishment.establishment_id).toBeInstanceOf(EstablishmentId);
     expect(establishment.name).toBe("Jazz Club");
     expect(establishment.description).toBe("Premium jazz venue");
     expect(establishment.avatar).toBe("https://example.com/avatar.jpg");
@@ -101,7 +101,7 @@ describe("Establishment Unit Tests without validator", () => {
       .withEstablishmentType("pub")
       .build();
 
-    expect(establishment.id).toBeInstanceOf(EstablishmentId);
+    expect(establishment.establishment_id).toBeInstanceOf(EstablishmentId);
     expect(establishment.name).toBe("Music Pub");
     expect(establishment.email.value).toBe("contact@musicpub.com");
     expect(establishment.phone!.value).toBe("+5511777777777");
@@ -170,7 +170,7 @@ describe("Establishment Unit Tests without validator", () => {
 
     const json = establishment.toJSON();
     expect(json).toMatchObject({
-      establishment_id: establishment.id.id,
+      establishment_id: establishment.establishment_id.id,
       name: establishment.name,
       description: establishment.description,
       avatar: establishment.avatar,

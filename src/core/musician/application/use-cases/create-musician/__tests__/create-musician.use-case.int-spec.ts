@@ -43,7 +43,7 @@ describe("CreateMusicianUseCase Integration Tests", () => {
     expect(musician.qr_code).toBeDefined();
     expect(musician.qr_code!.isValid).toBe(true);
 
-    expect(output.id).toBe(musician.id.id);
+    expect(output.id).toBe(musician.musician_id.id);
     expect(output.name).toBe(musician.name);
     expect(output.email).toBe(musician.email.value);
     expect(output.qr_code).toBe(musician.qr_code!.code);

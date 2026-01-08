@@ -1,11 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
 
-import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-output";
+import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-profile-output";
 import { CreateMusicianUseCase } from "../../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { DeleteMusicianUseCase } from "../../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../../core/musician/application/use-cases/update-musician/update-musician.use-case";
+import { UpdateMusicianProfileUseCase } from "../../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import {
   Musician,
   MusicianId,
@@ -47,6 +48,12 @@ describe("MusiciansController Integration Tests", () => {
           provide: UpdateMusicianUseCase,
           useFactory: (repo: IMusicianRepository) =>
             new UpdateMusicianUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
+          provide: UpdateMusicianProfileUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new UpdateMusicianProfileUseCase(repo),
           inject: ["MusicianRepository"],
         },
         {
@@ -121,7 +128,7 @@ describe("MusiciansController Integration Tests", () => {
       "when body is $send_data",
       async ({ send_data, expected }) => {
         const presenter = await controller.update(
-          musician.id.id,
+          musician.musician_id.id,
           send_data as any,
         );
         const entity = await repository.findById(new MusicianId(presenter.id));
@@ -139,10 +146,10 @@ describe("MusiciansController Integration Tests", () => {
     const musician = Musician.fake().aMusician().build();
     await repository.insert(musician);
 
-    const response = await controller.remove(musician.id.id);
+    const response = await controller.remove(musician.musician_id.id);
     expect(response).not.toBeDefined();
 
-    await expect(repository.findById(musician.id)).resolves.toBeNull();
+    await expect(repository.findById(musician.musician_id)).resolves.toBeNull();
   });
 
   it("should get a musician", async () => {
@@ -155,14 +162,16 @@ describe("MusiciansController Integration Tests", () => {
       .build();
     await repository.insert(musician);
 
-    const presenter = await controller.findOne(musician.id.id);
+    const presenter = await controller.findOne(musician.musician_id.id);
 
-    expect(presenter.id).toBe(musician.id.id);
+    expect(presenter.id).toBe(musician.musician_id.id);
     expect(presenter.name).toBe(musician.name);
     expect(presenter.email).toBe(musician.email.value);
     expect(presenter.genres).toEqual(musician.genres);
     expect(presenter.instruments).toEqual(musician.instruments);
-    expect(presenter.qr_code).toBe(`soundmeet://musician/${musician.id.id}`);
+    expect(presenter.qr_code).toBe(
+      `soundmeet://musician/${musician.musician_id.id}`,
+    );
   });
 
   describe("findAll method", () => {

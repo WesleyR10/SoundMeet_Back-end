@@ -18,7 +18,7 @@ describe("Musician Unit Tests without validator", () => {
       genres: ["Rock"],
       instruments: ["Guitar"],
     });
-    expect(musician.id).toBeInstanceOf(MusicianId);
+    expect(musician.musician_id).toBeInstanceOf(MusicianId);
     expect(musician.name).toBe("John Doe");
     expect(musician.email).toBeInstanceOf(Email);
     expect(musician.email.value).toBe("john@example.com");
@@ -55,7 +55,7 @@ describe("Musician Unit Tests without validator", () => {
       is_verified: true,
       created_at,
     });
-    expect(musician.id).toBeInstanceOf(MusicianId);
+    expect(musician.musician_id).toBeInstanceOf(MusicianId);
     expect(musician.name).toBe("Jane Smith");
     expect(musician.email.value).toBe("jane@example.com");
     expect(musician.stage_name).toBe("Jane Rock");
@@ -82,9 +82,8 @@ describe("Musician Unit Tests without validator", () => {
       genres: ["Rock"],
       instruments: ["Guitar"],
     });
-    expect(musician.id).toBeDefined();
-    expect(musician.id).toBeInstanceOf(MusicianId);
-    expect(musician.entity_id).toBe(musician.id);
+    expect(musician.musician_id).toBeDefined();
+    expect(musician.musician_id).toBeInstanceOf(MusicianId);
   });
 
   test("should create musician with create method", () => {
@@ -94,7 +93,7 @@ describe("Musician Unit Tests without validator", () => {
       genres: ["Rock"],
       instruments: ["Guitar"],
     });
-    expect(musician.id).toBeInstanceOf(MusicianId);
+    expect(musician.musician_id).toBeInstanceOf(MusicianId);
     expect(musician.name).toBe("John Doe");
     expect(musician.email.value).toBe("john@example.com");
     expect(musician.genres).toEqual(["Rock"]);
@@ -216,7 +215,7 @@ describe("Musician Unit Tests without validator", () => {
     });
     musician.generateQRCode();
     expect(musician.qr_code).toBeInstanceOf(QRCode);
-    expect(musician.qr_code?.url).toContain(musician.id.id);
+    expect(musician.qr_code?.url).toContain(musician.musician_id.id);
   });
 
   test("should add rating", () => {
@@ -349,7 +348,7 @@ describe("Musician Unit Tests without validator", () => {
 
     const json = musician.toJSON();
     expect(json).toEqual({
-      id: musician.id.id,
+      musician_id: musician.musician_id.id,
       email: "john@example.com",
       name: "John Doe",
       stage_name: "John Rock",
@@ -364,7 +363,9 @@ describe("Musician Unit Tests without validator", () => {
       total_ratings: 100,
       is_active: true,
       is_verified: true,
+      profile: null,
       created_at: musician.created_at,
+      updated_at: musician.updated_at,
       display_name: "John Rock",
       is_experienced: true,
       is_highly_rated: true,

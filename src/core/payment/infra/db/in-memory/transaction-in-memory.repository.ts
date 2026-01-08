@@ -7,7 +7,7 @@ import {
   TransactionSearchParams,
   TransactionSearchResult,
 } from "../../../domain/repositories/transaction.repository";
-import { Transaction } from "../../../domain/transaction.entity";
+import { Transaction } from "../../../domain/transaction.aggregate";
 
 export class TransactionInMemoryRepository
   extends InMemorySearchableRepository<Transaction, Uuid, TransactionFilter>

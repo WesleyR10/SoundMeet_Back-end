@@ -102,6 +102,8 @@ export const CONFIG_LIMITS_SCHEMA = {
   MAX_REQUESTS_PER_USER_PER_EVENT: Joi.number().default(5),
   REQUEST_COOLDOWN_MINUTES: Joi.number().default(2),
   VOTING_INTERVAL_MINUTES: Joi.number().default(3),
+
+  BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: Joi.number().min(0).default(72),
 };
 
 export const CONFIG_PRISMA_SCHEMA = {

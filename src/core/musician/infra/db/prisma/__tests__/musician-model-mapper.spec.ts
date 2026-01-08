@@ -3,10 +3,8 @@ import { Phone } from "../../../../../shared/domain/value-objects/phone.vo";
 import { QRCode } from "../../../../../shared/domain/value-objects/qr-code.vo";
 import { Rating } from "../../../../../shared/domain/value-objects/rating.vo";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
-import {
-  MusicianModelMapper,
-  MusicianModelProps,
-} from "../musician-model-mapper";
+import { MusicianModel } from "../musician-model";
+import { MusicianModelMapper } from "../musician-model-mapper";
 
 describe("MusicianModelMapper", () => {
   describe("toModel", () => {
@@ -31,7 +29,7 @@ describe("MusicianModelMapper", () => {
       const model = MusicianModelMapper.toModel(musician);
 
       expect(model).toEqual({
-        id: musician.id.id,
+        id: musician.musician_id.id,
         email: musician.email.value,
         name: musician.name,
         stage_name: musician.stage_name,
@@ -61,7 +59,7 @@ describe("MusicianModelMapper", () => {
       const model = MusicianModelMapper.toModel(musician);
 
       expect(model).toEqual({
-        id: musician.id.id,
+        id: musician.musician_id.id,
         email: musician.email.value,
         name: musician.name,
         stage_name: null,
@@ -83,7 +81,7 @@ describe("MusicianModelMapper", () => {
 
     it("should handle null optional properties correctly", () => {
       const musician = new Musician({
-        id: new MusicianId(),
+        musician_id: new MusicianId(),
         email: "test@example.com",
         name: "Test Musician",
         stage_name: undefined,
@@ -120,7 +118,7 @@ describe("MusicianModelMapper", () => {
       const created_at = new Date();
       const updated_at = new Date(created_at.getTime() + 1000);
 
-      const model: MusicianModelProps = {
+      const model: MusicianModel = {
         id: musicianId.id,
         email: "john@example.com",
         name: "John Doe",
@@ -138,11 +136,12 @@ describe("MusicianModelMapper", () => {
         is_verified: true,
         created_at: created_at,
         updated_at: updated_at,
+        profile: null,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.musician_id.id).toBe(model.id);
       expect(entity.email.value).toBe(model.email);
       expect(entity.name).toBe(model.name);
       expect(entity.stage_name).toBe(model.stage_name);
@@ -165,7 +164,7 @@ describe("MusicianModelMapper", () => {
       const created_at = new Date();
       const updated_at = new Date(created_at.getTime() + 1000);
 
-      const model: MusicianModelProps = {
+      const model: MusicianModel = {
         id: musicianId.id,
         email: "jane@example.com",
         name: "Jane Doe",
@@ -183,11 +182,12 @@ describe("MusicianModelMapper", () => {
         is_verified: false,
         created_at: created_at,
         updated_at: updated_at,
+        profile: null,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.musician_id.id).toBe(model.id);
       expect(entity.email.value).toBe(model.email);
       expect(entity.name).toBe(model.name);
       expect(entity.stage_name).toBeNull();
@@ -208,7 +208,7 @@ describe("MusicianModelMapper", () => {
     it("should handle null values correctly", () => {
       const created_at = new Date();
       const updated_at = new Date(created_at.getTime() + 1000);
-      const model: MusicianModelProps = {
+      const model: MusicianModel = {
         id: new MusicianId().id,
         email: "test@example.com",
         name: "Test Musician",
@@ -226,6 +226,7 @@ describe("MusicianModelMapper", () => {
         is_verified: false,
         created_at: created_at,
         updated_at: updated_at,
+        profile: null,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
@@ -243,7 +244,7 @@ describe("MusicianModelMapper", () => {
     it("should create proper value objects", () => {
       const created_at = new Date();
       const updated_at = new Date(created_at.getTime() + 1000);
-      const model: MusicianModelProps = {
+      const model: MusicianModel = {
         id: new MusicianId().id,
         email: "test@example.com",
         name: "Test Musician",
@@ -261,11 +262,12 @@ describe("MusicianModelMapper", () => {
         is_verified: false,
         created_at: created_at,
         updated_at: updated_at,
+        profile: null,
       };
 
       const entity = MusicianModelMapper.toEntity(model);
 
-      expect(entity.id).toBeInstanceOf(MusicianId);
+      expect(entity.musician_id).toBeInstanceOf(MusicianId);
       expect(entity.email).toBeInstanceOf(Email);
       expect(entity.phone).toBeInstanceOf(Phone);
       expect(entity.qr_code).toBeInstanceOf(QRCode);
@@ -295,7 +297,9 @@ describe("MusicianModelMapper", () => {
       const model = MusicianModelMapper.toModel(originalMusician);
       const convertedMusician = MusicianModelMapper.toEntity(model);
 
-      expect(convertedMusician.id.equals(originalMusician.id)).toBe(true);
+      expect(
+        convertedMusician.musician_id.equals(originalMusician.musician_id),
+      ).toBe(true);
       expect(convertedMusician.email.equals(originalMusician.email)).toBe(true);
       expect(convertedMusician.name).toBe(originalMusician.name);
       expect(convertedMusician.stage_name).toBe(originalMusician.stage_name);

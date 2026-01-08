@@ -47,7 +47,7 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── Sistema de avaliação e reviews de outros estabelecimentos
   ├── **Visualização de Preços**: Exibição clara do valor/hora cobrado por cada músico
   ├── **Chat Integrado**: Sistema de mensagens direto com músicos para negociação e agendamento
-  └── **Agenda Compartilhada**: Visualização da disponibilidade dos músicos em tempo real
+  └── **Agenda Compartilhada**: Visualização da disponibilidade de músicos e bandas em tempo real
 
 - **Analytics de Público**:
   ├── Demografia do público por evento (idade, gênero, preferências)

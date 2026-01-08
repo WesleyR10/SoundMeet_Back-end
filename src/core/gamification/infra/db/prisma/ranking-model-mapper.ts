@@ -17,7 +17,7 @@ export type RankingModelProps = {
 export class RankingModelMapper {
   static toModel(entity: Ranking): RankingModelProps {
     return {
-      id: entity.id.id,
+      id: entity.ranking_id.id,
       type: entity.ranking_type,
       period: entity.period,
       data: {
@@ -43,7 +43,7 @@ export class RankingModelMapper {
       ]);
     }
     return new Ranking({
-      id: new RankingId(model.id),
+      ranking_id: new RankingId(model.id),
       user_id: new Uuid(data.user_id),
       ranking_type: model.type as RankingTypeEnum,
       period: model.period as RankingPeriodEnum,

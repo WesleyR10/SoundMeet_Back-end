@@ -24,7 +24,7 @@ describe("AudienceModelMapper", () => {
       const model = AudienceModelMapper.toModel(audience);
 
       expect(model).toEqual({
-        id: audience.id.id,
+        id: audience.audience_id.id,
         email: audience.email.value,
         name: audience.name,
         nickname: audience.nickname,
@@ -57,7 +57,7 @@ describe("AudienceModelMapper", () => {
 
       const model = AudienceModelMapper.toModel(audience);
 
-      expect(model.id).toBe(audience.id.id);
+      expect(model.id).toBe(audience.audience_id.id);
       expect(model.email).toBe(audience.email.value);
       expect(model.name).toBe(audience.name);
       expect(model.location).toBeNull();
@@ -97,7 +97,7 @@ describe("AudienceModelMapper", () => {
 
       const entity = AudienceModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.audience_id.id).toBe(model.id);
       expect(entity.email.value).toBe(model.email);
       expect(entity.name).toBe(model.name);
       expect(entity.nickname).toBe(model.nickname);
@@ -155,7 +155,7 @@ describe("AudienceModelMapper", () => {
 
       const entity = AudienceModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.audience_id.id).toBe(model.id);
       expect(entity.email.value).toBe(model.email);
       expect(entity.name).toBe(model.name);
       expect(entity.nickname).toBeNull();

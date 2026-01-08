@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import { Currency } from "../../../../../shared/domain/value-objects/money.vo";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import { MusicianSearchParams } from "../../../../domain/musician.repository";
 import { MusicianModelMapper } from "../musician-model-mapper";
@@ -34,7 +35,7 @@ describe("MusicianPrismaRepository", () => {
       await repository.insert(musician);
 
       expect(prisma.musician.create).toHaveBeenCalledWith({
-        data: modelProps,
+        data: { ...modelProps, profile: undefined },
       });
     });
   });
@@ -65,8 +66,8 @@ describe("MusicianPrismaRepository", () => {
       await repository.update(musician);
 
       expect(prisma.musician.update).toHaveBeenCalledWith({
-        where: { id: musician.id.id },
-        data: modelProps,
+        where: { id: musician.musician_id.id },
+        data: { ...modelProps, profile: undefined },
       });
     });
 
@@ -76,7 +77,7 @@ describe("MusicianPrismaRepository", () => {
       (prisma.musician.update as jest.Mock).mockRejectedValue(error);
 
       await expect(repository.update(musician)).rejects.toThrow(
-        new NotFoundError(musician.id.id, Musician),
+        new NotFoundError(musician.musician_id.id, Musician),
       );
     });
 
@@ -125,10 +126,11 @@ describe("MusicianPrismaRepository", () => {
       const model = MusicianModelMapper.toModel(musician);
       (prisma.musician.findUnique as jest.Mock).mockResolvedValue(model);
 
-      const result = await repository.findById(musician.id);
+      const result = await repository.findById(musician.musician_id);
 
       expect(prisma.musician.findUnique).toHaveBeenCalledWith({
-        where: { id: musician.id.id },
+        where: { id: musician.musician_id.id },
+        include: { profile: true },
       });
       expect(result).toEqual(musician);
     });
@@ -150,7 +152,7 @@ describe("MusicianPrismaRepository", () => {
         Musician.fake().aMusician().build(),
       ];
       const models = musicians.map((m) => MusicianModelMapper.toModel(m));
-      const ids = musicians.map((m) => m.id);
+      const ids = musicians.map((m) => m.musician_id);
       (prisma.musician.findMany as jest.Mock).mockResolvedValue(models);
 
       const result = await repository.findByIds(ids);
@@ -161,6 +163,7 @@ describe("MusicianPrismaRepository", () => {
             in: ids.map((id) => id.id),
           },
         },
+        include: { profile: true },
       });
       expect(result).toHaveLength(2);
     });
@@ -227,6 +230,7 @@ describe("MusicianPrismaRepository", () => {
             mode: "insensitive",
           },
         },
+        include: { profile: true },
         orderBy: { name: "asc" },
         skip: 0,
         take: 2,
@@ -277,6 +281,26 @@ describe("MusicianPrismaRepository", () => {
           hasSome: ["Rock", "Pop"],
         },
         is_active: true,
+      });
+    });
+
+    it("should build where clause with price range filters", () => {
+      const result = repository["buildWhereClause"]({
+        price_model: "per_event",
+        price_min: 100,
+        price_max: 200,
+        price_currency: Currency.BRL,
+      });
+
+      expect(result).toEqual({
+        profile: {
+          is: {
+            price_model: "per_event",
+            price_currency: "BRL",
+            price_max: { gte: 100 },
+            price_min: { lte: 200 },
+          },
+        },
       });
     });
   });

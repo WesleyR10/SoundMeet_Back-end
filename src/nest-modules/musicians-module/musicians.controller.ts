@@ -13,15 +13,17 @@ import {
 } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 
-import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-output";
+import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
+import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { CreateMusicianDto } from "./dto/create-musician.dto";
 import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
+import { UpdateMusicianProfileDto } from "./dto/update-musician-profile.dto";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
@@ -35,6 +37,9 @@ export class MusiciansController {
 
   @Inject(UpdateMusicianUseCase)
   private updateUseCase: UpdateMusicianUseCase;
+
+  @Inject(UpdateMusicianProfileUseCase)
+  private updateProfileUseCase: UpdateMusicianProfileUseCase;
 
   @Inject(DeleteMusicianUseCase)
   private deleteUseCase: DeleteMusicianUseCase;
@@ -52,7 +57,7 @@ export class MusiciansController {
   })
   @ApiResponse({ status: 201, type: MusicianPresenter })
   async create(@Body() createMusicianDto: CreateMusicianDto) {
-    const output = await this.createUseCase.execute(createMusicianDto as any);
+    const output = await this.createUseCase.execute(createMusicianDto);
     return MusiciansController.serialize(output);
   }
 
@@ -93,9 +98,25 @@ export class MusiciansController {
     @Body() updateMusicianDto: UpdateMusicianDto,
   ) {
     const output = await this.updateUseCase.execute({
-      ...(updateMusicianDto as any),
+      ...updateMusicianDto,
       id,
     });
+    return MusiciansController.serialize(output);
+  }
+
+  @Patch(":id/profile")
+  @ApiOperation({
+    summary: "Atualizar perfil do músico",
+    description:
+      "Atualiza dados do MusicianProfile (preço, localização, links sociais).",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async updateProfile(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: UpdateMusicianProfileDto,
+  ) {
+    const output = await this.updateProfileUseCase.execute({ ...dto, id });
     return MusiciansController.serialize(output);
   }
 

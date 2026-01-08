@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { CurrencyEnum, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -16,6 +16,20 @@ export class BandPrismaRepository implements IBandRepository {
   sortableFields: string[] = ["name", "created_at"];
 
   constructor(private prisma: PrismaClient) {}
+
+  private isValidPrismaCurrency(currency: unknown): currency is CurrencyEnum {
+    return (Object.values(CurrencyEnum) as unknown[]).includes(currency);
+  }
+
+  private toPrismaCurrency(currency: unknown): CurrencyEnum | null {
+    if (!currency) {
+      return null;
+    }
+    if (!this.isValidPrismaCurrency(currency)) {
+      return null;
+    }
+    return currency;
+  }
 
   async insert(entity: Band): Promise<void> {
     const modelProps = BandModelMapper.toModel(entity);
@@ -193,6 +207,32 @@ export class BandPrismaRepository implements IBandRepository {
       where.genres = {
         hasSome: filter.genres,
       };
+    }
+
+    const prismaCurrency = this.toPrismaCurrency(filter.price_currency ?? null);
+
+    if (filter.price_model) {
+      where.price_model = filter.price_model;
+    }
+
+    if (prismaCurrency) {
+      where.price_currency = prismaCurrency;
+    }
+
+    if (
+      filter.price_min !== null &&
+      filter.price_min !== undefined &&
+      Number.isFinite(filter.price_min)
+    ) {
+      where.price_max = { gte: filter.price_min };
+    }
+
+    if (
+      filter.price_max !== null &&
+      filter.price_max !== undefined &&
+      Number.isFinite(filter.price_max)
+    ) {
+      where.price_min = { lte: filter.price_max };
     }
 
     if (filter.is_active !== undefined) {

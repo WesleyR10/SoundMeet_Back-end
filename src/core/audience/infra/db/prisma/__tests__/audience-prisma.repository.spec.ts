@@ -84,22 +84,24 @@ describe("AudiencePrismaRepository", () => {
         modelWithBadges,
       );
 
-      const result = await repository.findById(audience.id);
+      const result = await repository.findById(audience.audience_id);
 
-      expect(result).toMatchObject({
-        id: audience.id,
-        name: audience.name,
-        email: audience.email,
-        nickname: audience.nickname,
-        avatar: audience.avatar,
-        phone: audience.phone,
-        badges: audience.badges,
-        favorite_genres: audience.favorite_genres,
-        favorite_artists: audience.favorite_artists,
-        is_active: audience.is_active,
-      });
+      expect(result).not.toBeNull();
+      expect(result?.audience_id.id).toBe(audience.audience_id.id);
+      expect(result?.name).toBe(audience.name);
+      expect(result?.email.value).toBe(audience.email.value);
+      expect(result?.nickname).toBe(audience.nickname);
+      expect(result?.avatar).toBe(audience.avatar);
+      expect(result?.phone?.value ?? null).toBe(audience.phone?.value ?? null);
+      expect(result?.badges).toEqual(audience.badges);
+      expect(result?.favorite_genres).toEqual(audience.favorite_genres);
+      expect(result?.favorite_artists).toEqual(audience.favorite_artists);
+      expect(result?.favorite_instruments).toEqual(
+        audience.favorite_instruments,
+      );
+      expect(result?.is_active).toBe(audience.is_active);
       expect(prisma.audience.findUnique).toHaveBeenCalledWith({
-        where: { id: audience.id.id },
+        where: { id: audience.audience_id.id },
         include: {
           badges: {
             include: {
@@ -144,32 +146,37 @@ describe("AudiencePrismaRepository", () => {
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject({
-        id: audiences[0].id,
-        name: audiences[0].name,
-        email: audiences[0].email,
-        nickname: audiences[0].nickname,
-        avatar: audiences[0].avatar,
-        phone: audiences[0].phone,
-        badges: audiences[0].badges,
-        favorite_genres: audiences[0].favorite_genres,
-        favorite_artists: audiences[0].favorite_artists,
-        favorite_instruments: audiences[0].favorite_instruments,
-        is_active: audiences[0].is_active,
-      });
-      expect(result[1]).toMatchObject({
-        id: audiences[1].id,
-        name: audiences[1].name,
-        email: audiences[1].email,
-        nickname: audiences[1].nickname,
-        avatar: audiences[1].avatar,
-        phone: audiences[1].phone,
-        badges: audiences[1].badges,
-        favorite_genres: audiences[1].favorite_genres,
-        favorite_artists: audiences[1].favorite_artists,
-        favorite_instruments: audiences[1].favorite_instruments,
-        is_active: audiences[1].is_active,
-      });
+      expect(result[0].audience_id.id).toBe(audiences[0].audience_id.id);
+      expect(result[0].name).toBe(audiences[0].name);
+      expect(result[0].email.value).toBe(audiences[0].email.value);
+      expect(result[0].nickname).toBe(audiences[0].nickname);
+      expect(result[0].avatar).toBe(audiences[0].avatar);
+      expect(result[0].phone?.value ?? null).toBe(
+        audiences[0].phone?.value ?? null,
+      );
+      expect(result[0].badges).toEqual(audiences[0].badges);
+      expect(result[0].favorite_genres).toEqual(audiences[0].favorite_genres);
+      expect(result[0].favorite_artists).toEqual(audiences[0].favorite_artists);
+      expect(result[0].favorite_instruments).toEqual(
+        audiences[0].favorite_instruments,
+      );
+      expect(result[0].is_active).toBe(audiences[0].is_active);
+
+      expect(result[1].audience_id.id).toBe(audiences[1].audience_id.id);
+      expect(result[1].name).toBe(audiences[1].name);
+      expect(result[1].email.value).toBe(audiences[1].email.value);
+      expect(result[1].nickname).toBe(audiences[1].nickname);
+      expect(result[1].avatar).toBe(audiences[1].avatar);
+      expect(result[1].phone?.value ?? null).toBe(
+        audiences[1].phone?.value ?? null,
+      );
+      expect(result[1].badges).toEqual(audiences[1].badges);
+      expect(result[1].favorite_genres).toEqual(audiences[1].favorite_genres);
+      expect(result[1].favorite_artists).toEqual(audiences[1].favorite_artists);
+      expect(result[1].favorite_instruments).toEqual(
+        audiences[1].favorite_instruments,
+      );
+      expect(result[1].is_active).toBe(audiences[1].is_active);
     });
   });
 
@@ -183,7 +190,7 @@ describe("AudiencePrismaRepository", () => {
       await repository.update(audience);
 
       expect(prisma.audience.update).toHaveBeenCalledWith({
-        where: { id: audience.id.id },
+        where: { id: audience.audience_id.id },
         data: {
           email: modelProps.email,
           name: modelProps.name,
@@ -276,30 +283,45 @@ describe("AudiencePrismaRepository", () => {
         include: { badges: { include: { badge: true } } },
       });
       expect(result.items).toHaveLength(2);
-      expect(result.items[0]).toMatchObject({
-        id: audiences[0].id,
-        name: audiences[0].name,
-        email: audiences[0].email,
-        nickname: audiences[0].nickname,
-        avatar: audiences[0].avatar,
-        phone: audiences[0].phone,
-        badges: audiences[0].badges,
-        favorite_genres: audiences[0].favorite_genres,
-        favorite_artists: audiences[0].favorite_artists,
-        is_active: audiences[0].is_active,
-      });
-      expect(result.items[1]).toMatchObject({
-        id: audiences[1].id,
-        name: audiences[1].name,
-        email: audiences[1].email,
-        nickname: audiences[1].nickname,
-        avatar: audiences[1].avatar,
-        phone: audiences[1].phone,
-        badges: audiences[1].badges,
-        favorite_genres: audiences[1].favorite_genres,
-        favorite_artists: audiences[1].favorite_artists,
-        is_active: audiences[1].is_active,
-      });
+      expect(result.items[0].audience_id.id).toBe(audiences[0].audience_id.id);
+      expect(result.items[0].name).toBe(audiences[0].name);
+      expect(result.items[0].email.value).toBe(audiences[0].email.value);
+      expect(result.items[0].nickname).toBe(audiences[0].nickname);
+      expect(result.items[0].avatar).toBe(audiences[0].avatar);
+      expect(result.items[0].phone?.value ?? null).toBe(
+        audiences[0].phone?.value ?? null,
+      );
+      expect(result.items[0].badges).toEqual(audiences[0].badges);
+      expect(result.items[0].favorite_genres).toEqual(
+        audiences[0].favorite_genres,
+      );
+      expect(result.items[0].favorite_artists).toEqual(
+        audiences[0].favorite_artists,
+      );
+      expect(result.items[0].favorite_instruments).toEqual(
+        audiences[0].favorite_instruments,
+      );
+      expect(result.items[0].is_active).toBe(audiences[0].is_active);
+
+      expect(result.items[1].audience_id.id).toBe(audiences[1].audience_id.id);
+      expect(result.items[1].name).toBe(audiences[1].name);
+      expect(result.items[1].email.value).toBe(audiences[1].email.value);
+      expect(result.items[1].nickname).toBe(audiences[1].nickname);
+      expect(result.items[1].avatar).toBe(audiences[1].avatar);
+      expect(result.items[1].phone?.value ?? null).toBe(
+        audiences[1].phone?.value ?? null,
+      );
+      expect(result.items[1].badges).toEqual(audiences[1].badges);
+      expect(result.items[1].favorite_genres).toEqual(
+        audiences[1].favorite_genres,
+      );
+      expect(result.items[1].favorite_artists).toEqual(
+        audiences[1].favorite_artists,
+      );
+      expect(result.items[1].favorite_instruments).toEqual(
+        audiences[1].favorite_instruments,
+      );
+      expect(result.items[1].is_active).toBe(audiences[1].is_active);
       expect(result.total).toBe(2);
     });
 
@@ -339,19 +361,23 @@ describe("AudiencePrismaRepository", () => {
         include: { badges: { include: { badge: true } } },
       });
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]).toMatchObject({
-        id: audience.id,
-        name: audience.name,
-        email: audience.email,
-        nickname: audience.nickname,
-        avatar: audience.avatar,
-        phone: audience.phone,
-        badges: audience.badges,
-        favorite_genres: audience.favorite_genres,
-        favorite_artists: audience.favorite_artists,
-        favorite_instruments: audience.favorite_instruments,
-        is_active: audience.is_active,
-      });
+      expect(result.items[0].audience_id.id).toBe(audience.audience_id.id);
+      expect(result.items[0].name).toBe(audience.name);
+      expect(result.items[0].email.value).toBe(audience.email.value);
+      expect(result.items[0].nickname).toBe(audience.nickname);
+      expect(result.items[0].avatar).toBe(audience.avatar);
+      expect(result.items[0].phone?.value ?? null).toBe(
+        audience.phone?.value ?? null,
+      );
+      expect(result.items[0].badges).toEqual(audience.badges);
+      expect(result.items[0].favorite_genres).toEqual(audience.favorite_genres);
+      expect(result.items[0].favorite_artists).toEqual(
+        audience.favorite_artists,
+      );
+      expect(result.items[0].favorite_instruments).toEqual(
+        audience.favorite_instruments,
+      );
+      expect(result.items[0].is_active).toBe(audience.is_active);
       expect(result.total).toBe(1);
     });
 
@@ -452,18 +478,23 @@ describe("AudiencePrismaRepository", () => {
         include: { badges: { include: { badge: true } } },
       });
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]).toMatchObject({
-        id: audience.id,
-        name: audience.name,
-        email: audience.email,
-        nickname: audience.nickname,
-        avatar: audience.avatar,
-        phone: audience.phone,
-        badges: audience.badges,
-        favorite_genres: audience.favorite_genres,
-        favorite_artists: audience.favorite_artists,
-        is_active: audience.is_active,
-      });
+      expect(result.items[0].audience_id.id).toBe(audience.audience_id.id);
+      expect(result.items[0].name).toBe(audience.name);
+      expect(result.items[0].email.value).toBe(audience.email.value);
+      expect(result.items[0].nickname).toBe(audience.nickname);
+      expect(result.items[0].avatar).toBe(audience.avatar);
+      expect(result.items[0].phone?.value ?? null).toBe(
+        audience.phone?.value ?? null,
+      );
+      expect(result.items[0].badges).toEqual(audience.badges);
+      expect(result.items[0].favorite_genres).toEqual(audience.favorite_genres);
+      expect(result.items[0].favorite_artists).toEqual(
+        audience.favorite_artists,
+      );
+      expect(result.items[0].favorite_instruments).toEqual(
+        audience.favorite_instruments,
+      );
+      expect(result.items[0].is_active).toBe(audience.is_active);
     });
   });
 });

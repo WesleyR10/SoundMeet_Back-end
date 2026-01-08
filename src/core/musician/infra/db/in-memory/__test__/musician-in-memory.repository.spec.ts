@@ -1,3 +1,5 @@
+import { Currency } from "../../../../../shared/domain/value-objects/money.vo";
+import { PriceRange } from "../../../../../shared/domain/value-objects/price-range.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../musician-in-memory.repository";
 
@@ -80,6 +82,41 @@ describe("MusicianInMemoryRepository", () => {
       instruments: ["Piano"],
     });
     expect(itemsFiltered).toStrictEqual([items[0], items[2]]);
+  });
+
+  it("should filter items using price range parameters", async () => {
+    const items = [
+      Musician.fake().aMusician().withName("m1").build(),
+      Musician.fake().aMusician().withName("m2").build(),
+      Musician.fake().aMusician().withName("m3").build(),
+    ];
+
+    items[0].updatePriceRange(
+      new PriceRange({ model: "per_event", min: 100, max: 200 }),
+    );
+    items[1].updatePriceRange(
+      new PriceRange({
+        model: "per_event",
+        min: 300,
+        max: 400,
+        currency: Currency.USD,
+      }),
+    );
+    items[2].updatePriceRange(
+      new PriceRange({ model: "per_hour", min: 50, max: 80 }),
+    );
+
+    let itemsFiltered = await repository["applyFilter"](items, {
+      price_min: 150,
+      price_max: 350,
+      price_model: "per_event",
+    });
+    expect(itemsFiltered).toStrictEqual([items[0], items[1]]);
+
+    itemsFiltered = await repository["applyFilter"](items, {
+      price_currency: Currency.USD,
+    });
+    expect(itemsFiltered).toStrictEqual([items[1]]);
   });
 
   it("should filter items using is_active parameter", async () => {

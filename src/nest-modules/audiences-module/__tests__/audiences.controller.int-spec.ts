@@ -247,7 +247,7 @@ describe("AudiencesController Integration Tests", () => {
       "when body is $send_data",
       async ({ send_data, expected }) => {
         const presenter = await controller.update(
-          audience.id.id,
+          audience.audience_id.id,
           send_data as any,
         );
         const entity = await audienceRepository.findById(
@@ -266,10 +266,12 @@ describe("AudiencesController Integration Tests", () => {
     const audience = Audience.fake().aAudience().build();
     await audienceRepository.insert(audience);
 
-    const response = await controller.remove(audience.id.id);
+    const response = await controller.remove(audience.audience_id.id);
     expect(response).not.toBeDefined();
 
-    await expect(audienceRepository.findById(audience.id)).resolves.toBeNull();
+    await expect(
+      audienceRepository.findById(audience.audience_id),
+    ).resolves.toBeNull();
   });
 
   it("should get an audience", async () => {
@@ -281,9 +283,9 @@ describe("AudiencesController Integration Tests", () => {
     });
     await audienceRepository.insert(audience);
 
-    const presenter = await controller.findOne(audience.id.id);
+    const presenter = await controller.findOne(audience.audience_id.id);
 
-    expect(presenter.id).toBe(audience.id.id);
+    expect(presenter.id).toBe(audience.audience_id.id);
     expect(presenter.name).toBe(audience.name);
     expect(presenter.email).toBe(audience.email.value);
     expect(presenter.favorite_genres).toEqual(audience.favorite_genres);
@@ -351,18 +353,18 @@ describe("AudiencesController Integration Tests", () => {
     const musician = Musician.fake().aMusician().build();
     await musicianRepository.insert(musician);
 
-    const presenter = await controller.scanQR(audience.id.id, {
+    const presenter = await controller.scanQR(audience.audience_id.id, {
       qr_code: "qr_code",
-      musician_id: musician.id.id,
+      musician_id: musician.musician_id.id,
     } as any);
 
     expect(presenter).toBeInstanceOf(ScanQRPresenter);
-    expect(presenter.audience.id).toBe(audience.id.id);
+    expect(presenter.audience.id).toBe(audience.audience_id.id);
     expect(presenter.points_earned.value).toBe(10);
     expect(presenter.scan_metadata.qr_code).toBe("qr_code");
 
     const interactions = await userInteractionRepository.findByUserId(
-      audience.id.id,
+      audience.audience_id.id,
     );
     expect(interactions).toHaveLength(1);
     expect(interactions[0].interaction_type).toBe("scan_qr");
@@ -375,14 +377,17 @@ describe("AudiencesController Integration Tests", () => {
     });
     await audienceRepository.insert(audience);
 
-    const presenter = await controller.makeMusicRequest(audience.id.id, {
-      musician_id: "musician_1",
-      song_title: "Song",
-      artist_name: "Artist",
-    } as any);
+    const presenter = await controller.makeMusicRequest(
+      audience.audience_id.id,
+      {
+        musician_id: "musician_1",
+        song_title: "Song",
+        artist_name: "Artist",
+      } as any,
+    );
 
     expect(presenter).toBeInstanceOf(MakeMusicRequestPresenter);
-    expect(presenter.audience.id).toBe(audience.id.id);
+    expect(presenter.audience.id).toBe(audience.audience_id.id);
     expect(presenter.points_earned).toBe(25);
     expect(presenter.request_metadata.status).toBe("pending");
   });
@@ -394,14 +399,14 @@ describe("AudiencesController Integration Tests", () => {
     });
     await audienceRepository.insert(audience);
 
-    const presenter = await controller.sendTip(audience.id.id, {
+    const presenter = await controller.sendTip(audience.audience_id.id, {
       musician_id: "musician_1",
       amount: 10,
       payment_method: "pix",
     } as any);
 
     expect(presenter).toBeInstanceOf(SendTipPresenter);
-    expect(presenter.audience.id).toBe(audience.id.id);
+    expect(presenter.audience.id).toBe(audience.audience_id.id);
     expect(presenter.points_earned).toBe(10);
     expect(presenter.tip_metadata.status).toBe("success");
   });
@@ -437,9 +442,12 @@ describe("AudiencesController Integration Tests", () => {
         .build(),
     );
 
-    const presenter = await controller.recommendMusicians(audience.id.id, {
-      per_page: 10,
-    } as any);
+    const presenter = await controller.recommendMusicians(
+      audience.audience_id.id,
+      {
+        per_page: 10,
+      } as any,
+    );
 
     expect(presenter).toBeInstanceOf(MusicianCollectionPresenter);
     expect(presenter.data).toHaveLength(2);

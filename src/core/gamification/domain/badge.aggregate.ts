@@ -1,10 +1,9 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { BadgeValidatorFactory } from "./badge.validator";
 import { BadgeFakeBuilder } from "./badge-fake.builder";
 
 export type BadgeConstructorProps = {
-  id?: BadgeId;
+  badge_id?: BadgeId;
   name: string;
   description: string;
   icon: string;
@@ -34,7 +33,7 @@ export type BadgeRarity = "common" | "rare" | "epic" | "legendary";
 export class BadgeId extends Uuid {}
 
 export class Badge extends AggregateRoot {
-  id: BadgeId;
+  badge_id: BadgeId;
   name: string;
   description: string;
   icon: string;
@@ -48,7 +47,7 @@ export class Badge extends AggregateRoot {
 
   constructor(props: BadgeConstructorProps) {
     super();
-    this.id = props.id ?? new BadgeId();
+    this.badge_id = props.badge_id ?? new BadgeId();
     this.name = props.name;
     this.description = props.description;
     this.icon = props.icon;
@@ -61,8 +60,8 @@ export class Badge extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): BadgeId {
+    return this.badge_id;
   }
 
   static create(props: BadgeCreateCommand): Badge {
@@ -163,7 +162,7 @@ export class Badge extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      badge_id: this.badge_id.id,
       name: this.name,
       description: this.description,
       icon: this.icon,

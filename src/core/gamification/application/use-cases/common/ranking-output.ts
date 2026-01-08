@@ -20,9 +20,9 @@ export type RankingOutput = {
 
 export class RankingOutputMapper {
   static toOutput(entity: Ranking): RankingOutput {
-    const { id, ...otherProps } = entity.toJSON();
+    const { ranking_id, ...otherProps } = entity.toJSON();
     return {
-      id: id,
+      id: ranking_id,
       ...otherProps,
       is_current_period: entity.isCurrentPeriod(),
       is_top_position: entity.isTopPosition(),

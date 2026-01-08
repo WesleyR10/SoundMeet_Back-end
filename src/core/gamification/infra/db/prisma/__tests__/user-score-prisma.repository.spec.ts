@@ -34,7 +34,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
     it("should insert a new user score", async () => {
       const userScore = UserScore.fake().aUserScore().build();
       const modelProps = {
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -57,7 +57,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
     it("should insert multiple user scores", async () => {
       const userScores = UserScore.fake().theUserScores(3).build();
       const modelPropsArray = userScores.map((userScore) => ({
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -84,7 +84,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       userScore.changePoints(100);
 
       const modelProps = {
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: ScoreTypeEnum.QR_SCAN,
         points: userScore.points,
@@ -97,9 +97,9 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       await repository.update(userScore);
 
       expect(prisma.userScore.update).toHaveBeenCalledWith({
-        where: { id: userScore.id.id },
+        where: { id: userScore.user_score_id.id },
         data: {
-          id: userScore.id.id,
+          id: userScore.user_score_id.id,
           user_id: userScore.user_id.id,
           score_type: userScore.score_type,
           points: userScore.points,
@@ -127,10 +127,10 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const userScore = UserScore.fake().aUserScore().build();
 
       (prisma.userScore.delete as jest.Mock).mockResolvedValue({
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
       });
       (prisma.userScore.findUnique as jest.Mock).mockResolvedValue({
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -139,10 +139,10 @@ describe("UserScorePrismaRepository Unit Tests", () => {
         created_at: userScore.created_at,
       });
 
-      await repository.delete(userScore.id);
+      await repository.delete(userScore.user_score_id);
 
       expect(prisma.userScore.delete).toHaveBeenCalledWith({
-        where: { id: userScore.id.id },
+        where: { id: userScore.user_score_id.id },
       });
     });
 
@@ -162,7 +162,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
     it("should find user score by id", async () => {
       const userScore = UserScore.fake().aUserScore().build();
       const modelProps = {
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -171,10 +171,10 @@ describe("UserScorePrismaRepository Unit Tests", () => {
 
       (prisma.userScore.findUnique as jest.Mock).mockResolvedValue(modelProps);
 
-      const result = await repository.findById(userScore.id);
+      const result = await repository.findById(userScore.user_score_id);
 
       expect(result).toBeDefined();
-      expect(result!.id.id).toBe(userScore.id.id);
+      expect(result!.user_score_id.id).toBe(userScore.user_score_id.id);
       expect(result!.user_id.id).toBe(userScore.user_id.id);
       expect(result!.score_type).toBe(userScore.score_type);
       expect(result!.points).toBe(userScore.points);
@@ -195,7 +195,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
     it("should find user scores by ids", async () => {
       const userScores = UserScore.fake().theUserScores(3).build();
       const modelPropsArray = userScores.map((userScore) => ({
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -208,11 +208,11 @@ describe("UserScorePrismaRepository Unit Tests", () => {
         modelPropsArray,
       );
 
-      const ids = userScores.map((score) => score.id);
+      const ids = userScores.map((score) => score.user_score_id);
       const result = await repository.findByIds(ids);
 
       expect(result).toHaveLength(3);
-      expect(result.map((score) => score.id.id)).toEqual(
+      expect(result.map((score) => score.user_score_id.id)).toEqual(
         expect.arrayContaining(ids.map((id) => id.id)),
       );
       expect(prisma.userScore.findMany).toHaveBeenCalledWith({
@@ -233,7 +233,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       ];
 
       const modelPropsArray = userScores.map((userScore) => ({
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -245,13 +245,13 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       );
 
       const result = await repository.findByIds([
-        userScores[0].id,
-        userScores[1].id,
+        userScores[0].user_score_id,
+        userScores[1].user_score_id,
       ]);
 
       expect(result).toHaveLength(2);
-      expect(result[0].id.id).toBe(userScores[0].id.id);
-      expect(result[1].id.id).toBe(userScores[1].id.id);
+      expect(result[0].user_score_id.id).toBe(userScores[0].user_score_id.id);
+      expect(result[1].user_score_id.id).toBe(userScores[1].user_score_id.id);
     });
   });
 
@@ -261,17 +261,17 @@ describe("UserScorePrismaRepository Unit Tests", () => {
 
       (prisma.userScore.findMany as jest.Mock).mockResolvedValue([
         {
-          id: userScore.id.id,
+          id: userScore.user_score_id.id,
         },
       ]);
 
-      const result = await repository.existsById([userScore.id]);
+      const result = await repository.existsById([userScore.user_score_id]);
 
       expect(result.exists).toHaveLength(1);
-      expect(result.exists[0]).toStrictEqual(userScore.id);
+      expect(result.exists[0]).toStrictEqual(userScore.user_score_id);
       expect(result.not_exists).toHaveLength(0);
       expect(prisma.userScore.findMany).toHaveBeenCalledWith({
-        where: { id: { in: [userScore.id.id] } },
+        where: { id: { in: [userScore.user_score_id.id] } },
         select: { id: true },
       });
     });
@@ -294,7 +294,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
       const userId = new Uuid().id;
       const userScores = UserScore.fake().theUserScores(2).build();
       const modelPropsArray = userScores.map((userScore) => ({
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userScore.user_id.id,
         score_type: userScore.score_type,
         points: userScore.points,
@@ -338,7 +338,7 @@ describe("UserScorePrismaRepository Unit Tests", () => {
         .withUserId(userId)
         .build();
       const modelProps = {
-        id: userScore.id.id,
+        id: userScore.user_score_id.id,
         user_id: userId.id,
         score_type: ScoreTypeEnum.QR_SCAN,
         points: userScore.points,

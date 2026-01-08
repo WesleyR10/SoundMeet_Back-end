@@ -34,7 +34,7 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
   }
 
   async update(entity: UserScore): Promise<void> {
-    const id = entity.id.id;
+    const id = entity.user_score_id.id;
     const modelProps = UserScoreModelMapper.toModel(entity);
     await this.getEntityModel(id);
     await this.prismaClient.userScore.update({

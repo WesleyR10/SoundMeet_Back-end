@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { CurrencyEnum, Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -16,10 +16,64 @@ export class MusicianPrismaRepository implements IMusicianRepository {
 
   constructor(private prisma: PrismaClient) {}
 
+  private isValidPrismaCurrency(currency: unknown): currency is CurrencyEnum {
+    return (Object.values(CurrencyEnum) as unknown[]).includes(currency);
+  }
+
+  private toPrismaCurrency(currency: unknown): CurrencyEnum | null {
+    if (!currency) {
+      return null;
+    }
+    if (!this.isValidPrismaCurrency(currency)) {
+      return null;
+    }
+    return currency;
+  }
+
+  private toPrismaRequiredJson(
+    value: unknown,
+  ): Prisma.InputJsonValue | Prisma.JsonNullValueInput {
+    if (value === null) {
+      return Prisma.JsonNull;
+    }
+    return value as Prisma.InputJsonValue;
+  }
+
+  private toPrismaOptionalJson(
+    value: unknown,
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+    if (value === null) {
+      return Prisma.DbNull;
+    }
+    return value as Prisma.InputJsonValue;
+  }
+
   async insert(entity: Musician): Promise<void> {
     const modelProps = MusicianModelMapper.toModel(entity);
+    const profileModel = entity.profile
+      ? MusicianModelMapper.toProfileModel(entity.profile)
+      : null;
+
+    const profileCreateData = profileModel
+      ? {
+          ...(({ musicianId, ...data }) => data)(profileModel),
+          price_currency: this.toPrismaCurrency(profileModel.price_currency),
+          location: this.toPrismaRequiredJson(profileModel.location),
+          socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+        }
+      : null;
+
     await this.prisma.musician.create({
-      data: modelProps,
+      data: {
+        ...modelProps,
+        profile: profileCreateData
+          ? {
+              create: {
+                ...profileCreateData,
+              },
+            }
+          : undefined,
+      },
     });
   }
 
@@ -33,13 +87,44 @@ export class MusicianPrismaRepository implements IMusicianRepository {
   }
 
   async update(entity: Musician): Promise<void> {
-    const id = entity.id.id;
+    const id = entity.musician_id.id;
     const modelProps = MusicianModelMapper.toModel(entity);
+    const profileModel = entity.profile
+      ? MusicianModelMapper.toProfileModel(entity.profile)
+      : null;
+
+    const profileCreateData = profileModel
+      ? {
+          ...(({ musicianId, ...data }) => data)(profileModel),
+          price_currency: this.toPrismaCurrency(profileModel.price_currency),
+          location: this.toPrismaRequiredJson(profileModel.location),
+          socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+        }
+      : null;
+    const profileUpdateData = profileModel
+      ? {
+          ...(({ musicianId, id: profileId, ...data }) => data)(profileModel),
+          price_currency: this.toPrismaCurrency(profileModel.price_currency),
+          location: this.toPrismaRequiredJson(profileModel.location),
+          socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+        }
+      : null;
 
     try {
       await this.prisma.musician.update({
         where: { id: id },
-        data: modelProps,
+        data: {
+          ...modelProps,
+          profile:
+            profileCreateData && profileUpdateData
+              ? {
+                  upsert: {
+                    create: { ...profileCreateData },
+                    update: { ...profileUpdateData },
+                  },
+                }
+              : undefined,
+        },
       });
     } catch (error: any) {
       if (error.code === "P2025") {
@@ -67,6 +152,7 @@ export class MusicianPrismaRepository implements IMusicianRepository {
   async findById(entity_id: MusicianId): Promise<Musician | null> {
     const model = await this.prisma.musician.findUnique({
       where: { id: entity_id.id },
+      include: { profile: true },
     });
 
     return model ? MusicianModelMapper.toEntity(model) : null;
@@ -79,12 +165,15 @@ export class MusicianPrismaRepository implements IMusicianRepository {
           in: ids.map((id) => id.id),
         },
       },
+      include: { profile: true },
     });
     return models.map((m) => MusicianModelMapper.toEntity(m));
   }
 
   async findAll(): Promise<Musician[]> {
-    const models = await this.prisma.musician.findMany();
+    const models = await this.prisma.musician.findMany({
+      include: { profile: true },
+    });
     return models.map((model) => MusicianModelMapper.toEntity(model));
   }
 
@@ -130,6 +219,7 @@ export class MusicianPrismaRepository implements IMusicianRepository {
         orderBy,
         skip: offset,
         take: limit,
+        include: { profile: true },
       }),
       this.prisma.musician.count({ where }),
     ]);
@@ -179,6 +269,39 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     if (filter.instruments && filter.instruments.length > 0) {
       where.instruments = {
         hasSome: filter.instruments,
+      };
+    }
+
+    const profileWhere: any = {};
+    const prismaCurrency = this.toPrismaCurrency(filter.price_currency ?? null);
+
+    if (filter.price_model) {
+      profileWhere.price_model = filter.price_model;
+    }
+
+    if (prismaCurrency) {
+      profileWhere.price_currency = prismaCurrency;
+    }
+
+    if (
+      filter.price_min !== null &&
+      filter.price_min !== undefined &&
+      Number.isFinite(filter.price_min)
+    ) {
+      profileWhere.price_max = { gte: filter.price_min };
+    }
+
+    if (
+      filter.price_max !== null &&
+      filter.price_max !== undefined &&
+      Number.isFinite(filter.price_max)
+    ) {
+      profileWhere.price_min = { lte: filter.price_max };
+    }
+
+    if (Object.keys(profileWhere).length) {
+      where.profile = {
+        is: profileWhere,
       };
     }
 

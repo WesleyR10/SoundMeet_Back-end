@@ -15,7 +15,7 @@ describe("UserBadge Unit Tests without validator", () => {
       badge_type: BadgeTypeEnum.INICIANTE_MUSICAL,
     });
 
-    expect(userBadge.id).toBeInstanceOf(UserBadgeId);
+    expect(userBadge.user_badge_id).toBeInstanceOf(UserBadgeId);
     expect(userBadge.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440003");
     expect(userBadge.badge_type.value).toBe(BadgeTypeEnum.INICIANTE_MUSICAL);
     expect(userBadge.progress).toBe(0);
@@ -25,7 +25,7 @@ describe("UserBadge Unit Tests without validator", () => {
 
   test("should create user badge with constructor", () => {
     const userBadge = new UserBadge({
-      id: UserBadgeId.create(),
+      user_badge_id: UserBadgeId.create(),
       user_id: new Uuid("550e8400-e29b-41d4-a716-446655440000"),
       badge_type: BadgeTypeEnum.APOIADOR,
       progress: 50,
@@ -35,7 +35,7 @@ describe("UserBadge Unit Tests without validator", () => {
     });
 
     expect(userBadge).toBeInstanceOf(UserBadge);
-    expect(userBadge.id).toBeInstanceOf(UserBadgeId);
+    expect(userBadge.user_badge_id).toBeInstanceOf(UserBadgeId);
     expect(userBadge.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(userBadge.badge_type.value).toBe(BadgeTypeEnum.APOIADOR);
     expect(userBadge.progress).toBe(50);
@@ -47,7 +47,7 @@ describe("UserBadge Unit Tests without validator", () => {
     const createdAt = new Date();
     const updatedAt = new Date();
     const userBadge = new UserBadge({
-      id: UserBadgeId.create(),
+      user_badge_id: UserBadgeId.create(),
       user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       badge_type: BadgeTypeEnum.APOIADOR,
       progress: 50,
@@ -57,7 +57,7 @@ describe("UserBadge Unit Tests without validator", () => {
       updated_at: updatedAt,
     });
 
-    expect(userBadge.id).toBeInstanceOf(UserBadgeId);
+    expect(userBadge.user_badge_id).toBeInstanceOf(UserBadgeId);
     expect(userBadge.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440001");
     expect(userBadge.badge_type.value).toBe(BadgeTypeEnum.APOIADOR);
     expect(userBadge.progress).toBe(50);
@@ -76,7 +76,7 @@ describe("UserBadge Unit Tests without validator", () => {
     });
 
     expect(userBadge).toBeInstanceOf(UserBadge);
-    expect(userBadge.id).toBeInstanceOf(UserBadgeId);
+    expect(userBadge.user_badge_id).toBeInstanceOf(UserBadgeId);
     expect(userBadge.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440002");
     expect(userBadge.badge_type.value).toBe(BadgeTypeEnum.MECENAS);
     expect(userBadge.progress).toBe(25);
@@ -101,9 +101,9 @@ describe("UserBadge Unit Tests without validator", () => {
     expect(userBadge.unlocked_at).toBeNull();
   });
 
-  test("should return entity_id", () => {
+  test("should have an id", () => {
     const userBadge = UserBadge.fake().aUserBadge().build();
-    expect(userBadge.entity_id).toBe(userBadge.id);
+    expect(userBadge.user_badge_id).toBeInstanceOf(UserBadgeId);
   });
 
   test("should return json", () => {
@@ -111,7 +111,7 @@ describe("UserBadge Unit Tests without validator", () => {
     const json = userBadge.toJSON();
 
     expect(json).toMatchObject({
-      id: userBadge.id.id,
+      user_badge_id: userBadge.user_badge_id.id,
       user_id: userBadge.user_id.id,
       badge_type: userBadge.badge_type.value,
       progress: userBadge.progress,
@@ -129,7 +129,7 @@ describe("UserBadge Unit Tests without validator", () => {
     const userBadge = UserBadge.fake().aUserBadge().build();
 
     expect(userBadge).toBeInstanceOf(UserBadge);
-    expect(userBadge.id).toBeInstanceOf(UserBadgeId);
+    expect(userBadge.user_badge_id).toBeInstanceOf(UserBadgeId);
     expect(userBadge.user_id).toBeTruthy();
     expect(Object.values(BadgeTypeEnum)).toContain(userBadge.badge_type.value);
     expect(userBadge.created_at).toBeInstanceOf(Date);

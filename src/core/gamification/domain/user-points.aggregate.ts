@@ -1,5 +1,4 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { ValueObject } from "../../shared/domain/value-object";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { UserPointsValidatorFactory } from "./user-points.validator";
 import { UserPointsFakeBuilder } from "./user-points-fake.builder";
@@ -7,7 +6,7 @@ import { PointsSource } from "./value-objects/points-source.vo";
 import { UserLevel } from "./value-objects/user-level.vo";
 
 export type UserPointsConstructorProps = {
-  id?: UserPointsId;
+  user_points_id?: UserPointsId;
   user_id: Uuid;
   total_points?: number;
   total_scans?: number;
@@ -34,7 +33,7 @@ export type UserPointsCreateCommand = {
 export class UserPointsId extends Uuid {}
 
 export class UserPoints extends AggregateRoot {
-  id: UserPointsId;
+  user_points_id: UserPointsId;
   user_id: Uuid;
   total_points: number;
   total_scans: number;
@@ -48,7 +47,7 @@ export class UserPoints extends AggregateRoot {
 
   constructor(props: UserPointsConstructorProps) {
     super();
-    this.id = props.id ?? new UserPointsId();
+    this.user_points_id = props.user_points_id ?? new UserPointsId();
     this.user_id = props.user_id;
     this.total_points = props.total_points ?? 0;
     this.total_scans = props.total_scans ?? 0;
@@ -61,12 +60,8 @@ export class UserPoints extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
-  }
-
-  get user_points_id(): UserPointsId {
-    return this.id;
+  get entity_id(): UserPointsId {
+    return this.user_points_id;
   }
 
   static create(command: UserPointsCreateCommand): UserPoints {
@@ -247,7 +242,7 @@ export class UserPoints extends AggregateRoot {
   toJSON() {
     const levelInfo = this.getUserLevel();
     return {
-      id: this.id.id,
+      user_points_id: this.user_points_id.id,
       user_id: this.user_id.id,
       total_points: this.total_points,
       total_scans: this.total_scans,

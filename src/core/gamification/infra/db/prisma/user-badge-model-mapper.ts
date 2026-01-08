@@ -28,7 +28,7 @@ export type UserBadgeModelProps = {
 export class UserBadgeModelMapper {
   static toModel(entity: UserBadge): UserBadgeModelProps {
     return {
-      id: entity.id.id,
+      id: entity.user_badge_id.id,
       user_id: entity.user_id.id, // Convertendo Uuid para string
       badge_type: entity.badge_type.value, // Convertendo BadgeType para string
       progress: entity.progress,
@@ -45,7 +45,7 @@ export class UserBadgeModelMapper {
       typeof model.progress === "number" ? model.progress : 0;
 
     return new UserBadge({
-      id: new UserBadgeId(model.id),
+      user_badge_id: new UserBadgeId(model.id),
       user_id: new Uuid(model.audienceId),
       badge_type: model.badgeId as BadgeTypeEnum,
       progress: progressValue,

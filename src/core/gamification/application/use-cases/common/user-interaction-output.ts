@@ -13,9 +13,9 @@ export type UserInteractionOutput = {
 
 export class UserInteractionOutputMapper {
   static toOutput(entity: UserInteraction): UserInteractionOutput {
-    const { id, ...otherProps } = entity.toJSON();
+    const { user_interaction_id, ...otherProps } = entity.toJSON();
     return {
-      id,
+      id: user_interaction_id,
       ...otherProps,
     };
   }

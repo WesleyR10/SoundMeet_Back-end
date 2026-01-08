@@ -1,12 +1,11 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { UserInteractionValidatorFactory } from "./user-interaction.validator";
 import { UserInteractionFakeBuilder } from "./user-interaction-fake.builder";
 import { UserInteractionId } from "./value-objects/gamification-id.vo";
 import { InteractionMetadata } from "./value-objects/interaction-metadata.vo";
 
 export type UserInteractionConstructorProps = {
-  id?: UserInteractionId;
+  user_interaction_id?: UserInteractionId;
   user_id: string;
   interaction_type: string;
   target_id?: string | null;
@@ -27,7 +26,7 @@ export type UserInteractionCreateCommand = {
 export { UserInteractionId } from "./value-objects/gamification-id.vo";
 
 export class UserInteraction extends AggregateRoot {
-  id: UserInteractionId;
+  user_interaction_id: UserInteractionId;
   user_id: Uuid;
   interaction_type: string;
   target_id: string | null;
@@ -38,7 +37,8 @@ export class UserInteraction extends AggregateRoot {
 
   constructor(props: UserInteractionConstructorProps, id?: UserInteractionId) {
     super();
-    this.id = id ?? props.id ?? new UserInteractionId();
+    this.user_interaction_id =
+      id ?? props.user_interaction_id ?? new UserInteractionId();
     this.user_id = new Uuid(props.user_id);
     this.interaction_type = props.interaction_type;
     this.target_id = props.target_id ?? null;
@@ -48,8 +48,8 @@ export class UserInteraction extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): UserInteractionId {
+    return this.user_interaction_id;
   }
 
   static create(command: UserInteractionCreateCommand): UserInteraction {
@@ -144,7 +144,7 @@ export class UserInteraction extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      user_interaction_id: this.user_interaction_id.id,
       user_id: this.user_id.id,
       interaction_type: this.interaction_type,
       target_id: this.target_id,

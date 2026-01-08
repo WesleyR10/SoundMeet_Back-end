@@ -79,12 +79,12 @@ describe("GetRequestUseCase Unit Tests", () => {
       await repository.insert(entity);
 
       const input = {
-        id: entity.entity_id.id,
+        id: entity.request_id.id,
       };
 
       const output = await useCase.execute(input);
 
-      expect(output.id).toBe(entity.entity_id.id);
+      expect(output.id).toBe(entity.request_id.id);
       expect(output.audience_id).toBe(request.audience_id);
       expect(output.musician_id).toBe(request.musician_id);
       expect(output.song_title).toBe(expected.song_title);
@@ -114,12 +114,12 @@ describe("GetRequestUseCase Unit Tests", () => {
     await repository.insert(request);
 
     const input = {
-      id: request.entity_id.id,
+      id: request.request_id.id,
     };
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.entity_id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.status).toBe(RequestStatusEnum.ACCEPTED);
     expect(output.responded_at).toBeDefined();
     expect(output.is_accepted).toBe(true);
@@ -141,12 +141,12 @@ describe("GetRequestUseCase Unit Tests", () => {
     await repository.insert(request);
 
     const input = {
-      id: request.entity_id.id,
+      id: request.request_id.id,
     };
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.entity_id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.status).toBe(RequestStatusEnum.REJECTED);
     expect(output.rejection_reason).toBe(rejectionReason);
     expect(output.responded_at).toBeDefined();

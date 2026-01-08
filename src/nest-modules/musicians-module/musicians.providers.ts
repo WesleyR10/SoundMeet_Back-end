@@ -7,6 +7,7 @@ import { GetMusicianUseCase } from "../../core/musician/application/use-cases/ge
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
+import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
@@ -50,6 +51,13 @@ export const USE_CASES = {
     provide: UpdateMusicianUseCase,
     useFactory: (musicianRepo: IMusicianRepository) => {
       return new UpdateMusicianUseCase(musicianRepo);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+  UPDATE_MUSICIAN_PROFILE_USE_CASE: {
+    provide: UpdateMusicianProfileUseCase,
+    useFactory: (musicianRepo: IMusicianRepository) => {
+      return new UpdateMusicianProfileUseCase(musicianRepo);
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
   },

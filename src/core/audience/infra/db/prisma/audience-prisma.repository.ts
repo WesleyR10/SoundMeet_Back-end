@@ -74,7 +74,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
   }
 
   async update(entity: Audience): Promise<void> {
-    const id = entity.id.id;
+    const id = entity.audience_id.id;
     const modelProps = AudienceModelMapper.toModel(entity);
 
     try {

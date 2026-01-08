@@ -2,7 +2,7 @@ import { ISearchableRepository } from "../../../shared/domain/repository/reposit
 import { SearchParams } from "../../../shared/domain/repository/search-params";
 import { SearchResult } from "../../../shared/domain/repository/search-result";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
-import { MusicianWallet } from "../musician-wallet.entity";
+import { MusicianWallet } from "../musician-wallet.aggregate";
 
 export type MusicianWalletFilter = {
   musician_id?: string;

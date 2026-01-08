@@ -204,22 +204,17 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)s$': '@swc/jest',
   },
+  moduleNameMapper: {
+    '^@core/(.*)$': '<rootDir>/core/$1',
+  },
   modulePathIgnorePatterns: [
-    '<rootDir>/../dist',
-    '<rootDir>/../dist-dev',
-    '<rootDir>/../node_modules',
+    '<rootDir>/.nvm',
+    '/home/wesleyr10/.nvm',
+    '/home/wesleyr10/.trae-server',
+    '/home/wesleyr10/.cursor-server',
     '<rootDir>/../.trae-server',
     '<rootDir>/../.cursor-server',
-    '<rootDir>/../.vscode-server',
-    '<rootDir>/../venv_apostas',
-    '/home/wesleyr10/.nvm',
-    '/home/wesleyr10/.npm',
-    '/home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/.nvm',
-    'package.json',
-    '<rootDir>/../FC3-admin-catalogo-de-videos-typescript',
-    '<rootDir>/../Supermarket-WR/FC3-admin-catalogo-de-videos-typescript',
-    '<rootDir>/../test-live-coding/todo-app-axios',
-    '<rootDir>/../test-live-coding/todo-app-block'
+    '<rootDir>/../.git'
   ],
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',

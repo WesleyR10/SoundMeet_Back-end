@@ -11,6 +11,8 @@ import {
   validateSync,
 } from "class-validator";
 
+import { PriceRangeProps } from "../../../../shared/domain/value-objects/price-range.vo";
+
 export type UpdateMusicianInputConstructorProps = {
   id: string;
   email?: string;
@@ -22,6 +24,7 @@ export type UpdateMusicianInputConstructorProps = {
   genres?: string[];
   instruments?: string[];
   experience_years?: number;
+  priceRange?: PriceRangeProps | null;
   is_active?: boolean;
   is_verified?: boolean;
 };
@@ -69,6 +72,9 @@ export class UpdateMusicianInput {
   @IsOptional()
   experience_years?: number;
 
+  @IsOptional()
+  priceRange?: PriceRangeProps | null;
+
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
@@ -89,6 +95,7 @@ export class UpdateMusicianInput {
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years;
+    this.priceRange = props.priceRange;
     this.is_active = props.is_active;
     this.is_verified = props.is_verified;
   }

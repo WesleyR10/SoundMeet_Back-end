@@ -9,7 +9,7 @@ import {
   TransactionSearchParams,
   TransactionSearchResult,
 } from "../../../domain/repositories/transaction.repository";
-import { Transaction } from "../../../domain/transaction.entity";
+import { Transaction } from "../../../domain/transaction.aggregate";
 import { TransactionModelMapper } from "./transaction-model.mapper";
 
 export class TransactionPrismaRepository implements ITransactionRepository {

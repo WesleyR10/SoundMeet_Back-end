@@ -37,7 +37,7 @@ export type BadgePrismaModel = {
 export class BadgeModelMapper {
   static toModel(entity: Badge): BadgeModelProps {
     return {
-      id: entity.id.id,
+      id: entity.badge_id.id,
       name: entity.name,
       description: entity.description,
       icon: entity.icon,
@@ -53,7 +53,7 @@ export class BadgeModelMapper {
 
   static toEntity(model: BadgePrismaModel): Badge {
     return new Badge({
-      id: new BadgeId(model.id),
+      badge_id: new BadgeId(model.id),
       name: model.name,
       description: model.description,
       icon: model.icon,

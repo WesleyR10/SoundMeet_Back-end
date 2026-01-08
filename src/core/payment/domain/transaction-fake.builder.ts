@@ -3,7 +3,7 @@ import { Chance } from "chance";
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { PaymentMethod } from "./tip-enums";
-import { Transaction, TransactionId } from "./transaction.entity";
+import { Transaction, TransactionId } from "./transaction.aggregate";
 import { TransactionStatus, TransactionType } from "./transaction-enums";
 
 type PropOrFactory<T> = T | ((index: number) => T);

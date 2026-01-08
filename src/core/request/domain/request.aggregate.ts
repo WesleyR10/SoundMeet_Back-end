@@ -13,7 +13,7 @@ import {
 import { SongTitle } from "./value-objects/song-title.vo";
 
 export type RequestConstructorProps = {
-  id?: RequestId;
+  request_id?: RequestId;
   audience_id: string;
   musician_id: string;
   song_title: string;
@@ -36,7 +36,7 @@ export type RequestCreateCommand = {
 export class RequestId extends Uuid {}
 
 export class Request extends AggregateRoot {
-  id: RequestId;
+  request_id: RequestId;
   audience_id: Uuid;
   musician_id: Uuid;
   song_title: SongTitle;
@@ -49,7 +49,7 @@ export class Request extends AggregateRoot {
 
   constructor(props: RequestConstructorProps) {
     super();
-    this.id = props.id ?? new RequestId();
+    this.request_id = props.request_id ?? new RequestId();
     this.audience_id = new Uuid(props.audience_id);
     this.musician_id = new Uuid(props.musician_id);
     this.song_title = SongTitle.create(props.song_title);
@@ -65,7 +65,7 @@ export class Request extends AggregateRoot {
   }
 
   get entity_id(): RequestId {
-    return this.id;
+    return this.request_id;
   }
 
   static create(props: RequestCreateCommand): Request {
@@ -80,7 +80,7 @@ export class Request extends AggregateRoot {
     request.validate();
     request.applyEvent(
       new RequestCreatedEvent({
-        request_id: request.id,
+        request_id: request.request_id,
         audience_id: request.audience_id.id,
         musician_id: request.musician_id.id,
         song_title: request.song_title.value,
@@ -108,7 +108,7 @@ export class Request extends AggregateRoot {
     // Emitir evento para sistema de pontuação
     this.applyEvent(
       new RequestAcceptedEvent({
-        request_id: this.id.id,
+        request_id: this.request_id.id,
         audience_id: this.audience_id.id,
         musician_id: this.musician_id.id,
         song_title: this.song_title.value,
@@ -133,7 +133,7 @@ export class Request extends AggregateRoot {
     // Emitir evento para notificação
     this.applyEvent(
       new RequestRejectedEvent({
-        request_id: this.id.id,
+        request_id: this.request_id.id,
         audience_id: this.audience_id.id,
         musician_id: this.musician_id.id,
         song_title: this.song_title.value,
@@ -146,7 +146,7 @@ export class Request extends AggregateRoot {
   private dispatchUpdateEvent(): void {
     this.applyEvent(
       new RequestUpdatedEvent({
-        request_id: this.id,
+        request_id: this.request_id,
         song_title: this.song_title.value,
         artist: this.artist,
         message: this.message?.value || null,
@@ -244,7 +244,7 @@ export class Request extends AggregateRoot {
   get pointsValue(): Points {
     // Pontos base por fazer um pedido
     const basePoints = Points.createMusicRequest({
-      request_id: this.id.id,
+      request_id: this.request_id.id,
       song_title: this.song_title.value,
       artist: this.artist,
     });
@@ -252,7 +252,7 @@ export class Request extends AggregateRoot {
     // Pontos extras se o pedido for aceito
     if (this.isAccepted) {
       const acceptedPoints = Points.createAcceptedRequest({
-        request_id: this.id.id,
+        request_id: this.request_id.id,
         song_title: this.song_title.value,
         artist: this.artist,
         base_points: basePoints.value,
@@ -264,7 +264,7 @@ export class Request extends AggregateRoot {
         "accepted_request",
         "Pedido musical aceito pelo músico",
         {
-          request_id: this.id.id,
+          request_id: this.request_id.id,
           song_title: this.song_title.value,
           artist: this.artist,
           base_points: basePoints.value,
@@ -328,7 +328,7 @@ export class Request extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      request_id: this.request_id.id,
       audience_id: this.audience_id.id,
       musician_id: this.musician_id.id,
       song_title: this.song_title.value,

@@ -35,12 +35,12 @@ export class UserInteractionPrismaRepository implements IUserInteractionReposito
     const model = UserInteractionModelMapper.toModel(entity);
     try {
       await this.prismaClient.userInteraction.update({
-        where: { id: entity.id.id },
+        where: { id: entity.user_interaction_id.id },
         data: model,
       });
     } catch (error: any) {
       if (error.code === "P2025") {
-        throw new NotFoundError(entity.id.id, UserInteraction);
+        throw new NotFoundError(entity.user_interaction_id.id, UserInteraction);
       }
       throw error;
     }

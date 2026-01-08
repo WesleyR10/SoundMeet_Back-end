@@ -31,7 +31,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
     repository.items = [aggregate];
     await expect(() =>
       useCase.execute({
-        id: aggregate.id.id,
+        id: aggregate.musician_id.id,
         name: "t".repeat(256),
       }),
     ).rejects.toThrow(EntityValidationError);
@@ -43,12 +43,12 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
     repository.items = [entity];
 
     let output = await useCase.execute({
-      id: entity.id.id,
+      id: entity.musician_id.id,
       name: "Updated Name",
     });
     expect(spyUpdate).toHaveBeenCalledTimes(1);
     expect(output).toStrictEqual({
-      id: entity.id.id,
+      id: entity.musician_id.id,
       name: "Updated Name",
       stage_name: entity.stage_name,
       email: entity.email.value,
@@ -62,8 +62,10 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
+      profile: entity.profile?.toJSON() ?? null,
       qr_code: entity.qr_code!.code,
       created_at: entity.created_at,
+      updated_at: entity.updated_at,
       display_name: entity.displayName,
       is_experienced: entity.isExperienced,
       is_highly_rated: entity.isHighlyRated,
@@ -263,7 +265,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       repository.items = [freshEntity];
 
       output = await useCase.execute({
-        id: freshEntity.id.id,
+        id: freshEntity.musician_id.id,
         ...("name" in i.input && { name: i.input.name }),
         ...("stage_name" in i.input && { stage_name: i.input.stage_name }),
         ...("email" in i.input && { email: i.input.email }),
@@ -278,7 +280,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         ...("is_verified" in i.input && { is_verified: i.input.is_verified }),
       });
       expect(output).toStrictEqual({
-        id: freshEntity.id.id,
+        id: freshEntity.musician_id.id,
         name: "name" in i.input ? i.input.name : freshEntity.name,
         stage_name:
           "stage_name" in i.input ? i.input.stage_name : freshEntity.stage_name,
@@ -304,8 +306,10 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           "is_verified" in i.input
             ? i.input.is_verified
             : freshEntity.is_verified,
+        profile: freshEntity.profile?.toJSON() ?? null,
         qr_code: freshEntity.qr_code!.code,
         created_at: freshEntity.created_at,
+        updated_at: freshEntity.updated_at,
         display_name:
           "stage_name" in i.input
             ? i.input.stage_name

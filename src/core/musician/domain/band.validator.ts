@@ -12,6 +12,7 @@ import {
 
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
+import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { Band } from "./band.aggregate";
 
 export class BandMemberRules {
@@ -62,6 +63,9 @@ export class BandRules {
   @Type(() => BandMemberRules)
   members: BandMemberRules[];
 
+  @IsOptional({ groups: ["priceRange"] })
+  priceRange?: PriceRange | null;
+
   @IsBoolean({ groups: ["is_active"] })
   @IsOptional({ groups: ["is_active"] })
   is_active: boolean;
@@ -88,6 +92,7 @@ export class BandRules {
           joined_at: m.joined_at,
         }),
     );
+    this.priceRange = entity.priceRange;
     this.is_active = entity.is_active;
     this.created_at = entity.created_at;
     this.updated_at = entity.updated_at;

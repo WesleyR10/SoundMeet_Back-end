@@ -16,9 +16,9 @@ export type UserBadgeOutput = {
 
 export class UserBadgeOutputMapper {
   static toOutput(entity: UserBadge): UserBadgeOutput {
-    const { id, ...otherProps } = entity.toJSON();
+    const { user_badge_id, ...otherProps } = entity.toJSON();
     return {
-      id: id,
+      id: user_badge_id,
       ...otherProps,
       progress_percentage: entity.getProgressPercentage(),
       remaining_points: entity.getRemainingPoints(),

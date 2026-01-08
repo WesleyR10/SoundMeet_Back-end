@@ -7,7 +7,6 @@ import {
   Phone,
   Uuid,
 } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { AudienceValidatorFactory } from "./audience.validator";
 import { AudienceFakeBuilder } from "./audience-fake.builder";
 import { AudienceBadgeEarnedEvent } from "./events/audience-badge-earned.event";
@@ -23,7 +22,7 @@ import { SongVotedEvent } from "./events/song-voted.event";
 import { TipSentEvent } from "./events/tip-sent.event";
 
 export type AudienceConstructorProps = {
-  id?: AudienceId;
+  audience_id?: AudienceId;
   email: Email | string;
   name: string;
   nickname?: string | null;
@@ -57,7 +56,7 @@ export type AudienceCreateCommand = {
 export class AudienceId extends Uuid {}
 
 export class Audience extends AggregateRoot {
-  id: AudienceId;
+  audience_id: AudienceId;
   email: Email;
   name: string;
   nickname: string | null;
@@ -73,7 +72,7 @@ export class Audience extends AggregateRoot {
 
   constructor(props: AudienceConstructorProps) {
     super();
-    this.id = props.id ?? new AudienceId();
+    this.audience_id = props.audience_id ?? new AudienceId();
 
     // Handle email - create Email value object consistently
     this.email =
@@ -214,8 +213,8 @@ export class Audience extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): AudienceId {
+    return this.audience_id;
   }
 
   // Convenience getters for value objects
@@ -302,7 +301,7 @@ export class Audience extends AggregateRoot {
     audience.validate(["name", "email"]);
     audience.applyEvent(
       new AudienceCreatedEvent({
-        audience_id: audience.id,
+        audience_id: audience.audience_id,
         name: audience.name,
         email: audience.email,
         phone: audience.phone,
@@ -321,7 +320,7 @@ export class Audience extends AggregateRoot {
   private dispatchUpdateEvent(): void {
     this.applyEvent(
       new AudienceUpdatedEvent({
-        audience_id: this.id,
+        audience_id: this.audience_id,
         name: this.name,
         email: this.email.value,
         nickname: this.nickname,
@@ -385,7 +384,7 @@ export class Audience extends AggregateRoot {
   private dispatchPreferencesEvent(): void {
     this.applyEvent(
       new AudiencePreferencesUpdatedEvent({
-        audience_id: this.id,
+        audience_id: this.audience_id,
         favorite_genres: this.favorite_genres,
         favorite_artists: this.favorite_artists,
         favorite_instruments: this.favorite_instruments,
@@ -603,7 +602,7 @@ export class Audience extends AggregateRoot {
       this.level = newLevel;
       this.applyEvent(
         new AudienceLevelUpgradedEvent({
-          audience_id: this.id,
+          audience_id: this.audience_id,
           new_level: this.level.level,
           new_level_name: this.level.name,
           total_points: this.points.total,
@@ -620,7 +619,7 @@ export class Audience extends AggregateRoot {
       this.updated_at = new Date();
       this.applyEvent(
         new AudienceBadgeEarnedEvent({
-          audience_id: this.id,
+          audience_id: this.audience_id,
           badge: badge,
           earned_at: new Date(),
         }),
@@ -643,7 +642,9 @@ export class Audience extends AggregateRoot {
       this.addBadge("iniciante");
     }
 
-    this.applyEvent(new MusicianQRCodeScannedEvent(this.id, musicianId));
+    this.applyEvent(
+      new MusicianQRCodeScannedEvent(this.audience_id, musicianId),
+    );
   }
 
   canMakeRequest(): boolean {
@@ -665,19 +666,26 @@ export class Audience extends AggregateRoot {
 
     this.addPointsForAction("make_request");
     this.applyEvent(
-      new MusicRequestMadeEvent(this.id, musicianId, songTitle, artist),
+      new MusicRequestMadeEvent(
+        this.audience_id,
+        musicianId,
+        songTitle,
+        artist,
+      ),
     );
   }
 
   sendTip(musicianId: string, amount: number, message?: string): void {
     this.points = this.points.addTipPoints(amount);
     this.updateLevel();
-    this.applyEvent(new TipSentEvent(this.id, musicianId, amount, message));
+    this.applyEvent(
+      new TipSentEvent(this.audience_id, musicianId, amount, message),
+    );
   }
 
   voteForSong(requestId: string, vote: "up" | "down"): void {
     this.addPointsForAction("vote_song");
-    this.applyEvent(new SongVotedEvent(this.id, requestId, vote));
+    this.applyEvent(new SongVotedEvent(this.audience_id, requestId, vote));
   }
 
   shareOnSocialMedia(
@@ -687,14 +695,19 @@ export class Audience extends AggregateRoot {
   ): void {
     this.addPointsForAction("share_social");
     this.applyEvent(
-      new SocialMediaSharedEvent(this.id, requestId, platform, message),
+      new SocialMediaSharedEvent(
+        this.audience_id,
+        requestId,
+        platform,
+        message,
+      ),
     );
   }
 
   indicateMusician(establishmentId: string, musicianId: string): void {
     this.addPointsForAction("indicate_musician");
     this.applyEvent(
-      new MusicianIndicatedEvent(this.id, establishmentId, musicianId),
+      new MusicianIndicatedEvent(this.audience_id, establishmentId, musicianId),
     );
   }
 
@@ -805,7 +818,7 @@ export class Audience extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      audience_id: this.audience_id.id,
       email: this.email.value,
       name: this.name,
       nickname: this.nickname,

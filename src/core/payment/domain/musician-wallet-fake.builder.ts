@@ -2,7 +2,7 @@ import { Chance } from "chance";
 
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { MusicianWallet, MusicianWalletId } from "./musician-wallet.entity";
+import { MusicianWallet, MusicianWalletId } from "./musician-wallet.aggregate";
 import { PixKey } from "./value-objects/pix-key.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);

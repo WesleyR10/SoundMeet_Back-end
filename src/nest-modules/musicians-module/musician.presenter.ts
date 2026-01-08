@@ -1,6 +1,6 @@
 import { Transform } from "class-transformer";
 
-import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-output";
+import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
 import { ListMusiciansOutput } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { CollectionPresenter } from "../shared-module/collection.presenter";
 
@@ -20,11 +20,14 @@ export class MusicianPresenter {
   genres: string[];
   instruments: string[];
   experience_years: number;
+  profile: MusicianOutput["profile"];
   display_name: string;
   is_experienced: boolean;
   is_highly_rated: boolean;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   created_at: Date;
+  @Transform(({ value }: { value: Date }) => value.toISOString())
+  updated_at: Date;
 
   constructor(output: MusicianOutput) {
     this.id = output.id;
@@ -42,10 +45,12 @@ export class MusicianPresenter {
     this.genres = output.genres;
     this.instruments = output.instruments;
     this.experience_years = output.experience_years;
+    this.profile = output.profile;
     this.display_name = output.display_name;
     this.is_experienced = output.is_experienced;
     this.is_highly_rated = output.is_highly_rated;
     this.created_at = output.created_at;
+    this.updated_at = output.updated_at;
   }
 }
 

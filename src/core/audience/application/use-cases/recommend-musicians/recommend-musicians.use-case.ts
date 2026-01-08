@@ -1,7 +1,7 @@
 import {
   MusicianOutput,
   MusicianOutputMapper,
-} from "../../../../musician/application/use-cases/common/musician-output";
+} from "../../../../musician/application/use-cases/common/musician-profile-output";
 import {
   IMusicianRepository,
   MusicianSearchParams,

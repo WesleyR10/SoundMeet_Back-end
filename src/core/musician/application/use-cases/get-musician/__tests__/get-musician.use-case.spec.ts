@@ -44,18 +44,18 @@ describe("GetMusicianUseCase Unit Tests", () => {
     repository.items = [musician];
 
     const input: GetMusicianInput = {
-      id: musician.id.id,
+      id: musician.musician_id.id,
     };
 
     const output = await useCase.execute(input);
 
     expect(spyFindById).toHaveBeenCalledTimes(1);
     expect(output).toStrictEqual({
-      id: musician.id.id,
+      id: musician.musician_id.id,
       name: musician.name,
       stage_name: musician.stage_name,
       email: musician.email.value,
-      phone: musician.phone,
+      phone: musician.phone?.value ?? null,
       bio: musician.bio,
       avatar: musician.avatar,
       genres: musician.genres,
@@ -65,8 +65,10 @@ describe("GetMusicianUseCase Unit Tests", () => {
       total_ratings: musician.total_ratings,
       is_active: musician.is_active,
       is_verified: musician.is_verified,
+      profile: musician.profile?.toJSON() ?? null,
       qr_code: musician.qr_code!.code,
       created_at: musician.created_at,
+      updated_at: musician.updated_at,
       display_name: musician.displayName,
       is_experienced: musician.isExperienced,
       is_highly_rated: musician.isHighlyRated,
@@ -89,12 +91,12 @@ describe("GetMusicianUseCase Unit Tests", () => {
     repository.items = [musician1, musician2, musician3];
 
     const input: GetMusicianInput = {
-      id: musician2.id.id,
+      id: musician2.musician_id.id,
     };
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(musician2.id.id);
+    expect(output.id).toBe(musician2.musician_id.id);
     expect(output.name).toBe("Musician 2");
   });
 
@@ -104,12 +106,12 @@ describe("GetMusicianUseCase Unit Tests", () => {
     repository.items = [musician];
 
     const input: GetMusicianInput = {
-      id: musician.id.id,
+      id: musician.musician_id.id,
     };
 
     await useCase.execute(input);
 
-    expect(spyFindById).toHaveBeenCalledWith(musician.id);
+    expect(spyFindById).toHaveBeenCalledWith(musician.musician_id);
   });
 
   it("should return musician with all properties correctly mapped", async () => {
@@ -130,7 +132,7 @@ describe("GetMusicianUseCase Unit Tests", () => {
     repository.items = [musician];
 
     const input: GetMusicianInput = {
-      id: musician.id.id,
+      id: musician.musician_id.id,
     };
 
     const output = await useCase.execute(input);

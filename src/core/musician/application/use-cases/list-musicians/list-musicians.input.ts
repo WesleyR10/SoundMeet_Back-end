@@ -6,9 +6,9 @@ import { MusicianFilter } from "../../../domain/musician.repository";
 export type ListMusiciansInputConstructorProps = {
   page?: number;
   per_page?: number;
-  sort?: string;
-  sort_dir?: SortDirection;
-  filter?: MusicianFilter;
+  sort?: string | null;
+  sort_dir?: SortDirection | null;
+  filter?: MusicianFilter | null;
 };
 
 export class ListMusiciansInput {
@@ -19,13 +19,13 @@ export class ListMusiciansInput {
   per_page?: number;
 
   @IsOptional()
-  sort?: string;
+  sort?: string | null;
 
   @IsOptional()
-  sort_dir?: SortDirection;
+  sort_dir?: SortDirection | null;
 
   @IsOptional()
-  filter?: MusicianFilter;
+  filter?: MusicianFilter | null;
 
   constructor(props: ListMusiciansInputConstructorProps = {}) {
     this.page = props.page;

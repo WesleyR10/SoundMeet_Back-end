@@ -20,7 +20,7 @@ export type RequestModelProps = {
 export class RequestModelMapper {
   static toModel(entity: Request): RequestModelProps {
     return {
-      id: entity.id.id,
+      id: entity.request_id.id,
       eventId: "default-event-id", // Campo obrigatório no Prisma - usar valor padrão temporário
       audienceId: entity.audience_id.id,
       musicianId: entity.musician_id.id,
@@ -39,7 +39,7 @@ export class RequestModelMapper {
 
   static toEntity(model: RequestModelProps): Request {
     return new Request({
-      id: new RequestId(model.id),
+      request_id: new RequestId(model.id),
       audience_id: model.audienceId,
       musician_id: model.musicianId,
       song_title: model.songTitle,

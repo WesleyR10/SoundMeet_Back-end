@@ -114,26 +114,26 @@ describe("ScanQRUseCase Unit Tests", () => {
       const spyUpdate = jest.spyOn(repository, "update");
 
       const fullInput = {
-        id: audience.id.id,
+        id: audience.audience_id.id,
         ...input,
-        musician_id: musician.id.id,
+        musician_id: musician.musician_id.id,
       };
 
       const output = await useCase.execute(fullInput);
 
       expect(spyUpdate).toHaveBeenCalledTimes(1);
-      expect(output.audience.id).toBe(audience.id.id);
+      expect(output.audience.id).toBe(audience.audience_id.id);
       expect(output.points_earned).toBeInstanceOf(Points);
       expect(output.points_earned.value).toBe(expected.points_earned.value);
       expect(output.points_earned.source).toBe(expected.points_earned.source);
       expect(output.new_badges).toEqual(expected.new_badges);
       expect(output.scan_metadata).toMatchObject({
         ...expected.scan_metadata,
-        musician_id: musician.id.id,
+        musician_id: musician.musician_id.id,
       });
       expect(output.scan_metadata.scanned_at).toBeInstanceOf(Date);
 
-      const updatedAudience = await repository.findById(audience.id);
+      const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience).toBeDefined();
       expect(updatedAudience!.totalPoints).toBe(expected.points_earned.value);
     });
@@ -146,9 +146,9 @@ describe("ScanQRUseCase Unit Tests", () => {
     musicianRepository.items = [musician];
 
     const input: ScanQRInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       qr_code: "musician_123",
-      musician_id: musician.id.id,
+      musician_id: musician.musician_id.id,
       establishment_id: "establishment_1",
       location: {
         latitude: -23.5505,
@@ -162,7 +162,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     expect(userInteractionRepo.items).toHaveLength(1);
 
     const interaction = userInteractionRepo.items[0];
-    expect(interaction.user_id.id).toBe(audience.id.id);
+    expect(interaction.user_id.id).toBe(audience.audience_id.id);
     expect(interaction.interaction_type).toBe("scan_qr");
     expect(interaction.target_id).toBe(input.musician_id);
     expect(interaction.points_earned).toBe(output.points_earned.value);
@@ -181,12 +181,12 @@ describe("ScanQRUseCase Unit Tests", () => {
 
     const musician = Musician.fake().aMusician().build();
     musicianRepository.items = [musician];
-    const musicianId = musician.id.id;
+    const musicianId = musician.musician_id.id;
 
     for (let i = 0; i < 5; i++) {
       userInteractionRepo.items.push(
         UserInteraction.create({
-          user_id: audience.id.id,
+          user_id: audience.audience_id.id,
           interaction_type: "scan_qr",
           target_id: musicianId,
           metadata: {
@@ -198,7 +198,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     }
 
     const input: ScanQRInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       qr_code: "qr_code_limit",
       musician_id: musicianId,
     };
@@ -219,15 +219,15 @@ describe("ScanQRUseCase Unit Tests", () => {
     musicianRepository.items = [musician1, musician2];
 
     const input1: ScanQRInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       qr_code: "musician_123",
-      musician_id: musician1.id.id,
+      musician_id: musician1.musician_id.id,
     };
 
     const input2: ScanQRInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       qr_code: "musician_456",
-      musician_id: musician2.id.id,
+      musician_id: musician2.musician_id.id,
     };
 
     const output1 = await useCase.execute(input1);
@@ -240,7 +240,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     expect(output2.audience.points.total).toBe(20); // 10 points per scan
 
     // Verify both audiences were updated
-    const updatedAudience = await repository.findById(audience.id);
+    const updatedAudience = await repository.findById(audience.audience_id);
     expect(updatedAudience).toBeDefined();
     expect(updatedAudience!.totalPoints).toBe(20); // Total accumulated points
   });
@@ -255,9 +255,9 @@ describe("ScanQRUseCase Unit Tests", () => {
     musicianRepository.items = [musician];
 
     const input: ScanQRInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       qr_code: "musician_123",
-      musician_id: musician.id.id,
+      musician_id: musician.musician_id.id,
     };
 
     const output = await useCase.execute(input);

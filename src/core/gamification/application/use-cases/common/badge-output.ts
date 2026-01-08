@@ -16,6 +16,10 @@ export type BadgeOutput = {
 
 export class BadgeOutputMapper {
   static toOutput(entity: Badge): BadgeOutput {
-    return entity.toJSON();
+    const { badge_id, ...otherProps } = entity.toJSON();
+    return {
+      id: badge_id,
+      ...otherProps,
+    } as BadgeOutput;
   }
 }

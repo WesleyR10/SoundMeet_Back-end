@@ -7,7 +7,10 @@ import { Transaction as PrismaTransaction } from "@prisma/client";
 import { Money } from "../../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { PaymentMethod } from "../../../domain/tip-enums";
-import { Transaction, TransactionId } from "../../../domain/transaction.entity";
+import {
+  Transaction,
+  TransactionId,
+} from "../../../domain/transaction.aggregate";
 
 export type TransactionModelProps = {
   id: string;

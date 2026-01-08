@@ -96,7 +96,9 @@ export class UserInteractionFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const userInteraction = new UserInteraction({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          user_interaction_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           user_id: this.callFactory(this._user_id, index) ?? new Uuid().id,
           interaction_type:
             this.callFactory(this._interaction_type, index) ??

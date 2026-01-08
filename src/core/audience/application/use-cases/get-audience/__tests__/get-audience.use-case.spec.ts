@@ -17,10 +17,10 @@ describe("GetAudienceUseCase Unit Tests", () => {
     const audience = Audience.fake().aAudience().build();
     await repository.insert(audience);
 
-    const output = await useCase.execute({ id: audience.id.id });
+    const output = await useCase.execute({ id: audience.audience_id.id });
 
     expect(output).toStrictEqual({
-      id: audience.id.id,
+      id: audience.audience_id.id,
       name: audience.name,
       email: audience.emailValue,
       nickname: audience.nickname,
@@ -90,10 +90,10 @@ describe("GetAudienceUseCase Unit Tests", () => {
     const audience = AudienceFakeBuilder.aAudience().deactivate().build();
     await repository.insert(audience);
 
-    const output = await useCase.execute({ id: audience.id.id });
+    const output = await useCase.execute({ id: audience.audience_id.id });
 
     expect(output.is_active).toBe(false);
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
   });
 
   it("should get audience without phone and nickname", async () => {
@@ -103,11 +103,11 @@ describe("GetAudienceUseCase Unit Tests", () => {
       .build();
     await repository.insert(audience);
 
-    const output = await useCase.execute({ id: audience.id.id });
+    const output = await useCase.execute({ id: audience.audience_id.id });
 
     expect(output.nickname).toBeNull();
     expect(output.phone).toBeNull();
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
   });
 
   it("should get audience with points and scans", async () => {
@@ -116,9 +116,9 @@ describe("GetAudienceUseCase Unit Tests", () => {
       .build();
     await repository.insert(audience);
 
-    const output = await useCase.execute({ id: audience.id.id });
+    const output = await useCase.execute({ id: audience.audience_id.id });
 
     expect(output.points.total).toBe(500);
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
   });
 });

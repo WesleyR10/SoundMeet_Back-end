@@ -1,15 +1,21 @@
+import { Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   Max,
   Min,
+  ValidateNested,
   validateSync,
 } from "class-validator";
+
+import { LocationProps } from "../../../../shared/domain/value-objects/location.vo";
+import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 
 export type CreateMusicianInputConstructorProps = {
   email: string;
@@ -21,8 +27,40 @@ export type CreateMusicianInputConstructorProps = {
   genres?: string[];
   instruments?: string[];
   experience_years?: number;
+  priceRange?: CreateMusicianPriceRangeInput;
+  location?: LocationProps;
   is_active?: boolean;
 };
+
+export class CreateMusicianPriceRangeInput {
+  @IsIn(["per_event", "per_hour"])
+  model: "per_event" | "per_hour";
+
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  min: number;
+
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  max: number;
+
+  @IsIn(Object.values(Currency))
+  @IsOptional()
+  currency?: Currency;
+
+  @IsString()
+  @IsOptional()
+  notes?: string | null;
+
+  constructor(props: CreateMusicianPriceRangeInput) {
+    if (!props) return;
+    this.model = props.model;
+    this.min = props.min;
+    this.max = props.max;
+    this.currency = props.currency;
+    this.notes = props.notes;
+  }
+}
 
 export class CreateMusicianInput {
   @IsEmail()
@@ -63,6 +101,14 @@ export class CreateMusicianInput {
   @IsOptional()
   experience_years?: number;
 
+  @ValidateNested()
+  @Type(() => CreateMusicianPriceRangeInput)
+  @IsOptional()
+  priceRange?: CreateMusicianPriceRangeInput;
+
+  @IsOptional()
+  location?: LocationProps;
+
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
@@ -78,6 +124,8 @@ export class CreateMusicianInput {
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years;
+    this.priceRange = props.priceRange;
+    this.location = props.location;
     this.is_active = props.is_active ?? true;
   }
 }

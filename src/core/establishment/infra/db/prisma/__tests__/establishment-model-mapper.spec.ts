@@ -9,7 +9,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       const model = EstablishmentModelMapper.toModel(establishment);
 
       expect(model).toMatchObject({
-        id: establishment.id.id,
+        id: establishment.establishment_id.id,
         name: establishment.name,
         email: establishment.email.value,
         cnpj: establishment.cnpj?.value ?? null,
@@ -35,7 +35,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       const model = EstablishmentModelMapper.toModel(establishment);
 
       expect(model).toMatchObject({
-        id: establishment.id.id,
+        id: establishment.establishment_id.id,
         name: establishment.name,
         email: establishment.email.value,
         cnpj: establishment.cnpj?.value ?? null,
@@ -61,7 +61,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       const model = EstablishmentModelMapper.toModel(establishment);
 
       expect(model).toMatchObject({
-        id: establishment.id.id,
+        id: establishment.establishment_id.id,
         name: establishment.name,
         email: establishment.email.value,
         cnpj: establishment.cnpj?.value ?? null,
@@ -100,7 +100,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
 
       const establishment = EstablishmentModelMapper.toEntity(model);
 
-      expect(establishment.id.id).toBe(model.id);
+      expect(establishment.establishment_id.id).toBe(model.id);
       expect(establishment.name).toBe(model.name);
       expect(establishment.email.value).toBe(model.email);
       expect(establishment.cnpj?.value).toBe(model.cnpj);
@@ -144,7 +144,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
 
       const establishment = EstablishmentModelMapper.toEntity(model);
 
-      expect(establishment.id.id).toBe(model.id);
+      expect(establishment.establishment_id.id).toBe(model.id);
       expect(establishment.name).toBe(model.name);
       expect(establishment.email.value).toBe(model.email);
       expect(establishment.cnpj?.value).toBe(model.cnpj);
@@ -218,7 +218,9 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       const model = EstablishmentModelMapper.toModel(originalEstablishment);
       const convertedEstablishment = EstablishmentModelMapper.toEntity(model);
 
-      expect(convertedEstablishment.id.id).toBe(originalEstablishment.id.id);
+      expect(convertedEstablishment.establishment_id.id).toBe(
+        originalEstablishment.establishment_id.id,
+      );
       expect(convertedEstablishment.name).toBe(originalEstablishment.name);
       expect(convertedEstablishment.email.value).toBe(
         originalEstablishment.email.value,

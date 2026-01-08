@@ -64,7 +64,7 @@ describe("BadgePrismaRepository", () => {
       await repository.update(badge);
 
       expect(prisma.badge.update).toHaveBeenCalledWith({
-        where: { id: badge.id.id },
+        where: { id: badge.badge_id.id },
         data: modelProps,
       });
     });
@@ -76,7 +76,7 @@ describe("BadgePrismaRepository", () => {
       });
 
       await expect(repository.update(badge)).rejects.toThrow(
-        new NotFoundError(badge.id.id, Badge),
+        new NotFoundError(badge.badge_id.id, Badge),
       );
     });
   });
@@ -110,11 +110,11 @@ describe("BadgePrismaRepository", () => {
       const modelProps = BadgeModelMapper.toModel(badge);
       (prisma.badge.findUnique as jest.Mock).mockResolvedValue(modelProps);
 
-      const result = await repository.findById(badge.id);
+      const result = await repository.findById(badge.badge_id);
 
       expect(result).toEqual(badge);
       expect(prisma.badge.findUnique).toHaveBeenCalledWith({
-        where: { id: badge.id.id },
+        where: { id: badge.badge_id.id },
       });
     });
 
@@ -140,12 +140,12 @@ describe("BadgePrismaRepository", () => {
       (prisma.badge.findMany as jest.Mock).mockResolvedValue(modelsProps);
 
       const result = await repository.findByIds(
-        badges.map((badge) => badge.id),
+        badges.map((badge) => badge.badge_id),
       );
 
       expect(result).toHaveLength(2);
       expect(prisma.badge.findMany).toHaveBeenCalledWith({
-        where: { id: { in: badges.map((badge) => badge.id.id) } },
+        where: { id: { in: badges.map((badge) => badge.badge_id.id) } },
       });
     });
   });
@@ -157,19 +157,19 @@ describe("BadgePrismaRepository", () => {
       const badge3 = Badge.fake().aBadge().build();
 
       (prisma.badge.findMany as jest.Mock).mockResolvedValue([
-        { id: badge1.id.id },
-        { id: badge2.id.id },
+        { id: badge1.badge_id.id },
+        { id: badge2.badge_id.id },
       ]);
 
       const result = await repository.existsById([
-        badge1.id,
-        badge2.id,
-        badge3.id,
+        badge1.badge_id,
+        badge2.badge_id,
+        badge3.badge_id,
       ]);
 
       expect(result.exists).toHaveLength(2);
       expect(result.not_exists).toHaveLength(1);
-      expect(result.not_exists[0]).toBe(badge3.id);
+      expect(result.not_exists[0]).toBe(badge3.badge_id);
     });
   });
 

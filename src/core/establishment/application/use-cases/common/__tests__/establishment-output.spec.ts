@@ -17,7 +17,7 @@ describe("EstablishmentOutputMapper Unit Tests", () => {
 
     expect(spyToJSON).toHaveBeenCalled();
     expect(output).toStrictEqual({
-      id: entity.id.id,
+      id: entity.establishment_id.id,
       name: "Test Restaurant",
       description: "A great restaurant",
       avatar: "https://example.com/avatar.jpg",

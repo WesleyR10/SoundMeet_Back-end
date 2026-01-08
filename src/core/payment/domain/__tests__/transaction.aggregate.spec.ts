@@ -1,5 +1,5 @@
 import { PaymentMethod } from "../tip-enums";
-import { Transaction } from "../transaction.entity";
+import { Transaction } from "../transaction.aggregate";
 import { TransactionStatus, TransactionType } from "../transaction-enums";
 
 describe("Transaction Aggregate", () => {

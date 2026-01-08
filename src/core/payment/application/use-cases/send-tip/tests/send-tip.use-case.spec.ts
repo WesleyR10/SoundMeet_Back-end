@@ -1,4 +1,5 @@
 import { PaymentMethod, TipInMemoryRepository, TipStatus } from "@core/payment";
+import { TipId } from "@core/payment/domain/tip.entity";
 import { PixKeyType } from "@core/payment/domain/value-objects/pix-key.vo";
 
 import { SendTipUseCase } from "../send-tip.use-case";
@@ -30,9 +31,7 @@ describe("SendTipUseCase Unit Tests", () => {
     expect(output.qr_code).toBeDefined();
     expect(output.copy_paste_code).toBeDefined();
 
-    const Uuid = (await import("@core/shared/domain/value-objects/uuid.vo"))
-      .Uuid;
-    const tip = await repository.findById(new Uuid(output.id));
+    const tip = await repository.findById(new TipId(output.id));
 
     expect(tip).toBeDefined();
     expect(tip?.amount.amount).toBe(10.0);
@@ -48,9 +47,7 @@ describe("SendTipUseCase Unit Tests", () => {
       is_anonymous: true,
     });
 
-    const Uuid = (await import("@core/shared/domain/value-objects/uuid.vo"))
-      .Uuid;
-    const tip = await repository.findById(new Uuid(output.id));
+    const tip = await repository.findById(new TipId(output.id));
 
     expect(tip?.is_anonymous).toBe(true);
   });

@@ -17,7 +17,7 @@ export type UserScoreModelProps = {
 export class UserScoreModelMapper {
   static toModel(entity: UserScore): UserScoreModelProps {
     return {
-      id: entity.id.id,
+      id: entity.user_score_id.id,
       user_id: entity.user_id.id,
       score_type: entity.score_type,
       points: entity.points,
@@ -41,7 +41,7 @@ export class UserScoreModelMapper {
       ]);
     }
     return new UserScore({
-      id: new UserScoreId(model.id),
+      user_score_id: new UserScoreId(model.id),
       user_id: userId,
       score_type: model.score_type as ScoreTypeEnum,
       points: model.points,

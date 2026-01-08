@@ -36,15 +36,15 @@ describe("MusicianFakeBuilder Unit Tests", () => {
     test("should pass index to id factory", () => {
       faker.withMusicianId((index) => new MusicianId());
       const musician = faker.build();
-      expect(musician.id).toBeInstanceOf(MusicianId);
+      expect(musician.musician_id).toBeInstanceOf(MusicianId);
 
       const fakerMany = MusicianFakeBuilder.theMusicians(2);
       fakerMany.withMusicianId((index) => new MusicianId());
       const musicians = fakerMany.build();
 
-      expect(musicians[0].id).toBeInstanceOf(MusicianId);
-      expect(musicians[1].id).toBeInstanceOf(MusicianId);
-      expect(musicians[0].id).not.toBe(musicians[1].id);
+      expect(musicians[0].musician_id).toBeInstanceOf(MusicianId);
+      expect(musicians[1].musician_id).toBeInstanceOf(MusicianId);
+      expect(musicians[0].musician_id).not.toBe(musicians[1].musician_id);
     });
   });
 
@@ -479,7 +479,7 @@ describe("MusicianFakeBuilder Unit Tests", () => {
     const faker = MusicianFakeBuilder.aMusician();
     let musician = faker.build();
 
-    expect(musician.id).toBeInstanceOf(MusicianId);
+    expect(musician.musician_id).toBeInstanceOf(MusicianId);
     expect(typeof musician.name === "string").toBeTruthy();
     expect(musician.email).toBeInstanceOf(Email);
     expect(musician.stage_name).toBeNull();
@@ -516,7 +516,7 @@ describe("MusicianFakeBuilder Unit Tests", () => {
       .withcreated_at(created_at)
       .build();
 
-    expect(musician.id.id).toBe(id.id);
+    expect(musician.musician_id.id).toBe(id.id);
     expect(musician.name).toBe("test name");
     expect(musician.email.value).toBe("test@example.com");
     expect(musician.stage_name).toBe("Test Stage");
@@ -535,7 +535,7 @@ describe("MusicianFakeBuilder Unit Tests", () => {
     let musicians = faker.build();
 
     musicians.forEach((musician) => {
-      expect(musician.id).toBeInstanceOf(MusicianId);
+      expect(musician.musician_id).toBeInstanceOf(MusicianId);
       expect(typeof musician.name === "string").toBeTruthy();
       expect(musician.email).toBeInstanceOf(Email);
       expect(musician.created_at).toBeInstanceOf(Date);

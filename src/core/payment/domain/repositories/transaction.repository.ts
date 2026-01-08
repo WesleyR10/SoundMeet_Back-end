@@ -2,7 +2,7 @@ import { ISearchableRepository } from "../../../shared/domain/repository/reposit
 import { SearchParams } from "../../../shared/domain/repository/search-params";
 import { SearchResult } from "../../../shared/domain/repository/search-result";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
-import { Transaction } from "../transaction.entity";
+import { Transaction } from "../transaction.aggregate";
 import { TransactionStatus, TransactionType } from "../transaction-enums";
 
 export type TransactionFilter = {

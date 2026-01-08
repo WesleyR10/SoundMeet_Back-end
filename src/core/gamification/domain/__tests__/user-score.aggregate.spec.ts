@@ -19,7 +19,7 @@ describe("UserScore Unit Tests without validator", () => {
       points: 10,
     });
 
-    expect(userScore.id).toBeInstanceOf(UserScoreId);
+    expect(userScore.user_score_id).toBeInstanceOf(UserScoreId);
     expect(userScore.user_id).toBeInstanceOf(Uuid);
     expect(userScore.score_type).toBe(ScoreTypeEnum.QR_SCAN);
     expect(userScore.points).toBe(10);
@@ -32,7 +32,7 @@ describe("UserScore Unit Tests without validator", () => {
     const createdAt = new Date();
     const validUuid = "550e8400-e29b-41d4-a716-446655440000";
     const userScore = new UserScore({
-      id: new UserScoreId(validUuid),
+      user_score_id: new UserScoreId(validUuid),
       user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       score_type: ScoreTypeEnum.TIP_GIVEN,
       points: 5,
@@ -41,7 +41,7 @@ describe("UserScore Unit Tests without validator", () => {
       created_at: createdAt,
     });
 
-    expect(userScore.id.id).toBe(validUuid);
+    expect(userScore.user_score_id.id).toBe(validUuid);
     expect(userScore.user_id).toBeInstanceOf(Uuid);
     expect(userScore.score_type).toBe(ScoreTypeEnum.TIP_GIVEN);
     expect(userScore.points).toBe(5);
@@ -58,7 +58,7 @@ describe("UserScore Unit Tests without validator", () => {
       description: "Request sent to musician",
     });
 
-    expect(userScore.id).toBeInstanceOf(UserScoreId);
+    expect(userScore.user_score_id).toBeInstanceOf(UserScoreId);
     expect(userScore.user_id).toBeInstanceOf(Uuid);
     expect(userScore.score_type).toBe(ScoreTypeEnum.REQUEST_SENT);
     expect(userScore.points).toBe(25);
@@ -86,9 +86,9 @@ describe("UserScore Unit Tests without validator", () => {
     expect(userScore.reference_id).toBe("new-ref-123");
   });
 
-  test("should return entity_id", () => {
+  test("should have an id", () => {
     const userScore = UserScore.fake().aUserScore().build();
-    expect(userScore.entity_id).toBe(userScore.id);
+    expect(userScore.user_score_id).toBeInstanceOf(UserScoreId);
   });
 
   test("should return json", () => {
@@ -96,7 +96,7 @@ describe("UserScore Unit Tests without validator", () => {
     const json = userScore.toJSON();
 
     expect(json).toMatchObject({
-      id: userScore.id.id,
+      user_score_id: userScore.user_score_id.id,
       user_id: userScore.user_id.id,
       score_type: userScore.score_type,
       points: userScore.points,
@@ -110,7 +110,7 @@ describe("UserScore Unit Tests without validator", () => {
     const userScore = UserScore.fake().aUserScore().build();
 
     expect(userScore).toBeInstanceOf(UserScore);
-    expect(userScore.id).toBeInstanceOf(UserScoreId);
+    expect(userScore.user_score_id).toBeInstanceOf(UserScoreId);
     expect(userScore.user_id).toBeTruthy();
     expect(Object.values(ScoreTypeEnum)).toContain(userScore.score_type);
     expect(userScore.points).toBeGreaterThanOrEqual(0);

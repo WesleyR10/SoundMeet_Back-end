@@ -28,7 +28,7 @@ export type TipModelProps = {
 export class TipModelMapper {
   static toModel(entity: Tip): TipModelProps {
     const model = {
-      id: entity.entity_id.id,
+      id: entity.tip_id.id,
       audienceId: entity.audience_id.id,
       musicianId: entity.musician_id?.id ?? null,
       bandId: entity.band_id?.id ?? null,

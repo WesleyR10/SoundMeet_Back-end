@@ -1,4 +1,4 @@
-import { ListMusiciansInput } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
+import { ListMusiciansInput } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.input";
 import { MusicianFilter } from "../../../core/musician/domain/musician.repository";
 import { SortDirection } from "../../../core/shared/domain/repository/search-params";
 

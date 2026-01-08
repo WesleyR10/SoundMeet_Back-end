@@ -1,4 +1,4 @@
-import { MusicianWallet } from "../../../domain/musician-wallet.entity";
+import { MusicianWallet } from "../../../domain/musician-wallet.aggregate";
 
 export type MusicianWalletOutput = {
   id: string;

@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
-import { MusicianWallet } from "../../../domain/musician-wallet.entity";
+import { MusicianWallet } from "../../../domain/musician-wallet.aggregate";
 import {
   IMusicianWalletRepository,
   MusicianWalletFilter,

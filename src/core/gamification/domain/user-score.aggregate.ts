@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { UserScoreValidatorFactory } from "./user-score.validator";
 import { UserScoreFakeBuilder } from "./user-score-fake.builder";
 import { UserScoreId } from "./value-objects/gamification-id.vo";
@@ -8,7 +7,7 @@ import { ScoreTypeEnum } from "./value-objects/score-type.vo";
 export { UserScoreId } from "./value-objects/gamification-id.vo";
 
 export type UserScoreConstructorProps = {
-  id?: UserScoreId;
+  user_score_id?: UserScoreId;
   user_id: Uuid;
   score_type: ScoreTypeEnum;
   points: number;
@@ -26,7 +25,7 @@ export type UserScoreCreateCommand = {
 };
 
 export class UserScore extends AggregateRoot {
-  id: UserScoreId;
+  user_score_id: UserScoreId;
   user_id: Uuid;
   score_type: ScoreTypeEnum;
   points: number;
@@ -36,7 +35,7 @@ export class UserScore extends AggregateRoot {
 
   constructor(props: UserScoreConstructorProps) {
     super();
-    this.id = props.id ?? UserScoreId.create();
+    this.user_score_id = props.user_score_id ?? UserScoreId.create();
     this.user_id = props.user_id;
     this.score_type = props.score_type;
     this.points = props.points;
@@ -45,8 +44,8 @@ export class UserScore extends AggregateRoot {
     this.created_at = props.created_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): UserScoreId {
+    return this.user_score_id;
   }
 
   static create(props: UserScoreCreateCommand): UserScore {
@@ -129,7 +128,7 @@ export class UserScore extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      user_score_id: this.user_score_id.id,
       user_id: this.user_id.id,
       score_type: this.score_type,
       points: this.points,

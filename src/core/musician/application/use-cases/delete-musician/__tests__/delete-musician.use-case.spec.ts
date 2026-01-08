@@ -44,7 +44,7 @@ describe("DeleteMusicianUseCase Unit Tests", () => {
     repository.items = [musician];
 
     const input: DeleteMusicianInput = {
-      id: musician.id.id,
+      id: musician.musician_id.id,
     };
 
     await useCase.execute(input);
@@ -60,7 +60,7 @@ describe("DeleteMusicianUseCase Unit Tests", () => {
     repository.items = [musician1, musician2, musician3];
 
     const input: DeleteMusicianInput = {
-      id: musician2.id.id,
+      id: musician2.musician_id.id,
     };
 
     await useCase.execute(input);
@@ -68,7 +68,7 @@ describe("DeleteMusicianUseCase Unit Tests", () => {
     expect(repository.items).toHaveLength(2);
     expect(repository.items).toEqual([musician1, musician3]);
     expect(
-      repository.items.find((m) => m.id.equals(musician2.id)),
+      repository.items.find((m) => m.musician_id.equals(musician2.musician_id)),
     ).toBeUndefined();
   });
 
@@ -78,11 +78,11 @@ describe("DeleteMusicianUseCase Unit Tests", () => {
     repository.items = [musician];
 
     const input: DeleteMusicianInput = {
-      id: musician.id.id,
+      id: musician.musician_id.id,
     };
 
     await useCase.execute(input);
 
-    expect(spyDelete).toHaveBeenCalledWith(musician.id);
+    expect(spyDelete).toHaveBeenCalledWith(musician.musician_id);
   });
 });

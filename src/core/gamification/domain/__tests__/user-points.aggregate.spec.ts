@@ -16,7 +16,7 @@ describe("UserPoints Unit Tests without validator", () => {
       current_level: 2,
     });
 
-    expect(userPoints.id).toBeInstanceOf(UserPointsId);
+    expect(userPoints.user_points_id).toBeInstanceOf(UserPointsId);
     expect(userPoints.user_id).toBeInstanceOf(Uuid);
     expect(userPoints.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(userPoints.total_points).toBe(100);
@@ -30,7 +30,7 @@ describe("UserPoints Unit Tests without validator", () => {
     const createdAt = new Date();
     const updatedAt = new Date();
     const userPoints = new UserPoints({
-      id: new UserPointsId("550e8400-e29b-41d4-a716-446655440002"),
+      user_points_id: new UserPointsId("550e8400-e29b-41d4-a716-446655440002"),
       user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       total_points: 250,
       current_level: 5,
@@ -39,7 +39,9 @@ describe("UserPoints Unit Tests without validator", () => {
       updated_at: updatedAt,
     });
 
-    expect(userPoints.id.id).toBe("550e8400-e29b-41d4-a716-446655440002");
+    expect(userPoints.user_points_id.id).toBe(
+      "550e8400-e29b-41d4-a716-446655440002",
+    );
     expect(userPoints.user_id).toBeInstanceOf(Uuid);
     expect(userPoints.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440001");
     expect(userPoints.total_points).toBe(250);
@@ -56,7 +58,7 @@ describe("UserPoints Unit Tests without validator", () => {
       current_level: 1,
     });
 
-    expect(userPoints.id).toBeInstanceOf(UserPointsId);
+    expect(userPoints.user_points_id).toBeInstanceOf(UserPointsId);
     expect(userPoints.user_id).toBeInstanceOf(Uuid);
     expect(userPoints.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(userPoints.total_points).toBe(50);
@@ -146,9 +148,9 @@ describe("UserPoints Unit Tests without validator", () => {
     expect(needsLevelUp).toBe(true);
   });
 
-  test("should return entity_id", () => {
+  test("should have an id", () => {
     const userPoints = UserPoints.fake().aUserPoints().build();
-    expect(userPoints.entity_id).toBe(userPoints.id);
+    expect(userPoints.user_points_id).toBeInstanceOf(UserPointsId);
   });
 
   test("should return json", () => {
@@ -156,7 +158,7 @@ describe("UserPoints Unit Tests without validator", () => {
     const json = userPoints.toJSON();
 
     expect(json).toMatchObject({
-      id: userPoints.id.id,
+      user_points_id: userPoints.user_points_id.id,
       user_id: userPoints.user_id.id,
       total_points: userPoints.total_points,
       total_scans: userPoints.total_scans,
@@ -174,7 +176,7 @@ describe("UserPoints Unit Tests without validator", () => {
     const userPoints = UserPoints.fake().aUserPoints().build();
 
     expect(userPoints).toBeInstanceOf(UserPoints);
-    expect(userPoints.id).toBeInstanceOf(UserPointsId);
+    expect(userPoints.user_points_id).toBeInstanceOf(UserPointsId);
     expect(userPoints.user_id).toBeInstanceOf(Uuid);
     expect(userPoints.total_points).toBeGreaterThanOrEqual(0);
     expect(userPoints.current_level).toBeGreaterThanOrEqual(1);

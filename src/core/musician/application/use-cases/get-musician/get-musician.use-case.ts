@@ -5,7 +5,7 @@ import { IMusicianRepository } from "../../../domain/musician.repository";
 import {
   MusicianOutput,
   MusicianOutputMapper,
-} from "../common/musician-output";
+} from "../common/musician-profile-output";
 
 export class GetMusicianUseCase implements IUseCase<
   GetMusicianInput,

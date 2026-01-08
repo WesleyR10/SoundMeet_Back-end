@@ -25,22 +25,10 @@ export type UserPointsOutput = {
 
 export class UserPointsOutputMapper {
   static toOutput(entity: UserPoints): UserPointsOutput {
-    const entityJson = entity.toJSON();
+    const { user_points_id, is_active, ...otherProps } = entity.toJSON();
     return {
-      id: entityJson.id,
-      user_id: entityJson.user_id,
-      total_points: entityJson.total_points,
-      total_scans: entityJson.total_scans,
-      total_requests: entityJson.total_requests,
-      total_tips: entityJson.total_tips,
-      total_social_shares: entityJson.total_social_shares,
-      current_level: entityJson.current_level,
-      level_info: entityJson.level_info,
-      progress_to_next_level: entityJson.progress_to_next_level,
-      is_top_fan: entityJson.is_top_fan,
-      is_active_supporter: entityJson.is_active_supporter,
-      created_at: entityJson.created_at,
-      updated_at: entityJson.updated_at,
+      id: user_points_id,
+      ...otherProps,
     } as UserPointsOutput;
   }
 }

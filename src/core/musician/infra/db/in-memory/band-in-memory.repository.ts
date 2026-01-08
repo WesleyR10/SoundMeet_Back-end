@@ -47,6 +47,32 @@ export class BandInMemoryRepository
           filter.genres.every((g) => band.genres.some((bg) => bg === g));
       }
 
+      const priceRange = band.priceRange;
+
+      if (filter.price_model) {
+        matches = matches && priceRange?.model === filter.price_model;
+      }
+
+      if (filter.price_currency) {
+        matches = matches && priceRange?.currency === filter.price_currency;
+      }
+
+      if (
+        filter.price_min !== null &&
+        filter.price_min !== undefined &&
+        Number.isFinite(filter.price_min)
+      ) {
+        matches = matches && !!priceRange && priceRange.max >= filter.price_min;
+      }
+
+      if (
+        filter.price_max !== null &&
+        filter.price_max !== undefined &&
+        Number.isFinite(filter.price_max)
+      ) {
+        matches = matches && !!priceRange && priceRange.min <= filter.price_max;
+      }
+
       if (filter.is_active !== undefined) {
         matches = matches && band.is_active === filter.is_active;
       }

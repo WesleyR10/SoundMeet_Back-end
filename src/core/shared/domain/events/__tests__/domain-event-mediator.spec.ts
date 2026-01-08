@@ -39,7 +39,7 @@ class StubAggregate extends AggregateRoot {
   id: Uuid;
   name: string;
 
-  get entity_id(): ValueObject {
+  get entity_id(): Uuid {
     return this.id;
   }
 

@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { RankingValidatorFactory } from "./ranking.validator";
 import { RankingFakeBuilder } from "./ranking-fake.builder";
 import { RankingId } from "./value-objects/gamification-id.vo";
@@ -18,7 +17,7 @@ export {
 } from "./value-objects/ranking-type.vo";
 
 export type RankingConstructorProps = {
-  id?: RankingId;
+  ranking_id?: RankingId;
   user_id: Uuid;
   ranking_type: RankingTypeEnum;
   period: RankingPeriodEnum;
@@ -42,7 +41,7 @@ export type RankingCreateCommand = {
 };
 
 export class Ranking extends AggregateRoot {
-  id: RankingId;
+  ranking_id: RankingId;
   user_id: Uuid;
   ranking_type: RankingTypeEnum;
   period: RankingPeriodEnum;
@@ -56,7 +55,7 @@ export class Ranking extends AggregateRoot {
 
   constructor(props: RankingConstructorProps) {
     super();
-    this.id = props.id ?? RankingId.create();
+    this.ranking_id = props.ranking_id ?? RankingId.create();
     this.user_id = props.user_id;
     this.ranking_type = props.ranking_type;
     this.period = props.period;
@@ -69,8 +68,8 @@ export class Ranking extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): RankingId {
+    return this.ranking_id;
   }
 
   static create(command: RankingCreateCommand): Ranking {
@@ -223,7 +222,7 @@ export class Ranking extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      ranking_id: this.ranking_id.id,
       user_id: this.user_id.id,
       ranking_type: this.ranking_type,
       period: this.period,

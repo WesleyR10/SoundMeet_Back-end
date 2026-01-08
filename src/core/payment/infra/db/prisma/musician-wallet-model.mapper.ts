@@ -5,7 +5,7 @@ import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import {
   MusicianWallet,
   MusicianWalletId,
-} from "../../../domain/musician-wallet.entity";
+} from "../../../domain/musician-wallet.aggregate";
 import { PixKey } from "../../../domain/value-objects/pix-key.vo";
 
 export type MusicianWalletModelProps = {

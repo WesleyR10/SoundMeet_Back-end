@@ -1,9 +1,11 @@
-import { MusicianOutput } from "../../../core/musician/application/use-cases/common/musician-output";
+import { MusicianOutput } from "../../../core/musician/application/use-cases/common/musician-profile-output";
 import { ListMusiciansOutput } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { SortDirection } from "../../../core/shared/domain/repository/search-params";
+import { Currency } from "../../../core/shared/domain/value-objects/money.vo";
 import { CreateMusicianDto } from "../dto/create-musician.dto";
 import { SearchMusiciansDto } from "../dto/search-musicians.dto";
 import { UpdateMusicianDto } from "../dto/update-musician.dto";
+import { UpdateMusicianProfileDto } from "../dto/update-musician-profile.dto";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
@@ -30,6 +32,7 @@ function makeMusicianOutput(
     total_ratings: 0,
     is_active: true,
     is_verified: false,
+    profile: null,
     created_at: now,
     updated_at: now,
     display_name: "John Doe",
@@ -212,6 +215,68 @@ describe("MusiciansController Unit Tests", () => {
       } as any;
 
       await expect(controller.update(id, input)).rejects.toThrow(error);
+    });
+  });
+
+  describe("updateProfile", () => {
+    it("should update musician profile", async () => {
+      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+      const output = makeMusicianOutput({
+        id,
+        profile: {
+          id: "3c8e2e5b-9e76-4dbd-8ee4-5d6f1b53ac01",
+          musician_id: id,
+          price_range: {
+            model: "per_hour",
+            min: 100,
+            max: 200,
+            currency: "BRL",
+            notes: null,
+          },
+          location: {
+            city: "São Paulo",
+            state: "SP",
+            latitude: null,
+            longitude: null,
+          },
+          social_links: { instagram: "@john" },
+          experience: 5,
+          instruments: ["Guitar"],
+          genres: ["Rock"],
+          rating: 0,
+          total_ratings: 0,
+          created_at: new Date("2025-01-01T00:00:00.000Z"),
+          updated_at: new Date("2025-01-01T00:00:00.000Z"),
+        },
+      });
+
+      const mockUpdateProfileUseCase = {
+        execute: jest.fn().mockResolvedValue(output),
+      };
+      (controller as any).updateProfileUseCase = mockUpdateProfileUseCase;
+
+      const serializeSpy = jest.spyOn(MusiciansController, "serialize");
+      const input: UpdateMusicianProfileDto = {
+        experience: 5,
+        socialLinks: { instagram: "@john" },
+        priceRange: {
+          model: "per_hour",
+          min: 100,
+          max: 200,
+          currency: Currency.BRL,
+          notes: null,
+        },
+      } as any;
+
+      const presenter = await controller.updateProfile(id, input);
+
+      expect(mockUpdateProfileUseCase.execute).toHaveBeenCalledWith({
+        id,
+        ...input,
+      });
+      expect(serializeSpy).toHaveBeenCalledWith(output);
+      expect(presenter).toBeInstanceOf(MusicianPresenter);
+      expect(presenter).toStrictEqual(new MusicianPresenter(output));
     });
   });
 

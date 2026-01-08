@@ -11,8 +11,10 @@ import { PixKey } from "./value-objects/pix-key.vo";
 // Re-exporting for convenience, but implementation is now in tip-enums.ts
 export { PaymentMethod, TipStatus };
 
+export class TipId extends Uuid {}
+
 export type TipConstructorProps = {
-  tip_id?: Uuid;
+  tip_id?: TipId;
   audience_id: Uuid;
   musician_id?: Uuid | null;
   band_id?: Uuid | null;
@@ -43,7 +45,7 @@ export type TipCreateCommand = {
 };
 
 export class Tip extends AggregateRoot {
-  tip_id: Uuid;
+  tip_id: TipId;
   audience_id: Uuid;
   musician_id: Uuid | null;
   band_id: Uuid | null;
@@ -61,7 +63,7 @@ export class Tip extends AggregateRoot {
 
   constructor(props: TipConstructorProps) {
     super();
-    this.tip_id = props.tip_id ?? new Uuid();
+    this.tip_id = props.tip_id ?? new TipId();
     this.audience_id = props.audience_id;
     this.musician_id = props.musician_id ?? null;
     this.band_id = props.band_id ?? null;
@@ -78,7 +80,7 @@ export class Tip extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): Uuid {
+  get entity_id(): TipId {
     return this.tip_id;
   }
 

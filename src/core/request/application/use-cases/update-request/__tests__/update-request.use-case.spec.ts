@@ -32,7 +32,7 @@ describe("UpdateRequestUseCase Unit Tests", () => {
     await repository.insert(request);
 
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       song_title: "New Song",
     });
 
@@ -47,18 +47,18 @@ describe("UpdateRequestUseCase Unit Tests", () => {
 
     const newSongTitle = "Updated Song Title";
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       song_title: newSongTitle,
     });
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.song_title).toBe(newSongTitle);
     expect(output.artist).toBe(request.artist);
     expect(output.message).toBe(request.message?.value || null);
 
-    const updatedEntity = await repository.findById(request.id);
+    const updatedEntity = await repository.findById(request.request_id);
     expect(updatedEntity!.song_title.value).toBe(newSongTitle);
   });
 
@@ -68,18 +68,18 @@ describe("UpdateRequestUseCase Unit Tests", () => {
 
     const newArtist = "Updated Artist";
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       artist: newArtist,
     });
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.artist).toBe(newArtist);
     expect(output.song_title).toBe(request.song_title.value);
     expect(output.message).toBe(request.message?.value || null);
 
-    const updatedEntity = await repository.findById(request.id);
+    const updatedEntity = await repository.findById(request.request_id);
     expect(updatedEntity!.artist).toBe(newArtist);
   });
 
@@ -89,18 +89,18 @@ describe("UpdateRequestUseCase Unit Tests", () => {
 
     const newMessage = "Updated message content";
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       message: newMessage,
     });
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.message).toBe(newMessage);
     expect(output.song_title).toBe(request.song_title.value);
     expect(output.artist).toBe(request.artist);
 
-    const updatedEntity = await repository.findById(request.id);
+    const updatedEntity = await repository.findById(request.request_id);
     expect(updatedEntity!.message?.value).toBe(newMessage);
   });
 
@@ -113,7 +113,7 @@ describe("UpdateRequestUseCase Unit Tests", () => {
     const newMessage = "New message";
 
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       song_title: newSongTitle,
       artist: newArtist,
       message: newMessage,
@@ -121,12 +121,12 @@ describe("UpdateRequestUseCase Unit Tests", () => {
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.song_title).toBe(newSongTitle);
     expect(output.artist).toBe(newArtist);
     expect(output.message).toBe(newMessage);
 
-    const updatedEntity = await repository.findById(request.id);
+    const updatedEntity = await repository.findById(request.request_id);
     expect(updatedEntity!.song_title.value).toBe(newSongTitle);
     expect(updatedEntity!.artist).toBe(newArtist);
     expect(updatedEntity!.message?.value).toBe(newMessage);
@@ -141,13 +141,13 @@ describe("UpdateRequestUseCase Unit Tests", () => {
     const originalMessage = request.message;
 
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       // All fields undefined - should not change anything
     });
 
     const output = await useCase.execute(input);
 
-    expect(output.id).toBe(request.id.id);
+    expect(output.id).toBe(request.request_id.id);
     expect(output.song_title).toBe(originalSongTitle.value);
     expect(output.artist).toBe(originalArtist);
     expect(output.message).toBe(originalMessage?.value || null);
@@ -158,7 +158,7 @@ describe("UpdateRequestUseCase Unit Tests", () => {
     await repository.insert(request);
 
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       song_title: "", // Empty string should be invalid
     });
 
@@ -172,7 +172,7 @@ describe("UpdateRequestUseCase Unit Tests", () => {
     await repository.insert(request);
 
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       artist: "", // Empty string should be invalid
     });
 
@@ -191,7 +191,7 @@ describe("UpdateRequestUseCase Unit Tests", () => {
     const originalMusicianId = request.musician_id;
 
     const input = new UpdateRequestInput({
-      id: request.id.id,
+      id: request.request_id.id,
       song_title: "New Song Title",
     });
 

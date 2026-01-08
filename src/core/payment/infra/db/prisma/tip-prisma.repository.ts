@@ -2,14 +2,13 @@ import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import {
   ITipRepository,
   TipFilter,
   TipSearchParams,
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
-import { Tip } from "../../../domain/tip.entity";
+import { Tip, TipId } from "../../../domain/tip.entity";
 import { TipModelMapper } from "./tip-model.mapper";
 
 export class TipPrismaRepository implements ITipRepository {
@@ -56,7 +55,7 @@ export class TipPrismaRepository implements ITipRepository {
     }
   }
 
-  async delete(entity_id: Uuid): Promise<void> {
+  async delete(entity_id: TipId): Promise<void> {
     try {
       await this.prisma.tip.delete({
         where: { id: entity_id.id },
@@ -66,8 +65,8 @@ export class TipPrismaRepository implements ITipRepository {
     }
   }
 
-  async findById(entity_id: Uuid | string): Promise<Tip | null> {
-    const id = entity_id instanceof Uuid ? entity_id.id : entity_id;
+  async findById(entity_id: TipId | string): Promise<Tip | null> {
+    const id = entity_id instanceof TipId ? entity_id.id : entity_id;
     const model = await this.prisma.tip.findUnique({
       where: { id },
     });
@@ -80,7 +79,7 @@ export class TipPrismaRepository implements ITipRepository {
     return models.map((model) => TipModelMapper.toEntity(model));
   }
 
-  async findByIds(ids: Uuid[]): Promise<Tip[]> {
+  async findByIds(ids: TipId[]): Promise<Tip[]> {
     const models = await this.prisma.tip.findMany({
       where: {
         id: {
@@ -92,8 +91,8 @@ export class TipPrismaRepository implements ITipRepository {
   }
 
   async existsById(
-    ids: Uuid[],
-  ): Promise<{ exists: Uuid[]; not_exists: Uuid[] }> {
+    ids: TipId[],
+  ): Promise<{ exists: TipId[]; not_exists: TipId[] }> {
     if (!ids.length) {
       throw new InvalidArgumentError(
         "ids must be an array with at least one element",

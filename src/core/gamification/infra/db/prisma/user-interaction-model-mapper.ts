@@ -15,7 +15,7 @@ export type UserInteractionModelProps = {
 export class UserInteractionModelMapper {
   static toModel(entity: UserInteraction): UserInteractionModelProps {
     return {
-      id: entity.id.id,
+      id: entity.user_interaction_id.id,
       audienceId: entity.user_id.id,
       musicianId: entity.target_id,
       type: entity.interaction_type,
@@ -27,7 +27,7 @@ export class UserInteractionModelMapper {
 
   static toEntity(model: UserInteractionModelProps): UserInteraction {
     return new UserInteraction({
-      id: new UserInteractionId(model.id),
+      user_interaction_id: new UserInteractionId(model.id),
       user_id: model.audienceId,
       interaction_type: model.type,
       target_id: model.musicianId,

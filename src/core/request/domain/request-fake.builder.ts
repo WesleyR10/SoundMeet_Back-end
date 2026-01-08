@@ -142,7 +142,7 @@ export class RequestFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const request = new Request({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          request_id: !this._id ? undefined : this.callFactory(this._id, index),
           audience_id: this.callFactory(this._audience_id, index),
           musician_id: this.callFactory(this._musician_id, index),
           song_title: this.callFactory(this._song_title, index),

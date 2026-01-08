@@ -1,42 +1,69 @@
+import { Currency } from "../../../../shared/domain/value-objects/money.vo";
+import {
+  PriceModel,
+  PriceRange,
+} from "../../../../shared/domain/value-objects/price-range.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Band, BandId } from "../../../domain/band.aggregate";
+import { BandModel, CurrencyDb } from "./band-model";
 
-export type BandMemberModelProps = {
-  id: string;
-  musicianId: string;
-  role: string;
-  instrument: string;
-  joinedAt: Date;
+const toDbCurrency = (currency: Currency): CurrencyDb => {
+  switch (currency) {
+    case Currency.BRL:
+      return "BRL";
+    case Currency.USD:
+      return "USD";
+    case Currency.EUR:
+      return "EUR";
+  }
 };
 
-export type BandModelProps = {
-  id: string;
-  name: string;
-  description?: string | null;
-  avatar?: string | null;
-  genres: string[];
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
+const toDomainCurrency = (currency: CurrencyDb): Currency => {
+  switch (currency) {
+    case "BRL":
+      return Currency.BRL;
+    case "USD":
+      return Currency.USD;
+    case "EUR":
+      return Currency.EUR;
+  }
 };
 
 export class BandModelMapper {
-  static toModel(entity: Band): BandModelProps {
+  static toModel(entity: Band): Omit<BandModel, "members"> {
     return {
       id: entity.band_id.id,
       name: entity.name,
-      description: entity.description,
-      avatar: entity.avatar,
+      description: entity.description ?? null,
+      avatar: entity.avatar ?? null,
       genres: entity.genres,
+      price_model: entity.priceRange?.model ?? null,
+      price_min: entity.priceRange?.min ?? null,
+      price_max: entity.priceRange?.max ?? null,
+      price_currency: entity.priceRange
+        ? toDbCurrency(entity.priceRange.currency)
+        : null,
+      price_notes: entity.priceRange?.notes ?? null,
       is_active: entity.is_active,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
   }
 
-  static toEntity(
-    model: BandModelProps & { members?: BandMemberModelProps[] },
-  ): Band {
+  static toEntity(model: BandModel): Band {
+    const priceRange =
+      model.price_model && model.price_min !== null && model.price_max !== null
+        ? new PriceRange({
+            model: model.price_model as PriceModel,
+            min: model.price_min,
+            max: model.price_max,
+            currency: model.price_currency
+              ? toDomainCurrency(model.price_currency)
+              : undefined,
+            notes: model.price_notes,
+          })
+        : null;
+
     return new Band({
       band_id: new BandId(model.id),
       name: model.name,
@@ -50,6 +77,7 @@ export class BandModelMapper {
         instrument: m.instrument,
         joined_at: m.joinedAt,
       })),
+      priceRange: priceRange,
       is_active: model.is_active,
       created_at: model.created_at,
       updated_at: model.updated_at,

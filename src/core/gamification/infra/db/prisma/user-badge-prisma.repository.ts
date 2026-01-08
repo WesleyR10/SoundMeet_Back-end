@@ -48,7 +48,7 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
     const model = UserBadgeModelMapper.toModel(entity);
     try {
       await this.prismaClient.userBadge.update({
-        where: { id: entity.id.id },
+        where: { id: entity.user_badge_id.id },
         data: {
           audienceId: model.user_id,
           badgeId: model.badge_type,
@@ -58,7 +58,7 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
       });
     } catch (error: any) {
       if (error.code === "P2025") {
-        throw new NotFoundError(entity.id.id, UserBadge);
+        throw new NotFoundError(entity.user_badge_id.id, UserBadge);
       }
       throw error;
     }

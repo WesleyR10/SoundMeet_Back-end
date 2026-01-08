@@ -37,12 +37,12 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
     const model = UserPointsModelMapper.toModel(entity);
     try {
       await this.prismaClient.userPoints.update({
-        where: { id: entity.id.id },
+        where: { id: entity.user_points_id.id },
         data: model,
       });
     } catch (error: any) {
       if (error.code === "P2025") {
-        throw new NotFoundError(entity.id.id, UserPoints);
+        throw new NotFoundError(entity.user_points_id.id, UserPoints);
       }
       throw error;
     }

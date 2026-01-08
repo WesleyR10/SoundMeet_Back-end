@@ -42,7 +42,7 @@ describe("RespondToRequestUseCase Unit Tests", () => {
     await repository.insert(request);
 
     const input = new RespondToRequestInput({
-      request_id: request.entity_id.id,
+      request_id: request.request_id.id,
       musician_id: request.musician_id.id,
       action: RespondToRequestAction.ACCEPT,
     });
@@ -65,15 +65,15 @@ describe("RespondToRequestUseCase Unit Tests", () => {
       await repository.insert(request);
 
       const input = new RespondToRequestInput({
-        request_id: request.entity_id.id,
+        request_id: request.request_id.id,
         musician_id: request.musician_id.id,
         action: RespondToRequestAction.ACCEPT,
       });
 
       const output = await useCase.execute(input);
-      const updatedRequest = await repository.findById(request.entity_id);
+      const updatedRequest = await repository.findById(request.request_id);
 
-      expect(output.id).toBe(request.entity_id.id);
+      expect(output.id).toBe(request.request_id.id);
       expect(output.status).toBe("accepted");
       expect(output.rejection_reason).toBeNull();
       expect(output.responded_at).toBeDefined();
@@ -100,16 +100,16 @@ describe("RespondToRequestUseCase Unit Tests", () => {
 
       const rejectionReason = "I don't know this song";
       const input = new RespondToRequestInput({
-        request_id: request.entity_id.id,
+        request_id: request.request_id.id,
         musician_id: request.musician_id.id,
         action: RespondToRequestAction.REJECT,
         rejection_reason: rejectionReason,
       });
 
       const output = await useCase.execute(input);
-      const updatedRequest = await repository.findById(request.entity_id);
+      const updatedRequest = await repository.findById(request.request_id);
 
-      expect(output.id).toBe(request.entity_id.id);
+      expect(output.id).toBe(request.request_id.id);
       expect(output.status).toBe("rejected");
       expect(output.rejection_reason).toBe(rejectionReason);
       expect(output.responded_at).toBeDefined();

@@ -23,7 +23,7 @@ describe("Ranking Unit Tests without validator", () => {
       period_end: new Date("2024-01-07"),
     });
 
-    expect(ranking.id).toBeInstanceOf(RankingId);
+    expect(ranking.ranking_id).toBeInstanceOf(RankingId);
     expect(ranking.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(ranking.ranking_type).toBe(RankingTypeEnum.TOP_FAS);
     expect(ranking.period).toBe(RankingPeriodEnum.WEEKLY);
@@ -39,7 +39,7 @@ describe("Ranking Unit Tests without validator", () => {
     const createdAt = new Date();
     const updatedAt = new Date();
     const ranking = new Ranking({
-      id: new RankingId(),
+      ranking_id: new RankingId(),
       user_id: new Uuid("550e8400-e29b-41d4-a716-446655440001"),
       ranking_type: RankingTypeEnum.TOP_APOIADORES,
       period: RankingPeriodEnum.MONTHLY,
@@ -51,7 +51,7 @@ describe("Ranking Unit Tests without validator", () => {
       updated_at: updatedAt,
     });
 
-    expect(ranking.id).toBeInstanceOf(RankingId);
+    expect(ranking.ranking_id).toBeInstanceOf(RankingId);
     expect(ranking.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440001");
     expect(ranking.ranking_type).toBe(RankingTypeEnum.TOP_APOIADORES);
     expect(ranking.period).toBe(RankingPeriodEnum.MONTHLY);
@@ -72,7 +72,7 @@ describe("Ranking Unit Tests without validator", () => {
       period_end: new Date("2024-01-02"),
     });
 
-    expect(ranking.id).toBeInstanceOf(RankingId);
+    expect(ranking.ranking_id).toBeInstanceOf(RankingId);
     expect(ranking.user_id.id).toBe("550e8400-e29b-41d4-a716-446655440002");
     expect(ranking.ranking_type).toBe(RankingTypeEnum.TOP_FAS);
     expect(ranking.period).toBe(RankingPeriodEnum.DAILY);
@@ -163,9 +163,9 @@ describe("Ranking Unit Tests without validator", () => {
     expect(ranking.isCurrentPeriod()).toBe(false);
   });
 
-  test("should return entity_id", () => {
+  test("should have an id", () => {
     const ranking = Ranking.fake().aRanking().build();
-    expect(ranking.entity_id).toBe(ranking.id);
+    expect(ranking.ranking_id).toBeInstanceOf(RankingId);
   });
 
   test("should return json", () => {
@@ -173,7 +173,7 @@ describe("Ranking Unit Tests without validator", () => {
     const json = ranking.toJSON();
 
     expect(json).toMatchObject({
-      id: ranking.id.id,
+      ranking_id: ranking.ranking_id.id,
       user_id: ranking.user_id.id,
       ranking_type: ranking.ranking_type,
       period: ranking.period,
@@ -190,7 +190,7 @@ describe("Ranking Unit Tests without validator", () => {
     const ranking = Ranking.fake().aRanking().build();
 
     expect(ranking).toBeInstanceOf(Ranking);
-    expect(ranking.id).toBeInstanceOf(RankingId);
+    expect(ranking.ranking_id).toBeInstanceOf(RankingId);
     expect(ranking.user_id).toBeTruthy();
     expect(Object.values(RankingTypeEnum)).toContain(ranking.ranking_type);
     expect(Object.values(RankingPeriodEnum)).toContain(ranking.period);

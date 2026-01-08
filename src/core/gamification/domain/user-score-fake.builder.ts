@@ -91,7 +91,9 @@ export class UserScoreFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const userScore = new UserScore({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          user_score_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           user_id: this.callFactory(this._user_id, index),
           score_type: this.callFactory(this._score_type, index),
           points: this.callFactory(this._points, index),

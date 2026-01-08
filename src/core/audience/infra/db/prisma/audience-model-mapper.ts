@@ -7,7 +7,7 @@ export type AudienceModelProps = AudienceModel;
 export class AudienceModelMapper {
   static toModel(entity: Audience): AudienceModelProps {
     const model = {
-      id: entity.id.id,
+      id: entity.audience_id.id,
       email: entity.email.value,
       name: entity.name,
       nickname: entity.nickname,
@@ -110,7 +110,7 @@ export class AudienceModelMapper {
     });
 
     return new Audience({
-      id: new AudienceId(model.id),
+      audience_id: new AudienceId(model.id),
       email: model.email,
       name: model.name,
       nickname: model.nickname,

@@ -32,12 +32,14 @@ describe("DeleteEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.id.id,
+      id: establishment.establishment_id.id,
     };
 
     await useCase.execute(input);
 
-    const deletedEstablishment = await repository.findById(establishment.id);
+    const deletedEstablishment = await repository.findById(
+      establishment.establishment_id,
+    );
     expect(deletedEstablishment).toBeNull();
   });
 
@@ -47,13 +49,15 @@ describe("DeleteEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment1, establishment2];
 
     const input = {
-      id: establishment1.id.id,
+      id: establishment1.establishment_id.id,
     };
 
     await useCase.execute(input);
 
     expect(repository.items).toHaveLength(1);
-    expect(repository.items[0].id.id).toBe(establishment2.id.id);
+    expect(repository.items[0].establishment_id.id).toBe(
+      establishment2.establishment_id.id,
+    );
   });
 
   it("should handle multiple delete operations", async () => {
@@ -63,16 +67,18 @@ describe("DeleteEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment1, establishment2, establishment3];
 
     // Delete first establishment
-    await useCase.execute({ id: establishment1.id.id });
+    await useCase.execute({ id: establishment1.establishment_id.id });
     expect(repository.items).toHaveLength(2);
 
     // Delete second establishment
-    await useCase.execute({ id: establishment2.id.id });
+    await useCase.execute({ id: establishment2.establishment_id.id });
     expect(repository.items).toHaveLength(1);
-    expect(repository.items[0].id.id).toBe(establishment3.id.id);
+    expect(repository.items[0].establishment_id.id).toBe(
+      establishment3.establishment_id.id,
+    );
 
     // Delete third establishment
-    await useCase.execute({ id: establishment3.id.id });
+    await useCase.execute({ id: establishment3.establishment_id.id });
     expect(repository.items).toHaveLength(0);
   });
 
@@ -86,13 +92,13 @@ describe("DeleteEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment1, establishment2];
 
     const input = {
-      id: establishment1.id.id,
+      id: establishment1.establishment_id.id,
     };
 
     await useCase.execute(input);
 
     const remainingEstablishment = await repository.findById(
-      new EstablishmentId(establishment2.id.id),
+      new EstablishmentId(establishment2.establishment_id.id),
     );
     expect(remainingEstablishment).toBeDefined();
     expect(remainingEstablishment!.name).toBe("Bar 2");
@@ -103,7 +109,7 @@ describe("DeleteEstablishmentUseCase Unit Tests", () => {
     repository.items = [establishment];
 
     const input = {
-      id: establishment.id.id,
+      id: establishment.establishment_id.id,
     };
 
     // First deletion should succeed
@@ -111,7 +117,7 @@ describe("DeleteEstablishmentUseCase Unit Tests", () => {
 
     // Second deletion should throw error
     await expect(() => useCase.execute(input)).rejects.toThrow(
-      new NotFoundError(establishment.id.id, Establishment),
+      new NotFoundError(establishment.establishment_id.id, Establishment),
     );
   });
 });

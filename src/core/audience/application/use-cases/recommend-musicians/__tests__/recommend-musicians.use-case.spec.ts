@@ -35,7 +35,9 @@ describe("RecommendMusiciansUseCase", () => {
       audienceRepo as any,
       musicianRepo,
     );
-    const output = await useCase.execute({ audience_id: audience.id.id });
+    const output = await useCase.execute({
+      audience_id: audience.audience_id.id,
+    });
 
     expect(musicianRepo.search).toHaveBeenCalledWith(
       expect.objectContaining({

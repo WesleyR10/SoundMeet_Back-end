@@ -291,7 +291,7 @@ describe("Request Unit Tests", () => {
       const json = request.toJSON();
 
       expect(json).toMatchObject({
-        id: request.id.id,
+        request_id: request.request_id.id,
         audience_id: request.audience_id.id,
         musician_id: request.musician_id.id,
         song_title: request.song_title.value,
@@ -310,7 +310,7 @@ describe("Request Unit Tests", () => {
       const fakeRequest = Request.fake().aRequest().build();
 
       expect(fakeRequest).toBeInstanceOf(Request);
-      expect(fakeRequest.id).toBeDefined();
+      expect(fakeRequest.request_id).toBeDefined();
       expect(fakeRequest.audience_id).toBeDefined();
       expect(fakeRequest.musician_id).toBeDefined();
       expect(fakeRequest.song_title).toBeDefined();

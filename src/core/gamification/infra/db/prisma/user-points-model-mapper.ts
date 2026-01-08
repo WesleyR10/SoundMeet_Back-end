@@ -17,7 +17,7 @@ export type UserPointsModelProps = {
 export class UserPointsModelMapper {
   static toModel(entity: UserPoints): UserPointsModelProps {
     return {
-      id: entity.id.id,
+      id: entity.user_points_id.id,
       audienceId: entity.user_id.id,
       points: entity.total_points,
       source: "system", // Valor padrão baseado no domínio
@@ -38,7 +38,7 @@ export class UserPointsModelMapper {
   static toEntity(model: UserPointsModelProps): UserPoints {
     const metadata = model.metadata || {};
     return new UserPoints({
-      id: new UserPointsId(model.id),
+      user_points_id: new UserPointsId(model.id),
       user_id: new Uuid(model.audienceId),
       total_points: model.points,
       total_scans: metadata.total_scans || 0,

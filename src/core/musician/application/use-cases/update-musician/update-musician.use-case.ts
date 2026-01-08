@@ -1,13 +1,14 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Musician } from "../../../domain/musician.aggregate";
 import { MusicianId } from "../../../domain/musician.aggregate";
 import { IMusicianRepository } from "../../../domain/musician.repository";
 import {
   MusicianOutput,
   MusicianOutputMapper,
-} from "../common/musician-output";
+} from "../common/musician-profile-output";
 import { UpdateMusicianInput } from "./update-musician.input";
 
 export class UpdateMusicianUseCase implements IUseCase<
@@ -34,6 +35,28 @@ export class UpdateMusicianUseCase implements IUseCase<
       entity.updateInstruments(input.instruments);
     input.experience_years !== undefined &&
       entity.updateExperience(input.experience_years);
+
+    if (entity.profile) {
+      input.genres !== undefined && entity.profile.updateGenres(input.genres);
+      input.instruments !== undefined &&
+        entity.profile.updateInstruments(input.instruments);
+      input.experience_years !== undefined &&
+        entity.profile.updateExperience(input.experience_years);
+    }
+
+    if (input.priceRange !== undefined) {
+      try {
+        const priceRange = input.priceRange
+          ? new PriceRange(input.priceRange)
+          : null;
+        entity.updatePriceRange(priceRange);
+      } catch (error: any) {
+        entity.notification.addError(
+          error?.message ?? "Invalid price range",
+          "priceRange",
+        );
+      }
+    }
 
     if (input.is_active === true) {
       entity.activate();

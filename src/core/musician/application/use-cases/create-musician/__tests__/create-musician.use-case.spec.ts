@@ -121,10 +121,12 @@ describe("CreateMusicianUseCase Unit Tests", () => {
 
       expect(spyInsert).toHaveBeenCalledTimes(1);
       expect(output).toStrictEqual({
-        id: repository.items[0].id.id,
+        id: repository.items[0].musician_id.id,
         ...expected,
+        profile: null,
         qr_code: expect.any(String),
         created_at: repository.items[0].created_at,
+        updated_at: repository.items[0].updated_at,
       });
       expect(repository.items[0]).toBeInstanceOf(Musician);
       expect(repository.items[0].qr_code!.isValid).toBe(true);

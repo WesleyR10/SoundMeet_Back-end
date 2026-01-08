@@ -37,9 +37,9 @@ export type RequestOutput = {
 
 export class RequestOutputMapper {
   static toOutput(entity: Request): RequestOutput {
-    const { id, ...otherProps } = entity.toJSON();
+    const { request_id, ...otherProps } = entity.toJSON();
     return {
-      id: id,
+      id: request_id,
       ...otherProps,
       points_value: entity.pointsValue.toJSON(),
       is_special_request: entity.isSpecialRequest,

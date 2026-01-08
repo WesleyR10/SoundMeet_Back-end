@@ -94,21 +94,21 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
       const spyUpdate = jest.spyOn(repository, "update");
 
       const fullInput = {
-        id: audience.id.id,
+        id: audience.audience_id.id,
         ...input,
       };
 
       const output = await useCase.execute(fullInput);
 
       expect(spyUpdate).toHaveBeenCalledTimes(1);
-      expect(output.audience.id).toBe(audience.id.id);
+      expect(output.audience.id).toBe(audience.audience_id.id);
       expect(output.points_earned).toBe(expected.points_earned);
       expect(output.new_badges).toEqual(expected.new_badges);
       expect(output.request_metadata).toMatchObject(expected.request_metadata);
       expect(output.request_metadata.requested_at).toBeInstanceOf(Date);
 
       // Verify audience was updated in repository
-      const updatedAudience = await repository.findById(audience.id);
+      const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience).toBeDefined();
       expect(updatedAudience!.totalPoints).toBe(expected.points_earned);
     });
@@ -119,14 +119,14 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
     repository.items = [audience];
 
     const input1: MakeMusicRequestInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       musician_id: "musician-id-1",
       song_title: "Song 1",
       artist_name: "Artist 1",
     };
 
     const input2: MakeMusicRequestInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       musician_id: "musician-id-2",
       song_title: "Song 2",
       artist_name: "Artist 2",
@@ -140,7 +140,7 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
     expect(output2.audience.points.total).toBe(50); // 25 points per request
 
     // Verify final state in repository
-    const finalAudience = await repository.findById(audience.id);
+    const finalAudience = await repository.findById(audience.audience_id);
     expect(finalAudience!.totalPoints).toBe(50);
   });
 
@@ -149,7 +149,7 @@ describe("MakeMusicRequestUseCase Unit Tests", () => {
     repository.items = [audience];
 
     const input: MakeMusicRequestInput = {
-      id: audience.id.id,
+      id: audience.audience_id.id,
       musician_id: "musician-123",
       song_title: "Stairway to Heaven",
       artist_name: "Led Zeppelin",

@@ -19,7 +19,7 @@ describe("BadgeModelMapper", () => {
       const model = BadgeModelMapper.toModel(badge);
 
       expect(model).toEqual({
-        id: badge.id.id,
+        id: badge.badge_id.id,
         name: badge.name,
         description: badge.description,
         icon: badge.icon,
@@ -49,7 +49,7 @@ describe("BadgeModelMapper", () => {
       const model = BadgeModelMapper.toModel(badge);
 
       expect(model).toEqual({
-        id: badge.id.id,
+        id: badge.badge_id.id,
         name: badge.name,
         description: badge.description,
         icon: badge.icon,
@@ -81,7 +81,7 @@ describe("BadgeModelMapper", () => {
 
       const entity = BadgeModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.badge_id.id).toBe(model.id);
       expect(entity.name).toBe(model.name);
       expect(entity.description).toBe(model.description);
       expect(entity.icon).toBe(model.icon);
@@ -109,7 +109,7 @@ describe("BadgeModelMapper", () => {
 
       const entity = BadgeModelMapper.toEntity(model);
 
-      expect(entity.id.id).toBe(model.id);
+      expect(entity.badge_id.id).toBe(model.id);
       expect(entity.name).toBe(model.name);
       expect(entity.description).toBe(model.description);
       expect(entity.icon).toBe(model.icon);
@@ -139,7 +139,7 @@ describe("BadgeModelMapper", () => {
       const model = BadgeModelMapper.toModel(originalBadge);
       const convertedBadge = BadgeModelMapper.toEntity(model);
 
-      expect(convertedBadge.id.id).toBe(originalBadge.id.id);
+      expect(convertedBadge.badge_id.id).toBe(originalBadge.badge_id.id);
       expect(convertedBadge.name).toBe(originalBadge.name);
       expect(convertedBadge.description).toBe(originalBadge.description);
       expect(convertedBadge.icon).toBe(originalBadge.icon);

@@ -1,7 +1,8 @@
+import { PriceRange } from "../../../../../shared/domain/value-objects/price-range.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianSearchResult } from "../../../../domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
-import { MusicianOutputMapper } from "../../common/musician-output";
+import { MusicianOutputMapper } from "../../common/musician-profile-output";
 import { ListMusiciansUseCase } from "../list-musicians.use-case";
 
 describe("ListMusiciansUseCase Unit Tests", () => {
@@ -127,6 +128,51 @@ describe("ListMusiciansUseCase Unit Tests", () => {
       current_page: 1,
       per_page: 2,
       last_page: 2,
+    });
+  });
+
+  it("should filter output using price range", async () => {
+    const created_at = new Date(2024, 1, 1);
+
+    const items = [
+      Musician.fake()
+        .aMusician()
+        .withName("m1")
+        .withcreated_at(new Date(created_at.getTime() + 100))
+        .build(),
+      Musician.fake()
+        .aMusician()
+        .withName("m2")
+        .withcreated_at(new Date(created_at.getTime() + 200))
+        .build(),
+      Musician.fake()
+        .aMusician()
+        .withName("m3")
+        .withcreated_at(new Date(created_at.getTime() + 300))
+        .build(),
+    ];
+
+    items[0].updatePriceRange(
+      new PriceRange({ model: "per_event", min: 100, max: 200 }),
+    );
+    items[1].updatePriceRange(
+      new PriceRange({ model: "per_event", min: 300, max: 400 }),
+    );
+
+    repository.items = items;
+
+    const output = await useCase.execute({
+      sort: "created_at",
+      sort_dir: "asc",
+      filter: { price_min: 250 },
+    });
+
+    expect(output).toStrictEqual({
+      items: [items[1]].map(MusicianOutputMapper.toOutput),
+      total: 1,
+      current_page: 1,
+      per_page: 15,
+      last_page: 1,
     });
   });
 });

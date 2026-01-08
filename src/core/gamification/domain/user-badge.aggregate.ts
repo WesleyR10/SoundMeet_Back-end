@@ -1,12 +1,11 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import { UserBadgeValidatorFactory } from "./user-badge.validator";
 import { UserBadgeFakeBuilder } from "./user-badge-fake.builder";
 import { BadgeType, BadgeTypeEnum } from "./value-objects/badge-type.vo";
 import { UserBadgeId } from "./value-objects/gamification-id.vo";
 
 export type UserBadgeConstructorProps = {
-  id?: UserBadgeId;
+  user_badge_id?: UserBadgeId;
   user_id: Uuid;
   badge_type: BadgeTypeEnum;
   progress?: number;
@@ -24,7 +23,7 @@ export type UserBadgeCreateCommand = {
 };
 
 export class UserBadge extends AggregateRoot {
-  id: UserBadgeId;
+  user_badge_id: UserBadgeId;
   user_id: Uuid;
   badge_type: BadgeType;
   progress: number;
@@ -35,7 +34,7 @@ export class UserBadge extends AggregateRoot {
 
   constructor(props: UserBadgeConstructorProps) {
     super();
-    this.id = props.id ?? UserBadgeId.create();
+    this.user_badge_id = props.user_badge_id ?? UserBadgeId.create();
     this.user_id = props.user_id;
     this.badge_type = new BadgeType(props.badge_type);
     this.progress = props.progress ?? 0;
@@ -45,8 +44,8 @@ export class UserBadge extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): UserBadgeId {
+    return this.user_badge_id;
   }
 
   static create(command: UserBadgeCreateCommand): UserBadge {
@@ -137,7 +136,7 @@ export class UserBadge extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      user_badge_id: this.user_badge_id.id,
       user_id: this.user_id.id,
       badge_type: this.badge_type.value,
       progress: this.progress,

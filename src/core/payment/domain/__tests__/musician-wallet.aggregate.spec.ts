@@ -1,4 +1,4 @@
-import { MusicianWallet } from "../musician-wallet.entity";
+import { MusicianWallet } from "../musician-wallet.aggregate";
 
 describe("MusicianWallet Aggregate", () => {
   it("should credit and withdraw funds with validations", () => {

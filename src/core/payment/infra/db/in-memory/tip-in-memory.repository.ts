@@ -1,5 +1,3 @@
-import { Uuid } from "@core/shared/domain";
-
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import {
@@ -8,10 +6,10 @@ import {
   TipSearchParams,
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
-import { Tip } from "../../../domain/tip.entity";
+import { Tip, TipId } from "../../../domain/tip.entity";
 
 export class TipInMemoryRepository
-  extends InMemorySearchableRepository<Tip, Uuid, TipFilter>
+  extends InMemorySearchableRepository<Tip, TipId, TipFilter>
   implements ITipRepository
 {
   sortableFields: string[] = ["created_at"];

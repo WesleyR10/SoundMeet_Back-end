@@ -11,7 +11,7 @@ import {
 import { ClassValidatorFields } from "../../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../../shared/domain/validators/notification";
 import { PaymentMethod } from "../tip-enums";
-import { Transaction } from "../transaction.entity";
+import { Transaction } from "../transaction.aggregate";
 import { TransactionStatus, TransactionType } from "../transaction-enums";
 
 export class TransactionRules {

@@ -39,7 +39,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
     expect(output).toStrictEqual({
       items: [
         {
-          id: establishment.id.id,
+          id: establishment.establishment_id.id,
           name: establishment.name,
           email: establishment.email.value,
           cnpj: establishment.cnpj
@@ -92,7 +92,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
     expect(output).toStrictEqual({
       items: [
         {
-          id: establishments[1].id.id,
+          id: establishments[1].establishment_id.id,
           name: establishments[1].name,
           description: establishments[1].description,
           avatar: establishments[1].avatar,
@@ -125,7 +125,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           is_club: establishments[1].isClub,
         },
         {
-          id: establishments[0].id.id,
+          id: establishments[0].establishment_id.id,
           name: establishments[0].name,
           description: establishments[0].description,
           avatar: establishments[0].avatar,
@@ -194,7 +194,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
     expect(output).toMatchObject({
       items: [
         {
-          id: establishments[2].id.id,
+          id: establishments[2].establishment_id.id,
           name: "Blues Bar",
           email: establishments[2].email.value,
           cnpj: {
@@ -211,7 +211,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           created_at: establishments[2].created_at,
         },
         {
-          id: establishments[0].id.id,
+          id: establishments[0].establishment_id.id,
           name: "Rock Bar",
           email: establishments[0].email.value,
           cnpj: establishments[0].cnpj,

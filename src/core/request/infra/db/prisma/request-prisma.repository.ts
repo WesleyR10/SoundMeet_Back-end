@@ -34,7 +34,7 @@ export class RequestPrismaRepository implements IRequestRepository {
   }
 
   async update(entity: Request): Promise<void> {
-    const id = entity.id.id;
+    const id = entity.request_id.id;
     const modelProps = RequestModelMapper.toModel(entity);
 
     try {

@@ -2,7 +2,7 @@ import { Uuid } from "@core/shared/domain/value-objects";
 
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
-import { MusicianWallet } from "../../../domain/musician-wallet.entity";
+import { MusicianWallet } from "../../../domain/musician-wallet.aggregate";
 import {
   IMusicianWalletRepository,
   MusicianWalletFilter,

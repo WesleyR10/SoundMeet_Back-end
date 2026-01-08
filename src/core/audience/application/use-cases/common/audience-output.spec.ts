@@ -8,7 +8,7 @@ describe("AudienceOutputMapper Unit Tests", () => {
     const audience = Audience.fake().aAudience().build();
     const output = AudienceOutputMapper.toOutput(audience);
 
-    expect(output.id).toBe(audience.id.id);
+    expect(output.id).toBe(audience.audience_id.id);
     expect(output.email).toBe(audience.email?.value ?? null);
     expect(output.name).toBe(audience.name);
     expect(output.nickname).toBe(audience.nickname);

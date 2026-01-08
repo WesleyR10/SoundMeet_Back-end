@@ -1,6 +1,12 @@
-import { Band } from "@core/musician/domain/band.aggregate";
+import { Band, BandId } from "@core/musician/domain/band.aggregate";
 import { IBandRepository } from "@core/musician/domain/band.repository";
-import { MusicianWallet, PaymentMethod, Tip, Transaction } from "@core/payment";
+import {
+  MusicianWallet,
+  PaymentMethod,
+  Tip,
+  TipId,
+  Transaction,
+} from "@core/payment";
 import {
   IMusicianWalletRepository,
   ITipRepository,
@@ -8,7 +14,6 @@ import {
 } from "@core/payment/domain/repositories";
 import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IUseCase } from "@core/shared/application/use-case.interface";
-import { Uuid } from "@core/shared/domain";
 import { NotFoundError } from "@core/shared/domain/errors";
 import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
 
@@ -43,7 +48,7 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
   async execute(
     input: ConfirmTipPaymentInput,
   ): Promise<ConfirmTipPaymentOutput> {
-    const tip = await this.tipRepo.findById(new Uuid(input.tip_id));
+    const tip = await this.tipRepo.findById(new TipId(input.tip_id));
     if (!tip) {
       throw new NotFoundError(input.tip_id, Tip);
     }
@@ -69,7 +74,7 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
     await this.tipRepo.update(tip);
 
     if (tip.band_id) {
-      const band = await this.bandRepo.findById(new Uuid(tip.band_id.id));
+      const band = await this.bandRepo.findById(new BandId(tip.band_id.id));
       if (!band) {
         throw new NotFoundError(tip.band_id.id, Band);
       }

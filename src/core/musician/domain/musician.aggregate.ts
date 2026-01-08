@@ -6,14 +6,16 @@ import {
   Rating,
   Uuid,
 } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
+import { Location } from "../../shared/domain/value-objects/location.vo";
+import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { MusicianCreatedEvent } from "./events/musician-created.event";
 import { MusicianVerifiedEvent } from "./events/musician-verified.event";
 import { MusicianValidatorFactory } from "./musician.validator";
 import { MusicianFakeBuilder } from "./musician-fake.builder";
+import { MusicianProfile } from "./musician-profile.aggregate";
 
 export type MusicianConstructorProps = {
-  id?: MusicianId;
+  musician_id?: MusicianId;
   email: string;
   name: string;
   stage_name?: string | null;
@@ -28,11 +30,13 @@ export type MusicianConstructorProps = {
   total_ratings?: number;
   is_active?: boolean;
   is_verified?: boolean;
+  profile?: MusicianProfile | null;
   created_at?: Date;
   updated_at?: Date;
 };
 
 export type MusicianCreateCommand = {
+  musician_id?: MusicianId;
   email: string;
   name: string;
   stage_name?: string | null;
@@ -43,12 +47,13 @@ export type MusicianCreateCommand = {
   instruments: string[];
   experience_years?: number;
   is_active?: boolean;
+  profile?: MusicianProfile | null;
 };
 
 export class MusicianId extends Uuid {}
 
 export class Musician extends AggregateRoot {
-  id: MusicianId;
+  musician_id: MusicianId;
   email: Email;
   name: string;
   stage_name: string | null;
@@ -63,12 +68,13 @@ export class Musician extends AggregateRoot {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  profile: MusicianProfile | null;
   created_at: Date;
   updated_at: Date;
 
   constructor(props: MusicianConstructorProps) {
     super();
-    this.id = props.id ?? new MusicianId();
+    this.musician_id = props.musician_id ?? new MusicianId();
     this.email = new Email(props.email);
     this.name = props.name;
     this.stage_name = props.stage_name ?? null;
@@ -81,19 +87,20 @@ export class Musician extends AggregateRoot {
     this.qr_code = props.qr_code
       ? new QRCode({
           code: props.qr_code,
-          url: `https://soundmeet.app/musician/${this.id.id}`,
+          url: `https://soundmeet.app/musician/${this.musician_id.id}`,
         })
       : null;
     this.rating = new Rating(props.rating ?? 0);
     this.total_ratings = props.total_ratings ?? 0;
     this.is_active = props.is_active ?? true;
     this.is_verified = props.is_verified ?? false;
+    this.profile = props.profile ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): MusicianId {
+    return this.musician_id;
   }
 
   static create(props: MusicianCreateCommand): Musician {
@@ -102,7 +109,7 @@ export class Musician extends AggregateRoot {
     musician.generateQRCode();
     musician.applyEvent(
       new MusicianCreatedEvent({
-        musician_id: musician.id,
+        musician_id: musician.musician_id,
         email: musician.email,
         name: musician.name,
         stage_name: musician.stage_name,
@@ -165,11 +172,35 @@ export class Musician extends AggregateRoot {
     this.experience_years = years;
   }
 
+  updatePriceRange(price: PriceRange | null): void {
+    this.ensureProfile().changePriceRange(price);
+    this.updated_at = new Date();
+  }
+
+  ensureIsActive(): void {
+    if (!this.is_active) {
+      this.notification.addError("Musician is not active", "is_active");
+    }
+  }
+
+  ensureProfile(): MusicianProfile {
+    if (!this.profile) {
+      this.profile = MusicianProfile.create({
+        musician_id: this.musician_id,
+        location: new Location({}),
+        instruments: this.instruments,
+        genres: this.genres,
+        experience: this.experience_years,
+      });
+    }
+    return this.profile;
+  }
+
   generateQRCode(): void {
-    const qrData = `soundmeet://musician/${this.id.id}`;
+    const qrData = `soundmeet://musician/${this.musician_id.id}`;
     this.qr_code = new QRCode({
       code: qrData,
-      url: `https://soundmeet.app/musician/${this.id.id}`,
+      url: `https://soundmeet.app/musician/${this.musician_id.id}`,
     });
   }
 
@@ -197,7 +228,7 @@ export class Musician extends AggregateRoot {
     this.is_verified = true;
     this.applyEvent(
       new MusicianVerifiedEvent({
-        musician_id: this.id,
+        musician_id: this.musician_id,
         verified_at: new Date(),
       }),
     );
@@ -230,7 +261,7 @@ export class Musician extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      musician_id: this.musician_id.id,
       email: this.email.value,
       name: this.name,
       stage_name: this.stage_name,
@@ -245,7 +276,9 @@ export class Musician extends AggregateRoot {
       total_ratings: this.total_ratings,
       is_active: this.is_active,
       is_verified: this.is_verified,
+      profile: this.profile?.toJSON() || null,
       created_at: this.created_at,
+      updated_at: this.updated_at,
       display_name: this.displayName,
       is_experienced: this.isExperienced,
       is_highly_rated: this.isHighlyRated,

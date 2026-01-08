@@ -159,7 +159,9 @@ export class MusicianFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const musician = new Musician({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          musician_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           name: this.callFactory(this._name, index),
           stage_name: this.callFactory(this._stage_name, index),
           email: this.callFactory(this._email, index),

@@ -36,7 +36,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
   }
 
   async update(entity: Establishment): Promise<void> {
-    const id = entity.id.id;
+    const id = entity.establishment_id.id;
     const modelProps = EstablishmentModelMapper.toModel(entity);
 
     try {

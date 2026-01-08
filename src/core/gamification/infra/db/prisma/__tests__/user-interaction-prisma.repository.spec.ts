@@ -67,7 +67,7 @@ describe("UserInteractionPrismaRepository", () => {
       await repository.update(userInteraction);
 
       expect(prisma.userInteraction.update).toHaveBeenCalledWith({
-        where: { id: userInteraction.id.id },
+        where: { id: userInteraction.user_interaction_id.id },
         data: modelProps,
       });
     });
@@ -79,7 +79,10 @@ describe("UserInteractionPrismaRepository", () => {
       });
 
       await expect(repository.update(userInteraction)).rejects.toThrow(
-        new NotFoundError(userInteraction.id.id, UserInteraction),
+        new NotFoundError(
+          userInteraction.user_interaction_id.id,
+          UserInteraction,
+        ),
       );
     });
   });
@@ -110,16 +113,19 @@ describe("UserInteractionPrismaRepository", () => {
   describe("findById", () => {
     it("should return a user interaction when found", async () => {
       const userInteraction = UserInteraction.fake().aUserInteraction().build();
+      userInteraction.updated_at = userInteraction.created_at;
       const modelProps = UserInteractionModelMapper.toModel(userInteraction);
       (prisma.userInteraction.findUnique as jest.Mock).mockResolvedValue(
         modelProps,
       );
 
-      const result = await repository.findById(userInteraction.id);
+      const result = await repository.findById(
+        userInteraction.user_interaction_id,
+      );
 
       expect(result).toEqual(userInteraction);
       expect(prisma.userInteraction.findUnique).toHaveBeenCalledWith({
-        where: { id: userInteraction.id.id },
+        where: { id: userInteraction.user_interaction_id.id },
       });
     });
 
@@ -147,7 +153,9 @@ describe("UserInteractionPrismaRepository", () => {
       );
 
       const result = await repository.findByIds(
-        userInteractions.map((userInteraction) => userInteraction.id),
+        userInteractions.map(
+          (userInteraction) => userInteraction.user_interaction_id,
+        ),
       );
 
       expect(result).toHaveLength(2);
@@ -155,7 +163,7 @@ describe("UserInteractionPrismaRepository", () => {
         where: {
           id: {
             in: userInteractions.map(
-              (userInteraction) => userInteraction.id.id,
+              (userInteraction) => userInteraction.user_interaction_id.id,
             ),
           },
         },
@@ -176,19 +184,19 @@ describe("UserInteractionPrismaRepository", () => {
         .build();
 
       (prisma.userInteraction.findMany as jest.Mock).mockResolvedValue([
-        { id: userInteraction1.id.id },
-        { id: userInteraction2.id.id },
+        { id: userInteraction1.user_interaction_id.id },
+        { id: userInteraction2.user_interaction_id.id },
       ]);
 
       const result = await repository.existsById([
-        userInteraction1.id,
-        userInteraction2.id,
-        userInteraction3.id,
+        userInteraction1.user_interaction_id,
+        userInteraction2.user_interaction_id,
+        userInteraction3.user_interaction_id,
       ]);
 
       expect(result.exists).toHaveLength(2);
       expect(result.not_exists).toHaveLength(1);
-      expect(result.not_exists[0]).toBe(userInteraction3.id);
+      expect(result.not_exists[0]).toBe(userInteraction3.user_interaction_id);
     });
   });
 
