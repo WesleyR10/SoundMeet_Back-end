@@ -3,7 +3,6 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Booking } from "../../../domain/booking.aggregate";
 import { IBookingRepository } from "../../../domain/booking.repository";
 import { Inquiry, InquiryId } from "../../../domain/inquiry.aggregate";
@@ -20,6 +19,7 @@ export class ConvertInquiryToBookingUseCase implements IUseCase<
     private readonly bookingRepo: IBookingRepository,
     private readonly clock: IClock = { now: () => new Date() },
     private readonly domainEventMediator?: DomainEventMediator,
+    private readonly bookingDefaultFreeCancellationHours?: number,
   ) {}
 
   async execute(input: ConvertInquiryToBookingInput): Promise<BookingOutput> {
@@ -49,7 +49,9 @@ export class ConvertInquiryToBookingUseCase implements IUseCase<
       notes: input.notes ?? null,
       buffer_minutes: input.buffer_minutes ?? 0,
       expires_at: input.expires_at ?? null,
-      free_cancellation_hours: input.free_cancellation_hours ?? 72,
+      ...(this.bookingDefaultFreeCancellationHours !== undefined
+        ? { free_cancellation_hours: this.bookingDefaultFreeCancellationHours }
+        : {}),
     });
 
     if (booking.notification.hasErrors()) {
@@ -58,7 +60,7 @@ export class ConvertInquiryToBookingUseCase implements IUseCase<
 
     await this.bookingRepo.insert(booking);
 
-    inquiry.convert(this.clock.now(), booking.id);
+    inquiry.convert(this.clock.now(), booking.booking_id);
     if (inquiry.notification.hasErrors()) {
       throw new EntityValidationError(inquiry.notification.toJSON());
     }

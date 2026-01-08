@@ -58,7 +58,7 @@ describe("BookingInMemoryRepository", () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].id.equals(booking.id)).toBe(true);
+    expect(result[0].booking_id.equals(booking.booking_id)).toBe(true);
   });
 
   it("should find confirmed bookings for band overlapping range with buffer", async () => {

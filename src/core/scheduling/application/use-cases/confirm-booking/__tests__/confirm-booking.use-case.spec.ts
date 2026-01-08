@@ -1,6 +1,7 @@
 import { Band } from "../../../../../musician/domain/band.aggregate";
 import { BandInMemoryRepository } from "../../../../../musician/infra/db/in-memory/band-in-memory.repository";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { LuxonDateTimeService } from "../../../../../shared/infra/date-time/luxon-date-time.service";
 import { Booking } from "../../../../domain/booking.aggregate";
 import { AvailabilityInMemoryRepository } from "../../../../infra/db/in-memory/availability-in-memory.repository";
 import { BookingInMemoryRepository } from "../../../../infra/db/in-memory/booking-in-memory.repository";
@@ -10,6 +11,7 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
   it("should not confirm when musician has an existing confirmed booking in range", async () => {
     const bookingRepo = new BookingInMemoryRepository();
     const availabilityRepo = new AvailabilityInMemoryRepository();
+    const dateTimeService = new LuxonDateTimeService();
 
     const musicianId = new Uuid();
     const now = new Date("2024-01-01T09:00:00.000Z");
@@ -39,13 +41,14 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
 
     const useCase = new ConfirmBookingUseCase(
       bookingRepo,
+      dateTimeService,
       availabilityRepo,
       undefined,
       { now: () => now },
     );
 
     await expect(async () => {
-      await useCase.execute({ booking_id: pending.id.id });
+      await useCase.execute({ booking_id: pending.booking_id.id });
     }).rejects.toMatchObject({
       name: "EntityValidationError",
       error: expect.arrayContaining([
@@ -61,6 +64,7 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
   it("should consider buffer when detecting conflicts for musician", async () => {
     const bookingRepo = new BookingInMemoryRepository();
     const availabilityRepo = new AvailabilityInMemoryRepository();
+    const dateTimeService = new LuxonDateTimeService();
 
     const musicianId = new Uuid();
     const now = new Date("2024-01-01T09:00:00.000Z");
@@ -90,13 +94,14 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
 
     const useCase = new ConfirmBookingUseCase(
       bookingRepo,
+      dateTimeService,
       availabilityRepo,
       undefined,
       { now: () => now },
     );
 
     await expect(async () => {
-      await useCase.execute({ booking_id: pending.id.id });
+      await useCase.execute({ booking_id: pending.booking_id.id });
     }).rejects.toMatchObject({
       name: "EntityValidationError",
       error: expect.arrayContaining([
@@ -112,6 +117,7 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
   it("should publish domain and integration events when mediator is provided", async () => {
     const bookingRepo = new BookingInMemoryRepository();
     const availabilityRepo = new AvailabilityInMemoryRepository();
+    const dateTimeService = new LuxonDateTimeService();
 
     const musicianId = new Uuid();
     const now = new Date("2024-01-01T09:00:00.000Z");
@@ -135,13 +141,14 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
 
     const useCase = new ConfirmBookingUseCase(
       bookingRepo,
+      dateTimeService,
       availabilityRepo,
       undefined,
       { now: () => now },
       domainEventMediator,
     );
 
-    await useCase.execute({ booking_id: pending.id.id });
+    await useCase.execute({ booking_id: pending.booking_id.id });
 
     expect(domainEventMediator.publish).toHaveBeenCalledTimes(1);
     expect(domainEventMediator.publishIntegrationEvents).toHaveBeenCalledTimes(
@@ -153,6 +160,7 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
     const bandRepo = new BandInMemoryRepository();
     const bookingRepo = new BookingInMemoryRepository();
     const availabilityRepo = new AvailabilityInMemoryRepository();
+    const dateTimeService = new LuxonDateTimeService();
 
     const memberA = new Uuid();
     const memberB = new Uuid();
@@ -191,12 +199,13 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
 
     const useCase = new ConfirmBookingUseCase(
       bookingRepo,
+      dateTimeService,
       availabilityRepo,
       bandRepo,
       { now: () => now },
     );
 
-    const output = await useCase.execute({ booking_id: booking.id.id });
+    const output = await useCase.execute({ booking_id: booking.booking_id.id });
 
     expect(output.status).toBe("confirmed");
 
@@ -212,10 +221,11 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
     expect(availabilityB!.isAvailable(blockedStart, blockedEnd)).toBe(false);
   });
 
-  it("should fail confirming a band booking when a member has conflicts", async () => {
+  it("should confirm a band booking even when a member has conflicts", async () => {
     const bandRepo = new BandInMemoryRepository();
     const bookingRepo = new BookingInMemoryRepository();
     const availabilityRepo = new AvailabilityInMemoryRepository();
+    const dateTimeService = new LuxonDateTimeService();
 
     const memberA = new Uuid();
     const memberB = new Uuid();
@@ -265,22 +275,16 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
 
     const useCase = new ConfirmBookingUseCase(
       bookingRepo,
+      dateTimeService,
       availabilityRepo,
       bandRepo,
       { now: () => now },
     );
 
-    await expect(async () => {
-      await useCase.execute({ booking_id: pendingBandBooking.id.id });
-    }).rejects.toMatchObject({
-      name: "EntityValidationError",
-      error: expect.arrayContaining([
-        {
-          conflict: [
-            "Band member already has a confirmed booking for this period",
-          ],
-        },
-      ]),
+    const output = await useCase.execute({
+      booking_id: pendingBandBooking.booking_id.id,
     });
+
+    expect(output.status).toBe("confirmed");
   });
 });

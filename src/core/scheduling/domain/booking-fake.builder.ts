@@ -163,7 +163,7 @@ export class BookingFakeBuilder<TBuild = any> {
       .fill(undefined)
       .map((_, index) => {
         const booking = new Booking({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          booking_id: !this._id ? undefined : this.callFactory(this._id, index),
           establishment_id: this.callFactory(this._establishment_id, index),
           musician_id: this.callFactory(this._musician_id, index),
           band_id: this.callFactory(this._band_id, index),

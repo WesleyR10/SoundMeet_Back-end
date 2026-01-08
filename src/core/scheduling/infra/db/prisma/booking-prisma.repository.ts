@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
+import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
@@ -40,7 +41,7 @@ export class BookingPrismaRepository implements IBookingRepository {
   }
 
   async update(entity: Booking): Promise<void> {
-    const id = entity.id.id;
+    const id = entity.booking_id.id;
     const modelProps = BookingModelMapper.toModel(entity);
 
     try {
@@ -218,7 +219,7 @@ export class BookingPrismaRepository implements IBookingRepository {
     const modelProps = BookingModelMapper.toModel(entity);
     const result = await this.prisma.booking.updateMany({
       where: {
-        id: entity.id.id,
+        id: entity.booking_id.id,
         status: {
           in: expected_statuses,
         },
@@ -226,6 +227,76 @@ export class BookingPrismaRepository implements IBookingRepository {
       data: modelProps,
     });
     return result.count === 1;
+  }
+
+  async confirmWithBandMembersAvailability(
+    entity: Booking,
+    expected_statuses: BookingStatusEnum[],
+    band_member_ids: string[],
+    candidateStart: Date,
+    candidateEnd: Date,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const modelProps = BookingModelMapper.toModel(entity);
+      const result = await tx.booking.updateMany({
+        where: {
+          id: entity.booking_id.id,
+          status: {
+            in: expected_statuses,
+          },
+        },
+        data: modelProps,
+      });
+
+      if (result.count !== 1) {
+        return false;
+      }
+
+      for (const musicianId of band_member_ids) {
+        const settings = await tx.musicianCalendarSettings.findUnique({
+          where: { musicianId },
+        });
+
+        if (!settings) {
+          await tx.musicianCalendarSettings.create({
+            data: {
+              id: new Uuid().id,
+              musicianId,
+              timezone: "UTC",
+              default_buffer_minutes: 0,
+              max_shows_per_day: null,
+              is_active: true,
+            },
+          });
+        }
+
+        const overlap = await tx.musicianUnavailability.findFirst({
+          where: {
+            musicianId,
+            start_at: { lt: candidateEnd },
+            end_at: { gt: candidateStart },
+          },
+          select: { id: true },
+        });
+
+        if (overlap) {
+          continue;
+        }
+
+        await tx.musicianUnavailability.create({
+          data: {
+            id: new Uuid().id,
+            musicianId,
+            start_at: candidateStart,
+            end_at: candidateEnd,
+            reason: `Band booking ${entity.booking_id.id}`,
+            created_at: new Date(),
+          },
+        });
+      }
+
+      return true;
+    });
   }
 
   private buildWhereClause(filter?: BookingFilter | null) {

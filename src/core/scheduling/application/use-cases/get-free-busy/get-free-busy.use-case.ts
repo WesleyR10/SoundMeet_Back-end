@@ -19,7 +19,7 @@ export class GetFreeBusyUseCase implements IUseCase<
       errors.push({ end_at: ["end_at must be greater than start_at"] });
     }
 
-    const maxRangeMs = 366 * 24 * 60 * 60 * 1000;
+    const maxRangeMs = 366 * 24 * 60 * 60 * 1000; // 1 Ano
     if (input.end_at.getTime() - input.start_at.getTime() > maxRangeMs) {
       errors.push({ range: ["range is too large"] });
     }

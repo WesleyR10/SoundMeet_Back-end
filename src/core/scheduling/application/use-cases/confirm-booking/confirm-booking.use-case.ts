@@ -2,10 +2,11 @@ import { Band, BandId } from "../../../../musician/domain/band.aggregate";
 import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { IDateTimeService } from "../../../../shared/domain";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
-import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { Availability } from "../../../domain/availability.aggregate";
 import { IAvailabilityRepository } from "../../../domain/availability.repository";
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
@@ -19,6 +20,7 @@ export class ConfirmBookingUseCase implements IUseCase<
 > {
   constructor(
     private readonly bookingRepo: IBookingRepository,
+    private readonly dateTimeService: IDateTimeService,
     private readonly availabilityRepo?: IAvailabilityRepository,
     private readonly bandRepo?: IBandRepository,
     private readonly clock: IClock = { now: () => new Date() },
@@ -54,7 +56,11 @@ export class ConfirmBookingUseCase implements IUseCase<
         );
         if (
           availability &&
-          !availability.isAvailable(candidateStart, candidateEnd)
+          !availability.isAvailable(
+            candidateStart,
+            candidateEnd,
+            this.dateTimeService,
+          )
         ) {
           entity.notification.addError(
             "Musician is unavailable for this period",
@@ -85,7 +91,11 @@ export class ConfirmBookingUseCase implements IUseCase<
         );
         if (
           availability &&
-          !availability.isAvailable(candidateStart, candidateEnd)
+          !availability.isAvailable(
+            candidateStart,
+            candidateEnd,
+            this.dateTimeService,
+          )
         ) {
           entity.notification.addError(
             "Band is unavailable for this period",
@@ -117,26 +127,10 @@ export class ConfirmBookingUseCase implements IUseCase<
 
       const members = band.members;
       bandMembers = members as any;
-
-      for (const member of members) {
-        const conflicts = await this.bookingRepo.findConfirmedInRangeByMusician(
-          member.musician_id.id,
-          candidateStart,
-          candidateEnd,
-        );
-
-        if (conflicts.length) {
-          entity.notification.addError(
-            "Band member already has a confirmed booking for this period",
-            "conflict",
-          );
-          throw new EntityValidationError(entity.notification.toJSON());
-        }
-      }
     }
 
     const entityToUpdate = new Booking({
-      id: entity.id,
+      booking_id: entity.booking_id,
       establishment_id: entity.establishment_id.id,
       musician_id: entity.musician_id?.id ?? null,
       band_id: entity.band_id?.id ?? null,
@@ -158,9 +152,29 @@ export class ConfirmBookingUseCase implements IUseCase<
 
     entityToUpdate.confirm(now);
 
-    const updated = await this.bookingRepo.updateWithStatus(entityToUpdate, [
-      BookingStatusEnum.PENDING,
-    ]);
+    const transactionalConfirm = (this.bookingRepo as any)
+      .confirmWithBandMembersAvailability as
+      | undefined
+      | ((
+          booking: Booking,
+          expected_statuses: BookingStatusEnum[],
+          band_member_ids: string[],
+          candidateStart: Date,
+          candidateEnd: Date,
+        ) => Promise<boolean>);
+
+    const updated =
+      bandMembers && typeof transactionalConfirm === "function"
+        ? await transactionalConfirm(
+            entityToUpdate,
+            [BookingStatusEnum.PENDING],
+            bandMembers.map((m) => m.musician_id.id),
+            candidateStart,
+            candidateEnd,
+          )
+        : await this.bookingRepo.updateWithStatus(entityToUpdate, [
+            BookingStatusEnum.PENDING,
+          ]);
     if (!updated) {
       entityToUpdate.notification.addError(
         "Only pending bookings can be confirmed",
@@ -169,7 +183,7 @@ export class ConfirmBookingUseCase implements IUseCase<
       throw new EntityValidationError(entityToUpdate.notification.toJSON());
     }
 
-    if (bandMembers && this.availabilityRepo) {
+    if (bandMembers && this.availabilityRepo && !transactionalConfirm) {
       await Promise.all(
         bandMembers.map(async (member) => {
           const availability = await this.availabilityRepo!.findByMusicianId(
@@ -183,7 +197,7 @@ export class ConfirmBookingUseCase implements IUseCase<
                 {
                   start_at: candidateStart,
                   end_at: candidateEnd,
-                  reason: `Band booking ${entityToUpdate.id.id}`,
+                  reason: `Band booking ${entityToUpdate.booking_id.id}`,
                 },
               ],
             });
@@ -191,14 +205,20 @@ export class ConfirmBookingUseCase implements IUseCase<
             return;
           }
 
-          if (!availability.isAvailable(candidateStart, candidateEnd)) {
+          if (
+            !availability.isAvailable(
+              candidateStart,
+              candidateEnd,
+              this.dateTimeService,
+            )
+          ) {
             return;
           }
 
           availability.addUnavailability(
             candidateStart,
             candidateEnd,
-            `Band booking ${entityToUpdate.id.id}`,
+            `Band booking ${entityToUpdate.booking_id.id}`,
           );
           await this.availabilityRepo!.update(availability);
         }),

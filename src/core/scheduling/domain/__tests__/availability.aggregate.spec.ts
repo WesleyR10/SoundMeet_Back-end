@@ -1,4 +1,5 @@
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
+import { LuxonDateTimeService } from "../../../shared/infra/date-time/luxon-date-time.service";
 import { Availability } from "../availability.aggregate";
 
 describe("Availability Unit Tests", () => {
@@ -56,6 +57,7 @@ describe("Availability Unit Tests", () => {
   });
 
   test("isAvailable should consider weekly rules when provided", () => {
+    const dateTimeService = new LuxonDateTimeService();
     const availability = Availability.create({
       musician_id: new Uuid().id,
       weekly_rules: [
@@ -68,6 +70,7 @@ describe("Availability Unit Tests", () => {
       availability.isAvailable(
         new Date("2024-01-01T10:30:00.000Z"),
         new Date("2024-01-01T11:00:00.000Z"),
+        dateTimeService,
       ),
     ).toBe(true);
 
@@ -75,6 +78,7 @@ describe("Availability Unit Tests", () => {
       availability.isAvailable(
         new Date("2024-01-01T09:30:00.000Z"),
         new Date("2024-01-01T11:00:00.000Z"),
+        dateTimeService,
       ),
     ).toBe(false);
 
@@ -82,6 +86,59 @@ describe("Availability Unit Tests", () => {
       availability.isAvailable(
         new Date("2024-01-03T10:30:00.000Z"),
         new Date("2024-01-03T11:00:00.000Z"),
+        dateTimeService,
+      ),
+    ).toBe(false);
+  });
+
+  test("weekly rules should be evaluated using availability timezone", () => {
+    const dateTimeService = new LuxonDateTimeService();
+    const availability = Availability.create({
+      musician_id: new Uuid().id,
+      timezone: "America/Sao_Paulo",
+      weekly_rules: [{ weekday: 0, start_time: "22:00", end_time: "23:00" }],
+    });
+
+    expect(
+      availability.isAvailable(
+        new Date("2024-01-01T01:00:00.000Z"),
+        new Date("2024-01-01T01:30:00.000Z"),
+        dateTimeService,
+      ),
+    ).toBe(true);
+  });
+
+  test("isAvailable should consider weekly rules for band when provided", () => {
+    const dateTimeService = new LuxonDateTimeService();
+    const availability = Availability.create({
+      band_id: new Uuid().id,
+      weekly_rules: [
+        { weekday: 1, start_time: "10:00", end_time: "12:00" },
+        { weekday: 2, start_time: "10:00", end_time: "12:00" },
+      ],
+    });
+
+    expect(
+      availability.isAvailable(
+        new Date("2024-01-01T10:30:00.000Z"),
+        new Date("2024-01-01T11:00:00.000Z"),
+        dateTimeService,
+      ),
+    ).toBe(true);
+
+    expect(
+      availability.isAvailable(
+        new Date("2024-01-01T09:30:00.000Z"),
+        new Date("2024-01-01T11:00:00.000Z"),
+        dateTimeService,
+      ),
+    ).toBe(false);
+
+    expect(
+      availability.isAvailable(
+        new Date("2024-01-03T10:30:00.000Z"),
+        new Date("2024-01-03T11:00:00.000Z"),
+        dateTimeService,
       ),
     ).toBe(false);
   });

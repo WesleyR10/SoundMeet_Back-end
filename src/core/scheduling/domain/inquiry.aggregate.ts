@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import {
   InquiryStatus,
   InquiryStatusEnum,
@@ -83,7 +82,7 @@ export class Inquiry extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
+  get entity_id(): InquiryId {
     return this.inquiry_id;
   }
 
@@ -223,7 +222,7 @@ export class Inquiry extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.inquiry_id.id,
+      inquiry_id: this.inquiry_id.id,
       establishment_id: this.establishment_id.id,
       musician_id: this.musician_id?.id ?? null,
       band_id: this.band_id?.id ?? null,

@@ -2,6 +2,7 @@ import { Band, BandId } from "../../../../musician/domain/band.aggregate";
 import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { IDateTimeService } from "../../../../shared/domain";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -17,16 +18,18 @@ export class ProposeBookingUseCase implements IUseCase<
 > {
   constructor(
     private readonly bookingRepo: IBookingRepository,
+    private readonly dateTimeService: IDateTimeService,
     private readonly availabilityRepo?: IAvailabilityRepository,
     private readonly bandRepo?: IBandRepository,
     private readonly clock: IClock = { now: () => new Date() },
     private readonly domainEventMediator?: DomainEventMediator,
+    private readonly bookingDefaultFreeCancellationHours?: number,
   ) {}
 
   async execute(input: ProposeBookingInput): Promise<ProposeBookingOutput> {
     const now = this.clock.now();
     const expires_at =
-      input.expires_at ?? new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
+      input.expires_at ?? this.dateTimeService.addHours(now, 48);
 
     const availability = this.availabilityRepo
       ? input.musician_id
@@ -50,7 +53,9 @@ export class ProposeBookingUseCase implements IUseCase<
       notes: input.notes ?? null,
       buffer_minutes,
       expires_at,
-      free_cancellation_hours: input.free_cancellation_hours,
+      ...(this.bookingDefaultFreeCancellationHours !== undefined
+        ? { free_cancellation_hours: this.bookingDefaultFreeCancellationHours }
+        : {}),
     });
 
     if (entity.notification.hasErrors()) {
@@ -63,7 +68,11 @@ export class ProposeBookingUseCase implements IUseCase<
     if (entity.musician_id) {
       if (
         availability &&
-        !availability.isAvailable(candidateStart, candidateEnd)
+        !availability.isAvailable(
+          candidateStart,
+          candidateEnd,
+          this.dateTimeService,
+        )
       ) {
         throw new EntityValidationError([
           {
@@ -90,7 +99,11 @@ export class ProposeBookingUseCase implements IUseCase<
     if (entity.band_id) {
       if (
         availability &&
-        !availability.isAvailable(candidateStart, candidateEnd)
+        !availability.isAvailable(
+          candidateStart,
+          candidateEnd,
+          this.dateTimeService,
+        )
       ) {
         throw new EntityValidationError([
           {
@@ -119,23 +132,6 @@ export class ProposeBookingUseCase implements IUseCase<
         );
         if (!band) {
           throw new NotFoundError(entity.band_id.id, Band);
-        }
-
-        for (const member of band.members) {
-          const memberConflicts =
-            await this.bookingRepo.findConfirmedInRangeByMusician(
-              member.musician_id.id,
-              candidateStart,
-              candidateEnd,
-            );
-
-          if (memberConflicts.length) {
-            entity.notification.addError(
-              "Band member already has a confirmed booking for this period",
-              "conflict",
-            );
-            throw new EntityValidationError(entity.notification.toJSON());
-          }
         }
       }
     }

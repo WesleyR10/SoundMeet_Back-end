@@ -37,7 +37,7 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
       if (entity.musician_id) {
         await tx.musicianCalendarSettings.create({
           data: {
-            id: entity.id.id,
+            id: entity.availability_id.id,
             musicianId: entity.musician_id.id,
             timezone: entity.timezone,
             default_buffer_minutes: entity.default_buffer_minutes,
@@ -78,7 +78,7 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
       if (entity.band_id) {
         await tx.bandCalendarSettings.create({
           data: {
-            id: entity.id.id,
+            id: entity.availability_id.id,
             bandId: entity.band_id.id,
             timezone: entity.timezone,
             default_buffer_minutes: entity.default_buffer_minutes,
@@ -86,6 +86,20 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
             is_active: entity.is_active,
           },
         });
+
+        if (entity.weekly_rules.length) {
+          await tx.bandAvailabilityRule.createMany({
+            data: entity.weekly_rules.map((r) => ({
+              id: r.id.id,
+              bandId: entity.band_id!.id,
+              weekday: r.weekday,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              is_available: r.is_available,
+              created_at: r.created_at,
+            })),
+          });
+        }
 
         if (entity.unavailabilities.length) {
           await tx.bandUnavailability.createMany({
@@ -114,7 +128,7 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
       if (entity.musician_id) {
         try {
           await tx.musicianCalendarSettings.update({
-            where: { id: entity.id.id },
+            where: { id: entity.availability_id.id },
             data: {
               timezone: entity.timezone,
               default_buffer_minutes: entity.default_buffer_minutes,
@@ -125,7 +139,10 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
           });
         } catch (error: any) {
           if (error.code === "P2025") {
-            throw new NotFoundError(entity.id.id, this.getEntity());
+            throw new NotFoundError(
+              entity.availability_id.id,
+              this.getEntity(),
+            );
           }
           throw error;
         }
@@ -170,7 +187,7 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
       if (entity.band_id) {
         try {
           await tx.bandCalendarSettings.update({
-            where: { id: entity.id.id },
+            where: { id: entity.availability_id.id },
             data: {
               timezone: entity.timezone,
               default_buffer_minutes: entity.default_buffer_minutes,
@@ -181,7 +198,10 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
           });
         } catch (error: any) {
           if (error.code === "P2025") {
-            throw new NotFoundError(entity.id.id, this.getEntity());
+            throw new NotFoundError(
+              entity.availability_id.id,
+              this.getEntity(),
+            );
           }
           throw error;
         }
@@ -189,6 +209,24 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
         await tx.bandUnavailability.deleteMany({
           where: { bandId: entity.band_id.id },
         });
+
+        await tx.bandAvailabilityRule.deleteMany({
+          where: { bandId: entity.band_id.id },
+        });
+
+        if (entity.weekly_rules.length) {
+          await tx.bandAvailabilityRule.createMany({
+            data: entity.weekly_rules.map((r) => ({
+              id: r.id.id,
+              bandId: entity.band_id!.id,
+              weekday: r.weekday,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              is_available: r.is_available,
+              created_at: r.created_at,
+            })),
+          });
+        }
 
         if (entity.unavailabilities.length) {
           await tx.bandUnavailability.createMany({
@@ -227,6 +265,9 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
       }
 
       if ((target as any).bandId) {
+        await tx.bandAvailabilityRule.deleteMany({
+          where: { bandId: (target as any).bandId },
+        });
         await tx.bandUnavailability.deleteMany({
           where: { bandId: (target as any).bandId },
         });
@@ -443,7 +484,12 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
           where: { musicianId: targetMusicianId },
           orderBy: [{ weekday: "asc" }, { start_time: "asc" }],
         })
-      : [];
+      : targetBandId
+        ? await this.prisma.bandAvailabilityRule.findMany({
+            where: { bandId: targetBandId },
+            orderBy: [{ weekday: "asc" }, { start_time: "asc" }],
+          })
+        : [];
 
     const unavailabilities = targetMusicianId
       ? await this.prisma.musicianUnavailability.findMany({
@@ -456,7 +502,7 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
         });
 
     const entity = new Availability({
-      id: new AvailabilityId(settings.id),
+      availability_id: new AvailabilityId(settings.id),
       musician_id: targetMusicianId,
       band_id: targetBandId,
       timezone: settings.timezone,

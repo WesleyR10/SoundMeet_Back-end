@@ -19,7 +19,6 @@ export type ConvertInquiryToBookingInputConstructorProps = {
   notes?: string | null;
   buffer_minutes?: number;
   expires_at?: Date | null;
-  free_cancellation_hours?: number;
 };
 
 export class ConvertInquiryToBookingInput {
@@ -55,11 +54,6 @@ export class ConvertInquiryToBookingInput {
   @IsOptional()
   expires_at?: Date | null;
 
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  free_cancellation_hours?: number;
-
   constructor(props: ConvertInquiryToBookingInputConstructorProps) {
     if (!props) return;
     this.inquiry_id = props.inquiry_id;
@@ -69,7 +63,6 @@ export class ConvertInquiryToBookingInput {
     this.notes = props.notes;
     this.buffer_minutes = props.buffer_minutes;
     this.expires_at = props.expires_at;
-    this.free_cancellation_hours = props.free_cancellation_hours;
   }
 }
 

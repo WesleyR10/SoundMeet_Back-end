@@ -43,10 +43,10 @@ describe("ExpirePendingBookingsUseCase Unit Tests", () => {
 
     expect(output).toStrictEqual({ expired: 1 });
 
-    const updatedExpired = await repo.findById(expiredBooking.id);
+    const updatedExpired = await repo.findById(expiredBooking.booking_id);
     expect(updatedExpired?.status.isExpired()).toBe(true);
 
-    const updatedNotExpired = await repo.findById(notExpiredBooking.id);
+    const updatedNotExpired = await repo.findById(notExpiredBooking.booking_id);
     expect(updatedNotExpired?.status.isPending()).toBe(true);
   });
 

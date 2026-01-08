@@ -158,7 +158,9 @@ export class AvailabilityFakeBuilder<TBuild = any> {
             : [];
 
         const entity = new Availability({
-          id: !this._id ? undefined : this.callFactory(this._id, index),
+          availability_id: !this._id
+            ? undefined
+            : this.callFactory(this._id, index),
           musician_id: musician_id?.id ?? null,
           band_id: band_id?.id ?? null,
           timezone,

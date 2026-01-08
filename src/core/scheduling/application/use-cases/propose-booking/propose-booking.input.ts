@@ -22,7 +22,6 @@ export type ProposeBookingInputConstructorProps = {
   notes?: string | null;
   buffer_minutes?: number;
   expires_at?: Date | null;
-  free_cancellation_hours?: number;
 };
 
 export class ProposeBookingInput {
@@ -73,11 +72,6 @@ export class ProposeBookingInput {
   @IsOptional()
   expires_at?: Date | null;
 
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  free_cancellation_hours?: number;
-
   constructor(props: ProposeBookingInputConstructorProps) {
     if (!props) return;
     this.establishment_id = props.establishment_id;
@@ -90,7 +84,6 @@ export class ProposeBookingInput {
     this.notes = props.notes;
     this.buffer_minutes = props.buffer_minutes;
     this.expires_at = props.expires_at;
-    this.free_cancellation_hours = props.free_cancellation_hours;
   }
 }
 

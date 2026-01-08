@@ -21,6 +21,10 @@ export type InquiryOutput = {
 
 export class InquiryOutputMapper {
   static toOutput(entity: Inquiry): InquiryOutput {
-    return entity.toJSON();
+    const { inquiry_id, ...otherProps } = entity.toJSON();
+    return {
+      id: inquiry_id,
+      ...otherProps,
+    } as InquiryOutput;
   }
 }

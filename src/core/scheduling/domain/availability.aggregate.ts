@@ -1,5 +1,10 @@
-import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
+import { BandId, MusicianId } from "../../musician";
+import {
+  AggregateRoot,
+  IDateTimeService,
+  parseTimeToMinutes,
+  Uuid,
+} from "../../shared/domain";
 import { AvailabilityValidatorFactory } from "./availability.validator";
 import { AvailabilityFakeBuilder } from "./availability-fake.builder";
 
@@ -14,7 +19,7 @@ export type UnavailabilityConstructorProps = {
 };
 
 export type AvailabilityConstructorProps = {
-  id?: AvailabilityId;
+  availability_id?: AvailabilityId;
   musician_id?: string | null;
   band_id?: string | null;
   timezone?: string;
@@ -51,7 +56,7 @@ export type Unavailability = {
   id: Uuid;
   start_at: Date;
   end_at: Date;
-  reason: string | null;
+  reason: string | null; // Motivo da indisponibilidade
   created_at: Date;
 };
 
@@ -74,12 +79,12 @@ export type AvailabilityRule = {
 };
 
 export class Availability extends AggregateRoot {
-  id: AvailabilityId;
-  musician_id: Uuid | null;
-  band_id: Uuid | null;
-  timezone: string;
+  availability_id: AvailabilityId;
+  musician_id: MusicianId | null;
+  band_id: BandId | null;
+  timezone: string; // Fuso horário do músico/banda
   default_buffer_minutes: number;
-  max_shows_per_day: number | null;
+  max_shows_per_day: number | null; // Máximo de shows por dia
   weekly_rules: AvailabilityRule[];
   unavailabilities: Unavailability[];
   is_active: boolean;
@@ -88,9 +93,11 @@ export class Availability extends AggregateRoot {
 
   constructor(props: AvailabilityConstructorProps) {
     super();
-    this.id = props.id ?? new AvailabilityId();
-    this.musician_id = props.musician_id ? new Uuid(props.musician_id) : null;
-    this.band_id = props.band_id ? new Uuid(props.band_id) : null;
+    this.availability_id = props.availability_id ?? new AvailabilityId();
+    this.musician_id = props.musician_id
+      ? new MusicianId(props.musician_id)
+      : null;
+    this.band_id = props.band_id ? new BandId(props.band_id) : null;
     this.timezone = props.timezone ?? "UTC";
     this.default_buffer_minutes = props.default_buffer_minutes ?? 0;
     this.max_shows_per_day = props.max_shows_per_day ?? null;
@@ -114,8 +121,8 @@ export class Availability extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): AvailabilityId {
+    return this.availability_id;
   }
 
   static create(props: AvailabilityCreateCommand): Availability {
@@ -217,13 +224,17 @@ export class Availability extends AggregateRoot {
     this.updated_at = new Date();
   }
 
-  isAvailable(start_at: Date, end_at: Date): boolean {
+  isAvailable(
+    start_at: Date,
+    end_at: Date,
+    dateTimeService?: IDateTimeService,
+  ): boolean {
     if (!this.is_active) {
       return false;
     }
 
     if (this.weekly_rules.length) {
-      if (!this.isAllowedByWeeklyRules(start_at, end_at)) {
+      if (!this.isAllowedByWeeklyRules(start_at, end_at, dateTimeService)) {
         return false;
       }
     }
@@ -237,7 +248,100 @@ export class Availability extends AggregateRoot {
     });
   }
 
-  private isAllowedByWeeklyRules(start_at: Date, end_at: Date): boolean {
+  private isAllowedByWeeklyRules(
+    start_at: Date,
+    end_at: Date,
+    dateTimeService?: IDateTimeService,
+  ): boolean {
+    if (!dateTimeService) {
+      return this.isAllowedByWeeklyRulesUTC(start_at, end_at);
+    }
+
+    const timezone = this.timezone ?? "UTC";
+    const localDate = dateTimeService.toLocalDateString(start_at, timezone);
+    const dateParts = Availability.parseIsoDate(localDate);
+    if (!dateParts) {
+      return false;
+    }
+
+    let dayStart = dateTimeService.fromLocalDateTime({
+      date: dateParts,
+      time: { hour: 0, minute: 0 },
+      timezone,
+    });
+    if (!dayStart) {
+      return false;
+    }
+
+    for (
+      ;
+      dayStart.getTime() < end_at.getTime();
+      dayStart = dateTimeService.addDaysKeepingLocalTime(dayStart, 1, timezone)
+    ) {
+      const dayEnd = dateTimeService.addDaysKeepingLocalTime(
+        dayStart,
+        1,
+        timezone,
+      );
+
+      const segmentStart =
+        start_at.getTime() > dayStart.getTime() ? start_at : dayStart;
+      const segmentEnd = end_at.getTime() < dayEnd.getTime() ? end_at : dayEnd;
+
+      if (segmentStart.getTime() >= segmentEnd.getTime()) {
+        continue;
+      }
+
+      const weekday = dateTimeService.getLocalWeekday(dayStart, timezone);
+      const rulesForDay = this.weekly_rules.filter(
+        (r) => r.weekday === weekday,
+      );
+      if (!rulesForDay.length) {
+        return false;
+      }
+
+      const segmentStartMinutes =
+        dateTimeService.getLocalMinutesSinceStartOfDay(segmentStart, timezone);
+      const segmentEndMinutes =
+        segmentEnd.getTime() === dayEnd.getTime()
+          ? 24 * 60
+          : dateTimeService.getLocalMinutesSinceStartOfDay(
+              segmentEnd,
+              timezone,
+            );
+
+      if (segmentStartMinutes < 0 || segmentEndMinutes <= segmentStartMinutes) {
+        return false;
+      }
+
+      const availableRules = rulesForDay.filter((r) => r.is_available);
+      const unavailableRules = rulesForDay.filter((r) => !r.is_available);
+
+      const isInsideSomeAvailable = availableRules.some((r) => {
+        const rStart = parseTimeToMinutes(r.start_time);
+        const rEnd = parseTimeToMinutes(r.end_time);
+        return rStart <= segmentStartMinutes && segmentEndMinutes <= rEnd;
+      });
+
+      if (!isInsideSomeAvailable) {
+        return false;
+      }
+
+      const hitsUnavailable = unavailableRules.some((r) => {
+        const rStart = parseTimeToMinutes(r.start_time);
+        const rEnd = parseTimeToMinutes(r.end_time);
+        return segmentStartMinutes < rEnd && rStart < segmentEndMinutes;
+      });
+
+      if (hitsUnavailable) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private isAllowedByWeeklyRulesUTC(start_at: Date, end_at: Date): boolean {
     const startDayKey = Availability.getDayKeyUTC(start_at);
     const endDayKey = Availability.getDayKeyUTC(end_at);
 
@@ -270,8 +374,8 @@ export class Availability extends AggregateRoot {
       const unavailableRules = rulesForDay.filter((r) => !r.is_available);
 
       const isInsideSomeAvailable = availableRules.some((r) => {
-        const rStart = Availability.parseTimeToMinutes(r.start_time);
-        const rEnd = Availability.parseTimeToMinutes(r.end_time);
+        const rStart = parseTimeToMinutes(r.start_time);
+        const rEnd = parseTimeToMinutes(r.end_time);
         return rStart <= segmentStartMinutes && segmentEndMinutes <= rEnd;
       });
 
@@ -280,8 +384,8 @@ export class Availability extends AggregateRoot {
       }
 
       const hitsUnavailable = unavailableRules.some((r) => {
-        const rStart = Availability.parseTimeToMinutes(r.start_time);
-        const rEnd = Availability.parseTimeToMinutes(r.end_time);
+        const rStart = parseTimeToMinutes(r.start_time);
+        const rEnd = parseTimeToMinutes(r.end_time);
         return segmentStartMinutes < rEnd && rStart < segmentEndMinutes;
       });
 
@@ -291,6 +395,28 @@ export class Availability extends AggregateRoot {
     }
 
     return true;
+  }
+
+  private static parseIsoDate(isoDate: string): {
+    year: number;
+    month: number;
+    day: number;
+  } | null {
+    const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(isoDate);
+    if (!match) {
+      return null;
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(day)
+    ) {
+      return null;
+    }
+    return { year, month, day };
   }
 
   private static getDayKeyUTC(date: Date): number {
@@ -310,26 +436,6 @@ export class Availability extends AggregateRoot {
     return new Date(dayKey * 24 * 60 * 60 * 1000);
   }
 
-  private static parseTimeToMinutes(value: string): number {
-    const match = /^(\d{2}):(\d{2})$/.exec(value);
-    if (!match) {
-      return -1;
-    }
-    const h = Number(match[1]);
-    const m = Number(match[2]);
-    if (
-      Number.isNaN(h) ||
-      Number.isNaN(m) ||
-      h < 0 ||
-      h > 23 ||
-      m < 0 ||
-      m > 59
-    ) {
-      return -1;
-    }
-    return h * 60 + m;
-  }
-
   validate(fields?: string[]): boolean {
     const validator = AvailabilityValidatorFactory.create();
     validator.validate(this.notification, this, fields);
@@ -340,13 +446,6 @@ export class Availability extends AggregateRoot {
       this.notification.addError(
         "Either musician_id or band_id must be provided (exclusively)",
         "target",
-      );
-    }
-
-    if (hasBand && this.weekly_rules.length) {
-      this.notification.addError(
-        "weekly_rules is only supported for musician availability",
-        "weekly_rules",
       );
     }
 
@@ -392,8 +491,8 @@ export class Availability extends AggregateRoot {
         );
         continue;
       }
-      const startMinutes = Availability.parseTimeToMinutes(r.start_time);
-      const endMinutes = Availability.parseTimeToMinutes(r.end_time);
+      const startMinutes = parseTimeToMinutes(r.start_time);
+      const endMinutes = parseTimeToMinutes(r.end_time);
       if (startMinutes < 0) {
         this.notification.addError(
           "start_time must be in HH:mm format",
@@ -425,16 +524,15 @@ export class Availability extends AggregateRoot {
     for (const list of byDayAndFlag.values()) {
       const sortedRules = [...list].sort(
         (a, b) =>
-          Availability.parseTimeToMinutes(a.start_time) -
-          Availability.parseTimeToMinutes(b.start_time),
+          parseTimeToMinutes(a.start_time) - parseTimeToMinutes(b.start_time),
       );
       for (let i = 1; i < sortedRules.length; i++) {
         const prev = sortedRules[i - 1];
         const curr = sortedRules[i];
-        const prevStart = Availability.parseTimeToMinutes(prev.start_time);
-        const prevEnd = Availability.parseTimeToMinutes(prev.end_time);
-        const currStart = Availability.parseTimeToMinutes(curr.start_time);
-        const currEnd = Availability.parseTimeToMinutes(curr.end_time);
+        const prevStart = parseTimeToMinutes(prev.start_time);
+        const prevEnd = parseTimeToMinutes(prev.end_time);
+        const currStart = parseTimeToMinutes(curr.start_time);
+        const currEnd = parseTimeToMinutes(curr.end_time);
         if (prevStart < currEnd && currStart < prevEnd) {
           this.notification.addError(
             "Weekly rules cannot overlap",
@@ -454,7 +552,7 @@ export class Availability extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      availability_id: this.availability_id.id,
       musician_id: this.musician_id?.id ?? null,
       band_id: this.band_id?.id ?? null,
       timezone: this.timezone,

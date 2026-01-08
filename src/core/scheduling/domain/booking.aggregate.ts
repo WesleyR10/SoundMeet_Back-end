@@ -1,5 +1,4 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
-import { ValueObject } from "../../shared/domain/value-object";
 import {
   BookingStatus,
   BookingStatusEnum,
@@ -13,8 +12,10 @@ import { BookingProposedEvent } from "./events/booking-proposed.event";
 
 export class BookingId extends Uuid {}
 
+export const BOOKING_DEFAULT_FREE_CANCELLATION_HOURS = 72;
+
 export type BookingConstructorProps = {
-  id?: BookingId;
+  booking_id?: BookingId;
   establishment_id: string;
   musician_id?: string | null;
   band_id?: string | null;
@@ -41,15 +42,15 @@ export type BookingCreateCommand = {
   event_id?: string | null;
   start_at: Date;
   end_at: Date;
-  fee?: number | null;
-  notes?: string | null;
-  buffer_minutes?: number;
+  fee?: number | null; // Valor pago pelo estabelecimento
+  notes?: string | null; // Notas sobre o agendamento
+  buffer_minutes?: number; // Tempo de buffer antes e depois do agendamento
   expires_at?: Date | null;
   free_cancellation_hours?: number;
 };
 
 export class Booking extends AggregateRoot {
-  id: BookingId;
+  booking_id: BookingId;
   establishment_id: Uuid;
   musician_id: Uuid | null;
   band_id: Uuid | null;
@@ -70,7 +71,7 @@ export class Booking extends AggregateRoot {
 
   constructor(props: BookingConstructorProps) {
     super();
-    this.id = props.id ?? new BookingId();
+    this.booking_id = props.booking_id ?? new BookingId();
     this.establishment_id = new Uuid(props.establishment_id);
     this.musician_id = props.musician_id ? new Uuid(props.musician_id) : null;
     this.band_id = props.band_id ? new Uuid(props.band_id) : null;
@@ -85,7 +86,8 @@ export class Booking extends AggregateRoot {
         : BookingStatus.create(props.status || BookingStatusEnum.PENDING);
     this.buffer_minutes = props.buffer_minutes ?? 0;
     this.expires_at = props.expires_at ?? null;
-    this.free_cancellation_hours = props.free_cancellation_hours ?? 72;
+    this.free_cancellation_hours =
+      props.free_cancellation_hours ?? BOOKING_DEFAULT_FREE_CANCELLATION_HOURS;
     this.confirmed_at = props.confirmed_at ?? null;
     this.cancelled_at = props.cancelled_at ?? null;
     this.completed_at = props.completed_at ?? null;
@@ -93,8 +95,8 @@ export class Booking extends AggregateRoot {
     this.updated_at = props.updated_at ?? new Date();
   }
 
-  get entity_id(): ValueObject {
-    return this.id;
+  get entity_id(): BookingId {
+    return this.booking_id;
   }
 
   get bufferedStartAt(): Date {
@@ -121,7 +123,7 @@ export class Booking extends AggregateRoot {
     }
     booking.applyEvent(
       new BookingProposedEvent({
-        booking_id: booking.id,
+        booking_id: booking.booking_id,
         establishment_id: booking.establishment_id.id,
         musician_id: booking.musician_id?.id ?? null,
         band_id: booking.band_id?.id ?? null,
@@ -162,7 +164,7 @@ export class Booking extends AggregateRoot {
     this.updated_at = now;
     this.applyEvent(
       new BookingConfirmedEvent({
-        booking_id: this.id,
+        booking_id: this.booking_id,
         confirmed_at: now,
       }),
     );
@@ -189,7 +191,7 @@ export class Booking extends AggregateRoot {
       this.updated_at = now;
       this.applyEvent(
         new BookingCancelledEvent({
-          booking_id: this.id,
+          booking_id: this.booking_id,
           cancelled_by,
           reason: reason ?? null,
           cancelled_at: now,
@@ -218,7 +220,7 @@ export class Booking extends AggregateRoot {
     this.updated_at = now;
     this.applyEvent(
       new BookingCancelledEvent({
-        booking_id: this.id,
+        booking_id: this.booking_id,
         cancelled_by,
         reason: reason ?? null,
         cancelled_at: now,
@@ -240,7 +242,7 @@ export class Booking extends AggregateRoot {
     this.updated_at = now;
     this.applyEvent(
       new BookingCompletedEvent({
-        booking_id: this.id,
+        booking_id: this.booking_id,
         completed_at: now,
       }),
     );
@@ -294,7 +296,7 @@ export class Booking extends AggregateRoot {
 
   toJSON() {
     return {
-      id: this.id.id,
+      booking_id: this.booking_id.id,
       establishment_id: this.establishment_id.id,
       musician_id: this.musician_id?.id ?? null,
       band_id: this.band_id?.id ?? null,

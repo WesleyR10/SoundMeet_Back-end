@@ -13,6 +13,7 @@ import { SCHEDULING_PROVIDERS } from "./scheduling.providers";
   providers: [
     ...Object.values(SCHEDULING_PROVIDERS.REPOSITORIES),
     ...Object.values(SCHEDULING_PROVIDERS.EVENTS),
+    ...Object.values(SCHEDULING_PROVIDERS.SERVICES),
     ...Object.values(SCHEDULING_PROVIDERS.USE_CASES),
     ...Object.values(SCHEDULING_PROVIDERS.HANDLERS),
     ...Object.values(SCHEDULING_PROVIDERS.JOBS),

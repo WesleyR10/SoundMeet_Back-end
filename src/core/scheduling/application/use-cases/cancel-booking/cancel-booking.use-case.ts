@@ -2,8 +2,8 @@ import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
-import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 import { IBookingRepository } from "../../../domain/booking.repository";
 import { BookingOutput, BookingOutputMapper } from "../common/booking-output";
@@ -29,7 +29,7 @@ export class CancelBookingUseCase implements IUseCase<
     const now = this.clock.now();
 
     const entityToUpdate = new Booking({
-      id: entity.id,
+      booking_id: entity.booking_id,
       establishment_id: entity.establishment_id.id,
       musician_id: entity.musician_id?.id ?? null,
       band_id: entity.band_id?.id ?? null,

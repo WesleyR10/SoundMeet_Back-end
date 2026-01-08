@@ -19,7 +19,7 @@ describe("CancelBookingUseCase Unit Tests", () => {
 
     await expect(async () => {
       await useCase.execute({
-        booking_id: confirmed.id.id,
+        booking_id: confirmed.booking_id.id,
         cancelled_by: "establishment",
       });
     }).rejects.toMatchObject({
@@ -31,7 +31,7 @@ describe("CancelBookingUseCase Unit Tests", () => {
       ]),
     });
 
-    const reloaded = await bookingRepo.findById(confirmed.id);
+    const reloaded = await bookingRepo.findById(confirmed.booking_id);
     expect(reloaded?.status.isConfirmed()).toBe(true);
   });
 });

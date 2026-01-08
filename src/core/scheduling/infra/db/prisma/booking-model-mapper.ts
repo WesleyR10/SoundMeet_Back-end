@@ -25,7 +25,7 @@ export type BookingModelProps = {
 export class BookingModelMapper {
   static toModel(entity: Booking): BookingModelProps {
     return {
-      id: entity.id.id,
+      id: entity.booking_id.id,
       establishmentId: entity.establishment_id.id,
       musicianId: entity.musician_id?.id ?? null,
       bandId: entity.band_id?.id ?? null,
@@ -48,7 +48,7 @@ export class BookingModelMapper {
 
   static toEntity(model: BookingModelProps): Booking {
     const booking = new Booking({
-      id: new BookingId(model.id),
+      booking_id: new BookingId(model.id),
       establishment_id: model.establishmentId,
       musician_id: model.musicianId,
       band_id: model.bandId,

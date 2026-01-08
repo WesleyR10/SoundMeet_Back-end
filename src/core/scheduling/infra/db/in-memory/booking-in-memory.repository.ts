@@ -57,7 +57,9 @@ export class BookingInMemoryRepository
     entity: Booking,
     expected_statuses: BookingStatusEnum[],
   ): Promise<boolean> {
-    const index = this.items.findIndex((item) => item.id.equals(entity.id));
+    const index = this.items.findIndex((item) =>
+      item.booking_id.equals(entity.booking_id),
+    );
     if (index < 0) {
       return false;
     }

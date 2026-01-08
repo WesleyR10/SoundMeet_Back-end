@@ -1,3 +1,4 @@
+import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { IBandRepository } from "../../core/musician/domain/band.repository";
@@ -20,7 +21,11 @@ import { AvailabilityPrismaRepository } from "../../core/scheduling/infra/db/pri
 import { BookingPrismaRepository } from "../../core/scheduling/infra/db/prisma/booking-prisma.repository";
 import { CalendarPrismaReadModel } from "../../core/scheduling/infra/db/prisma/calendar-prisma.read-model";
 import { InquiryPrismaRepository } from "../../core/scheduling/infra/db/prisma/inquiry-prisma.repository";
+import { IClock } from "../../core/shared/application/clock.interface";
+import { IDateTimeService } from "../../core/shared/domain";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
+import { LuxonDateTimeService } from "../../core/shared/infra/date-time/luxon-date-time.service";
+import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { BookingEventsHandlers } from "./booking-events.handlers";
 import { ExpirePendingBookingsJob } from "./expire-pending-bookings.job";
@@ -89,6 +94,17 @@ export const EVENTS = {
   },
 };
 
+export const SERVICES = {
+  DATE_TIME_SERVICE: {
+    provide: "DateTimeService",
+    useClass: LuxonDateTimeService,
+  },
+  CLOCK: {
+    provide: "Clock",
+    useValue: { now: () => new Date() } satisfies IClock,
+  },
+};
+
 export const USE_CASES = {
   CREATE_INQUIRY_USE_CASE: {
     provide: CreateInquiryUseCase,
@@ -107,16 +123,14 @@ export const USE_CASES = {
     provide: AcceptInquiryUseCase,
     useFactory: (
       inquiryRepo: IInquiryRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
     ) => {
-      return new AcceptInquiryUseCase(
-        inquiryRepo,
-        undefined,
-        domainEventMediator,
-      );
+      return new AcceptInquiryUseCase(inquiryRepo, clock, domainEventMediator);
     },
     inject: [
       REPOSITORIES.INQUIRY_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
     ],
   },
@@ -124,16 +138,14 @@ export const USE_CASES = {
     provide: RejectInquiryUseCase,
     useFactory: (
       inquiryRepo: IInquiryRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
     ) => {
-      return new RejectInquiryUseCase(
-        inquiryRepo,
-        undefined,
-        domainEventMediator,
-      );
+      return new RejectInquiryUseCase(inquiryRepo, clock, domainEventMediator);
     },
     inject: [
       REPOSITORIES.INQUIRY_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
     ],
   },
@@ -142,64 +154,82 @@ export const USE_CASES = {
     useFactory: (
       inquiryRepo: IInquiryRepository,
       bookingRepo: IBookingRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
+      configService: ConfigSchemaType,
     ) => {
       return new ConvertInquiryToBookingUseCase(
         inquiryRepo,
         bookingRepo,
-        undefined,
+        clock,
         domainEventMediator,
+        configService.get<number>("BOOKING_DEFAULT_FREE_CANCELLATION_HOURS")!,
       );
     },
     inject: [
       REPOSITORIES.INQUIRY_REPOSITORY.provide,
       REPOSITORIES.BOOKING_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      ConfigService,
     ],
   },
   PROPOSE_BOOKING_USE_CASE: {
     provide: ProposeBookingUseCase,
     useFactory: (
       bookingRepo: IBookingRepository,
+      dateTimeService: IDateTimeService,
       availabilityRepo: IAvailabilityRepository,
       bandRepo: IBandRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
+      configService: ConfigSchemaType,
     ) => {
       return new ProposeBookingUseCase(
         bookingRepo,
+        dateTimeService,
         availabilityRepo,
         bandRepo,
-        undefined,
+        clock,
         domainEventMediator,
+        configService.get<number>("BOOKING_DEFAULT_FREE_CANCELLATION_HOURS")!,
       );
     },
     inject: [
       REPOSITORIES.BOOKING_REPOSITORY.provide,
+      SERVICES.DATE_TIME_SERVICE.provide,
       REPOSITORIES.AVAILABILITY_REPOSITORY.provide,
       REPOSITORIES.BAND_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      ConfigService,
     ],
   },
   CONFIRM_BOOKING_USE_CASE: {
     provide: ConfirmBookingUseCase,
     useFactory: (
       bookingRepo: IBookingRepository,
+      dateTimeService: IDateTimeService,
       availabilityRepo: IAvailabilityRepository,
       bandRepo: IBandRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
     ) => {
       return new ConfirmBookingUseCase(
         bookingRepo,
+        dateTimeService,
         availabilityRepo,
         bandRepo,
-        undefined,
+        clock,
         domainEventMediator,
       );
     },
     inject: [
       REPOSITORIES.BOOKING_REPOSITORY.provide,
+      SERVICES.DATE_TIME_SERVICE.provide,
       REPOSITORIES.AVAILABILITY_REPOSITORY.provide,
       REPOSITORIES.BAND_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
     ],
   },
@@ -207,16 +237,14 @@ export const USE_CASES = {
     provide: CancelBookingUseCase,
     useFactory: (
       bookingRepo: IBookingRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
     ) => {
-      return new CancelBookingUseCase(
-        bookingRepo,
-        undefined,
-        domainEventMediator,
-      );
+      return new CancelBookingUseCase(bookingRepo, clock, domainEventMediator);
     },
     inject: [
       REPOSITORIES.BOOKING_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
     ],
   },
@@ -236,10 +264,16 @@ export const USE_CASES = {
   },
   GET_MONTH_SLOTS_USE_CASE: {
     provide: GetMonthSlotsUseCase,
-    useFactory: (calendarReadModel: ICalendarReadModel) => {
-      return new GetMonthSlotsUseCase(calendarReadModel);
+    useFactory: (
+      calendarReadModel: ICalendarReadModel,
+      dateTimeService: IDateTimeService,
+    ) => {
+      return new GetMonthSlotsUseCase(calendarReadModel, dateTimeService);
     },
-    inject: [REPOSITORIES.CALENDAR_READ_MODEL.provide],
+    inject: [
+      REPOSITORIES.CALENDAR_READ_MODEL.provide,
+      SERVICES.DATE_TIME_SERVICE.provide,
+    ],
   },
 };
 
@@ -260,6 +294,7 @@ export const JOBS = {
 export const SCHEDULING_PROVIDERS = {
   REPOSITORIES,
   EVENTS,
+  SERVICES,
   USE_CASES,
   HANDLERS,
   JOBS,

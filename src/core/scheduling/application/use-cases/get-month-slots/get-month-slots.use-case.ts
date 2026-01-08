@@ -1,4 +1,8 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import {
+  IDateTimeService,
+  parseTimeToMinutes,
+} from "../../../../shared/domain";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import {
   CalendarTarget,
@@ -14,7 +18,10 @@ export class GetMonthSlotsUseCase implements IUseCase<
   GetMonthSlotsInput,
   GetMonthSlotsOutput
 > {
-  constructor(private readonly calendarReadModel: ICalendarReadModel) {}
+  constructor(
+    private readonly calendarReadModel: ICalendarReadModel,
+    private readonly dateTimeService: IDateTimeService,
+  ) {}
 
   async execute(input: GetMonthSlotsInput): Promise<GetMonthSlotsOutput> {
     const slot_minutes = input.slot_minutes ?? 30;
@@ -24,20 +31,23 @@ export class GetMonthSlotsUseCase implements IUseCase<
       ]);
     }
 
-    const start_at = new Date(
-      Date.UTC(input.year, input.month - 1, 1, 0, 0, 0, 0),
-    );
-    const end_at = new Date(Date.UTC(input.year, input.month, 1, 0, 0, 0, 0));
-
     const target: CalendarTarget = {
       type: input.target_type,
       id: input.target_id,
     } as CalendarTarget;
 
-    const [settings, bookings] = await Promise.all([
-      this.calendarReadModel.getSettings(target),
-      this.calendarReadModel.getBookingsInRange(target, { start_at, end_at }),
-    ]);
+    const settings = await this.calendarReadModel.getSettings(target);
+    const timezone = settings.timezone ?? "UTC";
+    const range = this.dateTimeService.getUtcRangeForMonth({
+      year: input.year,
+      month: input.month,
+      timezone,
+    });
+
+    const bookings = await this.calendarReadModel.getBookingsInRange(target, {
+      start_at: range.start_at,
+      end_at: range.end_at,
+    });
 
     const busy: BusyInterval[] = [
       ...settings.unavailabilities.map((u) => ({
@@ -52,18 +62,28 @@ export class GetMonthSlotsUseCase implements IUseCase<
 
     const days: DaySlotsOutput[] = [];
     for (
-      let cursor = new Date(start_at);
-      cursor.getTime() < end_at.getTime();
+      let dayStart = new Date(range.start_at);
+      dayStart.getTime() < range.end_at.getTime();
+      dayStart = this.dateTimeService.addDaysKeepingLocalTime(
+        dayStart,
+        1,
+        timezone,
+      )
     ) {
-      const dayStart = new Date(cursor);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      const weekday = dayStart.getUTCDay();
-      const date = dayStart.toISOString().slice(0, 10);
+      const dayEnd = this.dateTimeService.addDaysKeepingLocalTime(
+        dayStart,
+        1,
+        timezone,
+      );
+      const weekday = this.dateTimeService.getLocalWeekday(dayStart, timezone);
+      const date = this.dateTimeService.toLocalDateString(dayStart, timezone);
 
       const slots = this.buildDaySlots({
+        localDate: date,
         dayStart,
         dayEnd,
         weekday,
+        timezone,
         weekly_rules: settings.weekly_rules,
         busy,
         slot_minutes,
@@ -71,7 +91,6 @@ export class GetMonthSlotsUseCase implements IUseCase<
       });
 
       days.push({ date, slots });
-      cursor = dayEnd;
     }
 
     return {
@@ -85,9 +104,11 @@ export class GetMonthSlotsUseCase implements IUseCase<
   }
 
   private buildDaySlots(props: {
+    localDate: string;
     dayStart: Date;
     dayEnd: Date;
     weekday: number;
+    timezone: string;
     weekly_rules: WeeklyRule[];
     busy: BusyInterval[];
     slot_minutes: number;
@@ -106,11 +127,14 @@ export class GetMonthSlotsUseCase implements IUseCase<
     }
 
     const slots: Array<{ start_at: Date; end_at: Date }> = [];
+    const dateParts = GetMonthSlotsUseCase.parseIsoDate(props.localDate);
+    if (!dateParts) {
+      return [];
+    }
+
     for (const rule of availableRules) {
-      const ruleStart = GetMonthSlotsUseCase.parseTimeToMinutes(
-        rule.start_time,
-      );
-      const ruleEnd = GetMonthSlotsUseCase.parseTimeToMinutes(rule.end_time);
+      const ruleStart = parseTimeToMinutes(rule.start_time);
+      const ruleEnd = parseTimeToMinutes(rule.end_time);
       if (ruleStart < 0 || ruleEnd < 0 || ruleEnd <= ruleStart) {
         continue;
       }
@@ -120,21 +144,35 @@ export class GetMonthSlotsUseCase implements IUseCase<
         minute + props.slot_minutes <= ruleEnd;
         minute += props.slot_minutes
       ) {
-        const start_at = new Date(
-          props.dayStart.getTime() + minute * 60 * 1000,
+        const startTime = GetMonthSlotsUseCase.minutesToTime(minute);
+        const endTime = GetMonthSlotsUseCase.minutesToTime(
+          minute + props.slot_minutes,
         );
-        const end_at = new Date(
-          start_at.getTime() + props.slot_minutes * 60 * 1000,
-        );
+
+        const start_at = this.dateTimeService.fromLocalDateTime({
+          date: dateParts,
+          time: startTime,
+          timezone: props.timezone,
+        });
+        const end_at = this.dateTimeService.fromLocalDateTime({
+          date: dateParts,
+          time: endTime,
+          timezone: props.timezone,
+        });
+
+        if (!start_at || !end_at) {
+          continue;
+        }
+
         if (end_at.getTime() > props.dayEnd.getTime()) {
           break;
         }
 
         if (
-          !GetMonthSlotsUseCase.isAllowedByWeeklyRules(
+          !GetMonthSlotsUseCase.isAllowedByWeeklyRulesMinutes(
             rulesForDay,
-            start_at,
-            end_at,
+            minute,
+            minute + props.slot_minutes,
           )
         ) {
           continue;
@@ -163,21 +201,17 @@ export class GetMonthSlotsUseCase implements IUseCase<
     );
   }
 
-  private static isAllowedByWeeklyRules(
+  private static isAllowedByWeeklyRulesMinutes(
     rulesForDay: WeeklyRule[],
-    start_at: Date,
-    end_at: Date,
+    slotStartMinutes: number,
+    slotEndMinutes: number,
   ): boolean {
-    const slotStartMinutes =
-      start_at.getUTCHours() * 60 + start_at.getUTCMinutes();
-    const slotEndMinutes = end_at.getUTCHours() * 60 + end_at.getUTCMinutes();
-
     const availableRules = rulesForDay.filter((r) => r.is_available);
     const unavailableRules = rulesForDay.filter((r) => !r.is_available);
 
     const insideAvailable = availableRules.some((r) => {
-      const rStart = GetMonthSlotsUseCase.parseTimeToMinutes(r.start_time);
-      const rEnd = GetMonthSlotsUseCase.parseTimeToMinutes(r.end_time);
+      const rStart = parseTimeToMinutes(r.start_time);
+      const rEnd = parseTimeToMinutes(r.end_time);
       return rStart <= slotStartMinutes && slotEndMinutes <= rEnd;
     });
 
@@ -186,31 +220,39 @@ export class GetMonthSlotsUseCase implements IUseCase<
     }
 
     const hitsUnavailable = unavailableRules.some((r) => {
-      const rStart = GetMonthSlotsUseCase.parseTimeToMinutes(r.start_time);
-      const rEnd = GetMonthSlotsUseCase.parseTimeToMinutes(r.end_time);
+      const rStart = parseTimeToMinutes(r.start_time);
+      const rEnd = parseTimeToMinutes(r.end_time);
       return slotStartMinutes < rEnd && rStart < slotEndMinutes;
     });
 
     return !hitsUnavailable;
   }
 
-  private static parseTimeToMinutes(value: string): number {
-    const match = /^(\d{2}):(\d{2})$/.exec(value);
+  private static minutesToTime(totalMinutes: number) {
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    return { hour, minute };
+  }
+
+  private static parseIsoDate(value: string) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
     if (!match) {
-      return -1;
+      return null;
     }
-    const h = Number(match[1]);
-    const m = Number(match[2]);
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
     if (
-      Number.isNaN(h) ||
-      Number.isNaN(m) ||
-      h < 0 ||
-      h > 23 ||
-      m < 0 ||
-      m > 59
+      Number.isNaN(year) ||
+      Number.isNaN(month) ||
+      Number.isNaN(day) ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31
     ) {
-      return -1;
+      return null;
     }
-    return h * 60 + m;
+    return { year, month, day };
   }
 }

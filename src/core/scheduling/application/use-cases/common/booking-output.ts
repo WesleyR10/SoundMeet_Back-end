@@ -25,9 +25,10 @@ export type BookingOutput = {
 
 export class BookingOutputMapper {
   static toOutput(entity: Booking): BookingOutput {
-    const json = entity.toJSON();
+    const { booking_id, ...otherProps } = entity.toJSON();
     return {
-      ...json,
+      id: booking_id,
+      ...otherProps,
       buffered_start_at: entity.bufferedStartAt,
       buffered_end_at: entity.bufferedEndAt,
     };
