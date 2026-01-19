@@ -98,14 +98,14 @@ model Band {
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
 
-  members           BandMember[]
-  events            EventMusician[]
-  tips              Tip[]
-  bookings          Booking[]
-  inquiries         Inquiry[]
-  calendar_settings BandCalendarSettings?
+  members            BandMember[]
+  events             EventMusician[]
+  tips               Tip[]
+  bookings           Booking[]
+  inquiries          Inquiry[]
+  calendar_settings  BandCalendarSettings?
   availability_rules BandAvailabilityRule[]
-  unavailabilities  BandUnavailability[]
+  unavailabilities   BandUnavailability[]
 
   @@map("bands")
 }
@@ -177,22 +177,17 @@ model Establishment {
   avatar      String?
   cnpj        String? @unique
   phone       String?
+  website     String?
 
-  // Endereço (Flattened Address Value Object)
-  address_street       String?
-  address_number       String?
-  address_complement   String?
-  address_neighborhood String?
-  address_city         String?
-  address_state        String?
-  address_zip_code     String?
-  address_lat          Float?
-  address_long         Float?
+  establishment_type String
+  qr_code            String? @unique
+  rating             Float   @default(0)
+  total_ratings      Int     @default(0)
 
-  is_active  Boolean  @default(true)
-  isVerified Boolean  @default(false)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  is_active   Boolean  @default(true)
+  is_verified Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
   // Relacionamentos
   profile   EstablishmentProfile?
@@ -200,6 +195,7 @@ model Establishment {
   bookings  Booking[]
   inquiries Inquiry[]
   analytics EstablishmentAnalytics[]
+  rankings  Ranking[]
 
   @@map("establishments")
 }
@@ -207,21 +203,26 @@ model Establishment {
 model EstablishmentProfile {
   id              String   @id @default(uuid())
   establishmentId String   @unique
-  type            String // "bar", "restaurant", "club", "venue"
   capacity        Int?
-  location        Json // {address: "", city: "", state: "", coordinates: {}}
-  amenities       String[] // ["sound_system", "stage", "parking"]
-  preferredGenres String[]
-  operatingHours  Json // {monday: {open: "18:00", close: "02:00"}}
-  priceRange      Json // {min: 200, max: 1000}
+  location        Json
+  location_city   String
+  location_lat    Float?
+  location_lng    Float?
+  amenities       String[] @default([]) // ["sound_system", "stage", "parking"]
+  preferredGenres String[] @default([])
+  operatingHours  Json?
+  priceRange      Json?
   socialLinks     Json?
-  rating          Float    @default(0)
-  totalRatings    Int      @default(0)
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 
+  @@index([location_city])
+  @@index([location_lat, location_lng])
+  @@index([capacity])
+  @@index([amenities], type: Gin)
+  @@index([preferredGenres], type: Gin)
   @@map("establishment_profiles")
 }
 
@@ -442,6 +443,8 @@ model Audience {
   points_history UserPoints[]
   badges         UserBadge[]
   interactions   UserInteraction[]
+  scores         UserScore[]
+  rankings       Ranking[]
 
   @@map("audiences")
 }
@@ -490,9 +493,11 @@ model MusicRequest {
   artistName String
   message    String?
   status     String    @default("pending") // "pending", "accepted", "rejected", "played"
+  rejectionReason String?
   priority   Int       @default(0)
   votesCount Int       @default(0)
   playedAt   DateTime?
+  respondedAt DateTime?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
 
@@ -503,6 +508,12 @@ model MusicRequest {
   votes    RequestVote[]
   feedback RequestFeedback?
 
+  @@index([audienceId, created_at])
+  @@index([musicianId, created_at])
+  @@index([eventId, created_at])
+  @@index([status, created_at])
+  @@index([eventId, musicianId])
+  @@index([audienceId, musicianId, status])
   @@map("music_requests")
 }
 
@@ -561,6 +572,7 @@ model Badge {
   rarity      String   @default("common") // "common", "rare", "epic", "legendary"
   is_active   Boolean  @default(true)
   created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
   userBadges UserBadge[]
 
@@ -590,17 +602,32 @@ model UserScore {
   description  String?
   created_at   DateTime @default(now())
 
+  audience Audience @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@map("user_scores")
 }
 
 model Ranking {
-  id         String   @id @default(uuid())
-  type       String // "monthly_fans", "top_supporters", "discoverers"
-  period     String // "2024-01", "2024-02"
-  data       Json // Rankings calculados
-  created_at DateTime @default(now())
+  id               String   @id @default(uuid())
+  type             String // "monthly_fans", "top_supporters", "discoverers"
+  period           String // "2024-01", "2024-02"
+  user_id          String
+  establishment_id String?
+  position         Int
+  score            Int
+  period_start     DateTime
+  period_end       DateTime
+  is_active        Boolean  @default(true)
+  metadata         Json?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 
-  @@unique([type, period])
+  audience      Audience       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  establishment Establishment? @relation(fields: [establishment_id], references: [id], onDelete: SetNull)
+
+  @@index([type, period])
+  @@index([user_id, type, period])
+  @@index([establishment_id, type, period])
   @@map("rankings")
 }
 
