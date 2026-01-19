@@ -230,7 +230,7 @@ describe("MusiciansController Unit Tests", () => {
             model: "per_hour",
             min: 100,
             max: 200,
-            currency: "BRL",
+            currency: "BRL" as Currency,
             notes: null,
           },
           location: {

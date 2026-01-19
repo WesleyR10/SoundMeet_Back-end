@@ -1,11 +1,14 @@
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
+import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
+import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
+import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
@@ -86,6 +89,27 @@ export const USE_CASES = {
     provide: CreateBandUseCase,
     useFactory: (bandRepo: IBandRepository) => {
       return new CreateBandUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  LIST_BANDS_USE_CASE: {
+    provide: ListBandsUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new ListBandsUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  DELETE_BAND_USE_CASE: {
+    provide: DeleteBandUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new DeleteBandUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  UPDATE_BAND_USE_CASE: {
+    provide: UpdateBandUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new UpdateBandUseCase(bandRepo);
     },
     inject: [REPOSITORIES.BAND_REPOSITORY.provide],
   },
