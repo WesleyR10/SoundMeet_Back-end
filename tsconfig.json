@@ -26,5 +26,6 @@
       ]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/metadata.ts"]
 }

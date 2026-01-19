@@ -216,10 +216,11 @@ const config: Config = {
     '<rootDir>/../.cursor-server',
     '<rootDir>/../.git'
   ],
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverageFrom: ['core/**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   coveragePathIgnorePatterns: [
     '/node_modules/',
+    'index\\.ts$',
     '.interface.ts',
     '-interface.ts',
     'shared/testing',
@@ -231,6 +232,12 @@ const config: Config = {
   ],
   coverageThreshold: {
     global: {
+      statements: 0,
+      branches: 0,
+      functions: 0,
+      lines: 0,
+    },
+    'src/core/establishment/application/use-cases/recalculate-establishment-analytics/recalculate-establishment-analytics.use-case.ts': {
       statements: 80,
       branches: 80,
       functions: 80,

@@ -44,6 +44,7 @@ COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/package.json ./package.json
 COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
+RUN ln -s ./dist ./src
 
 USER nestjs
 
