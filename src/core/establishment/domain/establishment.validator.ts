@@ -59,9 +59,6 @@ export class EstablishmentRules {
   @IsString({ groups: ["website"] })
   website?: string;
 
-  @IsNotEmpty({ groups: ["address"] })
-  address: any;
-
   @IsIn(
     ["bar", "restaurant", "club", "pub", "cafe", "hotel", "theater", "other"],
     { groups: ["establishment_type"] },
@@ -89,7 +86,6 @@ export class EstablishmentRules {
       phone:
         typeof entity.phone === "string" ? entity.phone : entity.phone?.value,
       website: entity.website,
-      address: entity.address,
       establishment_type: entity.establishment_type,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
@@ -101,14 +97,7 @@ export class EstablishmentValidator extends ClassValidatorFields {
   validate(notification: Notification, data: any, fields?: string[]): boolean {
     const newFields = fields?.length
       ? fields
-      : [
-          "name",
-          "email",
-          "phone",
-          "address_street",
-          "address_city",
-          "establishment_type",
-        ];
+      : ["name", "email", "phone", "establishment_type"];
     return super.validate(
       notification,
       new EstablishmentRules(data),

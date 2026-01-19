@@ -5,8 +5,48 @@ import { Email } from "../../../shared/domain/value-objects/email.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
 import { EstablishmentId } from "../establishment.aggregate";
 import { EstablishmentFakeBuilder } from "../establishment-fake.builder";
+import { EstablishmentProfile } from "../establishment-profile.aggregate";
 
 describe("EstablishmentFakeBuilder Unit Tests", () => {
+  describe("profile prop", () => {
+    test("should not create profile by default", () => {
+      const establishment = EstablishmentFakeBuilder.anEstablishment().build();
+      expect(establishment.profile).toBeNull();
+    });
+
+    test("withProfile should create profile with same establishment_id", () => {
+      const establishment = EstablishmentFakeBuilder.anEstablishment()
+        .withProfile()
+        .build();
+
+      expect(establishment.profile).toBeInstanceOf(EstablishmentProfile);
+      expect(establishment.profile!.establishment_id).toEqual(
+        establishment.establishment_id,
+      );
+
+      expect(establishment.profile!.capacity).toBeNull();
+      expect(establishment.profile!.location).toBeDefined();
+      expect(establishment.profile!.amenities).toEqual(["sound_system"]);
+      expect(establishment.profile!.preferredGenres).toEqual(["Rock"]);
+      expect(establishment.profile!.operatingHours).toBeNull();
+      expect(establishment.profile!.priceRange).toBeNull();
+      expect(establishment.profile!.socialLinks).toBeNull();
+    });
+
+    test("withProfile should accept explicit profile and align ids", () => {
+      const otherId = new EstablishmentId();
+      const explicit = EstablishmentProfile.fake().aProfile().build();
+
+      const establishment = EstablishmentFakeBuilder.anEstablishment()
+        .withEstablishmentId(otherId)
+        .withProfile(explicit)
+        .build();
+
+      expect(establishment.profile).toBeTruthy();
+      expect(establishment.profile!.establishment_id).toEqual(otherId);
+    });
+  });
+
   describe("establishment_id prop", () => {
     const faker = EstablishmentFakeBuilder.anEstablishment();
 

@@ -1,18 +1,47 @@
+import {
+  Address,
+  OperatingHours,
+  SocialLinks,
+  Uuid,
+} from "../../../../shared/domain";
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
-import { Address } from "../../../../shared/domain/value-objects/address.vo";
 import { Email } from "../../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
+import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Rating } from "../../../../shared/domain/value-objects/rating.vo";
 import {
   Establishment,
   EstablishmentId,
 } from "../../../domain/establishment.aggregate";
-import { EstablishmentModel } from "./establishment-model";
+import {
+  EstablishmentProfile,
+  EstablishmentProfileId,
+} from "../../../domain/establishment-profile.aggregate";
+import {
+  EstablishmentModel,
+  EstablishmentProfileModel,
+  JsonValue,
+} from "./establishment-model";
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+};
+
+const toSocialLinks = (value: unknown): SocialLinks | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const links = (value as any).links;
+  if (!Array.isArray(links)) {
+    return null;
+  }
+  return SocialLinks.create(links);
+};
 
 export type EstablishmentModelProps = EstablishmentModel;
 
 export class EstablishmentModelMapper {
-  static toModel(entity: Establishment): EstablishmentModel {
+  static toModel(entity: Establishment): Omit<EstablishmentModel, "profile"> {
     return {
       id: entity.establishment_id.id,
       email: entity.email.value,
@@ -21,60 +50,106 @@ export class EstablishmentModelMapper {
       avatar: entity.avatar,
       phone: entity.phone?.value ?? null,
       cnpj: entity.cnpj?.value ?? null,
+      website: entity.website,
+      establishment_type: entity.establishment_type,
+      qr_code: entity.qr_code?.code ?? null,
+      rating: entity.rating.value,
+      total_ratings: entity.total_ratings,
       is_active: entity.is_active,
-      isVerified: entity.is_verified,
+      is_verified: entity.is_verified,
       created_at: entity.created_at,
-      updated_at: entity.created_at,
+      updated_at: entity.updated_at,
+    };
+  }
 
-      // Mapeamento do Endereço (Flattened)
-      address_street: entity.address.street,
-      address_number: entity.address.number,
-      address_complement: entity.address.complement ?? null,
-      address_neighborhood: entity.address.neighborhood,
-      address_city: entity.address.city,
-      address_state: entity.address.state,
-      address_zip_code: entity.address.zipCode,
-      address_lat: entity.address.latitude ?? null,
-      address_long: entity.address.longitude ?? null,
+  static toProfileModel(
+    profile: EstablishmentProfile,
+  ): EstablishmentProfileModel {
+    return {
+      id: profile.profile_id.id,
+      establishmentId: profile.establishment_id.id,
+      capacity: profile.capacity,
+      location: profile.location.toJSON() as unknown as JsonValue,
+      location_city: profile.location.city,
+      location_lat: profile.location.latitude ?? null,
+      location_lng: profile.location.longitude ?? null,
+      amenities: profile.amenities,
+      preferredGenres: profile.preferredGenres,
+      operatingHours: (profile.operatingHours?.toJSON() ??
+        null) as unknown as JsonValue | null,
+      priceRange: (profile.priceRange?.toJSON() ??
+        null) as unknown as JsonValue | null,
+      socialLinks: (profile.socialLinks
+        ? ({ links: profile.socialLinks.links } as any)
+        : null) as unknown as JsonValue | null,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at,
     };
   }
 
   static toEntity(model: EstablishmentModel): Establishment {
-    const address =
-      model.address_street &&
-      model.address_number &&
-      model.address_city &&
-      model.address_state &&
-      model.address_zip_code &&
-      model.address_neighborhood
-        ? new Address({
-            street: model.address_street,
-            number: model.address_number,
-            complement: model.address_complement ?? undefined,
-            neighborhood: model.address_neighborhood,
-            city: model.address_city,
-            state: model.address_state,
-            zipCode: model.address_zip_code,
-            latitude: model.address_lat ?? undefined,
-            longitude: model.address_long ?? undefined,
-          })
-        : null;
+    let profile: EstablishmentProfile | null = null;
+    if (model.profile) {
+      try {
+        if (!isRecord(model.profile.location)) {
+          throw new Error("Invalid establishment profile location");
+        }
 
-    if (!address) {
-      // Em um cenário de produção, dados legados sem endereço poderiam causar erro aqui.
-      // Como estamos em desenvolvimento/migração, o ideal é garantir que o banco tenha constraints
-      // ou tratar como erro de integridade de dados se o domínio exigir Address.
-      // Por enquanto, para evitar crash se o banco estiver inconsistente com o domínio:
-      throw new LoadEntityError([
-        {
-          address: [
-            `Establishment ${model.id} has invalid/missing address data in database`,
-          ],
-        },
-      ]);
+        const locationJson: any = model.profile.location;
+        const address = new Address({
+          street: locationJson.street,
+          number: locationJson.number,
+          complement: locationJson.complement,
+          neighborhood: locationJson.neighborhood,
+          city: locationJson.city,
+          state: locationJson.state,
+          zipCode: locationJson.zipCode ?? locationJson.zip_code,
+          country: locationJson.country,
+          latitude: locationJson.latitude,
+          longitude: locationJson.longitude,
+        });
+
+        const operatingHours = isRecord(model.profile.operatingHours)
+          ? OperatingHours.fromJSON(model.profile.operatingHours)
+          : null;
+
+        const priceRange = isRecord(model.profile.priceRange)
+          ? PriceRange.fromJSON(model.profile.priceRange)
+          : null;
+
+        const socialLinks = toSocialLinks(model.profile.socialLinks);
+
+        profile = new EstablishmentProfile({
+          profile_id: new EstablishmentProfileId(model.profile.id),
+          establishment_id: new Uuid(model.profile.establishmentId),
+          capacity: model.profile.capacity,
+          location: address,
+          amenities: model.profile.amenities ?? [],
+          preferredGenres: model.profile.preferredGenres ?? [],
+          operatingHours,
+          priceRange,
+          socialLinks,
+          created_at: model.profile.created_at,
+          updated_at: model.profile.updated_at,
+        });
+      } catch (error: any) {
+        throw new LoadEntityError([
+          {
+            profile: [
+              error?.message ??
+                `Establishment ${model.id} has invalid profile data in database`,
+            ],
+          },
+        ]);
+      }
+
+      profile.validate();
+      if (profile.notification.hasErrors()) {
+        throw new LoadEntityError(profile.notification.toJSON());
+      }
     }
 
-    return new Establishment({
+    const entity = new Establishment({
       establishment_id: new EstablishmentId(model.id),
       name: model.name,
       email: new Email(model.email),
@@ -82,14 +157,23 @@ export class EstablishmentModelMapper {
       description: model.description,
       avatar: model.avatar,
       phone: model.phone ? new Phone(model.phone) : null,
-      website: null,
-      address: address,
-      establishment_type: "bar", // TODO: Implement type mapping when available in schema
-      rating: new Rating(0), // TODO: Implement rating mapping when available in schema
-      total_ratings: 0,
+      website: model.website,
+      establishment_type: model.establishment_type,
+      rating: new Rating(model.rating),
+      total_ratings: model.total_ratings,
+      qr_code: model.qr_code,
       is_active: model.is_active,
-      is_verified: model.isVerified,
+      is_verified: model.is_verified,
+      profile,
       created_at: model.created_at,
+      updated_at: model.updated_at,
     });
+
+    entity.validate();
+    if (entity.notification.hasErrors()) {
+      throw new LoadEntityError(entity.notification.toJSON());
+    }
+
+    return entity;
   }
 }

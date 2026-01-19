@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -12,6 +12,7 @@ import {
   EstablishmentSearchResult,
   IEstablishmentRepository,
 } from "../../../domain/establishment.repository";
+import { EstablishmentProfile } from "../../../domain/establishment-profile.aggregate";
 import { EstablishmentModelMapper } from "./establishment-model-mapper";
 
 export class EstablishmentPrismaRepository implements IEstablishmentRepository {
@@ -19,10 +20,51 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
 
   constructor(private prisma: PrismaClient) {}
 
+  private toPrismaRequiredJson(
+    value: unknown,
+  ): Prisma.InputJsonValue | Prisma.JsonNullValueInput {
+    if (value === null) {
+      return Prisma.JsonNull;
+    }
+    return value as Prisma.InputJsonValue;
+  }
+
+  private toPrismaOptionalJson(
+    value: unknown,
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+    if (value === null) {
+      return Prisma.DbNull;
+    }
+    return value as Prisma.InputJsonValue;
+  }
+
   async insert(entity: Establishment): Promise<void> {
     const modelProps = EstablishmentModelMapper.toModel(entity);
+    const profileModel = entity.profile
+      ? EstablishmentModelMapper.toProfileModel(entity.profile)
+      : null;
+    const profileCreateData = profileModel
+      ? {
+          ...(({ establishmentId, ...data }) => data)(profileModel),
+          location: this.toPrismaRequiredJson(profileModel.location),
+          operatingHours: this.toPrismaOptionalJson(
+            profileModel.operatingHours,
+          ),
+          priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
+          socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+        }
+      : null;
     await this.prisma.establishment.create({
-      data: modelProps,
+      data: {
+        ...modelProps,
+        profile: profileCreateData
+          ? {
+              create: {
+                ...profileCreateData,
+              },
+            }
+          : undefined,
+      },
     });
   }
 
@@ -39,10 +81,49 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
     const id = entity.establishment_id.id;
     const modelProps = EstablishmentModelMapper.toModel(entity);
 
+    const profileModel = entity.profile
+      ? EstablishmentModelMapper.toProfileModel(entity.profile)
+      : null;
+    const profileCreateData = profileModel
+      ? {
+          ...(({ establishmentId, ...data }) => data)(profileModel),
+          location: this.toPrismaRequiredJson(profileModel.location),
+          operatingHours: this.toPrismaOptionalJson(
+            profileModel.operatingHours,
+          ),
+          priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
+          socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+        }
+      : null;
+    const profileUpdateData = profileModel
+      ? {
+          ...(({ establishmentId, id: profileId, ...data }) => data)(
+            profileModel,
+          ),
+          location: this.toPrismaRequiredJson(profileModel.location),
+          operatingHours: this.toPrismaOptionalJson(
+            profileModel.operatingHours,
+          ),
+          priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
+          socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+        }
+      : null;
+
     try {
       await this.prisma.establishment.update({
         where: { id: id },
-        data: modelProps,
+        data: {
+          ...modelProps,
+          profile:
+            profileCreateData && profileUpdateData
+              ? {
+                  upsert: {
+                    create: { ...profileCreateData },
+                    update: { ...profileUpdateData },
+                  },
+                }
+              : undefined,
+        },
       });
     } catch (error: any) {
       if (error.code === "P2025") {
@@ -67,9 +148,26 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
     }
   }
 
+  async deleteProfile(establishment_id: EstablishmentId): Promise<void> {
+    const id = establishment_id.id;
+    try {
+      await this.prisma.establishmentProfile.delete({
+        where: {
+          establishmentId: id,
+        },
+      });
+    } catch (error: any) {
+      if (error.code === "P2025") {
+        throw new NotFoundError(id, EstablishmentProfile);
+      }
+      throw error;
+    }
+  }
+
   async findById(entity_id: EstablishmentId): Promise<Establishment | null> {
     const model = await this.prisma.establishment.findUnique({
       where: { id: entity_id.id },
+      include: { profile: true },
     });
 
     return model ? EstablishmentModelMapper.toEntity(model) : null;
@@ -82,13 +180,16 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           in: ids.map((id) => id.id),
         },
       },
+      include: { profile: true },
     });
 
     return models.map((model) => EstablishmentModelMapper.toEntity(model));
   }
 
   async findAll(): Promise<Establishment[]> {
-    const models = await this.prisma.establishment.findMany();
+    const models = await this.prisma.establishment.findMany({
+      include: { profile: true },
+    });
     return models.map((model) => EstablishmentModelMapper.toEntity(model));
   }
 
@@ -139,6 +240,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
         orderBy,
         skip: offset,
         take: limit,
+        include: { profile: true },
       }),
       this.prisma.establishment.count({ where }),
     ]);
@@ -160,6 +262,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
 
     const orConditions: any[] = [];
     const andConditions: any = {};
+    const profileWhere: any = {};
 
     if (filter.name) {
       orConditions.push({
@@ -195,6 +298,43 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
       andConditions.is_verified = filter.is_verified;
     }
 
+    if (filter.location_city) {
+      profileWhere.location_city = {
+        contains: filter.location_city,
+        mode: "insensitive",
+      };
+    }
+
+    if (filter.amenities && filter.amenities.length > 0) {
+      profileWhere.amenities = {
+        hasSome: filter.amenities,
+      };
+    }
+
+    if (filter.preferred_genres && filter.preferred_genres.length > 0) {
+      profileWhere.preferredGenres = {
+        hasSome: filter.preferred_genres,
+      };
+    }
+
+    if (
+      (filter.capacity_min !== null &&
+        filter.capacity_min !== undefined &&
+        Number.isFinite(filter.capacity_min)) ||
+      (filter.capacity_max !== null &&
+        filter.capacity_max !== undefined &&
+        Number.isFinite(filter.capacity_max))
+    ) {
+      profileWhere.capacity = {
+        ...(filter.capacity_min !== null &&
+          filter.capacity_min !== undefined &&
+          Number.isFinite(filter.capacity_min) && { gte: filter.capacity_min }),
+        ...(filter.capacity_max !== null &&
+          filter.capacity_max !== undefined &&
+          Number.isFinite(filter.capacity_max) && { lte: filter.capacity_max }),
+      };
+    }
+
     const where: any = {};
 
     if (orConditions.length > 0) {
@@ -203,6 +343,12 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
 
     if (Object.keys(andConditions).length > 0) {
       Object.assign(where, andConditions);
+    }
+
+    if (Object.keys(profileWhere).length > 0) {
+      where.profile = {
+        is: profileWhere,
+      };
     }
 
     return where;

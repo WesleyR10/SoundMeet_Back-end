@@ -10,6 +10,11 @@ export type EstablishmentFilter = {
   name?: string | null;
   email?: string | null;
   cnpj?: string | null;
+  location_city?: string | null;
+  amenities?: string[] | null;
+  preferred_genres?: string[] | null;
+  capacity_min?: number | null;
+  capacity_max?: number | null;
   is_active?: boolean | null;
   is_verified?: boolean | null;
 };
@@ -40,6 +45,28 @@ export class EstablishmentSearchParams extends DefaultSearchParams<Establishment
       ...(_value && _value.email && { email: `${_value?.email}` }),
       ...(_value && _value.cnpj && { cnpj: `${_value?.cnpj}` }),
       ...(_value &&
+        _value.location_city && { location_city: `${_value?.location_city}` }),
+      ...(_value &&
+        Array.isArray(_value.amenities) &&
+        _value.amenities.length > 0 && { amenities: _value.amenities }),
+      ...(_value &&
+        Array.isArray(_value.preferred_genres) &&
+        _value.preferred_genres.length > 0 && {
+          preferred_genres: _value.preferred_genres,
+        }),
+      ...(_value &&
+        _value.capacity_min !== null &&
+        _value.capacity_min !== undefined &&
+        Number.isFinite(_value.capacity_min) && {
+          capacity_min: _value.capacity_min,
+        }),
+      ...(_value &&
+        _value.capacity_max !== null &&
+        _value.capacity_max !== undefined &&
+        Number.isFinite(_value.capacity_max) && {
+          capacity_max: _value.capacity_max,
+        }),
+      ...(_value &&
         typeof _value.is_active === "boolean" && {
           is_active: _value.is_active,
         }),
@@ -61,4 +88,6 @@ export interface IEstablishmentRepository extends ISearchableRepository<
   EstablishmentFilter,
   EstablishmentSearchParams,
   EstablishmentSearchResult
-> {}
+> {
+  deleteProfile(establishment_id: EstablishmentId): Promise<void>;
+}

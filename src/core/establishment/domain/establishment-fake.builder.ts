@@ -1,11 +1,11 @@
 import { Chance } from "chance";
 
-import { Address } from "../../shared/domain/value-objects/address.vo";
 import { CNPJ } from "../../shared/domain/value-objects/cnpj.vo";
 import { Email } from "../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../shared/domain/value-objects/phone.vo";
 import { Rating } from "../../shared/domain/value-objects/rating.vo";
 import { Establishment, EstablishmentId } from "./establishment.aggregate";
+import { EstablishmentProfile } from "./establishment-profile.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
@@ -21,14 +21,6 @@ export class EstablishmentFakeBuilder<TBuild = any> {
   private _phone: PropOrFactory<string | null> = (_index) => null;
   private _website: PropOrFactory<string | null> = (_index) =>
     this.chance.url();
-  private _address: PropOrFactory<any> = (_index) => ({
-    street: this.chance.street() || "Main Street",
-    number: this.chance.integer({ min: 1, max: 9999 }).toString(),
-    neighborhood: this.chance.word() || "Downtown",
-    city: this.chance.city() || "São Paulo",
-    state: this.chance.state({ territories: false }) || "SP",
-    zipCode: this.chance.string({ length: 8, pool: "0123456789" }),
-  });
   private _establishment_type: PropOrFactory<string> = (_index) =>
     this.chance.pickone([
       "bar",
@@ -44,6 +36,9 @@ export class EstablishmentFakeBuilder<TBuild = any> {
   private _total_ratings: PropOrFactory<number> = (_index) => 0;
   private _is_active: PropOrFactory<boolean> = (_index) => true;
   private _is_verified: PropOrFactory<boolean> = (_index) => false;
+  private _with_profile: PropOrFactory<boolean> = (_index) => false;
+  private _profile: PropOrFactory<EstablishmentProfile | null> | undefined =
+    undefined;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
 
   private countObjs;
@@ -99,11 +94,6 @@ export class EstablishmentFakeBuilder<TBuild = any> {
 
   withWebsite(valueOrFactory: PropOrFactory<string | null>): this {
     this._website = valueOrFactory;
-    return this;
-  }
-
-  withAddress(valueOrFactory: PropOrFactory<any>) {
-    this._address = valueOrFactory;
     return this;
   }
 
@@ -182,19 +172,43 @@ export class EstablishmentFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withProfile(valueOrFactory?: PropOrFactory<EstablishmentProfile | null>) {
+    this._with_profile = true;
+    if (valueOrFactory !== undefined) {
+      this._profile = valueOrFactory;
+    }
+    return this;
+  }
+
   build(): TBuild {
     const establishments = new Array(this.countObjs)
       .fill(undefined)
       .map((_, index) => {
         const emailValue = this.callFactory(this._email, index);
         const phoneValue = this.callFactory(this._phone, index);
-        const addressValue = this.callFactory(this._address, index);
         const ratingValue = this.callFactory(this._rating, index);
 
+        const establishmentId = !this._establishment_id
+          ? new EstablishmentId()
+          : this.callFactory(this._establishment_id, index);
+
+        const withProfile = this.callFactory(this._with_profile, index);
+        const profile = withProfile
+          ? this._profile
+            ? this.callFactory(this._profile, index)
+            : EstablishmentProfile.fake()
+                .aProfile()
+                .withEstablishmentId(establishmentId)
+                .build()
+          : null;
+
+        if (profile && !profile.establishment_id.equals(establishmentId)) {
+          profile.establishment_id = establishmentId;
+          profile.validate(["establishment_id"]);
+        }
+
         const establishment = new Establishment({
-          establishment_id: !this._establishment_id
-            ? undefined
-            : this.callFactory(this._establishment_id, index),
+          establishment_id: establishmentId,
           name: this.callFactory(this._name, index),
           description: this.callFactory(this._description, index),
           avatar: this.callFactory(this._avatar, index),
@@ -202,14 +216,15 @@ export class EstablishmentFakeBuilder<TBuild = any> {
           email: new Email(emailValue),
           phone: phoneValue ? new Phone(phoneValue) : null,
           website: this.callFactory(this._website, index),
-          address: new Address(addressValue),
           establishment_type: this.callFactory(this._establishment_type, index),
           rating: new Rating(ratingValue),
           total_ratings: this.callFactory(this._total_ratings, index),
           is_active: this.callFactory(this._is_active, index),
           is_verified: this.callFactory(this._is_verified, index),
+          profile,
           ...(this._created_at && {
             created_at: this.callFactory(this._created_at, index),
+            updated_at: this.callFactory(this._created_at, index),
           }),
         });
         establishment.validate();
@@ -251,10 +266,6 @@ export class EstablishmentFakeBuilder<TBuild = any> {
 
   get website() {
     return this.getValue("website");
-  }
-
-  get address() {
-    return this.getValue("address");
   }
 
   get establishment_type() {

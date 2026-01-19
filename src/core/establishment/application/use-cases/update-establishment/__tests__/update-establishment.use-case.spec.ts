@@ -75,12 +75,6 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
           description: "Updated description",
           avatar: "https://example.com/new-avatar.jpg",
           phone: "+5511888888888",
-          address_street: "456 New Rock Street",
-          address_number: "123",
-          address_neighborhood: "Pinheiros",
-          address_city: "São Paulo",
-          address_state: "SP",
-          address_zipcode: "01234-567",
           website: "https://newrockclub.com",
           is_active: false,
         },
@@ -90,12 +84,6 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
           description: "Updated description",
           avatar: "https://example.com/new-avatar.jpg",
           phone: "+5511888888888",
-          address_street: "456 New Rock Street",
-          address_number: "123",
-          address_neighborhood: "Pinheiros",
-          address_city: "São Paulo",
-          address_state: "SP",
-          address_zipcode: "01234-567",
           website: "https://newrockclub.com",
           is_active: false,
         },
@@ -117,20 +105,6 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
         description: expected.description || establishment.description,
         avatar: expected.avatar || establishment.avatar,
         phone: expected.phone || establishment.phone?.value || null,
-        address_street:
-          expected.address_street || establishment.address?.street || null,
-        address_number:
-          expected.address_number || establishment.address?.number || null,
-        address_neighborhood:
-          expected.address_neighborhood ||
-          establishment.address?.neighborhood ||
-          null,
-        address_city:
-          expected.address_city || establishment.address?.city || null,
-        address_state:
-          expected.address_state || establishment.address?.state || null,
-        address_zipcode:
-          expected.address_zipcode || establishment.address?.zipCode || null,
         website: expected.website || establishment.website,
         establishment_type: establishment.establishment_type,
         qr_code: expect.any(String),
@@ -141,7 +115,9 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
             ? expected.is_active
             : establishment.is_active,
         is_verified: establishment.is_verified,
+        profile: null,
         created_at: establishment.created_at,
+        updated_at: establishment.updated_at,
         is_bar: establishment.establishment_type === "bar",
         is_club: establishment.establishment_type === "club",
         is_highly_rated: false,
@@ -149,24 +125,6 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
         is_restaurant: establishment.establishment_type === "restaurant",
       });
     });
-  });
-
-  it("should update establishment with QR code generation", async () => {
-    const establishment = EstablishmentFakeBuilder.anEstablishment().build();
-    repository.items = [establishment];
-
-    const input = {
-      id: establishment.establishment_id.id,
-      name: "QR Updated Bar",
-      generate_qr_code: true,
-    };
-
-    const output = await useCase.execute(input);
-
-    expect(output.qr_code).not.toBeNull();
-    expect(output.qr_code).toMatch(
-      /^soundmeet:\/\/establishment\/[a-f0-9-]{36}$/,
-    );
   });
 
   it("should save the updated establishment in the repository", async () => {

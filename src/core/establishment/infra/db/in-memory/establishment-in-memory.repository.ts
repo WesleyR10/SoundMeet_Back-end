@@ -1,3 +1,4 @@
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import {
@@ -10,6 +11,7 @@ import {
   EstablishmentSearchResult,
   IEstablishmentRepository,
 } from "../../../domain/establishment.repository";
+import { EstablishmentProfile } from "../../../domain/establishment-profile.aggregate";
 
 export class EstablishmentInMemoryRepository
   extends InMemorySearchableRepository<
@@ -19,6 +21,20 @@ export class EstablishmentInMemoryRepository
   >
   implements IEstablishmentRepository
 {
+  async deleteProfile(establishment_id: EstablishmentId): Promise<void> {
+    const entity = await this.findById(establishment_id);
+    if (!entity) {
+      throw new NotFoundError(establishment_id.id, this.getEntity());
+    }
+
+    if (!entity.profile) {
+      throw new NotFoundError(establishment_id.id, EstablishmentProfile);
+    }
+
+    entity.removeProfile();
+    await this.update(entity);
+  }
+
   async search(
     props: EstablishmentSearchParams,
   ): Promise<EstablishmentSearchResult> {
@@ -42,6 +58,7 @@ export class EstablishmentInMemoryRepository
 
     const filtered = items.filter((establishment) => {
       let matches = true;
+      const profile = establishment.profile;
 
       if (filter.name) {
         const nameMatch = establishment.name
@@ -61,6 +78,61 @@ export class EstablishmentInMemoryRepository
       if (filter.cnpj) {
         matches =
           matches && (establishment.cnpj?.value.includes(filter.cnpj) ?? false);
+      }
+
+      if (filter.location_city) {
+        matches =
+          matches &&
+          !!profile &&
+          profile.location.city
+            .toLowerCase()
+            .includes(filter.location_city.toLowerCase());
+      }
+
+      if (filter.amenities && filter.amenities.length > 0) {
+        matches =
+          matches &&
+          !!profile &&
+          profile.amenities.some((amenity) =>
+            filter.amenities!.some(
+              (f) => f.toLowerCase() === amenity.toLowerCase(),
+            ),
+          );
+      }
+
+      if (filter.preferred_genres && filter.preferred_genres.length > 0) {
+        matches =
+          matches &&
+          !!profile &&
+          profile.preferredGenres.some((genre) =>
+            filter.preferred_genres!.some(
+              (f) => f.toLowerCase() === genre.toLowerCase(),
+            ),
+          );
+      }
+
+      if (
+        filter.capacity_min !== null &&
+        filter.capacity_min !== undefined &&
+        Number.isFinite(filter.capacity_min)
+      ) {
+        matches =
+          matches &&
+          !!profile &&
+          profile.capacity !== null &&
+          profile.capacity >= filter.capacity_min;
+      }
+
+      if (
+        filter.capacity_max !== null &&
+        filter.capacity_max !== undefined &&
+        Number.isFinite(filter.capacity_max)
+      ) {
+        matches =
+          matches &&
+          !!profile &&
+          profile.capacity !== null &&
+          profile.capacity <= filter.capacity_max;
       }
 
       if (filter.is_active !== undefined) {

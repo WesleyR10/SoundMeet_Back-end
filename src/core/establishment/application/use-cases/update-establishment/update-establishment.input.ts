@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -17,14 +18,9 @@ export type UpdateEstablishmentInputConstructorProps = {
   email?: string;
   phone?: string;
   website?: string;
-  address_street?: string;
-  address_number?: string;
-  address_neighborhood?: string;
-  address_city?: string;
-  address_state?: string;
-  address_zipcode?: string;
-  establishment_type?: string;
+  establishment_type?: "bar" | "restaurant" | "club";
   is_active?: boolean;
+  is_verified?: boolean;
 };
 
 export class UpdateEstablishmentInput {
@@ -68,38 +64,9 @@ export class UpdateEstablishmentInput {
 
   @IsString()
   @IsOptional()
-  @MaxLength(255)
-  address_street?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(10)
-  address_number?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  address_neighborhood?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  address_city?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(2)
-  address_state?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(10)
-  address_zipcode?: string;
-
-  @IsString()
-  @IsOptional()
+  @IsIn(["bar", "restaurant", "club"])
   @MaxLength(50)
-  establishment_type?: string;
+  establishment_type?: "bar" | "restaurant" | "club";
 
   @IsBoolean()
   @IsOptional()
@@ -119,14 +86,9 @@ export class UpdateEstablishmentInput {
     this.email = props.email;
     this.phone = props.phone;
     this.website = props.website;
-    this.address_street = props.address_street;
-    this.address_number = props.address_number;
-    this.address_neighborhood = props.address_neighborhood;
-    this.address_city = props.address_city;
-    this.address_state = props.address_state;
-    this.address_zipcode = props.address_zipcode;
     this.establishment_type = props.establishment_type;
     this.is_active = props.is_active;
+    this.is_verified = props.is_verified;
   }
 }
 

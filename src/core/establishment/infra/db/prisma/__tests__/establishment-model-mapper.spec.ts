@@ -16,8 +16,13 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: establishment.description,
         avatar: establishment.avatar,
         phone: establishment.phone?.value || null,
+        website: establishment.website,
+        establishment_type: establishment.establishment_type,
+        qr_code: establishment.qr_code?.code ?? null,
+        rating: establishment.rating.value,
+        total_ratings: establishment.total_ratings,
         is_active: establishment.is_active,
-        isVerified: establishment.is_verified,
+        is_verified: establishment.is_verified,
         created_at: establishment.created_at,
         updated_at: expect.any(Date),
       });
@@ -42,8 +47,13 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: null,
         avatar: null,
         phone: null,
+        website: null,
+        establishment_type: establishment.establishment_type,
+        qr_code: establishment.qr_code?.code ?? null,
+        rating: establishment.rating.value,
+        total_ratings: establishment.total_ratings,
         is_active: establishment.is_active,
-        isVerified: establishment.is_verified,
+        is_verified: establishment.is_verified,
         created_at: establishment.created_at,
         updated_at: expect.any(Date),
       });
@@ -68,8 +78,13 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         description: "Great place for live music",
         avatar: "https://example.com/avatar.jpg",
         phone: "11999999999",
+        website: "https://rockbar.com",
+        establishment_type: establishment.establishment_type,
+        qr_code: establishment.qr_code?.code ?? null,
+        rating: establishment.rating.value,
+        total_ratings: establishment.total_ratings,
         is_active: establishment.is_active,
-        isVerified: establishment.is_verified,
+        is_verified: establishment.is_verified,
         created_at: establishment.created_at,
         updated_at: expect.any(Date),
       });
@@ -87,15 +102,14 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         avatar: "https://example.com/avatar.jpg",
         phone: "11999999999",
         is_active: true,
-        isVerified: false,
+        website: null,
+        establishment_type: "bar",
+        qr_code: null,
+        rating: 0,
+        total_ratings: 0,
+        is_verified: false,
         created_at: new Date("2023-01-01"),
         updated_at: new Date("2023-01-01"),
-        address_street: "Rua Exemplo",
-        address_number: "123",
-        address_neighborhood: "Centro",
-        address_city: "São Paulo",
-        address_state: "SP",
-        address_zip_code: "01000-000",
       };
 
       const establishment = EstablishmentModelMapper.toEntity(model);
@@ -107,17 +121,12 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       expect(establishment.description).toBe(model.description);
       expect(establishment.avatar).toBe(model.avatar);
       expect(establishment.phone?.value).toBe(model.phone);
-      expect(establishment.address.street).toBe("Rua Exemplo");
-      expect(establishment.address.number).toBe("123");
-      expect(establishment.address.city).toBe("São Paulo");
-      expect(establishment.address.state).toBe("SP");
-      expect(establishment.address.zipCode).toBe("01000-000");
       expect(establishment.website).toBeNull();
       expect(establishment.establishment_type).toBe("bar");
       expect(establishment.rating.value).toBe(0);
       expect(establishment.total_ratings).toBe(0);
       expect(establishment.is_active).toBe(model.is_active);
-      expect(establishment.is_verified).toBe(model.isVerified);
+      expect(establishment.is_verified).toBe(model.is_verified);
       expect(establishment.created_at).toEqual(model.created_at);
     });
 
@@ -131,15 +140,14 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         avatar: null,
         phone: null,
         is_active: true,
-        isVerified: false,
+        website: null,
+        establishment_type: "bar",
+        qr_code: null,
+        rating: 0,
+        total_ratings: 0,
+        is_verified: false,
         created_at: new Date("2023-01-01"),
         updated_at: new Date("2023-01-01"),
-        address_street: "Rua Exemplo",
-        address_number: "123",
-        address_neighborhood: "Centro",
-        address_city: "São Paulo",
-        address_state: "SP",
-        address_zip_code: "01000-000",
       };
 
       const establishment = EstablishmentModelMapper.toEntity(model);
@@ -151,17 +159,13 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       expect(establishment.description).toBeNull();
       expect(establishment.avatar).toBeNull();
       expect(establishment.phone).toBeNull();
-      expect(establishment.address.street).toBe("Rua Exemplo");
-      expect(establishment.address.number).toBe("123");
-      expect(establishment.address.city).toBe("São Paulo");
-      expect(establishment.address.state).toBe("SP");
-      expect(establishment.address.zipCode).toBe("01000-000");
       expect(establishment.website).toBeNull();
       expect(establishment.establishment_type).toBe("bar");
       expect(establishment.rating.value).toBe(0);
       expect(establishment.is_active).toBe(true);
       expect(establishment.is_verified).toBe(false);
       expect(establishment.created_at).toEqual(model.created_at);
+      expect(establishment.updated_at).toEqual(model.updated_at);
     });
 
     it("should handle inactive establishment", () => {
@@ -174,15 +178,14 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         avatar: null,
         phone: null,
         is_active: false,
-        isVerified: true,
+        website: null,
+        establishment_type: "bar",
+        qr_code: null,
+        rating: 0,
+        total_ratings: 0,
+        is_verified: true,
         created_at: new Date("2023-01-01"),
         updated_at: new Date("2023-01-01"),
-        address_street: "Rua Exemplo",
-        address_number: "123",
-        address_neighborhood: "Centro",
-        address_city: "São Paulo",
-        address_state: "SP",
-        address_zip_code: "01000-000",
       };
 
       const establishment = EstablishmentModelMapper.toEntity(model);
@@ -191,6 +194,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       expect(establishment.is_verified).toBe(true);
       expect(establishment.rating.value).toBe(0);
       expect(establishment.total_ratings).toBe(0);
+      expect(establishment.updated_at).toEqual(model.updated_at);
     });
   });
 
@@ -201,16 +205,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
         .withDescription("Test description")
         .withAvatar("https://example.com/avatar.jpg")
         .withPhone("11999999999")
-        .withAddress({
-          street: "Test Street",
-          number: "123",
-          neighborhood: "Test Neighborhood",
-          city: "Test City",
-          state: "TS",
-          zipCode: "12345678",
-        })
         .withWebsite("https://test.com")
-
         .withRating(4.2)
         .withTotalRatings(85)
         .build();
@@ -235,7 +230,21 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       expect(convertedEstablishment.phone?.value).toBe(
         originalEstablishment.phone?.value,
       );
-      // Address, website, social_media, qr_code, rating and total_ratings comparison skipped - mapper uses fixed values
+      expect(convertedEstablishment.website).toBe(
+        originalEstablishment.website,
+      );
+      expect(convertedEstablishment.establishment_type).toBe(
+        originalEstablishment.establishment_type,
+      );
+      expect(convertedEstablishment.qr_code?.code ?? null).toBe(
+        originalEstablishment.qr_code?.code ?? null,
+      );
+      expect(convertedEstablishment.rating.value).toBe(
+        originalEstablishment.rating.value,
+      );
+      expect(convertedEstablishment.total_ratings).toBe(
+        originalEstablishment.total_ratings,
+      );
       expect(convertedEstablishment.is_active).toBe(
         originalEstablishment.is_active,
       );
@@ -244,6 +253,9 @@ describe("EstablishmentModelMapper Unit Tests", () => {
       );
       expect(convertedEstablishment.created_at).toEqual(
         originalEstablishment.created_at,
+      );
+      expect(convertedEstablishment.updated_at).toEqual(
+        originalEstablishment.updated_at,
       );
     });
   });

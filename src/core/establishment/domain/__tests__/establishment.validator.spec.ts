@@ -79,8 +79,6 @@ describe("EstablishmentValidator Tests", () => {
       name: "Test Establishment",
       email: "test@establishment.com",
       phone: "11999999999",
-      address_street: "Rua Teste",
-      address_city: "São Paulo",
       establishment_type: "bar",
     };
 
@@ -99,8 +97,6 @@ describe("EstablishmentValidator Tests", () => {
       "name",
       "email",
       "phone",
-      "address_street",
-      "address_city",
       "establishment_type",
       "cnpj",
     ]);
@@ -111,15 +107,7 @@ describe("EstablishmentValidator Tests", () => {
     isValid = validator.validate(
       notification,
       { ...validData, cnpj: "invalid-cnpj" },
-      [
-        "name",
-        "email",
-        "phone",
-        "address_street",
-        "address_city",
-        "establishment_type",
-        "cnpj",
-      ],
+      ["name", "email", "phone", "establishment_type", "cnpj"],
     );
     expect(isValid).toBeFalsy();
     expect(notification.hasErrors()).toBeTruthy();
@@ -131,8 +119,6 @@ describe("EstablishmentValidator Tests", () => {
         name: "Test Establishment",
         email: "test@establishment.com",
         phone: "11999999999",
-        address_street: "Rua Teste",
-        address_city: "São Paulo",
         establishment_type: "bar",
         cnpj: "84.244.955/0001-84",
       },
@@ -140,8 +126,6 @@ describe("EstablishmentValidator Tests", () => {
         name: "Another Establishment",
         email: "another@establishment.com",
         phone: "11888888888",
-        address_street: "Av. Principal",
-        address_city: "Rio de Janeiro",
         establishment_type: "restaurant",
         cnpj: "90.441.272/0001-10",
         description: "A great place",

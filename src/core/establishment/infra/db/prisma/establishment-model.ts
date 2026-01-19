@@ -1,3 +1,25 @@
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
+export type JsonObject = { [key: string]: JsonValue | undefined };
+export type JsonArray = JsonValue[];
+
+export type EstablishmentProfileModel = {
+  id: string;
+  establishmentId: string;
+  capacity: number | null;
+  location: JsonValue;
+  location_city: string;
+  location_lat: number | null;
+  location_lng: number | null;
+  amenities: string[];
+  preferredGenres: string[];
+  operatingHours: JsonValue | null;
+  priceRange: JsonValue | null;
+  socialLinks: JsonValue | null;
+  created_at: Date;
+  updated_at: Date;
+};
+
 export type EstablishmentModel = {
   id: string;
   email: string;
@@ -6,19 +28,14 @@ export type EstablishmentModel = {
   avatar: string | null;
   cnpj: string | null;
   phone: string | null;
+  website: string | null;
+  establishment_type: string;
+  qr_code: string | null;
+  rating: number;
+  total_ratings: number;
   is_active: boolean;
-  isVerified: boolean;
+  is_verified: boolean;
   created_at: Date;
   updated_at: Date;
-
-  // Endereço (Flattened)
-  address_street?: string | null;
-  address_number?: string | null;
-  address_complement?: string | null;
-  address_neighborhood?: string | null;
-  address_city?: string | null;
-  address_state?: string | null;
-  address_zip_code?: string | null;
-  address_lat?: number | null;
-  address_long?: number | null;
+  profile?: EstablishmentProfileModel | null;
 };

@@ -1,4 +1,4 @@
-import { Address, CNPJ, Email, Phone, Rating } from "../../../shared/domain";
+import { CNPJ, Email, Phone, QRCode, Rating } from "../../../shared/domain";
 import { IDomainEvent } from "../../../shared/domain/events/domain-event.interface";
 import { EstablishmentId } from "../establishment.aggregate";
 
@@ -8,11 +8,11 @@ export type EstablishmentCreatedEventProps = {
   email: Email;
   cnpj: CNPJ | null;
   phone: Phone | null;
-  address: Address | null;
   description: string | null;
   avatar: string | null;
-  cover: string | null;
+  qr_code: QRCode | null;
   rating: Rating;
+  total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
   created_at: Date;
@@ -27,11 +27,11 @@ export class EstablishmentCreatedEvent implements IDomainEvent {
   readonly email: Email;
   readonly cnpj: CNPJ | null;
   readonly phone: Phone | null;
-  readonly address: Address | null;
   readonly description: string | null;
   readonly avatar: string | null;
-  readonly cover: string | null;
+  readonly qr_code: QRCode | null;
   readonly rating: Rating;
+  readonly total_ratings: number;
   readonly is_active: boolean;
   readonly is_verified: boolean;
   readonly created_at: Date;
@@ -42,11 +42,11 @@ export class EstablishmentCreatedEvent implements IDomainEvent {
     this.email = props.email;
     this.cnpj = props.cnpj;
     this.phone = props.phone;
-    this.address = props.address;
     this.description = props.description;
     this.avatar = props.avatar;
-    this.cover = props.cover;
+    this.qr_code = props.qr_code;
     this.rating = props.rating;
+    this.total_ratings = props.total_ratings;
     this.is_active = props.is_active;
     this.is_verified = props.is_verified;
     this.created_at = props.created_at;

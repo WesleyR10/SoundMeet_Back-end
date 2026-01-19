@@ -34,25 +34,6 @@ export class UpdateEstablishmentUseCase implements IUseCase<
     input.email !== undefined && entity.changeEmail(input.email);
     input.phone !== undefined && entity.changePhone(input.phone);
     input.website !== undefined && entity.changeWebsite(input.website);
-    // Update address if any address field is provided
-    if (
-      input.address_street !== undefined ||
-      input.address_number !== undefined ||
-      input.address_city !== undefined ||
-      input.address_state !== undefined ||
-      input.address_zipcode !== undefined ||
-      input.address_neighborhood !== undefined
-    ) {
-      const currentAddress = entity.address;
-      entity.changeAddress(
-        input.address_street ?? currentAddress.street,
-        input.address_number ?? currentAddress.number,
-        input.address_city ?? currentAddress.city,
-        input.address_state ?? currentAddress.state,
-        input.address_zipcode ?? currentAddress.zipCode,
-        input.address_neighborhood ?? currentAddress.neighborhood,
-      );
-    }
     input.establishment_type !== undefined &&
       entity.changeEstablishmentType(input.establishment_type);
 

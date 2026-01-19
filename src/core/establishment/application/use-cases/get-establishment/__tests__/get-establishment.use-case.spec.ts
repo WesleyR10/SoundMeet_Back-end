@@ -61,6 +61,7 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
       is_active: establishment.is_active,
       is_verified: establishment.is_verified,
       created_at: establishment.created_at,
+      updated_at: establishment.updated_at,
     });
   });
 
@@ -101,6 +102,7 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
       is_active: establishment.is_active,
       is_verified: true,
       created_at: establishment.created_at,
+      updated_at: establishment.updated_at,
     });
   });
 
@@ -156,6 +158,7 @@ describe("GetEstablishmentUseCase Unit Tests", () => {
       is_active: true,
       is_verified: false,
       created_at: establishment.created_at,
+      updated_at: establishment.updated_at,
     });
   });
 

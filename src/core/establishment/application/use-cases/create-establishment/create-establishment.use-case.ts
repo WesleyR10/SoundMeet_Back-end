@@ -25,14 +25,6 @@ export class CreateEstablishmentUseCase implements IUseCase<
       email: input.email,
       phone: input.phone,
       website: input.website,
-      address: {
-        street: input.address_street,
-        number: input.address_number,
-        city: input.address_city,
-        state: input.address_state,
-        zipCode: input.address_zipcode,
-        neighborhood: input.address_neighborhood,
-      },
       establishment_type: input.establishment_type,
       is_active: input.is_active,
     });

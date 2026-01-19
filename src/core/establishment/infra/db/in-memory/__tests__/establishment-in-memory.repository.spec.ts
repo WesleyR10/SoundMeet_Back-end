@@ -9,21 +9,11 @@ describe("EstablishmentInMemoryRepository", () => {
   beforeEach(() => (repository = new EstablishmentInMemoryRepository()));
 
   it("should no filter items when filter object is null", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Test",
         email: new Email("test@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -36,21 +26,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should filter items using name parameter", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Rock Bar",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -58,7 +38,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "jazz club",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -66,7 +45,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Blues Cafe",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -81,21 +59,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should filter items using email parameter", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Test 1",
         email: new Email("contact@rockbar.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -103,7 +71,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 2",
         email: new Email("info@jazzclub.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -111,7 +78,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 3",
         email: new Email("hello@rockbar.net"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -124,21 +90,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should filter items using cnpj parameter", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Test 1",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -146,7 +102,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 2",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -154,7 +109,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 3",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -166,22 +120,54 @@ describe("EstablishmentInMemoryRepository", () => {
     expect(itemsFiltered).toStrictEqual([items[0]]);
   });
 
-  it("should filter items using multiple parameters", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
+  it("should filter items using profile parameters", async () => {
+    const withProfile = new Establishment({
+      name: "Rock Bar",
+      email: new Email("contact@rockbar.com"),
+      cnpj: "84.244.955/0001-84",
+      establishment_type: "bar",
+      website: "http://test.com",
+    });
+    const withoutProfile = new Establishment({
+      name: "Jazz Club",
+      email: new Email("info@jazzclub.com"),
+      cnpj: "90.441.272/0001-10",
+      establishment_type: "club",
+      website: "http://test.com",
     });
 
+    const profile = withProfile.ensureProfile(
+      new Address({
+        street: "Rua A",
+        number: "10",
+        neighborhood: "Centro",
+        city: "São Paulo",
+        state: "SP",
+        zipCode: "01001000",
+      }),
+    );
+    profile.changeCapacity(200);
+    profile.updateAmenities(["Wi-Fi", "stage"]);
+    profile.updatePreferredGenres(["rock"]);
+
+    const items = [withProfile, withoutProfile];
+    const itemsFiltered = await repository["applyFilter"](items, {
+      location_city: "são",
+      amenities: ["wi-fi"],
+      preferred_genres: ["ROCK"],
+      capacity_min: 100,
+      capacity_max: 300,
+    });
+
+    expect(itemsFiltered).toStrictEqual([withProfile]);
+  });
+
+  it("should filter items using multiple parameters", async () => {
     const items = [
       new Establishment({
         name: "Rock Bar",
         email: new Email("contact@rockbar.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -189,7 +175,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Jazz Club",
         email: new Email("info@jazzclub.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -197,7 +182,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Rock Cafe",
         email: new Email("hello@rockcafe.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -212,21 +196,11 @@ describe("EstablishmentInMemoryRepository", () => {
 
   it("should sort by created_at when sort param is null", async () => {
     const created_at = new Date();
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "c",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date(created_at.getTime() + 300),
@@ -235,7 +209,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "b",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date(created_at.getTime() + 200),
@@ -244,7 +217,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "a",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date(created_at.getTime() + 100),
@@ -256,21 +228,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should sort by name", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "c",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -278,7 +240,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "b",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -286,7 +247,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "a",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -300,21 +260,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should sort by email", async () => {
-    const baseAddress = new Address({
-      street: "Rua Exemplo",
-      number: "123",
-      neighborhood: "Centro",
-      city: "São Paulo",
-      state: "SP",
-      zipCode: "01000-000",
-    });
-
     const items = [
       new Establishment({
         name: "Test Establishment C",
         email: new Email("c@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -322,7 +272,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test Establishment B",
         email: new Email("b@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -330,7 +279,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test Establishment A",
         email: new Email("a@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -345,21 +293,11 @@ describe("EstablishmentInMemoryRepository", () => {
 
   it("should sort by created_at", async () => {
     const created_at = new Date();
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Test 1",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date(created_at.getTime() + 300),
@@ -368,7 +306,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 2",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date(created_at.getTime() + 200),
@@ -377,7 +314,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 3",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date(created_at.getTime() + 100),
@@ -392,21 +328,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should sort by rating", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Test 1",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         rating: new Rating(3.5),
@@ -415,7 +341,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 2",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         rating: new Rating(4.8),
@@ -424,7 +349,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 3",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         rating: new Rating(2.1),
@@ -443,21 +367,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should apply pagination", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Test 1",
         email: new Email("test1@test.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -465,7 +379,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 2",
         email: new Email("test2@test.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -473,7 +386,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 3",
         email: new Email("test3@test.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -481,7 +393,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 4",
         email: new Email("test4@test.com"),
         cnpj: "40.122.464/0001-95",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -489,7 +400,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Test 5",
         email: new Email("test5@test.com"),
         cnpj: "40.122.464/0001-95",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
       }),
@@ -509,21 +419,11 @@ describe("EstablishmentInMemoryRepository", () => {
   });
 
   it("should search using all methods", async () => {
-    const baseAddress = new Address({
-      street: "Test Street",
-      number: "123",
-      neighborhood: "Test Neighborhood",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345-678",
-    });
-
     const items = [
       new Establishment({
         name: "Rock Bar",
         email: new Email("contact@rockbar.com"),
         cnpj: "84.244.955/0001-84",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date("2023-01-01"),
@@ -532,7 +432,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Jazz Club",
         email: new Email("info@jazzclub.com"),
         cnpj: "90.441.272/0001-10",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date("2023-01-02"),
@@ -541,7 +440,6 @@ describe("EstablishmentInMemoryRepository", () => {
         name: "Blues Bar",
         email: new Email("hello@bluesbar.com"),
         cnpj: "88.226.299/0001-48",
-        address: baseAddress,
         establishment_type: "bar",
         website: "http://test.com",
         created_at: new Date("2023-01-03"),

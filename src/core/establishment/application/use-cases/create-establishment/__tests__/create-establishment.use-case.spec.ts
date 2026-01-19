@@ -19,11 +19,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       email: "invalid-email",
       cnpj: "12.345.678/0001-90",
       phone: "+5500000000000",
-      address_street: "",
-      address_number: "",
-      address_city: "",
-      address_state: "",
-      address_zipcode: "",
       establishment_type: "bar",
     };
 
@@ -33,18 +28,27 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
   });
 
   describe("should create an establishment", () => {
-    const arrange = [
+    const arrange: Array<{
+      input: CreateEstablishmentInput;
+      expected: {
+        name: string;
+        email: string;
+        cnpj: { formatted: string; value: string };
+        description: string | null;
+        avatar: string | null;
+        phone: string;
+        establishment_type: string;
+        website: string | null;
+        rating: number;
+        is_active: boolean;
+        is_verified: boolean;
+      };
+    }> = [
       {
         input: {
           name: "Test Bar",
           email: "test@bar.com",
           phone: "+5511999999999",
-          address_street: "Rua Test",
-          address_number: "123",
-          address_neighborhood: "Centro",
-          address_city: "São Paulo",
-          address_state: "SP",
-          address_zipcode: "01234-567",
           establishment_type: "bar",
           cnpj: "11.222.333/0001-81",
         },
@@ -58,11 +62,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
           description: null,
           avatar: null,
           phone: "+5511999999999",
-          address_street: "Rua Test",
-          address_number: null,
-          address_city: "São Paulo",
-          address_state: null,
-          address_zipcode: null,
           establishment_type: "bar",
           website: null,
           rating: 0,
@@ -78,12 +77,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
           description: "The best rock club in town",
           avatar: "https://example.com/avatar.jpg",
           phone: "+5511999999999",
-          address_street: "123 Rock Street",
-          address_number: "456",
-          address_neighborhood: "Vila Madalena",
-          address_city: "São Paulo",
-          address_state: "SP",
-          address_zipcode: "01234-567",
           establishment_type: "club",
           website: "https://rockclub.com",
           is_active: false,
@@ -98,11 +91,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
           description: "The best rock club in town",
           avatar: "https://example.com/avatar.jpg",
           phone: "+5511999999999",
-          address_street: "123 Rock Street",
-          address_number: null,
-          address_city: "São Paulo",
-          address_state: null,
-          address_zipcode: null,
           establishment_type: "club",
           website: "https://rockclub.com",
           rating: 0,
@@ -122,14 +110,13 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
         description: expected.description,
         avatar: expected.avatar,
         phone: expected.phone,
-        address_street: expected.address_street,
-        address_city: expected.address_city,
         establishment_type: expected.establishment_type,
         website: expected.website,
         rating: expected.rating,
         is_active: expected.is_active,
         is_verified: expected.is_verified,
         created_at: expect.any(Date),
+        updated_at: expect.any(Date),
       });
     });
   });
@@ -139,12 +126,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       name: "QR Bar",
       email: "qr@bar.com",
       phone: "+5511999999999",
-      address_street: "Rua QR",
-      address_number: "100",
-      address_neighborhood: "Centro",
-      address_city: "São Paulo",
-      address_state: "SP",
-      address_zipcode: "01234-567",
       establishment_type: "bar",
       cnpj: "11.111.111/0001-91",
     };
@@ -161,12 +142,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       name: "Save Test Bar",
       email: "save@test.com",
       phone: "+5511888888888",
-      address_street: "Rua Save",
-      address_number: "789",
-      address_neighborhood: "Liberdade",
-      address_city: "São Paulo",
-      address_state: "SP",
-      address_zipcode: "01234-567",
       establishment_type: "restaurant",
       cnpj: "11.222.333/0001-81",
     };
@@ -188,11 +163,6 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       email: "invalid-email",
       cnpj: "",
       phone: "+5500000000000",
-      address_street: "",
-      address_number: "",
-      address_city: "",
-      address_state: "",
-      address_zipcode: "",
       establishment_type: "bar",
     };
 

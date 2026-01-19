@@ -7,6 +7,7 @@ import {
   EstablishmentId,
 } from "../../../../domain/establishment.aggregate";
 import { EstablishmentSearchParams } from "../../../../domain/establishment.repository";
+import { EstablishmentProfile } from "../../../../domain/establishment-profile.aggregate";
 import { EstablishmentModelMapper } from "../establishment-model-mapper";
 import { EstablishmentPrismaRepository } from "../establishment-prisma.repository";
 
@@ -25,6 +26,9 @@ describe("EstablishmentPrismaRepository", () => {
         findMany: jest.fn(),
         count: jest.fn(),
       },
+      establishmentProfile: {
+        delete: jest.fn(),
+      },
     } as any;
     repository = new EstablishmentPrismaRepository(prisma);
   });
@@ -37,7 +41,10 @@ describe("EstablishmentPrismaRepository", () => {
       await repository.insert(establishment);
 
       expect(prisma.establishment.create).toHaveBeenCalledWith({
-        data: modelProps,
+        data: {
+          ...modelProps,
+          profile: undefined,
+        },
       });
     });
   });
@@ -73,6 +80,7 @@ describe("EstablishmentPrismaRepository", () => {
 
       expect(prisma.establishment.findUnique).toHaveBeenCalledWith({
         where: { id: establishment.establishment_id.id },
+        include: { profile: true },
       });
       expect(result).toBeInstanceOf(Establishment);
       expect(result?.establishment_id).toEqual(establishment.establishment_id);
@@ -92,6 +100,7 @@ describe("EstablishmentPrismaRepository", () => {
 
       expect(prisma.establishment.findUnique).toHaveBeenCalledWith({
         where: { id: establishmentId.id },
+        include: { profile: true },
       });
       expect(result).toBeNull();
     });
@@ -113,7 +122,9 @@ describe("EstablishmentPrismaRepository", () => {
 
       const result = await repository.findAll();
 
-      expect(prisma.establishment.findMany).toHaveBeenCalledWith();
+      expect(prisma.establishment.findMany).toHaveBeenCalledWith({
+        include: { profile: true },
+      });
       expect(result).toHaveLength(2);
       expect(result[0].establishment_id.id).toBe(
         establishments[0].establishment_id.id,
@@ -137,7 +148,10 @@ describe("EstablishmentPrismaRepository", () => {
 
       expect(prisma.establishment.update).toHaveBeenCalledWith({
         where: { id: establishment.establishment_id.id },
-        data: modelProps,
+        data: {
+          ...modelProps,
+          profile: undefined,
+        },
       });
     });
 
@@ -209,6 +223,7 @@ describe("EstablishmentPrismaRepository", () => {
         orderBy: { created_at: "desc" },
         skip: 0,
         take: 15,
+        include: { profile: true },
       });
       expect(prisma.establishment.count).toHaveBeenCalledWith({ where: {} });
       expect(result.items).toHaveLength(2);
@@ -240,8 +255,51 @@ describe("EstablishmentPrismaRepository", () => {
         orderBy: { created_at: "desc" },
         skip: 0,
         take: 15,
+        include: { profile: true },
       });
       expect(result.items).toHaveLength(1);
+    });
+
+    it("should search establishments with profile filters", async () => {
+      const establishments = [
+        Establishment.fake().anEstablishment().withName("Rock Bar").build(),
+      ];
+      const modelsProps = establishments.map((entity) =>
+        EstablishmentModelMapper.toModel(entity),
+      );
+
+      (prisma.establishment.findMany as jest.Mock).mockResolvedValue(
+        modelsProps,
+      );
+      (prisma.establishment.count as jest.Mock).mockResolvedValue(1);
+
+      const searchParams = EstablishmentSearchParams.create({
+        filter: {
+          location_city: "São",
+          amenities: ["Wi-Fi"],
+          preferred_genres: ["rock"],
+          capacity_min: 100,
+          capacity_max: 300,
+        },
+      });
+      await repository.search(searchParams);
+
+      expect(prisma.establishment.findMany).toHaveBeenCalledWith({
+        where: {
+          profile: {
+            is: {
+              location_city: { contains: "São", mode: "insensitive" },
+              amenities: { hasSome: ["Wi-Fi"] },
+              preferredGenres: { hasSome: ["rock"] },
+              capacity: { gte: 100, lte: 300 },
+            },
+          },
+        },
+        orderBy: { created_at: "desc" },
+        skip: 0,
+        take: 15,
+        include: { profile: true },
+      });
     });
 
     it("should search establishments with sorting", async () => {
@@ -266,6 +324,7 @@ describe("EstablishmentPrismaRepository", () => {
         orderBy: { name: "asc" },
         skip: 0,
         take: 15,
+        include: { profile: true },
       });
     });
 
@@ -291,6 +350,7 @@ describe("EstablishmentPrismaRepository", () => {
         orderBy: { created_at: "desc" },
         skip: 5,
         take: 5,
+        include: { profile: true },
       });
       expect(result.current_page).toBe(2);
       expect(result.per_page).toBe(5);
@@ -326,6 +386,7 @@ describe("EstablishmentPrismaRepository", () => {
         orderBy: { name: "desc" },
         skip: 0,
         take: 10,
+        include: { profile: true },
       });
     });
 
@@ -343,6 +404,33 @@ describe("EstablishmentPrismaRepository", () => {
   describe("getEntity", () => {
     it("should return Establishment constructor", () => {
       expect(repository.getEntity()).toBe(Establishment);
+    });
+  });
+
+  describe("deleteProfile", () => {
+    it("should delete an establishment profile", async () => {
+      const establishmentId = new EstablishmentId();
+
+      await repository.deleteProfile(establishmentId);
+
+      expect(prisma.establishmentProfile.delete).toHaveBeenCalledWith({
+        where: {
+          establishmentId: establishmentId.id,
+        },
+      });
+    });
+
+    it("should throw NotFoundError when profile not found", async () => {
+      const establishmentId = new EstablishmentId();
+
+      (prisma.establishmentProfile.delete as jest.Mock).mockRejectedValue({
+        code: "P2025",
+        message: "Record not found",
+      });
+
+      await expect(repository.deleteProfile(establishmentId)).rejects.toThrow(
+        new NotFoundError(establishmentId.id, EstablishmentProfile),
+      );
     });
   });
 });

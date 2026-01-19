@@ -1,4 +1,3 @@
-import { Address } from "../../../shared/domain/value-objects/address.vo";
 import { Email } from "../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
@@ -22,12 +21,6 @@ describe("Establishment Unit Tests without validator", () => {
       expect(establishment.phone).toBeInstanceOf(Phone);
       expect(establishment.phone.value).toMatch(/^\+?[0-9]{10,15}$/); // Formato telefone
     }
-    expect(establishment.address).toBeInstanceOf(Address);
-    expect(establishment.address.street).toBeTruthy(); // Rua não vazia
-    expect(establishment.address.number).toBeTruthy(); // Número não vazio
-    expect(establishment.address.city).toBeTruthy(); // Cidade não vazia
-    expect(establishment.address.state).toBeTruthy(); // Estado não vazio
-    expect(establishment.address.zipCode).toBeTruthy(); // CEP não vazio
     expect(establishment.establishment_type).toBeTruthy(); // Tipo não vazio
     expect(establishment.description).toBeNull();
     expect(establishment.avatar).toBeNull();
@@ -45,14 +38,6 @@ describe("Establishment Unit Tests without validator", () => {
       .withName("Jazz Club")
       .withEmail("info@jazzclub.com")
       .withPhone("+5511888888888")
-      .withAddress({
-        street: "Jazz Avenue",
-        number: "456",
-        city: "Rio de Janeiro",
-        state: "RJ",
-        zipCode: "20000-000",
-        neighborhood: "Copacabana",
-      })
       .withEstablishmentType("club")
       .withDescription("Premium jazz venue")
       .withAvatar("https://example.com/avatar.jpg")
@@ -72,11 +57,6 @@ describe("Establishment Unit Tests without validator", () => {
     expect(establishment.email.value).toBe("info@jazzclub.com");
     expect(establishment.phone!.value).toBe("+5511888888888");
     expect(establishment.website).toBe("https://jazzclub.com");
-    expect(establishment.address.street).toBe("Jazz Avenue");
-    expect(establishment.address.number).toBe("456");
-    expect(establishment.address.city).toBe("Rio de Janeiro");
-    expect(establishment.address.state).toBe("RJ");
-    expect(establishment.address.zipCode).toBe("20000-000");
     expect(establishment.establishment_type).toBe("club");
     expect(establishment.rating.value).toBe(4.5);
     expect(establishment.is_active).toBe(false);
@@ -90,14 +70,6 @@ describe("Establishment Unit Tests without validator", () => {
       .withName("Music Pub")
       .withEmail("contact@musicpub.com")
       .withPhone("+5511777777777")
-      .withAddress({
-        street: "Music Street",
-        number: "789",
-        neighborhood: "Centro",
-        city: "Belo Horizonte",
-        state: "MG",
-        zipCode: "30000-000",
-      })
       .withEstablishmentType("pub")
       .build();
 
@@ -105,12 +77,6 @@ describe("Establishment Unit Tests without validator", () => {
     expect(establishment.name).toBe("Music Pub");
     expect(establishment.email.value).toBe("contact@musicpub.com");
     expect(establishment.phone!.value).toBe("+5511777777777");
-    expect(establishment.address).toBeInstanceOf(Address);
-    expect(establishment.address.street).toBe("Music Street");
-    expect(establishment.address.number).toBe("789");
-    expect(establishment.address.city).toBe("Belo Horizonte");
-    expect(establishment.address.state).toBe("MG");
-    expect(establishment.address.zipCode).toBe("30000-000");
     expect(establishment.establishment_type).toBe("pub");
     expect(establishment.is_active).toBe(true);
     expect(establishment.is_verified).toBe(false);
@@ -174,30 +140,14 @@ describe("Establishment Unit Tests without validator", () => {
       name: establishment.name,
       description: establishment.description,
       avatar: establishment.avatar,
-      cnpj: establishment.cnpj,
+      cnpj: establishment.cnpj?.toJSON() ?? null,
       email: establishment.email.value,
       phone: establishment.phone?.value || null,
       website: establishment.website,
-      address: {
-        street: establishment.address.street,
-        number: establishment.address.number,
-        complement: establishment.address.complement,
-        neighborhood: establishment.address.neighborhood,
-        city: establishment.address.city,
-        state: establishment.address.state,
-        zipCode: establishment.address.zipCode,
-        country: establishment.address.country,
-        latitude: establishment.address.latitude,
-        longitude: establishment.address.longitude,
-        coordinates: establishment.address.coordinates,
-        hasCoordinates: establishment.address.hasCoordinates,
-        formattedZipCode: establishment.address.formattedZipCode,
-        fullAddress: establishment.address.fullAddress,
-        shortAddress: establishment.address.shortAddress,
-      },
       establishment_type: establishment.establishment_type,
       rating: establishment.rating.value,
       total_ratings: establishment.total_ratings,
+      qr_code: establishment.qr_code?.code || null,
       is_active: establishment.is_active,
       is_verified: establishment.is_verified,
       created_at: establishment.created_at,
