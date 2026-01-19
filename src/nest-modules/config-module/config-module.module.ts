@@ -88,20 +88,21 @@ export const CONFIG_NOTIFICATIONS_SCHEMA = {
 };
 
 export const CONFIG_LIMITS_SCHEMA = {
-  RATE_LIMIT_TTL: Joi.number().default(60),
-  RATE_LIMIT_MAX: Joi.number().default(100),
-  MAX_FILE_SIZE: Joi.number().default(10485760),
-  ALLOWED_IMAGE_TYPES: Joi.string().default("image/jpeg,image/png,image/webp"),
-  ALLOWED_VIDEO_TYPES: Joi.string().default("video/mp4,video/webm"),
-  ALLOWED_AUDIO_TYPES: Joi.string().default("audio/mpeg,audio/wav,audio/ogg"),
-  POINTS_SCAN_QR: Joi.number().default(10),
-  POINTS_MUSIC_REQUEST: Joi.number().default(25),
-  POINTS_REQUEST_ACCEPTED: Joi.number().default(50),
-  POINTS_TIP_MULTIPLIER: Joi.number().default(1),
-  POINTS_SOCIAL_SHARE: Joi.number().default(50),
-  MAX_REQUESTS_PER_USER_PER_EVENT: Joi.number().default(5),
-  REQUEST_COOLDOWN_MINUTES: Joi.number().default(2),
-  VOTING_INTERVAL_MINUTES: Joi.number().default(3),
+  RATE_LIMIT_TTL: Joi.number().default(60), // Tempo de expiração do limite de taxa em segundos
+  RATE_LIMIT_MAX: Joi.number().default(100), // Máximo de requisições permitidas por RATE_LIMIT_TTL
+  MAX_FILE_SIZE: Joi.number().default(10485760), // Tamanho máximo de arquivo em bytes
+  ALLOWED_IMAGE_TYPES: Joi.string().default("image/jpeg,image/png,image/webp"), // Tipos de arquivos de imagem permitidos
+  ALLOWED_VIDEO_TYPES: Joi.string().default("video/mp4,video/webm"), // Tipos de arquivos de vídeo permitidos
+  ALLOWED_AUDIO_TYPES: Joi.string().default("audio/mpeg,audio/wav,audio/ogg"), // Tipos de arquivos de áudio permitidos
+  POINTS_SCAN_QR: Joi.number().default(10), // Pontos ganhos ao escanear um QR code
+  POINTS_MUSIC_REQUEST: Joi.number().default(25), // Pontos ganhos ao fazer uma solicitação de música
+  POINTS_REQUEST_ACCEPTED: Joi.number().default(50), // Pontos ganhos ao aceitar uma solicitação
+  POINTS_TIP_MULTIPLIER: Joi.number().default(1), // Multiplicador de pontos ao dar um "tip"
+  POINTS_SOCIAL_SHARE: Joi.number().default(50), // Pontos ganhos ao compartilhar uma solicitação socialmente
+  MAX_REQUESTS_PER_USER_PER_EVENT: Joi.number().default(10), // Máximo de solicitações por usuário por evento
+  REQUEST_COOLDOWN_MINUTES: Joi.number().default(120), // Cooldown ( Tempo mínimo entre solicitações) entre solicitações em minutos
+  REQUEST_RESPONSE_TIME_MINUTES: Joi.number().default(60), // Tempo máximo para resposta de uma solicitação em minutos
+  VOTING_INTERVAL_MINUTES: Joi.number().default(3), // Intervalo de votação em minutos
 
   BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: Joi.number().min(0).default(72),
 };
@@ -159,3 +160,4 @@ export class ConfigModuleRoot extends NestConfigModule {
     });
   }
 }
+

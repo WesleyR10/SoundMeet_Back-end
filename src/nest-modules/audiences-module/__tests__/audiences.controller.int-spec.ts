@@ -26,6 +26,7 @@ import { UserInteractionInMemoryRepository } from "../../../core/gamification/in
 import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
 import { MusicianCollectionPresenter } from "../../musicians-module/musician.presenter";
 import {
   AudienceCollectionPresenter,
@@ -377,12 +378,15 @@ describe("AudiencesController Integration Tests", () => {
     });
     await audienceRepository.insert(audience);
 
+    const eventId = new Uuid().id;
+
     const presenter = await controller.makeMusicRequest(
       audience.audience_id.id,
       {
         musician_id: "musician_1",
         song_title: "Song",
         artist_name: "Artist",
+        event_id: eventId,
       } as any,
     );
 

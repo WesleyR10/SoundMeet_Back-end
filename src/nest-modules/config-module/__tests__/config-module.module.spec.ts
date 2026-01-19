@@ -115,7 +115,7 @@ describe("Schema Unit Tests", () => {
       expect(validated.PRISMA_LOG_QUERIES).toBe(false);
       expect(validated.RATE_LIMIT_TTL).toBe(60);
       expect(validated.RATE_LIMIT_MAX).toBe(100);
-      expect(validated.MAX_REQUESTS_PER_USER_PER_EVENT).toBe(5);
+      expect(validated.MAX_REQUESTS_PER_USER_PER_EVENT).toBe(10);
       expect(validated.VOTING_INTERVAL_MINUTES).toBe(3);
     });
 

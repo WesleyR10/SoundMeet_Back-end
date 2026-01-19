@@ -185,6 +185,7 @@ describe("AudiencesController Unit Tests", () => {
   describe("makeMusicRequest", () => {
     it("should make music request", async () => {
       const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+      const event_id = "2b6b6a32-8f4a-4d4c-b2e4-4f8e99c8b89d";
       const output = {
         audience: makeAudienceOutput({ id }),
         points_earned: 25,
@@ -194,6 +195,7 @@ describe("AudiencesController Unit Tests", () => {
           musician_id: "musician_id",
           song_title: "Song",
           artist_name: "Artist",
+          event_id,
           requested_at: new Date(),
           status: "pending",
         },
@@ -207,6 +209,7 @@ describe("AudiencesController Unit Tests", () => {
         musician_id: "musician_id",
         song_title: "Song",
         artist_name: "Artist",
+        event_id,
       } as any);
 
       expect(mockUseCase.execute).toHaveBeenCalledWith({
@@ -214,6 +217,7 @@ describe("AudiencesController Unit Tests", () => {
         musician_id: "musician_id",
         song_title: "Song",
         artist_name: "Artist",
+        event_id,
       });
       expect(presenter).toBeInstanceOf(MakeMusicRequestPresenter);
     });

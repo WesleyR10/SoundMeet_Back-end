@@ -83,6 +83,7 @@ export type EnvConfig = {
   // Anti-Spam
   MAX_REQUESTS_PER_USER_PER_EVENT: number;
   REQUEST_COOLDOWN_MINUTES: number;
+  REQUEST_RESPONSE_TIME_MINUTES: number;
   VOTING_INTERVAL_MINUTES: number;
 
   // Scheduling
