@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsDateString,
   IsEnum,
@@ -21,6 +22,7 @@ export type ListRequestsInputConstructorProps = {
   sort?: string;
   sort_dir?: "asc" | "desc";
   filter?: {
+    event_id?: string;
     audience_id?: string;
     musician_id?: string;
     status?: RequestStatusFilter;
@@ -35,11 +37,13 @@ export class ListRequestsInput {
   @IsNumber()
   @Min(1)
   @IsOptional()
+  @Type(() => Number)
   page?: number = 1;
 
   @IsNumber()
   @Min(1)
   @IsOptional()
+  @Type(() => Number)
   per_page?: number = 15;
 
   @IsString()
@@ -49,6 +53,10 @@ export class ListRequestsInput {
   @IsEnum(["asc", "desc"])
   @IsOptional()
   sort_dir?: "asc" | "desc";
+
+  @IsUUID()
+  @IsOptional()
+  event_id?: string;
 
   @IsUUID()
   @IsOptional()
@@ -87,6 +95,7 @@ export class ListRequestsInput {
     this.sort_dir = props.sort_dir;
 
     if (props.filter) {
+      this.event_id = props.filter.event_id;
       this.audience_id = props.filter.audience_id;
       this.musician_id = props.filter.musician_id;
       this.status = props.filter.status;

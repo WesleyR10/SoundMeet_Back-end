@@ -2,17 +2,23 @@ import { Request } from "../../../domain/request.aggregate";
 
 export type RequestOutput = {
   id: string;
+  event_id: string;
   audience_id: string;
   musician_id: string;
+  library_id: string | null;
   song_title: string;
   artist: string | null;
   message: string | null;
   status: string;
   rejection_reason: string | null;
+  votes_count: number;
+  played_at: Date | null;
   created_at: Date;
+  updated_at: Date;
   responded_at: Date | null;
   is_pending: boolean;
   is_accepted: boolean;
+  is_played: boolean;
   is_rejected: boolean;
   is_responded: boolean;
   has_message: boolean;

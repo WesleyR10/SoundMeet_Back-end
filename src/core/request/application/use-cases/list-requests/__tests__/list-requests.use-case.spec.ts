@@ -44,9 +44,18 @@ describe("ListRequestsUseCase Unit Tests", () => {
 
   it("should filter requests by audience_id", async () => {
     const audienceId = new Uuid();
+    const eventId = new Uuid();
     const requests = [
-      Request.fake().aRequest().withAudienceId(audienceId.id).build(),
-      Request.fake().aRequest().withAudienceId(audienceId.id).build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withAudienceId(audienceId.id)
+        .build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withAudienceId(audienceId.id)
+        .build(),
       Request.fake().aRequest().build(), // Different audience
     ];
     await repository.bulkInsert(requests);
@@ -66,9 +75,18 @@ describe("ListRequestsUseCase Unit Tests", () => {
 
   it("should filter requests by musician_id", async () => {
     const musicianId = new Uuid();
+    const eventId = new Uuid();
     const requests = [
-      Request.fake().aRequest().withMusicianId(musicianId.id).build(),
-      Request.fake().aRequest().withMusicianId(musicianId.id).build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withMusicianId(musicianId.id)
+        .build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withMusicianId(musicianId.id)
+        .build(),
       Request.fake().aRequest().build(), // Different musician
     ];
     await repository.bulkInsert(requests);
@@ -112,9 +130,18 @@ describe("ListRequestsUseCase Unit Tests", () => {
 
   it("should filter requests by song_title", async () => {
     const songTitle = "Bohemian Rhapsody";
+    const eventId = new Uuid();
     const requests = [
-      Request.fake().aRequest().withSongTitle(songTitle).build(),
-      Request.fake().aRequest().withSongTitle("Another Song").build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withSongTitle(songTitle)
+        .build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withSongTitle("Another Song")
+        .build(),
     ];
     await repository.bulkInsert(requests);
 
@@ -131,9 +158,18 @@ describe("ListRequestsUseCase Unit Tests", () => {
 
   it("should filter requests by artist", async () => {
     const artist = "Queen";
+    const eventId = new Uuid();
     const requests = [
-      Request.fake().aRequest().withArtist(artist).build(),
-      Request.fake().aRequest().withArtist("Beatles").build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withArtist(artist)
+        .build(),
+      Request.fake()
+        .aRequest()
+        .withEventId(eventId.id)
+        .withArtist("Beatles")
+        .build(),
     ];
     await repository.bulkInsert(requests);
 
@@ -183,10 +219,12 @@ describe("ListRequestsUseCase Unit Tests", () => {
   it("should apply multiple filters", async () => {
     const audienceId = new Uuid();
     const musicianId = new Uuid();
+    const eventId = new Uuid();
     const songTitle = "Unique Test Song";
 
     const matchingRequest = Request.fake()
       .aRequest()
+      .withEventId(eventId.id)
       .withAudienceId(audienceId.id)
       .withMusicianId(musicianId.id)
       .withSongTitle(songTitle)
@@ -217,6 +255,7 @@ describe("ListRequestsUseCase Unit Tests", () => {
 
     const input = new ListRequestsInput({
       filter: {
+        event_id: eventId.id,
         audience_id: audienceId.id,
         musician_id: musicianId.id,
         song_title: songTitle,
@@ -230,5 +269,30 @@ describe("ListRequestsUseCase Unit Tests", () => {
     expect(output.items[0].audience_id).toBe(audienceId.id);
     expect(output.items[0].musician_id).toBe(musicianId.id);
     expect(output.items[0].song_title).toBe(songTitle);
+  });
+
+  it("should filter requests by event_id", async () => {
+    const eventId = new Uuid();
+    const otherEventId = new Uuid();
+
+    const requests = [
+      Request.fake().aRequest().withEventId(eventId.id).build(),
+      Request.fake().aRequest().withEventId(eventId.id).build(),
+      Request.fake().aRequest().withEventId(otherEventId.id).build(),
+    ];
+    await repository.bulkInsert(requests);
+
+    const input = new ListRequestsInput({
+      filter: {
+        event_id: eventId.id,
+      },
+    });
+
+    const output = await useCase.execute(input);
+
+    expect(output.items).toHaveLength(2);
+    output.items.forEach((item) => {
+      expect(item.event_id).toBe(eventId.id);
+    });
   });
 });

@@ -46,6 +46,10 @@ export class RequestInMemoryRepository
         matches = false;
       }
 
+      if (filter.event_id && item.event_id.id !== filter.event_id) {
+        matches = false;
+      }
+
       if (filter.musician_id && item.musician_id.id !== filter.musician_id) {
         matches = false;
       }
@@ -159,23 +163,27 @@ export class RequestInMemoryRepository
   async findRequestsByAudienceAndMusician(
     audience_id: string,
     musician_id: string,
+    event_id?: string,
   ): Promise<Request[]> {
     return this.items.filter(
       (item) =>
         item.audience_id.id === audience_id &&
-        item.musician_id.id === musician_id,
+        item.musician_id.id === musician_id &&
+        (!event_id || item.event_id.id === event_id),
     );
   }
 
   async findPendingRequestsByAudienceAndMusician(
     audience_id: string,
     musician_id: string,
+    event_id?: string,
   ): Promise<Request[]> {
     return this.items.filter(
       (item) =>
         item.audience_id.id === audience_id &&
         item.musician_id.id === musician_id &&
-        item.isPending,
+        item.isPending &&
+        (!event_id || item.event_id.id === event_id),
     );
   }
 
@@ -201,6 +209,21 @@ export class RequestInMemoryRepository
     ).length;
   }
 
+  async countRequestsByAudienceInPeriodForEvent(
+    audience_id: string,
+    event_id: string,
+    start_date: Date,
+    end_date: Date,
+  ): Promise<number> {
+    return this.items.filter(
+      (item) =>
+        item.audience_id.id === audience_id &&
+        item.event_id.id === event_id &&
+        item.created_at >= start_date &&
+        item.created_at < end_date,
+    ).length;
+  }
+
   async countPendingRequestsByMusician(musician_id: string): Promise<number> {
     return this.items.filter(
       (item) => item.isPending && item.musician_id.id === musician_id,
@@ -209,10 +232,10 @@ export class RequestInMemoryRepository
 
   async findRecentRequestsByAudience(
     audience_id: string,
-    hoursLimit: number = 10,
+    hours_limit: number = 2,
   ): Promise<Request[]> {
     const cutoffTime = new Date();
-    cutoffTime.setHours(cutoffTime.getHours() - hoursLimit);
+    cutoffTime.setHours(cutoffTime.getHours() - hours_limit);
 
     return this.items
       .filter(

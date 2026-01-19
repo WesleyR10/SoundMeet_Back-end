@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -13,7 +13,15 @@ import {
 import { RequestModelMapper } from "./request-model.mapper";
 
 export class RequestPrismaRepository implements IRequestRepository {
-  sortableFields: string[] = ["created_at", "songTitle"];
+  sortableFields: string[] = [
+    "created_at",
+    "updated_at",
+    "respondedAt",
+    "playedAt",
+    "songTitle",
+    "votesCount",
+    "priority",
+  ];
 
   constructor(private prisma: PrismaClient) {}
 
@@ -118,10 +126,107 @@ export class RequestPrismaRepository implements IRequestRepository {
   }
 
   async search(props: RequestSearchParams): Promise<RequestSearchResult> {
-    const offset = (props.page - 1) * props.per_page;
-    const limit = props.per_page;
+    if (props.sort === "priority") {
+      const conditions: Prisma.Sql[] = [];
+      const filter = props.filter;
+
+      if (filter?.event_id) {
+        conditions.push(Prisma.sql`"eventId" = ${filter.event_id}`);
+      }
+      if (filter?.audience_id) {
+        conditions.push(Prisma.sql`"audienceId" = ${filter.audience_id}`);
+      }
+      if (filter?.musician_id) {
+        conditions.push(Prisma.sql`"musicianId" = ${filter.musician_id}`);
+      }
+      if (filter?.status) {
+        conditions.push(Prisma.sql`"status" = ${filter.status}`);
+      }
+      if (filter?.song_title) {
+        conditions.push(
+          Prisma.sql`"songTitle" ILIKE ${`%${filter.song_title}%`}`,
+        );
+      }
+      if (filter?.artist) {
+        conditions.push(Prisma.sql`"artistName" ILIKE ${`%${filter.artist}%`}`);
+      }
+      if (filter?.created_after) {
+        conditions.push(Prisma.sql`"created_at" >= ${filter.created_after}`);
+      }
+      if (filter?.created_before) {
+        conditions.push(Prisma.sql`"created_at" <= ${filter.created_before}`);
+      }
+
+      const whereSql =
+        conditions.length > 0
+          ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
+          : Prisma.sql``;
+
+      const priorityExpr = Prisma.sql`CASE
+        WHEN "status" = 'pending' AND NOW() - "created_at" > interval '15 minutes' THEN 2
+        WHEN NOW() - "created_at" > interval '30 minutes' THEN 1
+        ELSE 0
+      END`;
+
+      const orderDirSql =
+        props.sort_dir === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+      const offset = (props.page - 1) * props.per_page;
+      const limit = props.per_page;
+
+      const [rows, countRows] = await Promise.all([
+        this.prisma.$queryRaw(
+          Prisma.sql`
+            SELECT
+              "id",
+              "eventId",
+              "audienceId",
+              "musicianId",
+              "libraryId",
+              "songTitle",
+              "artistName",
+              "message",
+              "status",
+              "rejectionReason",
+              "priority",
+              "votesCount",
+              "playedAt",
+              "respondedAt",
+              "created_at",
+              "updated_at"
+            FROM "music_requests"
+            ${whereSql}
+            ORDER BY ${priorityExpr} ${orderDirSql}, "created_at" DESC
+            OFFSET ${offset}
+            LIMIT ${limit}
+          `,
+        ),
+        this.prisma.$queryRaw(
+          Prisma.sql`
+            SELECT COUNT(*)::int AS "count"
+            FROM "music_requests"
+            ${whereSql}
+          `,
+        ),
+      ]);
+
+      const total = Number((countRows as any)[0]?.count ?? 0);
+      const items = (rows as any[]).map((row) =>
+        RequestModelMapper.toEntity(row),
+      );
+
+      return new RequestSearchResult({
+        items,
+        total,
+        current_page: props.page,
+        per_page: props.per_page,
+      });
+    }
 
     const where = this.buildWhereClause(props.filter);
+
+    const offset = (props.page - 1) * props.per_page;
+    const limit = props.per_page;
     const orderBy = this.buildOrderByClause(props.sort, props.sort_dir);
 
     const [models, count] = await Promise.all([
@@ -222,11 +327,13 @@ export class RequestPrismaRepository implements IRequestRepository {
   async findRequestsByAudienceAndMusician(
     audience_id: string,
     musician_id: string,
+    event_id?: string,
   ): Promise<Request[]> {
     const models = await this.prisma.musicRequest.findMany({
       where: {
         audienceId: audience_id,
         musicianId: musician_id,
+        ...(event_id ? { eventId: event_id } : {}),
       },
       orderBy: { created_at: "desc" },
     });
@@ -236,12 +343,14 @@ export class RequestPrismaRepository implements IRequestRepository {
   async findPendingRequestsByAudienceAndMusician(
     audience_id: string,
     musician_id: string,
+    event_id?: string,
   ): Promise<Request[]> {
     const models = await this.prisma.musicRequest.findMany({
       where: {
         audienceId: audience_id,
         musicianId: musician_id,
         status: "pending",
+        ...(event_id ? { eventId: event_id } : {}),
       },
       orderBy: { created_at: "desc" },
     });
@@ -293,6 +402,24 @@ export class RequestPrismaRepository implements IRequestRepository {
     });
   }
 
+  async countRequestsByAudienceInPeriodForEvent(
+    audience_id: string,
+    event_id: string,
+    start_date: Date,
+    end_date: Date,
+  ): Promise<number> {
+    return await this.prisma.musicRequest.count({
+      where: {
+        audienceId: audience_id,
+        eventId: event_id,
+        created_at: {
+          gte: start_date,
+          lte: end_date,
+        },
+      },
+    });
+  }
+
   async countPendingRequestsByMusician(musician_id: string): Promise<number> {
     return await this.prisma.musicRequest.count({
       where: {
@@ -304,12 +431,19 @@ export class RequestPrismaRepository implements IRequestRepository {
 
   async findRecentRequestsByAudience(
     audience_id: string,
-    limit: number = 10,
+    hours_limit: number = 2,
   ): Promise<Request[]> {
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - hours_limit);
+
     const models = await this.prisma.musicRequest.findMany({
-      where: { audienceId: audience_id },
+      where: {
+        audienceId: audience_id,
+        created_at: {
+          gte: cutoffTime,
+        },
+      },
       orderBy: { created_at: "desc" },
-      take: limit,
     });
     return models.map((model) => RequestModelMapper.toEntity(model));
   }
@@ -348,6 +482,10 @@ export class RequestPrismaRepository implements IRequestRepository {
     if (!filter) return {};
 
     const where: any = {};
+
+    if (filter.event_id) {
+      where.eventId = filter.event_id;
+    }
 
     if (filter.audience_id) {
       where.audienceId = filter.audience_id;

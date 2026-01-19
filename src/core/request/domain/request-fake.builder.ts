@@ -9,6 +9,7 @@ type PropOrFactory<T> = T | ((index: number) => T);
 
 export class RequestFakeBuilder<TBuild = any> {
   private _id: PropOrFactory<RequestId> | undefined = undefined;
+  private _event_id: PropOrFactory<string> = (_index) => uuidv4();
   private _audience_id: PropOrFactory<string> = (_index) => uuidv4();
   private _musician_id: PropOrFactory<string> = (_index) => uuidv4();
   private _song_title: PropOrFactory<string> = (_index) =>
@@ -42,6 +43,19 @@ export class RequestFakeBuilder<TBuild = any> {
 
   withId(valueOrFactory: PropOrFactory<RequestId>) {
     this._id = valueOrFactory;
+    return this;
+  }
+
+  withEventId(valueOrFactory: PropOrFactory<string | Uuid>) {
+    this._event_id =
+      typeof valueOrFactory === "function"
+        ? (index: number) => {
+            const result = valueOrFactory(index);
+            return result instanceof Uuid ? result.id : result;
+          }
+        : valueOrFactory instanceof Uuid
+          ? valueOrFactory.id
+          : valueOrFactory;
     return this;
   }
 
@@ -143,6 +157,7 @@ export class RequestFakeBuilder<TBuild = any> {
       .map((_, index) => {
         const request = new Request({
           request_id: !this._id ? undefined : this.callFactory(this._id, index),
+          event_id: this.callFactory(this._event_id, index),
           audience_id: this.callFactory(this._audience_id, index),
           musician_id: this.callFactory(this._musician_id, index),
           song_title: this.callFactory(this._song_title, index),
@@ -165,6 +180,10 @@ export class RequestFakeBuilder<TBuild = any> {
 
   get audience_id() {
     return this.getValue("audience_id");
+  }
+
+  get event_id() {
+    return this.getValue("event_id");
   }
 
   get musician_id() {

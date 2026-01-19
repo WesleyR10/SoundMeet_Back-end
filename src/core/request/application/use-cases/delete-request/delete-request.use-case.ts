@@ -14,21 +14,13 @@ export class DeleteRequestUseCase implements IUseCase<
   constructor(private readonly requestRepo: IRequestRepository) {}
 
   async execute(input: DeleteRequestInput): Promise<DeleteRequestOutput> {
-    try {
-      const requestId = new RequestId(input.id);
-      const entity = await this.requestRepo.findById(requestId);
+    const requestId = new RequestId(input.id);
+    const entity = await this.requestRepo.findById(requestId);
 
-      if (!entity) {
-        throw new NotFoundError(input.id, Request);
-      }
-
-      await this.requestRepo.delete(requestId);
-    } catch (error) {
-      // Se o UUID for inválido, tratar como NotFoundError
-      if (error.message?.includes("Invalid UUID")) {
-        throw new NotFoundError(input.id, Request);
-      }
-      throw error;
+    if (!entity) {
+      throw new NotFoundError(input.id, Request);
     }
+
+    await this.requestRepo.delete(requestId);
   }
 }

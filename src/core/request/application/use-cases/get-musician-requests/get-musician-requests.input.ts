@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsEnum,
   IsNotEmpty,
@@ -35,16 +36,19 @@ export class GetMusicianRequestsInput {
   @IsNumber()
   @Min(1)
   @IsOptional()
+  @Type(() => Number)
   page?: number = 1;
 
   @IsNumber()
   @Min(1)
   @IsOptional()
+  @Type(() => Number)
   per_page?: number = 15;
 
   @IsNumber()
   @Min(1)
   @IsOptional()
+  @Type(() => Number)
   limit?: number; // Para compatibilidade com testes existentes
 
   constructor(props: GetMusicianRequestsInputConstructorProps) {

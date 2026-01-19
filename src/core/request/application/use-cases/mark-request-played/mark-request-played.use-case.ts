@@ -8,27 +8,32 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { Request } from "../../../domain/request.aggregate";
-import { RequestId } from "../../../domain/request.aggregate";
+import { Request, RequestId } from "../../../domain/request.aggregate";
 import { IRequestRepository } from "../../../domain/request.repository";
 import { RequestOutput, RequestOutputMapper } from "../common/request-output";
-import { UpdateRequestInput } from "./update-request.input";
+import { MarkRequestPlayedInput } from "./mark-request-played.input";
 
-export class UpdateRequestUseCase implements IUseCase<
-  UpdateRequestInput,
-  UpdateRequestOutput
+export type MarkRequestPlayedOutput = RequestOutput;
+
+export class MarkRequestPlayedUseCase implements IUseCase<
+  MarkRequestPlayedInput,
+  MarkRequestPlayedOutput
 > {
   constructor(
-    private readonly requestRepo: IRequestRepository,
-    private readonly eventRepo: IEventRepository,
-    private readonly musicianRepo: IMusicianRepository,
+    private requestRepo: IRequestRepository,
+    private eventRepo: IEventRepository,
+    private musicianRepo: IMusicianRepository,
     private readonly domainEventMediator?: DomainEventMediator,
   ) {}
 
-  async execute(input: UpdateRequestInput): Promise<RequestOutput> {
-    const entity = await this.requestRepo.findById(new RequestId(input.id));
+  async execute(
+    input: MarkRequestPlayedInput,
+  ): Promise<MarkRequestPlayedOutput> {
+    const requestId = new RequestId(input.request_id);
+    const entity = await this.requestRepo.findById(requestId);
+
     if (!entity) {
-      throw new NotFoundError(input.id, Request);
+      throw new NotFoundError(input.request_id, Request);
     }
 
     await this.validateEventAndMusician(
@@ -36,19 +41,8 @@ export class UpdateRequestUseCase implements IUseCase<
       entity.musician_id.id,
     );
 
-    if (input.song_title !== undefined) {
-      entity.changeSongTitle(input.song_title);
-    }
-
-    if (input.artist !== undefined) {
-      entity.changeArtist(input.artist);
-    }
-
-    if (input.message !== undefined) {
-      entity.changeMessage(input.message);
-    }
-
-    entity.validate();
+    const playedAt = input.played_at ? new Date(input.played_at) : undefined;
+    entity.markAsPlayed(playedAt);
 
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
@@ -107,5 +101,3 @@ export class UpdateRequestUseCase implements IUseCase<
     }
   }
 }
-
-export type UpdateRequestOutput = RequestOutput;

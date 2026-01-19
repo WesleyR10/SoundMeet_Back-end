@@ -9,8 +9,10 @@ import {
 } from "class-validator";
 
 export type CreateRequestInputConstructorProps = {
+  event_id: string;
   audience_id: string;
   musician_id: string;
+  library_id?: string | null;
   song_title: string;
   artist?: string;
   message?: string;
@@ -19,11 +21,19 @@ export type CreateRequestInputConstructorProps = {
 export class CreateRequestInput {
   @IsUUID()
   @IsNotEmpty()
+  event_id: string;
+
+  @IsUUID()
+  @IsNotEmpty()
   audience_id: string;
 
   @IsUUID()
   @IsNotEmpty()
   musician_id: string;
+
+  @IsUUID()
+  @IsOptional()
+  library_id?: string | null;
 
   @IsString()
   @IsNotEmpty()
@@ -45,8 +55,10 @@ export class CreateRequestInput {
   constructor(props: CreateRequestInputConstructorProps) {
     if (!props) return;
 
+    this.event_id = props.event_id;
     this.audience_id = props.audience_id;
     this.musician_id = props.musician_id;
+    this.library_id = props.library_id;
     this.song_title = props.song_title;
     this.artist = props.artist;
     this.message = props.message;

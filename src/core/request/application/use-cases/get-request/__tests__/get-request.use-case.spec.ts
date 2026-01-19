@@ -26,6 +26,7 @@ describe("GetRequestUseCase Unit Tests", () => {
     const arrange = [
       {
         request: {
+          event_id: new Uuid().id,
           audience_id: new Uuid().id,
           musician_id: new Uuid().id,
           song_title: "Bohemian Rhapsody",
@@ -43,6 +44,7 @@ describe("GetRequestUseCase Unit Tests", () => {
       },
       {
         request: {
+          event_id: new Uuid().id,
           audience_id: new Uuid().id,
           musician_id: new Uuid().id,
           song_title: "Imagine",
@@ -59,6 +61,7 @@ describe("GetRequestUseCase Unit Tests", () => {
       },
       {
         request: {
+          event_id: new Uuid().id,
           audience_id: new Uuid().id,
           musician_id: new Uuid().id,
           song_title: "Hotel California",
@@ -85,6 +88,7 @@ describe("GetRequestUseCase Unit Tests", () => {
       const output = await useCase.execute(input);
 
       expect(output.id).toBe(entity.request_id.id);
+      expect(output.event_id).toBe(request.event_id);
       expect(output.audience_id).toBe(request.audience_id);
       expect(output.musician_id).toBe(request.musician_id);
       expect(output.song_title).toBe(expected.song_title);
@@ -103,6 +107,7 @@ describe("GetRequestUseCase Unit Tests", () => {
 
   it("should get an accepted request", async () => {
     const request = Request.create({
+      event_id: new Uuid().id,
       audience_id: new Uuid().id,
       musician_id: new Uuid().id,
       song_title: "Test Song",
@@ -120,6 +125,7 @@ describe("GetRequestUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output.id).toBe(request.request_id.id);
+    expect(output.event_id).toBe(request.event_id.id);
     expect(output.status).toBe(RequestStatusEnum.ACCEPTED);
     expect(output.responded_at).toBeDefined();
     expect(output.is_accepted).toBe(true);
@@ -129,6 +135,7 @@ describe("GetRequestUseCase Unit Tests", () => {
 
   it("should get a rejected request", async () => {
     const request = Request.create({
+      event_id: new Uuid().id,
       audience_id: new Uuid().id,
       musician_id: new Uuid().id,
       song_title: "Test Song",
@@ -147,6 +154,7 @@ describe("GetRequestUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output.id).toBe(request.request_id.id);
+    expect(output.event_id).toBe(request.event_id.id);
     expect(output.status).toBe(RequestStatusEnum.REJECTED);
     expect(output.rejection_reason).toBe(rejectionReason);
     expect(output.responded_at).toBeDefined();

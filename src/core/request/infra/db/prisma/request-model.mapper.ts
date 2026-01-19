@@ -5,48 +5,62 @@ export type RequestModelProps = {
   eventId: string;
   audienceId: string;
   musicianId: string;
-  libraryId?: string | null;
+  libraryId: string | null;
   songTitle: string;
   artistName: string;
-  message?: string | null;
+  message: string | null;
   status: string;
+  rejectionReason: string | null;
   priority: number;
   votesCount: number;
-  playedAt?: Date | null;
+  playedAt: Date | null;
+  respondedAt: Date | null;
   created_at: Date;
   updated_at: Date;
 };
 
 export class RequestModelMapper {
   static toModel(entity: Request): RequestModelProps {
+    const priority =
+      entity.priority === "high" ? 2 : entity.priority === "medium" ? 1 : 0;
+
     return {
       id: entity.request_id.id,
-      eventId: "default-event-id", // Campo obrigatório no Prisma - usar valor padrão temporário
+      eventId: entity.event_id.id,
       audienceId: entity.audience_id.id,
       musicianId: entity.musician_id.id,
-      libraryId: null, // Campo opcional no Prisma
+      libraryId: entity.library_id?.id ?? null,
       songTitle: entity.song_title.value,
       artistName: entity.artist || "",
       message: entity.message?.value || null,
       status: entity.status.value,
-      priority: 1, // Campo obrigatório no Prisma, usando valor padrão
-      votesCount: 0, // Campo obrigatório no Prisma, usando valor padrão
-      playedAt: null, // Campo opcional no Prisma
+      rejectionReason: entity.rejection_reason,
+      priority,
+      votesCount: entity.votes_count,
+      playedAt: entity.played_at,
+      respondedAt: entity.responded_at,
       created_at: entity.created_at,
-      updated_at: entity.created_at, // Usando created_at como fallback
+      updated_at: entity.updated_at,
     };
   }
 
   static toEntity(model: RequestModelProps): Request {
     return new Request({
       request_id: new RequestId(model.id),
+      event_id: model.eventId,
       audience_id: model.audienceId,
       musician_id: model.musicianId,
+      library_id: model.libraryId,
       song_title: model.songTitle,
       artist: model.artistName || null,
       message: model.message || undefined,
       status: model.status,
+      rejection_reason: model.rejectionReason,
+      votes_count: model.votesCount,
+      played_at: model.playedAt,
       created_at: model.created_at,
+      updated_at: model.updated_at,
+      responded_at: model.respondedAt,
     });
   }
 }

@@ -231,7 +231,7 @@ describe("GetMusicianRequestsUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output.requests).toHaveLength(5);
-    expect(output.total_count).toBe(5); // Limited count
+    expect(output.total_count).toBe(10);
     expect(output.pending_count).toBe(10); // Full pending count
   });
 

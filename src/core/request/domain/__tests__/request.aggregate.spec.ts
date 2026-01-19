@@ -11,6 +11,7 @@ describe("Request Unit Tests", () => {
   describe("constructor", () => {
     test("should create a request with valid data", () => {
       const props = {
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -34,6 +35,7 @@ describe("Request Unit Tests", () => {
 
     test("should create a request with minimal data", () => {
       const props = {
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -48,6 +50,7 @@ describe("Request Unit Tests", () => {
 
     test("should create a request with custom status", () => {
       const props = {
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -63,6 +66,7 @@ describe("Request Unit Tests", () => {
   describe("create", () => {
     test("should create a request using static method", () => {
       const command: RequestCreateCommand = {
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -78,6 +82,7 @@ describe("Request Unit Tests", () => {
 
     test("should throw error when creating with invalid data", () => {
       const command: RequestCreateCommand = {
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "invalid-uuid",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -90,6 +95,7 @@ describe("Request Unit Tests", () => {
   describe("accept", () => {
     test("should accept a pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -104,6 +110,7 @@ describe("Request Unit Tests", () => {
 
     test("should add error when accepting non-pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -119,6 +126,7 @@ describe("Request Unit Tests", () => {
   describe("reject", () => {
     test("should reject a pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -134,6 +142,7 @@ describe("Request Unit Tests", () => {
 
     test("should reject without reason", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -147,6 +156,7 @@ describe("Request Unit Tests", () => {
 
     test("should add error when rejecting non-pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -162,6 +172,7 @@ describe("Request Unit Tests", () => {
   describe("change methods", () => {
     test("should change song title of pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -174,6 +185,7 @@ describe("Request Unit Tests", () => {
 
     test("should add error when changing song title of non-pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -197,6 +209,7 @@ describe("Request Unit Tests", () => {
 
     test("should change artist of pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -209,6 +222,7 @@ describe("Request Unit Tests", () => {
 
     test("should change message of pending request", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -223,6 +237,7 @@ describe("Request Unit Tests", () => {
   describe("getters", () => {
     test("should return correct status checks", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -243,6 +258,7 @@ describe("Request Unit Tests", () => {
 
     test("should return correct display title", () => {
       const requestWithArtist = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -250,6 +266,7 @@ describe("Request Unit Tests", () => {
       });
 
       const requestWithoutArtist = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -261,26 +278,39 @@ describe("Request Unit Tests", () => {
 
     test("should calculate points value correctly", () => {
       const pendingRequest = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
       });
 
       const acceptedRequest = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
       });
       acceptedRequest.accept();
 
+      const playedRequest = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
+        audience_id: "123e4567-e89b-12d3-a456-426614174000",
+        musician_id: "123e4567-e89b-12d3-a456-426614174001",
+        song_title: "Bohemian Rhapsody",
+      });
+      playedRequest.accept();
+      playedRequest.markAsPlayed();
+
       expect(pendingRequest.pointsValue.value).toBe(25); // Base points only
-      expect(acceptedRequest.pointsValue.value).toBe(75); // Base + accepted bonus
+      expect(acceptedRequest.pointsValue.value).toBe(25); // Sem bônus até ser tocado
+      expect(playedRequest.pointsValue.value).toBe(75); // Base + bônus por ser tocado
     });
   });
 
   describe("toJSON", () => {
     test("should return correct JSON representation", () => {
       const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
         audience_id: "123e4567-e89b-12d3-a456-426614174000",
         musician_id: "123e4567-e89b-12d3-a456-426614174001",
         song_title: "Bohemian Rhapsody",
@@ -292,6 +322,7 @@ describe("Request Unit Tests", () => {
 
       expect(json).toMatchObject({
         request_id: request.request_id.id,
+        event_id: request.event_id.id,
         audience_id: request.audience_id.id,
         musician_id: request.musician_id.id,
         song_title: request.song_title.value,

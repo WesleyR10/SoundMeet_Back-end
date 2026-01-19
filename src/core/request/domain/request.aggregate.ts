@@ -1,6 +1,7 @@
 import { AggregateRoot, Points, Uuid } from "../../shared/domain";
 import { RequestAcceptedEvent } from "./events/request-accepted.event";
 import { RequestCreatedEvent } from "./events/request-created.event";
+import { RequestPlayedEvent } from "./events/request-played.event";
 import { RequestRejectedEvent } from "./events/request-rejected.event";
 import { RequestUpdatedEvent } from "./events/request-updated.event";
 import { RequestValidatorFactory } from "./request.validator";
@@ -14,20 +15,27 @@ import { SongTitle } from "./value-objects/song-title.vo";
 
 export type RequestConstructorProps = {
   request_id?: RequestId;
+  event_id: string;
   audience_id: string;
   musician_id: string;
+  library_id?: string | null;
   song_title: string;
   artist?: string | null;
   message?: string | null;
   status?: RequestStatus | string;
   rejection_reason?: string | null;
+  votes_count?: number;
+  played_at?: Date | null;
   created_at?: Date;
+  updated_at?: Date;
   responded_at?: Date | null;
 };
 
 export type RequestCreateCommand = {
+  event_id: string;
   audience_id: string;
   musician_id: string;
+  library_id?: string | null;
   song_title: string;
   artist?: string | null;
   message?: string | null;
@@ -37,21 +45,28 @@ export class RequestId extends Uuid {}
 
 export class Request extends AggregateRoot {
   request_id: RequestId;
+  event_id: Uuid;
   audience_id: Uuid;
   musician_id: Uuid;
+  library_id: Uuid | null;
   song_title: SongTitle;
   artist: string | null;
   message: RequestMessage | null;
   status: RequestStatus;
   rejection_reason: string | null;
+  votes_count: number;
+  played_at: Date | null;
   created_at: Date;
+  updated_at: Date;
   responded_at: Date | null;
 
   constructor(props: RequestConstructorProps) {
     super();
     this.request_id = props.request_id ?? new RequestId();
+    this.event_id = new Uuid(props.event_id);
     this.audience_id = new Uuid(props.audience_id);
     this.musician_id = new Uuid(props.musician_id);
+    this.library_id = props.library_id ? new Uuid(props.library_id) : null;
     this.song_title = SongTitle.create(props.song_title);
     this.artist = props.artist ?? null;
     this.message = props.message ? RequestMessage.create(props.message) : null;
@@ -60,7 +75,10 @@ export class Request extends AggregateRoot {
         ? props.status
         : RequestStatus.create(props.status || RequestStatusEnum.PENDING);
     this.rejection_reason = props.rejection_reason ?? null;
+    this.votes_count = props.votes_count ?? 0;
+    this.played_at = props.played_at ?? null;
     this.created_at = props.created_at ?? new Date();
+    this.updated_at = props.updated_at ?? this.created_at;
     this.responded_at = props.responded_at ?? null;
   }
 
@@ -70,8 +88,10 @@ export class Request extends AggregateRoot {
 
   static create(props: RequestCreateCommand): Request {
     const request = new Request({
+      event_id: props.event_id,
       audience_id: props.audience_id,
       musician_id: props.musician_id,
+      library_id: props.library_id,
       song_title: props.song_title,
       artist: props.artist,
       message: props.message,
@@ -81,6 +101,7 @@ export class Request extends AggregateRoot {
     request.applyEvent(
       new RequestCreatedEvent({
         request_id: request.request_id,
+        event_id: request.event_id.id,
         audience_id: request.audience_id.id,
         musician_id: request.musician_id.id,
         song_title: request.song_title.value,
@@ -104,15 +125,16 @@ export class Request extends AggregateRoot {
     this.status = RequestStatus.accepted();
     this.responded_at = new Date();
     this.rejection_reason = null;
+    this.updated_at = new Date();
 
     // Emitir evento para sistema de pontuação
     this.applyEvent(
       new RequestAcceptedEvent({
-        request_id: this.request_id.id,
+        request_id: this.request_id,
+        event_id: this.event_id.id,
         audience_id: this.audience_id.id,
         musician_id: this.musician_id.id,
         song_title: this.song_title.value,
-        occurred_on: new Date(),
       }),
     );
   }
@@ -129,16 +151,17 @@ export class Request extends AggregateRoot {
     this.status = RequestStatus.rejected();
     this.responded_at = new Date();
     this.rejection_reason = reason || null;
+    this.updated_at = new Date();
 
     // Emitir evento para notificação
     this.applyEvent(
       new RequestRejectedEvent({
-        request_id: this.request_id.id,
+        request_id: this.request_id,
+        event_id: this.event_id.id,
         audience_id: this.audience_id.id,
         musician_id: this.musician_id.id,
         song_title: this.song_title.value,
         rejection_reason: this.rejection_reason,
-        occurred_on: new Date(),
       }),
     );
   }
@@ -153,6 +176,7 @@ export class Request extends AggregateRoot {
         updated_at: new Date(),
       }),
     );
+    this.updated_at = new Date();
   }
 
   changeSongTitle(song_title: string): void {
@@ -191,12 +215,59 @@ export class Request extends AggregateRoot {
     this.dispatchUpdateEvent();
   }
 
+  markAsPlayed(played_at?: Date): void {
+    if (this.status.isRejected()) {
+      this.notification.addError(
+        "Rejected requests cannot be marked as played",
+        "status",
+      );
+      return;
+    }
+
+    if (this.status.isPending()) {
+      this.notification.addError(
+        "Pending requests cannot be marked as played",
+        "status",
+      );
+      return;
+    }
+
+    this.status = RequestStatus.played();
+    const playedAt = played_at ?? new Date();
+    this.played_at = playedAt;
+    this.updated_at = new Date();
+
+    this.applyEvent(
+      new RequestPlayedEvent({
+        request_id: this.request_id,
+        event_id: this.event_id.id,
+        audience_id: this.audience_id.id,
+        musician_id: this.musician_id.id,
+        song_title: this.song_title.value,
+        played_at: playedAt,
+      }),
+    );
+  }
+
+  updateVotesCount(votes_count: number): void {
+    if (votes_count < 0) {
+      this.notification.addError("Votes count cannot be negative", "votes");
+      return;
+    }
+    this.votes_count = votes_count;
+    this.updated_at = new Date();
+  }
+
   get isPending(): boolean {
     return this.status.isPending();
   }
 
   get isAccepted(): boolean {
     return this.status.isAccepted();
+  }
+
+  get isPlayed(): boolean {
+    return this.status.isPlayed();
   }
 
   get isRejected(): boolean {
@@ -249,20 +320,21 @@ export class Request extends AggregateRoot {
       artist: this.artist,
     });
 
-    // Pontos extras se o pedido for aceito
-    if (this.isAccepted) {
+    // Pontos extras se o pedido for aceito e tocado
+    if (this.isPlayed) {
       const acceptedPoints = Points.createAcceptedRequest({
         request_id: this.request_id.id,
         song_title: this.song_title.value,
         artist: this.artist,
         base_points: basePoints.value,
+        status: this.status.value,
       });
 
       // Retorna um novo Points com a soma dos valores
       return Points.create(
         basePoints.value + acceptedPoints.value,
         "accepted_request",
-        "Pedido musical aceito pelo músico",
+        "Pedido musical aceito e tocado pelo músico",
         {
           request_id: this.request_id.id,
           song_title: this.song_title.value,
@@ -280,6 +352,7 @@ export class Request extends AggregateRoot {
   isSimilarTo(other: Request): boolean {
     return (
       this.audience_id.equals(other.audience_id) &&
+      this.musician_id.equals(other.musician_id) &&
       this.song_title.value.toLowerCase() ===
         other.song_title.value.toLowerCase() &&
       this.artist?.toLowerCase() === other.artist?.toLowerCase()
@@ -287,8 +360,8 @@ export class Request extends AggregateRoot {
   }
 
   // Método para verificar se pode ser aceito
-  canBeAccepted(): boolean {
-    return this.isPending && this.isWithinResponseTime();
+  canBeAccepted(maxResponseTimeMinutes: number = 60): boolean {
+    return this.isPending && this.isWithinResponseTime(maxResponseTimeMinutes);
   }
 
   // Método para verificar se pode ser rejeitado
@@ -297,8 +370,7 @@ export class Request extends AggregateRoot {
   }
 
   // Método para verificar se está dentro do tempo de resposta
-  isWithinResponseTime(): boolean {
-    const maxResponseTimeMinutes = 60; // 1 hora para responder
+  isWithinResponseTime(maxResponseTimeMinutes: number = 60): boolean {
     return this.ageInMinutes <= maxResponseTimeMinutes;
   }
 
@@ -329,18 +401,24 @@ export class Request extends AggregateRoot {
   toJSON() {
     return {
       request_id: this.request_id.id,
+      event_id: this.event_id.id,
       audience_id: this.audience_id.id,
       musician_id: this.musician_id.id,
+      library_id: this.library_id?.id ?? null,
       song_title: this.song_title.value,
       artist: this.artist,
       message: this.message?.value || null,
       status: this.status.value,
       rejection_reason: this.rejection_reason,
+      votes_count: this.votes_count,
+      played_at: this.played_at,
       created_at: this.created_at,
+      updated_at: this.updated_at,
       responded_at: this.responded_at,
       is_pending: this.isPending,
       is_accepted: this.isAccepted,
       is_rejected: this.isRejected,
+      is_played: this.isPlayed,
       is_responded: this.isResponded,
       has_message: this.hasMessage,
       display_title: this.displayTitle,

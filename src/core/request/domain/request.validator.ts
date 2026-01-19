@@ -14,6 +14,10 @@ import { Request } from "./request.aggregate";
 import { RequestStatusEnum } from "./value-objects/request-status.vo";
 
 export class RequestRules {
+  @IsUUID(4, { groups: ["event_id"] })
+  @IsNotEmpty({ groups: ["event_id"] })
+  event_id: string;
+
   @IsUUID(4, { groups: ["audience_id"] })
   @IsNotEmpty({ groups: ["audience_id"] })
   audience_id: string;
@@ -53,6 +57,7 @@ export class RequestRules {
 
   constructor(entity: Request | any) {
     // Convert value objects to their primitive values for validation
+    this.event_id = entity.event_id?.id || entity.event_id;
     this.audience_id = entity.audience_id?.id || entity.audience_id;
     this.musician_id = entity.musician_id?.id || entity.musician_id;
     this.song_title = entity.song_title?.value || entity.song_title;
@@ -67,6 +72,7 @@ export class RequestValidator extends ClassValidatorFields {
     const newFields = fields?.length
       ? fields
       : [
+          "event_id",
           "audience_id",
           "musician_id",
           "song_title",

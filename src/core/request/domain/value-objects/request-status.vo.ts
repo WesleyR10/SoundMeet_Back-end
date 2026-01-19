@@ -5,6 +5,7 @@ export enum RequestStatusEnum {
   PENDING = "pending",
   ACCEPTED = "accepted",
   REJECTED = "rejected",
+  PLAYED = "played",
 }
 
 export class RequestStatus extends ValueObject {
@@ -39,6 +40,10 @@ export class RequestStatus extends ValueObject {
     return new RequestStatus(RequestStatusEnum.REJECTED);
   }
 
+  static played(): RequestStatus {
+    return new RequestStatus(RequestStatusEnum.PLAYED);
+  }
+
   isPending(): boolean {
     return this.value === RequestStatusEnum.PENDING;
   }
@@ -49,6 +54,10 @@ export class RequestStatus extends ValueObject {
 
   isRejected(): boolean {
     return this.value === RequestStatusEnum.REJECTED;
+  }
+
+  isPlayed(): boolean {
+    return this.value === RequestStatusEnum.PLAYED;
   }
 
   toString(): string {

@@ -7,6 +7,7 @@ import { SearchResult as DefaultSearchResult } from "../../shared/domain/reposit
 import { Request, RequestId } from "./request.aggregate";
 
 export type RequestFilter = {
+  event_id?: string;
   audience_id?: string;
   musician_id?: string;
   status?: string;
@@ -61,10 +62,12 @@ export interface IRequestRepository extends ISearchableRepository<
   findRequestsByAudienceAndMusician(
     audience_id: string,
     musician_id: string,
+    event_id?: string,
   ): Promise<Request[]>;
   findPendingRequestsByAudienceAndMusician(
     audience_id: string,
     musician_id: string,
+    event_id?: string,
   ): Promise<Request[]>;
   countRequestsByAudienceToday(audience_id: string): Promise<number>;
   countRequestsByAudienceInPeriod(
@@ -72,10 +75,16 @@ export interface IRequestRepository extends ISearchableRepository<
     start_date: Date,
     end_date: Date,
   ): Promise<number>;
+  countRequestsByAudienceInPeriodForEvent(
+    audience_id: string,
+    event_id: string,
+    start_date: Date,
+    end_date: Date,
+  ): Promise<number>;
   countPendingRequestsByMusician(musician_id: string): Promise<number>;
   findRecentRequestsByAudience(
     audience_id: string,
-    limit?: number,
+    hours_limit?: number,
   ): Promise<Request[]>;
   findPopularSongs(
     musician_id?: string,

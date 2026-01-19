@@ -22,6 +22,7 @@ export class ListRequestsUseCase implements IUseCase<
   async execute(input: ListRequestsInput): Promise<ListRequestsOutput> {
     const filter: RequestFilter = {};
 
+    if (input.event_id) filter.event_id = input.event_id;
     if (input.audience_id) filter.audience_id = input.audience_id;
     if (input.musician_id) filter.musician_id = input.musician_id;
     if (input.status) filter.status = input.status;
