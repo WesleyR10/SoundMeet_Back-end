@@ -1,6 +1,7 @@
 import { Transform } from "class-transformer";
 
 import { InquiryOutput } from "../../core/scheduling/application/use-cases/common/inquiry-output";
+import { InquiryStatusEnum } from "../../core/shared/domain/value-objects/inquiry-status.vo";
 
 export class InquiryPresenter {
   id: string;
@@ -10,7 +11,7 @@ export class InquiryPresenter {
   event_id: string | null;
   subject: string | null;
   initial_message: string | null;
-  status: string;
+  status: InquiryStatusEnum;
   @Transform(
     ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
   )
@@ -42,7 +43,7 @@ export class InquiryPresenter {
     this.event_id = output.event_id;
     this.subject = output.subject;
     this.initial_message = output.initial_message;
-    this.status = output.status;
+    this.status = output.status as InquiryStatusEnum;
     this.expires_at = output.expires_at;
     this.accepted_at = output.accepted_at;
     this.rejected_at = output.rejected_at;

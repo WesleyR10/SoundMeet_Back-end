@@ -1,6 +1,7 @@
 import { Transform } from "class-transformer";
 
 import { BookingOutput } from "../../core/scheduling/application/use-cases/common/booking-output";
+import { BookingStatusEnum } from "../../core/shared/domain/value-objects/booking-status.vo";
 
 export class BookingPresenter {
   id: string;
@@ -14,7 +15,7 @@ export class BookingPresenter {
   end_at: Date;
   fee: number | null;
   notes: string | null;
-  status: string;
+  status: BookingStatusEnum;
   buffer_minutes: number;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   buffered_start_at: Date;
@@ -52,7 +53,7 @@ export class BookingPresenter {
     this.end_at = output.end_at;
     this.fee = output.fee;
     this.notes = output.notes;
-    this.status = output.status;
+    this.status = output.status as BookingStatusEnum;
     this.buffer_minutes = output.buffer_minutes;
     this.buffered_start_at = output.buffered_start_at;
     this.buffered_end_at = output.buffered_end_at;
