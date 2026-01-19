@@ -1,24 +1,22 @@
 import { Global, Module } from "@nestjs/common";
-import { EventEmitter2, EventEmitterModule } from "@nestjs/event-emitter";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 
-import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
-import { FakeController } from "./fake.controller";
-import { FakeService } from "./fake.service";
+import { DatabaseModule } from "../database-module/database.module";
+import { EventsController } from "./events.controller";
+import { EVENTS_PROVIDERS } from "./events.providers";
 
 @Global()
 @Module({
-  imports: [EventEmitterModule.forRoot()],
-  controllers: [FakeController],
+  imports: [DatabaseModule, EventEmitterModule.forRoot()],
+  controllers: [EventsController],
   providers: [
-    FakeService,
-    {
-      provide: DomainEventMediator,
-      useFactory: (eventEmitter: EventEmitter2) => {
-        return new DomainEventMediator(eventEmitter);
-      },
-      inject: [EventEmitter2],
-    },
+    ...Object.values(EVENTS_PROVIDERS.REPOSITORIES),
+    ...Object.values(EVENTS_PROVIDERS.USE_CASES),
+    ...Object.values(EVENTS_PROVIDERS.EVENTS),
   ],
-  exports: [DomainEventMediator],
+  exports: [
+    EVENTS_PROVIDERS.REPOSITORIES.EVENT_REPOSITORY.provide,
+    EVENTS_PROVIDERS.EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+  ],
 })
 export class EventModule {}
