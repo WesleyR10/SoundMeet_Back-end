@@ -47,6 +47,7 @@ async function bootstrap() {
     .addTag("Scheduling", "Agenda e bookings")
     .addTag("Establishments", "Gestão de estabelecimentos")
     .addTag("Requests", "Pedidos musicais")
+    .addTag("Events", "Gestão de eventos")
     .addTag("Gamification", "Sistema de gamificação")
     .addTag("Payments", "Pagamentos e gorjetas")
     .build();
