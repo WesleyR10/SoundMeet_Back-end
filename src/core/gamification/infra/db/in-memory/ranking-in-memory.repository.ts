@@ -63,7 +63,16 @@ export class RankingInMemoryRepository
     establishment_id: string,
     period_type: string,
   ): Promise<Ranking | null> {
-    throw new Error("Method not implemented.");
+    const matches = this.items
+      .filter(
+        (item) =>
+          item.user_id.id === user_id &&
+          item.establishment_id?.id === establishment_id &&
+          item.ranking_type === period_type,
+      )
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+
+    return matches[0] ?? null;
   }
 
   async findByUserAndTypeAndPeriod(
@@ -89,7 +98,15 @@ export class RankingInMemoryRepository
     period_type: string,
     limit?: number,
   ): Promise<Ranking[]> {
-    throw new Error("Method not implemented.");
+    const items = this.items
+      .filter(
+        (item) =>
+          item.establishment_id?.id === establishment_id &&
+          item.ranking_type === period_type,
+      )
+      .sort((a, b) => b.score - a.score);
+
+    return items.slice(0, limit ?? 10);
   }
 
   async findCurrentRankings(

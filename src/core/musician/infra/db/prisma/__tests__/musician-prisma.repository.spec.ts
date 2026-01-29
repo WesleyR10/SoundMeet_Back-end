@@ -1,6 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 
+import { DomainError } from "../../../../../shared/domain/errors/domain.error";
 import { InvalidArgumentError } from "../../../../../shared/domain/errors/invalid-argument.error";
+import { InvariantViolationError } from "../../../../../shared/domain/errors/invariant-violation.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Currency } from "../../../../../shared/domain/value-objects/money.vo";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
@@ -86,7 +88,16 @@ describe("MusicianPrismaRepository", () => {
       const error = new Error("Database error");
       (prisma.musician.update as jest.Mock).mockRejectedValue(error);
 
-      await expect(repository.update(musician)).rejects.toThrow(error);
+      try {
+        await repository.update(musician);
+        throw new InvariantViolationError(
+          "Expected repository.update to throw",
+        );
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(DomainError);
+        expect(e.message).toBe("Database error");
+        expect((e as any).cause).toBe(error);
+      }
     });
   });
 
@@ -116,7 +127,16 @@ describe("MusicianPrismaRepository", () => {
       const error = new Error("Database error");
       (prisma.musician.delete as jest.Mock).mockRejectedValue(error);
 
-      await expect(repository.delete(musicianId)).rejects.toThrow(error);
+      try {
+        await repository.delete(musicianId);
+        throw new InvariantViolationError(
+          "Expected repository.delete to throw",
+        );
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(DomainError);
+        expect(e.message).toBe("Database error");
+        expect((e as any).cause).toBe(error);
+      }
     });
   });
 

@@ -185,17 +185,17 @@ describe("MusicianInMemoryRepository", () => {
       Musician.fake()
         .aMusician()
         .withName("test")
-        .withcreated_at(created_at)
+        .withCreatedAt(created_at)
         .build(),
       Musician.fake()
         .aMusician()
         .withName("TEST")
-        .withcreated_at(new Date(created_at.getTime() + 100))
+        .withCreatedAt(new Date(created_at.getTime() + 100))
         .build(),
       Musician.fake()
         .aMusician()
         .withName("fake")
-        .withcreated_at(new Date(created_at.getTime() + 200))
+        .withCreatedAt(new Date(created_at.getTime() + 200))
         .build(),
     ];
 

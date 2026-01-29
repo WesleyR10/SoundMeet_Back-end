@@ -2,6 +2,7 @@ import { Controller, Get, INestApplication } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 
+import { DomainError } from "../../../core/shared/domain/errors/domain.error";
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
 import { InvalidUuidError } from "../../../core/shared/domain/value-objects/uuid.vo";
 import { GlobalExceptionFilter } from "./global-exception.filter";
@@ -20,7 +21,7 @@ class StubController {
 
   @Get("unexpected")
   unexpected() {
-    throw new Error("boom");
+    throw new DomainError("boom");
   }
 }
 

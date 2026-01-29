@@ -1,8 +1,10 @@
-import { UserInteractionId } from "@core/gamification/domain/value-objects/gamification-id.vo";
 import { PrismaClient } from "@prisma/client";
 
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { UserInteraction } from "../../../domain/user-interaction.aggregate";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
+import {
+  UserInteraction,
+  UserInteractionId,
+} from "../../../domain/user-interaction.aggregate";
 import { IUserInteractionRepository } from "../../../domain/user-interaction.repository";
 import {
   UserInteractionSearchParams,
@@ -17,18 +19,33 @@ export class UserInteractionPrismaRepository implements IUserInteractionReposito
 
   async insert(entity: UserInteraction): Promise<void> {
     const model = UserInteractionModelMapper.toModel(entity);
-    await this.prismaClient.userInteraction.create({
-      data: model,
-    });
+    try {
+      await this.prismaClient.userInteraction.create({
+        data: model,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserInteraction,
+        id: entity.user_interaction_id.id,
+        operation: "userInteraction.create",
+      });
+    }
   }
 
   async bulkInsert(entities: UserInteraction[]): Promise<void> {
     const models = entities.map((entity) =>
       UserInteractionModelMapper.toModel(entity),
     );
-    await this.prismaClient.userInteraction.createMany({
-      data: models,
-    });
+    try {
+      await this.prismaClient.userInteraction.createMany({
+        data: models,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserInteraction,
+        operation: "userInteraction.createMany",
+      });
+    }
   }
 
   async update(entity: UserInteraction): Promise<void> {
@@ -39,10 +56,11 @@ export class UserInteractionPrismaRepository implements IUserInteractionReposito
         data: model,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity.user_interaction_id.id, UserInteraction);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserInteraction,
+        id: entity.user_interaction_id.id,
+        operation: "userInteraction.update",
+      });
     }
   }
 
@@ -52,10 +70,11 @@ export class UserInteractionPrismaRepository implements IUserInteractionReposito
         where: { id: id.id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, UserInteraction);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserInteraction,
+        id: id.id,
+        operation: "userInteraction.delete",
+      });
     }
   }
 

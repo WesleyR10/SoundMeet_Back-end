@@ -1,8 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   ITransactionRepository,
   TransactionFilter,
@@ -19,18 +19,33 @@ export class TransactionPrismaRepository implements ITransactionRepository {
 
   async insert(entity: Transaction): Promise<void> {
     const modelProps = TransactionModelMapper.toModel(entity);
-    await this.prisma.transaction.create({
-      data: modelProps,
-    });
+    try {
+      await this.prisma.transaction.create({
+        data: modelProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.transaction_id.id,
+        operation: "transaction.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Transaction[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       TransactionModelMapper.toModel(entity),
     );
-    await this.prisma.transaction.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.transaction.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "transaction.createMany",
+      });
+    }
   }
 
   async update(entity: Transaction): Promise<void> {
@@ -40,8 +55,12 @@ export class TransactionPrismaRepository implements ITransactionRepository {
         where: { id: entity.transaction_id.id },
         data: modelProps,
       });
-    } catch (e) {
-      throw new NotFoundError(entity.transaction_id.id, Transaction);
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.transaction_id.id,
+        operation: "transaction.update",
+      });
     }
   }
 
@@ -50,8 +69,12 @@ export class TransactionPrismaRepository implements ITransactionRepository {
       await this.prisma.transaction.delete({
         where: { id: entity_id.id },
       });
-    } catch (e) {
-      throw new NotFoundError(entity_id.id, Transaction);
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity_id.id,
+        operation: "transaction.delete",
+      });
     }
   }
 

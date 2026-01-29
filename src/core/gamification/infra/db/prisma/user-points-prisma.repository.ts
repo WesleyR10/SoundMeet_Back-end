@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   UserPoints,
   UserPointsId,
@@ -19,18 +19,33 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
 
   async insert(entity: UserPoints): Promise<void> {
     const model = UserPointsModelMapper.toModel(entity);
-    await this.prismaClient.userPoints.create({
-      data: model,
-    });
+    try {
+      await this.prismaClient.userPoints.create({
+        data: model,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserPoints,
+        id: entity.user_points_id.id,
+        operation: "userPoints.create",
+      });
+    }
   }
 
   async bulkInsert(entities: UserPoints[]): Promise<void> {
     const models = entities.map((entity) =>
       UserPointsModelMapper.toModel(entity),
     );
-    await this.prismaClient.userPoints.createMany({
-      data: models,
-    });
+    try {
+      await this.prismaClient.userPoints.createMany({
+        data: models,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserPoints,
+        operation: "userPoints.createMany",
+      });
+    }
   }
 
   async update(entity: UserPoints): Promise<void> {
@@ -41,10 +56,11 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
         data: model,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity.user_points_id.id, UserPoints);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserPoints,
+        id: entity.user_points_id.id,
+        operation: "userPoints.update",
+      });
     }
   }
 
@@ -54,10 +70,11 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
         where: { id: id.id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, UserPoints);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserPoints,
+        id: id.id,
+        operation: "userPoints.delete",
+      });
     }
   }
 

@@ -2,6 +2,7 @@ import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Event, EventId } from "../../../domain";
 import {
@@ -94,7 +95,11 @@ export class EventInMemoryRepository
       : super.applySort(items, "created_at", "desc");
   }
 
-  async addAttendee(event_id: EventId, audience_id: string): Promise<void> {
+  async addAttendee(
+    event_id: EventId,
+    audience_id: string,
+    now: Date = new Date(),
+  ): Promise<void> {
     const event = await this.findById(event_id);
     if (!event) {
       throw new NotFoundError(event_id.id, Event);
@@ -106,11 +111,15 @@ export class EventInMemoryRepository
       return;
     }
 
-    event.addAttendee();
+    event.addAttendee(audience_id, now);
     if (event.notification.hasErrors()) {
-      throw new InvalidArgumentError(
-        JSON.stringify(event.notification.toJSON()),
-      );
+      throw new EntityValidationError(event.notification.toJSON(), {
+        metadata: {
+          operation: "event.addAttendee",
+          event_id: event_id.id,
+          audience_id,
+        },
+      });
     }
 
     set.add(audience_id);
@@ -118,7 +127,11 @@ export class EventInMemoryRepository
     await this.update(event);
   }
 
-  async removeAttendee(event_id: EventId, audience_id: string): Promise<void> {
+  async removeAttendee(
+    event_id: EventId,
+    audience_id: string,
+    now: Date = new Date(),
+  ): Promise<void> {
     const event = await this.findById(event_id);
     if (!event) {
       throw new NotFoundError(event_id.id, Event);
@@ -129,11 +142,15 @@ export class EventInMemoryRepository
       throw new NotFoundError(audience_id, Event);
     }
 
-    event.removeAttendee();
+    event.removeAttendee(audience_id, now);
     if (event.notification.hasErrors()) {
-      throw new InvalidArgumentError(
-        JSON.stringify(event.notification.toJSON()),
-      );
+      throw new EntityValidationError(event.notification.toJSON(), {
+        metadata: {
+          operation: "event.removeAttendee",
+          event_id: event_id.id,
+          audience_id,
+        },
+      });
     }
 
     set.delete(audience_id);

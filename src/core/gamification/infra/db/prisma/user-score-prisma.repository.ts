@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { UserScore, UserScoreId } from "../../../domain/user-score.aggregate";
 import { IUserScoreRepository } from "../../../domain/user-score.repository";
 import {
@@ -19,36 +20,67 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
 
   async insert(entity: UserScore): Promise<void> {
     const modelProps = UserScoreModelMapper.toModel(entity);
-    await this.prismaClient.userScore.create({
-      data: modelProps,
-    });
+    try {
+      await this.prismaClient.userScore.create({
+        data: modelProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.user_score_id.id,
+        operation: "userScore.create",
+      });
+    }
   }
 
   async bulkInsert(entities: UserScore[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       UserScoreModelMapper.toModel(entity),
     );
-    await this.prismaClient.userScore.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prismaClient.userScore.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "userScore.createMany",
+      });
+    }
   }
 
   async update(entity: UserScore): Promise<void> {
     const id = entity.user_score_id.id;
     const modelProps = UserScoreModelMapper.toModel(entity);
     await this.getEntityModel(id);
-    await this.prismaClient.userScore.update({
-      where: { id },
-      data: modelProps,
-    });
+    try {
+      await this.prismaClient.userScore.update({
+        where: { id },
+        data: modelProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "userScore.update",
+      });
+    }
   }
 
   async delete(entity_id: UserScoreId): Promise<void> {
     const id = entity_id.id;
     await this.getEntityModel(id);
-    await this.prismaClient.userScore.delete({
-      where: { id },
-    });
+    try {
+      await this.prismaClient.userScore.delete({
+        where: { id },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "userScore.delete",
+      });
+    }
   }
 
   async findById(entity_id: UserScoreId): Promise<UserScore | null> {
@@ -161,9 +193,18 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
   }
 
   private async getEntityModel(id: string): Promise<UserScoreModelProps> {
-    const model = await this.prismaClient.userScore.findUnique({
-      where: { id },
-    });
+    let model: any;
+    try {
+      model = await this.prismaClient.userScore.findUnique({
+        where: { id },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "userScore.findUnique",
+      });
+    }
     if (!model) {
       throw new NotFoundError(id, UserScore);
     }

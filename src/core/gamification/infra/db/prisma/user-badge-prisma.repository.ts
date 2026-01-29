@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { UserBadge, UserBadgeId } from "../../../domain/user-badge.aggregate";
 import { IUserBadgeRepository } from "../../../domain/user-badge.repository";
 import {
@@ -17,15 +17,23 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
   async insert(entity: UserBadge): Promise<void> {
     const model = UserBadgeModelMapper.toModel(entity);
     // Convertendo para o formato Prisma
-    await this.prismaClient.userBadge.create({
-      data: {
-        id: model.id,
-        audienceId: model.user_id,
-        badgeId: model.badge_type,
-        earnedAt: model.created_at,
-        progress: model.progress,
-      },
-    });
+    try {
+      await this.prismaClient.userBadge.create({
+        data: {
+          id: model.id,
+          audienceId: model.user_id,
+          badgeId: model.badge_type,
+          earnedAt: model.created_at,
+          progress: model.progress,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserBadge,
+        id: entity.user_badge_id.id,
+        operation: "userBadge.create",
+      });
+    }
   }
 
   async bulkInsert(entities: UserBadge[]): Promise<void> {
@@ -39,9 +47,16 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
         progress: model.progress,
       };
     });
-    await this.prismaClient.userBadge.createMany({
-      data: models,
-    });
+    try {
+      await this.prismaClient.userBadge.createMany({
+        data: models,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserBadge,
+        operation: "userBadge.createMany",
+      });
+    }
   }
 
   async update(entity: UserBadge): Promise<void> {
@@ -57,10 +72,11 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
         },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity.user_badge_id.id, UserBadge);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserBadge,
+        id: entity.user_badge_id.id,
+        operation: "userBadge.update",
+      });
     }
   }
 
@@ -70,10 +86,11 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
         where: { id: id.id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, UserBadge);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: UserBadge,
+        id: id.id,
+        operation: "userBadge.delete",
+      });
     }
   }
 

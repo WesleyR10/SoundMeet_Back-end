@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Badge, BadgeId } from "../../../domain/badge.aggregate";
 import { IBadgeRepository } from "../../../domain/badge.repository";
 import {
@@ -16,30 +16,47 @@ export class BadgePrismaRepository implements IBadgeRepository {
 
   async insert(entity: Badge): Promise<void> {
     const model = BadgeModelMapper.toModel(entity);
-    await this.prismaClient.badge.create({
-      data: model,
-    });
+    try {
+      await this.prismaClient.badge.create({
+        data: model,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Badge,
+        id: entity.badge_id.id,
+        operation: "badge.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Badge[]): Promise<void> {
     const models = entities.map((entity) => BadgeModelMapper.toModel(entity));
-    await this.prismaClient.badge.createMany({
-      data: models,
-    });
+    try {
+      await this.prismaClient.badge.createMany({
+        data: models,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Badge,
+        operation: "badge.createMany",
+      });
+    }
   }
 
   async update(entity: Badge): Promise<void> {
     const model = BadgeModelMapper.toModel(entity);
+    const { id: _id, created_at: _created_at, ...data } = model as any;
     try {
       await this.prismaClient.badge.update({
         where: { id: entity.badge_id.id },
-        data: model,
+        data,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity.badge_id.id, Badge);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Badge,
+        id: entity.badge_id.id,
+        operation: "badge.update",
+      });
     }
   }
 
@@ -49,10 +66,11 @@ export class BadgePrismaRepository implements IBadgeRepository {
         where: { id: id.id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, Badge);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Badge,
+        id: id.id,
+        operation: "badge.delete",
+      });
     }
   }
 
@@ -121,10 +139,17 @@ export class BadgePrismaRepository implements IBadgeRepository {
       }
     }
 
+    const orderBy: any = {};
+    if (props.sort && this.sortableFields.includes(props.sort)) {
+      orderBy[props.sort] = props.sort_dir || "asc";
+    } else {
+      orderBy.created_at = "desc";
+    }
+
     const [models, count] = await Promise.all([
       this.prismaClient.badge.findMany({
         where,
-        orderBy: props.sort ? { [props.sort]: props.sort_dir } : undefined,
+        orderBy,
         skip: offset,
         take: limit,
       }),

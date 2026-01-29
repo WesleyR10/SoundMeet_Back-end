@@ -18,7 +18,7 @@ export type BadgeModelProps = {
   rarity: string;
   is_active: boolean;
   created_at: Date;
-  updated_at?: Date;
+  updated_at: Date;
 };
 
 export type BadgePrismaModel = {
@@ -32,6 +32,7 @@ export type BadgePrismaModel = {
   rarity: string;
   is_active: boolean;
   created_at: Date;
+  updated_at: Date;
 };
 
 export class BadgeModelMapper {
@@ -63,7 +64,7 @@ export class BadgeModelMapper {
       rarity: model.rarity as BadgeRarity,
       is_active: model.is_active,
       created_at: model.created_at,
-      updated_at: model.created_at,
+      updated_at: model.updated_at,
     });
   }
 }

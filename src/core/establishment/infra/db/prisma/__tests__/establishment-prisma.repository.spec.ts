@@ -35,7 +35,7 @@ describe("EstablishmentPrismaRepository", () => {
 
   describe("insert", () => {
     it("should insert an establishment", async () => {
-      const establishment = Establishment.fake().anEstablishment().build();
+      const establishment = Establishment.fake().aEstablishment().build();
       const modelProps = EstablishmentModelMapper.toModel(establishment);
 
       await repository.insert(establishment);
@@ -52,8 +52,8 @@ describe("EstablishmentPrismaRepository", () => {
   describe("bulkInsert", () => {
     it("should insert multiple establishments", async () => {
       const establishments = [
-        Establishment.fake().anEstablishment().build(),
-        Establishment.fake().anEstablishment().build(),
+        Establishment.fake().aEstablishment().build(),
+        Establishment.fake().aEstablishment().build(),
       ];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
@@ -69,7 +69,7 @@ describe("EstablishmentPrismaRepository", () => {
 
   describe("findById", () => {
     it("should return an establishment when found", async () => {
-      const establishment = Establishment.fake().anEstablishment().build();
+      const establishment = Establishment.fake().aEstablishment().build();
       const modelProps = EstablishmentModelMapper.toModel(establishment);
 
       (prisma.establishment.findUnique as jest.Mock).mockResolvedValue(
@@ -109,8 +109,8 @@ describe("EstablishmentPrismaRepository", () => {
   describe("findAll", () => {
     it("should return all establishments", async () => {
       const establishments = [
-        Establishment.fake().anEstablishment().build(),
-        Establishment.fake().anEstablishment().build(),
+        Establishment.fake().aEstablishment().build(),
+        Establishment.fake().aEstablishment().build(),
       ];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
@@ -139,7 +139,7 @@ describe("EstablishmentPrismaRepository", () => {
 
   describe("update", () => {
     it("should update an establishment", async () => {
-      const establishment = Establishment.fake().anEstablishment().build();
+      const establishment = Establishment.fake().aEstablishment().build();
       const modelProps = EstablishmentModelMapper.toModel(establishment);
 
       (prisma.establishment.update as jest.Mock).mockResolvedValue(modelProps);
@@ -156,7 +156,7 @@ describe("EstablishmentPrismaRepository", () => {
     });
 
     it("should throw NotFoundError when establishment not found", async () => {
-      const establishment = Establishment.fake().anEstablishment().build();
+      const establishment = Establishment.fake().aEstablishment().build();
 
       (prisma.establishment.update as jest.Mock).mockRejectedValue({
         code: "P2025",
@@ -172,7 +172,7 @@ describe("EstablishmentPrismaRepository", () => {
   describe("delete", () => {
     it("should delete an establishment", async () => {
       const establishmentId = new EstablishmentId();
-      const establishment = Establishment.fake().anEstablishment().build();
+      const establishment = Establishment.fake().aEstablishment().build();
       const modelProps = EstablishmentModelMapper.toModel(establishment);
 
       (prisma.establishment.findUnique as jest.Mock).mockResolvedValue(
@@ -203,8 +203,8 @@ describe("EstablishmentPrismaRepository", () => {
   describe("search", () => {
     it("should search establishments with default params", async () => {
       const establishments = [
-        Establishment.fake().anEstablishment().build(),
-        Establishment.fake().anEstablishment().build(),
+        Establishment.fake().aEstablishment().build(),
+        Establishment.fake().aEstablishment().build(),
       ];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
@@ -232,7 +232,7 @@ describe("EstablishmentPrismaRepository", () => {
 
     it("should search establishments with filter", async () => {
       const establishments = [
-        Establishment.fake().anEstablishment().withName("Rock Bar").build(),
+        Establishment.fake().aEstablishment().withName("Rock Bar").build(),
       ];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
@@ -262,7 +262,7 @@ describe("EstablishmentPrismaRepository", () => {
 
     it("should search establishments with profile filters", async () => {
       const establishments = [
-        Establishment.fake().anEstablishment().withName("Rock Bar").build(),
+        Establishment.fake().aEstablishment().withName("Rock Bar").build(),
       ];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
@@ -303,7 +303,7 @@ describe("EstablishmentPrismaRepository", () => {
     });
 
     it("should search establishments with sorting", async () => {
-      const establishments = [Establishment.fake().anEstablishment().build()];
+      const establishments = [Establishment.fake().aEstablishment().build()];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
       );
@@ -329,7 +329,7 @@ describe("EstablishmentPrismaRepository", () => {
     });
 
     it("should search establishments with pagination", async () => {
-      const establishments = [Establishment.fake().anEstablishment().build()];
+      const establishments = [Establishment.fake().aEstablishment().build()];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
       );
@@ -357,7 +357,7 @@ describe("EstablishmentPrismaRepository", () => {
     });
 
     it("should handle complex search with all parameters", async () => {
-      const establishments = [Establishment.fake().anEstablishment().build()];
+      const establishments = [Establishment.fake().aEstablishment().build()];
       const modelsProps = establishments.map((entity) =>
         EstablishmentModelMapper.toModel(entity),
       );

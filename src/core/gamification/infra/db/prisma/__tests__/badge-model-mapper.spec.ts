@@ -77,6 +77,7 @@ describe("BadgeModelMapper", () => {
         rarity: "legendary",
         is_active: true,
         created_at: new Date("2024-01-01T00:00:00.000Z"),
+        updated_at: new Date("2024-01-02T00:00:00.000Z"),
       };
 
       const entity = BadgeModelMapper.toEntity(model);
@@ -105,6 +106,7 @@ describe("BadgeModelMapper", () => {
         rarity: "common",
         is_active: false,
         created_at: new Date("2023-01-01T00:00:00.000Z"),
+        updated_at: new Date("2023-01-02T00:00:00.000Z"),
       };
 
       const entity = BadgeModelMapper.toEntity(model);

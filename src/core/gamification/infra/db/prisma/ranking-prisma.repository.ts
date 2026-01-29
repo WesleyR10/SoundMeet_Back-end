@@ -1,31 +1,53 @@
 import { PrismaClient } from "@prisma/client";
 
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Ranking, RankingId } from "../../../domain/ranking.aggregate";
-import { IRankingRepository } from "../../../domain/ranking.repository";
 import {
+  IRankingRepository,
+  RankingFilter,
   RankingSearchParams,
   RankingSearchResult,
 } from "../../../domain/ranking.repository";
 import { RankingModelMapper } from "./ranking-model-mapper";
 
 export class RankingPrismaRepository implements IRankingRepository {
-  sortableFields: string[] = ["type", "period", "created_at"];
+  sortableFields: string[] = [
+    "type",
+    "period",
+    "position",
+    "score",
+    "created_at",
+  ];
 
   constructor(private prismaClient: PrismaClient) {}
 
   async insert(entity: Ranking): Promise<void> {
     const model = RankingModelMapper.toModel(entity);
-    await this.prismaClient.ranking.create({
-      data: model,
-    });
+    try {
+      await this.prismaClient.ranking.create({
+        data: model,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Ranking,
+        id: entity.ranking_id.id,
+        operation: "ranking.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Ranking[]): Promise<void> {
     const models = entities.map((entity) => RankingModelMapper.toModel(entity));
-    await this.prismaClient.ranking.createMany({
-      data: models,
-    });
+    try {
+      await this.prismaClient.ranking.createMany({
+        data: models,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Ranking,
+        operation: "ranking.createMany",
+      });
+    }
   }
 
   async update(entity: Ranking): Promise<void> {
@@ -36,10 +58,11 @@ export class RankingPrismaRepository implements IRankingRepository {
         data: model,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity.ranking_id.id, Ranking);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Ranking,
+        id: entity.ranking_id.id,
+        operation: "ranking.update",
+      });
     }
   }
 
@@ -49,10 +72,11 @@ export class RankingPrismaRepository implements IRankingRepository {
         where: { id: id.id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, Ranking);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Ranking,
+        id: id.id,
+        operation: "ranking.delete",
+      });
     }
   }
 
@@ -88,20 +112,8 @@ export class RankingPrismaRepository implements IRankingRepository {
     const model = await this.prismaClient.ranking.findFirst({
       where: {
         type: period_type,
-        AND: [
-          {
-            data: {
-              path: ["user_id"],
-              equals: user_id,
-            },
-          },
-          {
-            data: {
-              path: ["establishment_id"],
-              equals: establishment_id,
-            },
-          },
-        ],
+        user_id,
+        establishment_id,
       },
       orderBy: { created_at: "desc" },
     });
@@ -118,14 +130,13 @@ export class RankingPrismaRepository implements IRankingRepository {
     const model = await this.prismaClient.ranking.findFirst({
       where: {
         type: ranking_type,
-        period: period,
-        created_at: {
+        period,
+        user_id,
+        period_start: {
           gte: period_start,
-          lte: period_end,
         },
-        data: {
-          path: ["user_id"],
-          equals: user_id,
+        period_end: {
+          lte: period_end,
         },
       },
     });
@@ -140,30 +151,24 @@ export class RankingPrismaRepository implements IRankingRepository {
     const models = await this.prismaClient.ranking.findMany({
       where: {
         type: period_type,
-        data: {
-          path: ["establishment_id"],
-          equals: establishment_id,
-        },
+        establishment_id,
       },
-      orderBy: { created_at: "desc" },
+      orderBy: { score: "desc" },
       take: limit || 10,
     });
     return models.map((model) => RankingModelMapper.toEntity(model));
   }
 
   async findCurrentRankings(
-    establishment_id: string,
-    period_type: string,
+    ranking_type: string,
+    period: string,
   ): Promise<Ranking[]> {
     const models = await this.prismaClient.ranking.findMany({
       where: {
-        type: period_type,
-        data: {
-          path: ["establishment_id"],
-          equals: establishment_id,
-        },
+        type: ranking_type,
+        period,
       },
-      orderBy: { created_at: "desc" },
+      orderBy: { position: "asc" },
     });
     return models.map((model) => RankingModelMapper.toEntity(model));
   }
@@ -190,23 +195,49 @@ export class RankingPrismaRepository implements IRankingRepository {
     const where: any = {};
 
     if (props.filter) {
-      if (props.filter.user_id) {
-        where.user_id = props.filter.user_id;
-      }
       if (props.filter.ranking_type) {
         where.type = props.filter.ranking_type;
       }
       if (props.filter.period) {
         where.period = props.filter.period;
       }
-      if (props.filter.position_max !== undefined) {
-        where.data = {
-          path: ["position"],
+      if (props.filter.user_id) {
+        where.user_id = props.filter.user_id;
+      }
+      if (props.filter.position_max) {
+        where.position = {
           lte: props.filter.position_max,
         };
       }
-      if (props.filter.is_current_period !== undefined) {
-        // Implementar lógica para período atual se necessário
+      if (typeof props.filter.is_current_period === "boolean") {
+        const now = new Date();
+        if (props.filter.is_current_period) {
+          where.AND = [
+            {
+              period_start: {
+                lte: now,
+              },
+            },
+            {
+              period_end: {
+                gte: now,
+              },
+            },
+          ];
+        } else {
+          where.OR = [
+            {
+              period_end: {
+                lt: now,
+              },
+            },
+            {
+              period_start: {
+                gt: now,
+              },
+            },
+          ];
+        }
       }
     }
 
@@ -253,10 +284,7 @@ export class RankingPrismaRepository implements IRankingRepository {
     const model = await this.prismaClient.ranking.findFirst({
       where: {
         type,
-        data: {
-          path: ["user_id"],
-          equals: user_id,
-        },
+        user_id,
       },
       orderBy: { created_at: "desc" },
     });

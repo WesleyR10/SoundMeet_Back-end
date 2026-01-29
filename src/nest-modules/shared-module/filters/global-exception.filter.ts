@@ -7,12 +7,67 @@ import {
 import { Response } from "express";
 
 import { ConflictError } from "../../../core/shared/domain/errors/conflict.error";
+import { DomainError } from "../../../core/shared/domain/errors/domain.error";
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
+import { InvalidOperationError } from "../../../core/shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../core/shared/domain/errors/not-found.error";
 import {
   BaseValidationError,
   EntityValidationError,
 } from "../../../core/shared/domain/validators/validation.error";
+
+function safeJsonStringify(value: unknown): string | null {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+function toLoggableCause(cause: unknown): unknown {
+  if (cause instanceof Error) {
+    return {
+      name: cause.name,
+      message: cause.message,
+      stack: cause.stack,
+    };
+  }
+
+  if (cause === undefined) {
+    return undefined;
+  }
+
+  const json = safeJsonStringify(cause);
+  if (json !== null) {
+    return {
+      value: json,
+    };
+  }
+
+  return {
+    value: String(cause),
+  };
+}
+
+function toExceptionLogContext(exception: Error): Record<string, unknown> {
+  if (exception instanceof DomainError) {
+    const cause = (exception as any).cause;
+    return {
+      metadata: exception.metadata,
+      cause: toLoggableCause(cause),
+    };
+  }
+
+  const metadata = (exception as any)?.metadata;
+  if (metadata && typeof metadata === "object") {
+    const cause = (exception as any).cause;
+    return {
+      metadata,
+      cause: toLoggableCause(cause),
+    };
+  }
+  return {};
+}
 
 function getErrorText(statusCode: number): string {
   switch (statusCode) {
@@ -26,6 +81,8 @@ function getErrorText(statusCode: number): string {
       return "Not Found";
     case 409:
       return "Conflict";
+    case 413:
+      return "Payload Too Large";
     case 422:
       return "Unprocessable Entity";
     case 500:
@@ -112,6 +169,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    if (exception instanceof InvalidOperationError) {
+      response.status(422).json({
+        statusCode: 422,
+        error: getErrorText(422),
+        message: [exception.message],
+      });
+      return;
+    }
+
     if (exception instanceof Error) {
       if (
         exception.name.startsWith("Invalid") &&
@@ -142,6 +208,60 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    const isDevelopment = process.env.NODE_ENV !== "production";
+
+    if (exception instanceof Error) {
+      const rawMessage =
+        (exception as any)?.message == null
+          ? ""
+          : String((exception as any).message);
+      const normalizedMessage = rawMessage.toLowerCase();
+
+      const payloadTooLarge =
+        (exception as any)?.status === 413 ||
+        (exception as any)?.statusCode === 413 ||
+        normalizedMessage.includes("request entity too large") ||
+        normalizedMessage.includes("entity too large");
+
+      if (payloadTooLarge) {
+        const message = isDevelopment
+          ? ["Request entity too large", exception.message]
+          : ["Request entity too large"];
+
+        console.error(
+          "GlobalExceptionFilter payload too large",
+          JSON.stringify({
+            name: exception.name,
+            message: exception.message,
+            ...toExceptionLogContext(exception),
+          }),
+        );
+
+        response.status(413).json({
+          statusCode: 413,
+          error: getErrorText(413),
+          message,
+        });
+        return;
+      }
+
+      console.error(
+        "GlobalExceptionFilter unexpected error",
+        JSON.stringify({
+          name: exception.name,
+          message: exception.message,
+          stack: exception.stack,
+          ...toExceptionLogContext(exception),
+        }),
+      );
+    } else {
+      console.error(
+        "GlobalExceptionFilter non-error throw",
+        JSON.stringify({
+          value: safeJsonStringify(exception) ?? String(exception),
+        }),
+      );
+    }
     response.status(500).json({
       statusCode: 500,
       error: getErrorText(500),

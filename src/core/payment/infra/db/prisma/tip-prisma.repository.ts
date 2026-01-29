@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   ITipRepository,
   TipFilter,
@@ -18,14 +18,22 @@ export class TipPrismaRepository implements ITipRepository {
 
   async insert(entity: Tip): Promise<void> {
     const modelProps = TipModelMapper.toModel(entity);
-    await this.prisma.tip.create({
-      data: {
-        ...modelProps,
-        musicianId: modelProps.musicianId ?? null,
-        bandId: modelProps.bandId ?? null,
-        eventId: modelProps.eventId ?? null,
-      },
-    });
+    try {
+      await this.prisma.tip.create({
+        data: {
+          ...modelProps,
+          musicianId: modelProps.musicianId ?? null,
+          bandId: modelProps.bandId ?? null,
+          eventId: modelProps.eventId ?? null,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.tip_id.id,
+        operation: "tip.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Tip[]): Promise<void> {
@@ -38,9 +46,16 @@ export class TipPrismaRepository implements ITipRepository {
         eventId: model.eventId ?? null,
       };
     });
-    await this.prisma.tip.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.tip.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "tip.createMany",
+      });
+    }
   }
 
   async update(entity: Tip): Promise<void> {
@@ -50,8 +65,12 @@ export class TipPrismaRepository implements ITipRepository {
         where: { id: entity.tip_id.id },
         data: modelProps,
       });
-    } catch (e) {
-      throw new NotFoundError(entity.tip_id.id, Tip);
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.tip_id.id,
+        operation: "tip.update",
+      });
     }
   }
 
@@ -60,8 +79,12 @@ export class TipPrismaRepository implements ITipRepository {
       await this.prisma.tip.delete({
         where: { id: entity_id.id },
       });
-    } catch (e) {
-      throw new NotFoundError(entity_id.id, Tip);
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity_id.id,
+        operation: "tip.delete",
+      });
     }
   }
 

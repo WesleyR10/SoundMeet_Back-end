@@ -1,7 +1,7 @@
 import { CurrencyEnum, Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
   IMusicianRepository,
@@ -63,27 +63,42 @@ export class MusicianPrismaRepository implements IMusicianRepository {
         }
       : null;
 
-    await this.prisma.musician.create({
-      data: {
-        ...modelProps,
-        profile: profileCreateData
-          ? {
-              create: {
-                ...profileCreateData,
-              },
-            }
-          : undefined,
-      },
-    });
+    try {
+      await this.prisma.musician.create({
+        data: {
+          ...modelProps,
+          profile: profileCreateData
+            ? {
+                create: {
+                  ...profileCreateData,
+                },
+              }
+            : undefined,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.musician_id.id,
+        operation: "musician.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Musician[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       MusicianModelMapper.toModel(entity),
     );
-    await this.prisma.musician.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.musician.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "musician.createMany",
+      });
+    }
   }
 
   async update(entity: Musician): Promise<void> {
@@ -127,10 +142,11 @@ export class MusicianPrismaRepository implements IMusicianRepository {
         },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "musician.update",
+      });
     }
   }
 
@@ -142,10 +158,11 @@ export class MusicianPrismaRepository implements IMusicianRepository {
         where: { id: musicianId },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: id.id,
+        operation: "musician.delete",
+      });
     }
   }
 

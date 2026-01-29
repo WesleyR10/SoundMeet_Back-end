@@ -1,6 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsId,
@@ -38,38 +38,53 @@ export class EstablishmentAnalyticsPrismaRepository implements IEstablishmentAna
 
   async insert(entity: EstablishmentAnalytics): Promise<void> {
     const model = EstablishmentAnalyticsModelMapper.toModel(entity);
-    await this.prismaClient.establishmentAnalytics.create({
-      data: {
-        id: model.id,
-        establishmentId: model.establishmentId,
-        date: toUtcDateOnly(model.date),
-        eventsHosted: model.eventsHosted,
-        totalAttendees: model.totalAttendees,
-        musiciansHired: model.musiciansHired,
-        totalSpent: model.totalSpent,
-        avgRating: model.avgRating,
-        created_at: model.created_at,
-      },
-    });
+    try {
+      await this.prismaClient.establishmentAnalytics.create({
+        data: {
+          id: model.id,
+          establishmentId: model.establishmentId,
+          date: toUtcDateOnly(model.date),
+          eventsHosted: model.eventsHosted,
+          totalAttendees: model.totalAttendees,
+          musiciansHired: model.musiciansHired,
+          totalSpent: model.totalSpent,
+          avgRating: model.avgRating,
+          created_at: model.created_at,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: EstablishmentAnalytics,
+        id: entity.analytics_id.id,
+        operation: "establishmentAnalytics.create",
+      });
+    }
   }
 
   async bulkInsert(entities: EstablishmentAnalytics[]): Promise<void> {
     const models = entities.map((e) =>
       EstablishmentAnalyticsModelMapper.toModel(e),
     );
-    await this.prismaClient.establishmentAnalytics.createMany({
-      data: models.map((m) => ({
-        id: m.id,
-        establishmentId: m.establishmentId,
-        date: toUtcDateOnly(m.date),
-        eventsHosted: m.eventsHosted,
-        totalAttendees: m.totalAttendees,
-        musiciansHired: m.musiciansHired,
-        totalSpent: m.totalSpent,
-        avgRating: m.avgRating,
-        created_at: m.created_at,
-      })),
-    });
+    try {
+      await this.prismaClient.establishmentAnalytics.createMany({
+        data: models.map((m) => ({
+          id: m.id,
+          establishmentId: m.establishmentId,
+          date: toUtcDateOnly(m.date),
+          eventsHosted: m.eventsHosted,
+          totalAttendees: m.totalAttendees,
+          musiciansHired: m.musiciansHired,
+          totalSpent: m.totalSpent,
+          avgRating: m.avgRating,
+          created_at: m.created_at,
+        })),
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: EstablishmentAnalytics,
+        operation: "establishmentAnalytics.createMany",
+      });
+    }
   }
 
   async update(entity: EstablishmentAnalytics): Promise<void> {
@@ -89,10 +104,11 @@ export class EstablishmentAnalyticsPrismaRepository implements IEstablishmentAna
         },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity.analytics_id.id, EstablishmentAnalytics);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: EstablishmentAnalytics,
+        id: entity.analytics_id.id,
+        operation: "establishmentAnalytics.update",
+      });
     }
   }
 
@@ -102,10 +118,11 @@ export class EstablishmentAnalyticsPrismaRepository implements IEstablishmentAna
         where: { id: entity_id.id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(entity_id.id, EstablishmentAnalytics);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: EstablishmentAnalytics,
+        id: entity_id.id,
+        operation: "establishmentAnalytics.delete",
+      });
     }
   }
 

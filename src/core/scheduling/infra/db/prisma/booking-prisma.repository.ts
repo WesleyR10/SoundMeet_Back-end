@@ -2,8 +2,8 @@ import { PrismaClient } from "@prisma/client";
 
 import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booking-status.vo";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 import {
   BookingFilter,
@@ -26,18 +26,33 @@ export class BookingPrismaRepository implements IBookingRepository {
 
   async insert(entity: Booking): Promise<void> {
     const modelProps = BookingModelMapper.toModel(entity);
-    await this.prisma.booking.create({
-      data: modelProps,
-    });
+    try {
+      await this.prisma.booking.create({
+        data: modelProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.booking_id.id,
+        operation: "booking.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Booking[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       BookingModelMapper.toModel(entity),
     );
-    await this.prisma.booking.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.booking.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "booking.createMany",
+      });
+    }
   }
 
   async update(entity: Booking): Promise<void> {
@@ -50,10 +65,11 @@ export class BookingPrismaRepository implements IBookingRepository {
         data: modelProps,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "booking.update",
+      });
     }
   }
 
@@ -64,10 +80,11 @@ export class BookingPrismaRepository implements IBookingRepository {
         where: { id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "booking.delete",
+      });
     }
   }
 

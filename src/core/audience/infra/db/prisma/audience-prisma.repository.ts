@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import {
   AudienceFilter,
@@ -18,29 +18,37 @@ export class AudiencePrismaRepository implements IAudienceRepository {
 
   async insert(entity: Audience): Promise<void> {
     const modelProps = AudienceModelMapper.toModel(entity);
-    await this.prisma.audience.create({
-      data: {
-        id: modelProps.id,
-        email: modelProps.email,
-        name: modelProps.name,
-        nickname: modelProps.nickname,
-        avatar: modelProps.avatar,
-        phone: modelProps.phone,
-        points: modelProps.points,
-        monthly_points: modelProps.monthly_points,
-        level: modelProps.level,
-        favorite_genres: modelProps.favorite_genres,
-        favorite_artists: modelProps.favorite_artists,
-        favorite_instruments: modelProps.favorite_instruments,
-        preferred_languages: modelProps.preferred_languages,
-        notification_settings: modelProps.notification_settings,
-        privacy_settings: modelProps.privacy_settings,
-        discovery_settings: modelProps.discovery_settings,
-        is_active: modelProps.is_active,
-        created_at: modelProps.created_at,
-        updated_at: modelProps.updated_at,
-      },
-    });
+    try {
+      await this.prisma.audience.create({
+        data: {
+          id: modelProps.id,
+          email: modelProps.email,
+          name: modelProps.name,
+          nickname: modelProps.nickname,
+          avatar: modelProps.avatar,
+          phone: modelProps.phone,
+          points: modelProps.points,
+          monthly_points: modelProps.monthly_points,
+          level: modelProps.level,
+          favorite_genres: modelProps.favorite_genres,
+          favorite_artists: modelProps.favorite_artists,
+          favorite_instruments: modelProps.favorite_instruments,
+          preferred_languages: modelProps.preferred_languages,
+          notification_settings: modelProps.notification_settings,
+          privacy_settings: modelProps.privacy_settings,
+          discovery_settings: modelProps.discovery_settings,
+          is_active: modelProps.is_active,
+          created_at: modelProps.created_at,
+          updated_at: modelProps.updated_at,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.audience_id.id,
+        operation: "audience.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Audience[]): Promise<void> {
@@ -68,9 +76,16 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         updated_at: modelProps.updated_at,
       };
     });
-    await this.prisma.audience.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.audience.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "audience.createMany",
+      });
+    }
   }
 
   async update(entity: Audience): Promise<void> {
@@ -101,10 +116,11 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "audience.update",
+      });
     }
   }
 
@@ -115,10 +131,11 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         where: { id: _id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(_id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: _id,
+        operation: "audience.delete",
+      });
     }
   }
 

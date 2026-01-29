@@ -97,18 +97,30 @@ export class Establishment extends AggregateRoot {
   }
 
   static create(command: EstablishmentCreateCommand): Establishment {
+    const emailOrError = Email.create(command.email);
+    const phoneOrError = command.phone ? Phone.create(command.phone) : null;
     const establishment = new Establishment({
       name: command.name,
       description: command.description,
       avatar: command.avatar,
       cnpj: command.cnpj,
-      email: new Email(command.email),
-      phone: command.phone ? new Phone(command.phone) : null,
+      email: emailOrError.ok,
+      phone: !phoneOrError
+        ? null
+        : phoneOrError.isFail()
+          ? null
+          : phoneOrError.ok,
       website: command.website,
       establishment_type: command.establishment_type,
       is_active: command.is_active,
       profile: command.profile ?? null,
     });
+    if (emailOrError.isFail()) {
+      establishment.notification.setError(emailOrError.error.message, "email");
+    }
+    if (phoneOrError?.isFail()) {
+      establishment.notification.setError(phoneOrError.error.message, "phone");
+    }
     establishment.validate(["name", "email", "establishment_type"]);
     establishment.generateQRCode();
     establishment.applyEvent(
@@ -179,13 +191,27 @@ export class Establishment extends AggregateRoot {
   }
 
   changeEmail(email: string): void {
-    this.email = new Email(email);
+    const emailOrError = Email.create(email);
+    this.email = emailOrError.ok;
+    emailOrError.isFail() &&
+      this.notification.setError(emailOrError.error.message, "email");
     this.validate(["email"]);
     this.updated_at = new Date();
   }
 
   changePhone(phone: string | null): void {
-    this.phone = phone ? new Phone(phone) : null;
+    if (!phone) {
+      this.phone = null;
+      this.validate(["phone"]);
+      this.updated_at = new Date();
+      return;
+    }
+    const phoneOrError = Phone.create(phone);
+    if (phoneOrError.isFail()) {
+      this.notification.addError(phoneOrError.error.message, "phone");
+      return;
+    }
+    this.phone = phoneOrError.ok;
     this.validate(["phone"]);
     this.updated_at = new Date();
   }
@@ -278,7 +304,16 @@ export class Establishment extends AggregateRoot {
 
   validate(fields?: string[]): boolean {
     const validator = EstablishmentValidatorFactory.create();
-    return validator.validate(this.notification, this, fields);
+    const sanitizedFields = fields?.length
+      ? fields.filter(
+          (field) =>
+            !(
+              (field === "email" && this.notification.errors.has("email")) ||
+              (field === "phone" && this.notification.errors.has("phone"))
+            ),
+        )
+      : fields;
+    return validator.validate(this.notification, this, sanitizedFields);
   }
 
   static fake() {

@@ -75,12 +75,20 @@ export class Musician extends AggregateRoot {
   constructor(props: MusicianConstructorProps) {
     super();
     this.musician_id = props.musician_id ?? new MusicianId();
-    this.email = new Email(props.email);
+    const [email, errorEmail] = Email.create(props.email).asArray();
+    this.email = email;
+    errorEmail && this.notification.setError(errorEmail.message, "email");
     this.name = props.name;
     this.stage_name = props.stage_name ?? null;
     this.bio = props.bio ?? null;
     this.avatar = props.avatar ?? null;
-    this.phone = props.phone ? new Phone(props.phone) : null;
+    if (!props.phone) {
+      this.phone = null;
+    } else {
+      const [phone, errorPhone] = Phone.create(props.phone).asArray();
+      this.phone = phone;
+      errorPhone && this.notification.setError(errorPhone.message, "phone");
+    }
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years ?? 0;
@@ -148,7 +156,13 @@ export class Musician extends AggregateRoot {
   }
 
   changePhone(phone: string | null): void {
-    this.phone = phone ? new Phone(phone) : null;
+    if (!phone) {
+      this.phone = null;
+    } else {
+      const [newPhone, errorPhone] = Phone.create(phone).asArray();
+      this.phone = newPhone;
+      errorPhone && this.notification.setError(errorPhone.message, "phone");
+    }
   }
 
   updateGenres(genres: string[]): void {
@@ -252,7 +266,16 @@ export class Musician extends AggregateRoot {
 
   validate(fields?: string[]) {
     const validator = MusicianValidatorFactory.create();
-    return validator.validate(this.notification, this, fields);
+    const sanitizedFields = fields?.length
+      ? fields.filter(
+          (field) =>
+            !(
+              (field === "email" && this.notification.errors.has("email")) ||
+              (field === "phone" && this.notification.errors.has("phone"))
+            ),
+        )
+      : fields;
+    return validator.validate(this.notification, this, sanitizedFields);
   }
 
   static fake() {

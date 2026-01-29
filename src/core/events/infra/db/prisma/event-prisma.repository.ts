@@ -3,6 +3,8 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Event, EventId } from "../../../domain";
 import {
   EventFilter,
@@ -19,48 +21,63 @@ export class EventPrismaRepository implements IEventRepository {
 
   async insert(entity: Event): Promise<void> {
     const modelProps = EventModelMapper.toModel(entity);
-    await this.prisma.event.create({
-      data: {
-        id: modelProps.id,
-        establishmentId: modelProps.establishmentId,
-        name: modelProps.name,
-        description: modelProps.description,
-        date: modelProps.date,
-        startTime: modelProps.startTime,
-        endTime: modelProps.endTime,
-        status: modelProps.status,
-        maxCapacity: modelProps.maxCapacity,
-        currentCapacity: modelProps.currentCapacity,
-        isPublic: modelProps.isPublic,
-        coverCharge: modelProps.coverCharge,
-        created_at: modelProps.created_at,
-        updated_at: modelProps.updated_at,
-      },
-    });
+    try {
+      await this.prisma.event.create({
+        data: {
+          id: modelProps.id,
+          establishmentId: modelProps.establishmentId,
+          name: modelProps.name,
+          description: modelProps.description,
+          date: modelProps.date,
+          startTime: modelProps.startTime,
+          endTime: modelProps.endTime,
+          status: modelProps.status,
+          maxCapacity: modelProps.maxCapacity,
+          currentCapacity: modelProps.currentCapacity,
+          isPublic: modelProps.isPublic,
+          coverCharge: modelProps.coverCharge,
+          created_at: modelProps.created_at,
+          updated_at: modelProps.updated_at,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Event,
+        id: entity.event_id.id,
+        operation: "event.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Event[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       EventModelMapper.toModel(entity),
     );
-    await this.prisma.event.createMany({
-      data: modelsProps.map((m) => ({
-        id: m.id,
-        establishmentId: m.establishmentId,
-        name: m.name,
-        description: m.description,
-        date: m.date,
-        startTime: m.startTime,
-        endTime: m.endTime,
-        status: m.status,
-        maxCapacity: m.maxCapacity,
-        currentCapacity: m.currentCapacity,
-        isPublic: m.isPublic,
-        coverCharge: m.coverCharge,
-        created_at: m.created_at,
-        updated_at: m.updated_at,
-      })),
-    });
+    try {
+      await this.prisma.event.createMany({
+        data: modelsProps.map((m) => ({
+          id: m.id,
+          establishmentId: m.establishmentId,
+          name: m.name,
+          description: m.description,
+          date: m.date,
+          startTime: m.startTime,
+          endTime: m.endTime,
+          status: m.status,
+          maxCapacity: m.maxCapacity,
+          currentCapacity: m.currentCapacity,
+          isPublic: m.isPublic,
+          coverCharge: m.coverCharge,
+          created_at: m.created_at,
+          updated_at: m.updated_at,
+        })),
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: Event,
+        operation: "event.createMany",
+      });
+    }
   }
 
   async update(entity: Event): Promise<void> {
@@ -84,10 +101,11 @@ export class EventPrismaRepository implements IEventRepository {
         },
       });
     } catch (e: any) {
-      if (e?.code === "P2025") {
-        throw new NotFoundError(id, Event);
-      }
-      throw e;
+      throw mapPrismaErrorToDomainError(e, {
+        entityClass: Event,
+        id,
+        operation: "event.update",
+      });
     }
   }
 
@@ -95,10 +113,11 @@ export class EventPrismaRepository implements IEventRepository {
     try {
       await this.prisma.event.delete({ where: { id: id.id } });
     } catch (e: any) {
-      if (e?.code === "P2025") {
-        throw new NotFoundError(id.id, Event);
-      }
-      throw e;
+      throw mapPrismaErrorToDomainError(e, {
+        entityClass: Event,
+        id: id.id,
+        operation: "event.delete",
+      });
     }
   }
 
@@ -184,7 +203,11 @@ export class EventPrismaRepository implements IEventRepository {
     };
   }
 
-  async addAttendee(event_id: EventId, audience_id: string): Promise<void> {
+  async addAttendee(
+    event_id: EventId,
+    audience_id: string,
+    now: Date = new Date(),
+  ): Promise<void> {
     const event = await this.findById(event_id);
     if (!event) {
       throw new NotFoundError(event_id.id, Event);
@@ -204,41 +227,57 @@ export class EventPrismaRepository implements IEventRepository {
       return;
     }
 
-    event.addAttendee();
+    event.addAttendee(audience_id, now);
     if (event.notification.hasErrors()) {
-      throw new InvalidArgumentError(
-        JSON.stringify(event.notification.toJSON()),
-      );
+      throw new EntityValidationError(event.notification.toJSON(), {
+        metadata: {
+          operation: "event.addAttendee",
+          event_id: event_id.id,
+          audience_id,
+        },
+      });
     }
 
-    await this.prisma.$transaction([
-      this.prisma.eventAttendee.upsert({
-        where: {
-          eventId_audienceId: {
+    try {
+      await this.prisma.$transaction([
+        this.prisma.eventAttendee.upsert({
+          where: {
+            eventId_audienceId: {
+              eventId: event_id.id,
+              audienceId: audience_id,
+            },
+          },
+          update: {
+            is_active: true,
+            leftAt: null,
+          },
+          create: {
             eventId: event_id.id,
             audienceId: audience_id,
           },
-        },
-        update: {
-          is_active: true,
-          leftAt: null,
-        },
-        create: {
-          eventId: event_id.id,
-          audienceId: audience_id,
-        },
-      }),
-      this.prisma.event.update({
-        where: { id: event_id.id },
-        data: {
-          currentCapacity: event.current_capacity,
-          updated_at: event.updated_at,
-        },
-      }),
-    ]);
+        }),
+        this.prisma.event.update({
+          where: { id: event_id.id },
+          data: {
+            currentCapacity: event.current_capacity,
+            updated_at: event.updated_at,
+          },
+        }),
+      ]);
+    } catch (e: any) {
+      throw mapPrismaErrorToDomainError(e, {
+        entityClass: Event,
+        id: event_id.id,
+        operation: "event.addAttendee",
+      });
+    }
   }
 
-  async removeAttendee(event_id: EventId, audience_id: string): Promise<void> {
+  async removeAttendee(
+    event_id: EventId,
+    audience_id: string,
+    now: Date = new Date(),
+  ): Promise<void> {
     const event = await this.findById(event_id);
     if (!event) {
       throw new NotFoundError(event_id.id, Event);
@@ -262,34 +301,46 @@ export class EventPrismaRepository implements IEventRepository {
       return;
     }
 
-    event.removeAttendee();
+    event.removeAttendee(audience_id, now);
     if (event.notification.hasErrors()) {
-      throw new InvalidArgumentError(
-        JSON.stringify(event.notification.toJSON()),
-      );
+      throw new EntityValidationError(event.notification.toJSON(), {
+        metadata: {
+          operation: "event.removeAttendee",
+          event_id: event_id.id,
+          audience_id,
+        },
+      });
     }
 
-    await this.prisma.$transaction([
-      this.prisma.eventAttendee.update({
-        where: {
-          eventId_audienceId: {
-            eventId: event_id.id,
-            audienceId: audience_id,
+    try {
+      await this.prisma.$transaction([
+        this.prisma.eventAttendee.update({
+          where: {
+            eventId_audienceId: {
+              eventId: event_id.id,
+              audienceId: audience_id,
+            },
           },
-        },
-        data: {
-          is_active: false,
-          leftAt: new Date(),
-        },
-      }),
-      this.prisma.event.update({
-        where: { id: event_id.id },
-        data: {
-          currentCapacity: event.current_capacity,
-          updated_at: event.updated_at,
-        },
-      }),
-    ]);
+          data: {
+            is_active: false,
+            leftAt: now,
+          },
+        }),
+        this.prisma.event.update({
+          where: { id: event_id.id },
+          data: {
+            currentCapacity: event.current_capacity,
+            updated_at: event.updated_at,
+          },
+        }),
+      ]);
+    } catch (e: any) {
+      throw mapPrismaErrorToDomainError(e, {
+        entityClass: Event,
+        id: event_id.id,
+        operation: "event.removeAttendee",
+      });
+    }
   }
 
   async isAudienceAttendee(

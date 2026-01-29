@@ -4,6 +4,7 @@ import {
   SocialLinks,
   Uuid,
 } from "../../../../shared/domain";
+import { InvariantViolationError } from "../../../../shared/domain/errors/invariant-violation.error";
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { Email } from "../../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
@@ -92,7 +93,16 @@ export class EstablishmentModelMapper {
     if (model.profile) {
       try {
         if (!isRecord(model.profile.location)) {
-          throw new Error("Invalid establishment profile location");
+          throw new InvariantViolationError(
+            "Invalid establishment profile location",
+            {
+              metadata: {
+                entity: "Establishment",
+                model_id: model.id,
+                field: "profile.location",
+              },
+            },
+          );
         }
 
         const locationJson: any = model.profile.location;

@@ -1,8 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { MusicianWallet } from "../../../domain/musician-wallet.aggregate";
 import {
   IMusicianWalletRepository,
@@ -19,18 +19,33 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
 
   async insert(entity: MusicianWallet): Promise<void> {
     const modelProps = MusicianWalletModelMapper.toModel(entity);
-    await this.prisma.musicianWallet.create({
-      data: modelProps,
-    });
+    try {
+      await this.prisma.musicianWallet.create({
+        data: modelProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.wallet_id.id,
+        operation: "musicianWallet.create",
+      });
+    }
   }
 
   async bulkInsert(entities: MusicianWallet[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       MusicianWalletModelMapper.toModel(entity),
     );
-    await this.prisma.musicianWallet.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.musicianWallet.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "musicianWallet.createMany",
+      });
+    }
   }
 
   async update(entity: MusicianWallet): Promise<void> {
@@ -40,8 +55,12 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
         where: { id: entity.wallet_id.id },
         data: modelProps,
       });
-    } catch (e) {
-      throw new NotFoundError(entity.wallet_id.id, MusicianWallet);
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.wallet_id.id,
+        operation: "musicianWallet.update",
+      });
     }
   }
 
@@ -50,8 +69,12 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
       await this.prisma.musicianWallet.delete({
         where: { id: entity_id.id },
       });
-    } catch (e) {
-      throw new NotFoundError(entity_id.id, MusicianWallet);
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity_id.id,
+        operation: "musicianWallet.delete",
+      });
     }
   }
 

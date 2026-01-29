@@ -5,7 +5,7 @@ import { EstablishmentModelMapper } from "../establishment-model-mapper";
 describe("EstablishmentModelMapper Unit Tests", () => {
   describe("toModel", () => {
     it("should convert establishment entity to model", () => {
-      const establishment = Establishment.fake().anEstablishment().build();
+      const establishment = Establishment.fake().aEstablishment().build();
       const model = EstablishmentModelMapper.toModel(establishment);
 
       expect(model).toMatchObject({
@@ -30,7 +30,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
 
     it("should handle establishment with minimal data", () => {
       const establishment = Establishment.fake()
-        .anEstablishment()
+        .aEstablishment()
         .withDescription(null)
         .withAvatar(null)
         .withPhone(null)
@@ -61,7 +61,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
 
     it("should handle establishment with all optional fields", () => {
       const establishment = Establishment.fake()
-        .anEstablishment()
+        .aEstablishment()
         .withDescription("Great place for live music")
         .withAvatar("https://example.com/avatar.jpg")
         .withPhone("11999999999")
@@ -201,7 +201,7 @@ describe("EstablishmentModelMapper Unit Tests", () => {
   describe("bidirectional conversion", () => {
     it("should maintain data integrity in both directions", () => {
       const originalEstablishment = Establishment.fake()
-        .anEstablishment()
+        .aEstablishment()
         .withDescription("Test description")
         .withAvatar("https://example.com/avatar.jpg")
         .withPhone("11999999999")

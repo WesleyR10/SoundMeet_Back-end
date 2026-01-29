@@ -1,5 +1,7 @@
-import { UserInteraction } from "../../../domain/user-interaction.aggregate";
-import { UserInteractionId } from "../../../domain/value-objects/gamification-id.vo";
+import {
+  UserInteraction,
+  UserInteractionId,
+} from "../../../domain/user-interaction.aggregate";
 import { InteractionMetadata } from "../../../domain/value-objects/interaction-metadata.vo";
 
 export type UserInteractionModelProps = {

@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Inquiry, InquiryId } from "../../../domain/inquiry.aggregate";
 import {
   IInquiryRepository,
@@ -9,7 +9,7 @@ import {
   InquirySearchParams,
   InquirySearchResult,
 } from "../../../domain/inquiry.repository";
-import { InquiryModelMapper, InquiryModelProps } from "./inquiry-model-mapper";
+import { InquiryModelMapper } from "./inquiry-model-mapper";
 
 export class InquiryPrismaRepository implements IInquiryRepository {
   sortableFields: string[] = ["created_at", "updated_at", "status"];
@@ -18,18 +18,33 @@ export class InquiryPrismaRepository implements IInquiryRepository {
 
   async insert(entity: Inquiry): Promise<void> {
     const modelProps = InquiryModelMapper.toModel(entity);
-    await this.prisma.inquiry.create({
-      data: modelProps as any,
-    });
+    try {
+      await this.prisma.inquiry.create({
+        data: modelProps as any,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.inquiry_id.id,
+        operation: "inquiry.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Inquiry[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       InquiryModelMapper.toModel(entity),
     );
-    await this.prisma.inquiry.createMany({
-      data: modelsProps as any,
-    });
+    try {
+      await this.prisma.inquiry.createMany({
+        data: modelsProps as any,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "inquiry.createMany",
+      });
+    }
   }
 
   async update(entity: Inquiry): Promise<void> {
@@ -42,10 +57,11 @@ export class InquiryPrismaRepository implements IInquiryRepository {
         data: modelProps as any,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "inquiry.update",
+      });
     }
   }
 
@@ -56,10 +72,11 @@ export class InquiryPrismaRepository implements IInquiryRepository {
         where: { id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "inquiry.delete",
+      });
     }
   }
 

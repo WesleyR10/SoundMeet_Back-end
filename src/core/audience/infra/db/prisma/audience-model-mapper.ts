@@ -1,3 +1,4 @@
+import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { AudiencePreferences } from "../../../../shared/domain/value-objects/audience-preferences.vo";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { AudienceModel } from "./audience-model";
@@ -109,7 +110,7 @@ export class AudienceModelMapper {
       },
     });
 
-    return new Audience({
+    const entity = new Audience({
       audience_id: new AudienceId(model.id),
       email: model.email,
       name: model.name,
@@ -124,5 +125,12 @@ export class AudienceModelMapper {
       created_at: model.created_at,
       updated_at: model.updated_at,
     });
+
+    entity.validate();
+    if (entity.notification.hasErrors()) {
+      throw new LoadEntityError(entity.notification.toJSON());
+    }
+
+    return entity;
   }
 }

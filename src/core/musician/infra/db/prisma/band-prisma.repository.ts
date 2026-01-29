@@ -1,8 +1,8 @@
 import { CurrencyEnum, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Band, BandId } from "../../../domain/band.aggregate";
 import {
   BandFilter,
@@ -33,20 +33,28 @@ export class BandPrismaRepository implements IBandRepository {
 
   async insert(entity: Band): Promise<void> {
     const modelProps = BandModelMapper.toModel(entity);
-    await this.prisma.band.create({
-      data: {
-        ...modelProps,
-        members: {
-          create: entity.members.map((m) => ({
-            id: m.member_id?.id ?? new Uuid().id,
-            musicianId: m.musician_id.id,
-            role: m.role,
-            instrument: m.instrument,
-            joinedAt: m.joined_at,
-          })),
+    try {
+      await this.prisma.band.create({
+        data: {
+          ...modelProps,
+          members: {
+            create: entity.members.map((m) => ({
+              id: m.member_id?.id ?? new Uuid().id,
+              musicianId: m.musician_id.id,
+              role: m.role,
+              instrument: m.instrument,
+              joinedAt: m.joined_at,
+            })),
+          },
         },
-      },
-    });
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.band_id.id,
+        operation: "band.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Band[]): Promise<void> {
@@ -59,36 +67,45 @@ export class BandPrismaRepository implements IBandRepository {
     const id = entity.band_id.id;
     const modelProps = BandModelMapper.toModel(entity);
 
-    await this.prisma.$transaction(async (tx) => {
-      try {
-        await tx.band.update({
-          where: { id },
-          data: modelProps,
-        });
-      } catch (error: any) {
-        if (error.code === "P2025") {
-          throw new NotFoundError(id, this.getEntity());
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        try {
+          await tx.band.update({
+            where: { id },
+            data: modelProps,
+          });
+        } catch (error: any) {
+          throw mapPrismaErrorToDomainError(error, {
+            entityClass: this.getEntity(),
+            id,
+            operation: "band.update",
+          });
         }
-        throw error;
-      }
 
-      await tx.bandMember.deleteMany({
-        where: { bandId: id },
-      });
-
-      if (entity.members.length) {
-        await tx.bandMember.createMany({
-          data: entity.members.map((m) => ({
-            id: m.member_id?.id ?? new Uuid().id,
-            bandId: id,
-            musicianId: m.musician_id.id,
-            role: m.role,
-            instrument: m.instrument,
-            joinedAt: m.joined_at,
-          })),
+        await tx.bandMember.deleteMany({
+          where: { bandId: id },
         });
-      }
-    });
+
+        if (entity.members.length) {
+          await tx.bandMember.createMany({
+            data: entity.members.map((m) => ({
+              id: m.member_id?.id ?? new Uuid().id,
+              bandId: id,
+              musicianId: m.musician_id.id,
+              role: m.role,
+              instrument: m.instrument,
+              joinedAt: m.joined_at,
+            })),
+          });
+        }
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "band.update.transaction",
+      });
+    }
   }
 
   async delete(id: BandId): Promise<void> {
@@ -99,10 +116,11 @@ export class BandPrismaRepository implements IBandRepository {
         where: { id: bandId },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: id.id,
+        operation: "band.delete",
+      });
     }
   }
 

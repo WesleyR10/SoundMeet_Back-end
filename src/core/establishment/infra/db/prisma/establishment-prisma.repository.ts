@@ -1,7 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   Establishment,
   EstablishmentId,
@@ -54,27 +54,42 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
         }
       : null;
-    await this.prisma.establishment.create({
-      data: {
-        ...modelProps,
-        profile: profileCreateData
-          ? {
-              create: {
-                ...profileCreateData,
-              },
-            }
-          : undefined,
-      },
-    });
+    try {
+      await this.prisma.establishment.create({
+        data: {
+          ...modelProps,
+          profile: profileCreateData
+            ? {
+                create: {
+                  ...profileCreateData,
+                },
+              }
+            : undefined,
+        },
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.establishment_id.id,
+        operation: "establishment.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Establishment[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       EstablishmentModelMapper.toModel(entity),
     );
-    await this.prisma.establishment.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.establishment.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "establishment.createMany",
+      });
+    }
   }
 
   async update(entity: Establishment): Promise<void> {
@@ -126,10 +141,11 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
         },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "establishment.update",
+      });
     }
   }
 
@@ -141,10 +157,11 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
         where: { id: id },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(establishment_id.id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: establishment_id.id,
+        operation: "establishment.delete",
+      });
     }
   }
 
@@ -157,10 +174,11 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
         },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, EstablishmentProfile);
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: EstablishmentProfile,
+        id,
+        operation: "establishmentProfile.delete",
+      });
     }
   }
 

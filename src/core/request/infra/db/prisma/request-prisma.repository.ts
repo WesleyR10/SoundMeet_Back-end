@@ -1,8 +1,8 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
+import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Request, RequestId } from "../../../domain/request.aggregate";
 import {
   IRequestRepository,
@@ -27,18 +27,33 @@ export class RequestPrismaRepository implements IRequestRepository {
 
   async insert(entity: Request): Promise<void> {
     const modelProps = RequestModelMapper.toModel(entity);
-    await this.prisma.musicRequest.create({
-      data: modelProps,
-    });
+    try {
+      await this.prisma.musicRequest.create({
+        data: modelProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: entity.request_id.id,
+        operation: "musicRequest.create",
+      });
+    }
   }
 
   async bulkInsert(entities: Request[]): Promise<void> {
     const modelsProps = entities.map((entity) =>
       RequestModelMapper.toModel(entity),
     );
-    await this.prisma.musicRequest.createMany({
-      data: modelsProps,
-    });
+    try {
+      await this.prisma.musicRequest.createMany({
+        data: modelsProps,
+      });
+    } catch (error: any) {
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        operation: "musicRequest.createMany",
+      });
+    }
   }
 
   async update(entity: Request): Promise<void> {
@@ -51,10 +66,11 @@ export class RequestPrismaRepository implements IRequestRepository {
         data: modelProps,
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id,
+        operation: "musicRequest.update",
+      });
     }
   }
 
@@ -66,10 +82,11 @@ export class RequestPrismaRepository implements IRequestRepository {
         where: { id: requestId },
       });
     } catch (error: any) {
-      if (error.code === "P2025") {
-        throw new NotFoundError(id.id, this.getEntity());
-      }
-      throw error;
+      throw mapPrismaErrorToDomainError(error, {
+        entityClass: this.getEntity(),
+        id: requestId,
+        operation: "musicRequest.delete",
+      });
     }
   }
 

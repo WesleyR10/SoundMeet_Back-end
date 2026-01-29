@@ -60,12 +60,13 @@ describe("BadgePrismaRepository", () => {
     it("should update a badge", async () => {
       const badge = Badge.fake().aBadge().build();
       const modelProps = BadgeModelMapper.toModel(badge);
+      const { id: _id, created_at: _created_at, ...data } = modelProps;
 
       await repository.update(badge);
 
       expect(prisma.badge.update).toHaveBeenCalledWith({
         where: { id: badge.badge_id.id },
-        data: modelProps,
+        data,
       });
     });
 
@@ -107,6 +108,7 @@ describe("BadgePrismaRepository", () => {
   describe("findById", () => {
     it("should return a badge when found", async () => {
       const badge = Badge.fake().aBadge().build();
+      badge.updated_at = badge.created_at;
       const modelProps = BadgeModelMapper.toModel(badge);
       (prisma.badge.findUnique as jest.Mock).mockResolvedValue(modelProps);
 
@@ -201,7 +203,7 @@ describe("BadgePrismaRepository", () => {
           ],
           category: "engagement",
         },
-        orderBy: undefined,
+        orderBy: { created_at: "desc" },
         skip: 0,
         take: 10,
       });
