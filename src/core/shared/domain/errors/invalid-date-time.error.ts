@@ -1,6 +1,6 @@
-import { DomainError } from "./domain.error";
+import { InvariantViolationError } from "./invariant-violation.error";
 
-export class InvalidArgumentError extends DomainError {
+export class InvalidDateTimeError extends InvariantViolationError {
   constructor(
     message: string,
     options?: {

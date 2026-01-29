@@ -1,6 +1,6 @@
 import { DomainError } from "./domain.error";
 
-export class InvalidArgumentError extends DomainError {
+export class InvalidOperationError extends DomainError {
   constructor(
     message: string,
     options?: {
