@@ -1,7 +1,7 @@
 import { AggregateRoot } from "../../../domain/aggregate-root";
 import { IUnitOfWork } from "../../../domain/repository/unit-of-work.interface";
 
-export class UnitOfWorkFakeInMemory implements IUnitOfWork {
+export class UnitOfWorkFakeInMemory implements IUnitOfWork<void> {
   private aggregateRoots: Set<AggregateRoot> = new Set<AggregateRoot>();
 
   constructor() {}
@@ -18,12 +18,12 @@ export class UnitOfWorkFakeInMemory implements IUnitOfWork {
     return;
   }
 
-  do<T>(workFn: (uow: IUnitOfWork) => Promise<T>): Promise<T> {
+  do<T>(workFn: (uow: IUnitOfWork<void>) => Promise<T>): Promise<T> {
     return workFn(this);
   }
 
   getTransaction() {
-    return;
+    return null;
   }
 
   addAggregateRoot(aggregateRoot: AggregateRoot): void {
