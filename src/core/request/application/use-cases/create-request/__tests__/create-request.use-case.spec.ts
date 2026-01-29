@@ -5,6 +5,7 @@ import { EventInMemoryRepository } from "@core/events/infra/db/in-memory";
 import { Musician, MusicianId } from "@core/musician/domain";
 import { MusicianInMemoryRepository } from "@core/musician/infra/db/in-memory/musician-in-memory.repository";
 
+import { FakeClock } from "../../../../../shared/application/clock.interface";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
@@ -19,12 +20,14 @@ describe("CreateRequestUseCase Unit Tests", () => {
   let eventRepository: EventInMemoryRepository;
   let musicianRepository: MusicianInMemoryRepository;
   let audienceRepository: AudienceInMemoryRepository;
+  const now = new Date("2026-01-01T10:00:00.000Z");
+  const clock = new FakeClock(now);
 
   const setupEventWithMusicians = async (
     eventId: string,
     musicianIds: string[],
   ) => {
-    const now = new Date();
+    const now = clock.now();
     const event = new Event({
       event_id: new EventId(eventId),
       establishment_id: new Uuid(),
@@ -52,6 +55,8 @@ describe("CreateRequestUseCase Unit Tests", () => {
   };
 
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
     repository = new RequestInMemoryRepository();
     eventRepository = new EventInMemoryRepository();
     musicianRepository = new MusicianInMemoryRepository();
@@ -63,7 +68,12 @@ describe("CreateRequestUseCase Unit Tests", () => {
       audienceRepository,
       10,
       120,
+      clock,
     );
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("should throw an error when aggregate is not valid", async () => {
@@ -81,89 +91,137 @@ describe("CreateRequestUseCase Unit Tests", () => {
     );
   });
 
-  it("should throw an error when daily limit is exceeded", async () => {
-    const eventId = new Uuid().id;
-    const audienceId = new Uuid().id;
-    const musicianId = new Uuid().id;
+  test.each([
+    {
+      scenario: "daily limit is exceeded",
+      arrange: async () => {
+        const eventId = new Uuid().id;
+        const audienceId = new Uuid().id;
+        const musicianId = new Uuid().id;
 
-    await setupEventWithMusicians(eventId, [musicianId]);
-    await audienceRepository.insert(
-      new Audience({
-        audience_id: new AudienceId(audienceId),
-        email: `${audienceId}@soundmeet.test`,
-        name: "Audience",
-        is_active: true,
-      }),
-    );
-    await eventRepository.addAttendee(new EventId(eventId), audienceId);
+        await setupEventWithMusicians(eventId, [musicianId]);
+        await audienceRepository.insert(
+          new Audience({
+            audience_id: new AudienceId(audienceId),
+            email: `${audienceId}@soundmeet.test`,
+            name: "Audience",
+            is_active: true,
+          }),
+        );
+        await eventRepository.addAttendee(new EventId(eventId), audienceId);
 
-    // Create 10 requests (daily limit)
-    for (let i = 0; i < 10; i++) {
-      const request = Request.create({
-        event_id: eventId,
-        audience_id: audienceId,
-        musician_id: new Uuid().id,
-        song_title: `Song ${i}`,
-        artist: "Artist",
-        message: "Message",
-      });
-      await repository.insert(request);
-    }
+        for (let i = 0; i < 10; i++) {
+          const request = Request.create({
+            event_id: eventId,
+            audience_id: audienceId,
+            musician_id: new Uuid().id,
+            song_title: `Song ${i}`,
+            artist: "Artist",
+            message: "Message",
+            created_at: clock.now(),
+          });
+          await repository.insert(request);
+        }
 
-    const input = {
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "New Song",
-      artist: "New Artist",
-      message: "New message",
-    };
+        return {
+          event_id: eventId,
+          audience_id: audienceId,
+          musician_id: musicianId,
+          song_title: "New Song",
+          artist: "New Artist",
+          message: "New message",
+        };
+      },
+    },
+    {
+      scenario: "pending request exists for same musician",
+      arrange: async () => {
+        const eventId = new Uuid().id;
+        const audienceId = new Uuid().id;
+        const musicianId = new Uuid().id;
 
-    await expect(() => useCase.execute(input)).rejects.toThrow(
-      EntityValidationError,
-    );
-  });
+        await setupEventWithMusicians(eventId, [musicianId]);
+        await audienceRepository.insert(
+          new Audience({
+            audience_id: new AudienceId(audienceId),
+            email: `${audienceId}@soundmeet.test`,
+            name: "Audience",
+            is_active: true,
+          }),
+        );
+        await eventRepository.addAttendee(new EventId(eventId), audienceId);
 
-  it("should throw an error when there is a pending request for the same musician", async () => {
-    const eventId = new Uuid().id;
-    const audienceId = new Uuid().id;
-    const musicianId = new Uuid().id;
+        await repository.insert(
+          Request.create({
+            event_id: eventId,
+            audience_id: audienceId,
+            musician_id: musicianId,
+            song_title: "Existing Song",
+            artist: "Existing Artist",
+            message: "Existing message",
+          }),
+        );
 
-    await setupEventWithMusicians(eventId, [musicianId]);
-    await audienceRepository.insert(
-      new Audience({
-        audience_id: new AudienceId(audienceId),
-        email: `${audienceId}@soundmeet.test`,
-        name: "Audience",
-        is_active: true,
-      }),
-    );
-    await eventRepository.addAttendee(new EventId(eventId), audienceId);
+        return {
+          event_id: eventId,
+          audience_id: audienceId,
+          musician_id: musicianId,
+          song_title: "New Song",
+          artist: "New Artist",
+          message: "New message",
+        };
+      },
+    },
+    {
+      scenario: "similar recent request exists for same musician",
+      arrange: async () => {
+        const eventId = new Uuid().id;
+        const audienceId = new Uuid().id;
+        const musicianId = new Uuid().id;
+        const songTitle = "Same Song";
 
-    // Create a pending request for the same musician
-    const existingRequest = Request.create({
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "Existing Song",
-      artist: "Existing Artist",
-      message: "Existing message",
-    });
-    await repository.insert(existingRequest);
+        await setupEventWithMusicians(eventId, [musicianId]);
+        await audienceRepository.insert(
+          new Audience({
+            audience_id: new AudienceId(audienceId),
+            email: `${audienceId}@soundmeet.test`,
+            name: "Audience",
+            is_active: true,
+          }),
+        );
+        await eventRepository.addAttendee(new EventId(eventId), audienceId);
 
-    const input = {
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "New Song",
-      artist: "New Artist",
-      message: "New message",
-    };
+        await repository.insert(
+          Request.create({
+            event_id: eventId,
+            audience_id: audienceId,
+            musician_id: musicianId,
+            song_title: songTitle,
+            artist: "Same Artist",
+            message: "Message",
+            created_at: now,
+          }),
+        );
 
-    await expect(() => useCase.execute(input)).rejects.toThrow(
-      EntityValidationError,
-    );
-  });
+        return {
+          event_id: eventId,
+          audience_id: audienceId,
+          musician_id: musicianId,
+          song_title: songTitle,
+          artist: "Same Artist",
+          message: "New message",
+        };
+      },
+    },
+  ])(
+    "should throw EntityValidationError when $scenario",
+    async ({ arrange }) => {
+      const input = await arrange();
+      await expect(() => useCase.execute(input)).rejects.toThrow(
+        EntityValidationError,
+      );
+    },
+  );
 
   it("should allow similar request for a different musician in the last 2 hours", async () => {
     const eventId = new Uuid().id;
@@ -191,6 +249,7 @@ describe("CreateRequestUseCase Unit Tests", () => {
       song_title: songTitle,
       artist: "Same Artist",
       message: "Message",
+      created_at: clock.now(),
     });
     await repository.insert(existingRequest);
 
