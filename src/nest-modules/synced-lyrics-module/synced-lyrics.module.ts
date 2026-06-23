@@ -1,0 +1,32 @@
+import { Module } from "@nestjs/common";
+
+import { DatabaseModule } from "../database-module/database.module";
+import { RabbitmqModule } from "../rabbitmq-module/rabbitmq.module";
+import { SyncedLyricsBulkRequestedConsumer } from "./synced-lyrics.consumers";
+import { SyncedLyricsController } from "./synced-lyrics.controller";
+import { SYNCED_LYRICS_PROVIDERS } from "./synced-lyrics.providers";
+import { SyncedLyricsLrclibController } from "./synced-lyrics-lrclib.controller";
+import { SyncedLyricsRateLimitGuard } from "./synced-lyrics-rate-limit.guard";
+
+@Module({
+  imports: [
+    DatabaseModule,
+    ...((process.env.SYNCED_LYRICS_BULK_TRANSPORT ?? "inline") === "rabbitmq"
+      ? [RabbitmqModule.forFeature()]
+      : []),
+  ],
+  controllers: [SyncedLyricsController, SyncedLyricsLrclibController],
+  providers: [
+    ...Object.values(SYNCED_LYRICS_PROVIDERS.REPOSITORIES),
+    ...Object.values(SYNCED_LYRICS_PROVIDERS.INFRA_PROVIDERS),
+    ...Object.values(SYNCED_LYRICS_PROVIDERS.USE_CASES),
+    SyncedLyricsRateLimitGuard,
+    ...((process.env.SYNCED_LYRICS_BULK_TRANSPORT ?? "inline") === "rabbitmq"
+      ? [SyncedLyricsBulkRequestedConsumer]
+      : []),
+  ],
+  exports: [
+    SYNCED_LYRICS_PROVIDERS.REPOSITORIES.SYNCED_LYRICS_REPOSITORY.provide,
+  ],
+})
+export class SyncedLyricsModule {}
