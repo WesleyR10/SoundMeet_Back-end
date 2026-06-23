@@ -10,8 +10,15 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import {
   EstablishmentOutput,
@@ -27,6 +34,14 @@ import { ListEstablishmentAnalyticsUseCase } from "../../core/establishment/appl
 import { ListEstablishmentsUseCase } from "../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import {
+  AuthGuard,
+  CurrentUserContextGuard,
+  EstablishmentOwnershipGuard,
+  Public,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
 import { CreateEstablishmentDto } from "./dto/create-establishment.dto";
 import { CreateEstablishmentProfileDto } from "./dto/create-establishment-profile.dto";
 import { GetHiringDashboardDto } from "./dto/get-hiring-dashboard.dto";
@@ -43,6 +58,8 @@ import { EstablishmentAnalyticsCollectionPresenter } from "./establishment-analy
 import { HiringDashboardPresenter } from "./hiring-dashboard.presenter";
 
 @ApiTags("Establishments")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("establishments")
 export class EstablishmentsController {
   @Inject(CreateEstablishmentUseCase)
@@ -76,6 +93,7 @@ export class EstablishmentsController {
   private listAnalyticsUseCase: ListEstablishmentAnalyticsUseCase;
 
   @Post()
+  @Public()
   @ApiOperation({
     summary: "Criar estabelecimento",
     description: "Cria um estabelecimento e gera QR Code permanente.",
@@ -87,6 +105,7 @@ export class EstablishmentsController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({
     summary: "Listar estabelecimentos",
     description: "Lista estabelecimentos com paginação, ordenação e filtros.",
@@ -98,6 +117,7 @@ export class EstablishmentsController {
   }
 
   @Get(":id")
+  @Public()
   @ApiOperation({
     summary: "Buscar estabelecimento por ID",
     description: "Retorna os detalhes do estabelecimento.",
@@ -112,6 +132,8 @@ export class EstablishmentsController {
   }
 
   @Patch(":id")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar estabelecimento",
     description: "Atualiza dados do estabelecimento.",
@@ -127,6 +149,8 @@ export class EstablishmentsController {
   }
 
   @Post(":id/profile")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Criar perfil do estabelecimento",
     description:
@@ -143,6 +167,8 @@ export class EstablishmentsController {
   }
 
   @Patch(":id/profile")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar perfil do estabelecimento",
     description:
@@ -160,6 +186,8 @@ export class EstablishmentsController {
 
   @HttpCode(204)
   @Delete(":id/profile")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Remover perfil do estabelecimento",
     description: "Remove o EstablishmentProfile.",
@@ -174,6 +202,8 @@ export class EstablishmentsController {
 
   @HttpCode(204)
   @Delete(":id")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Remover estabelecimento",
     description: "Remove o estabelecimento.",
@@ -187,6 +217,8 @@ export class EstablishmentsController {
   }
 
   @Get(":id/hiring-dashboard")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Dashboard de Contratação",
     description:
@@ -200,12 +232,26 @@ export class EstablishmentsController {
   ) {
     const output = await this.getHiringDashboardUseCase.execute({
       establishment_id: id,
-      ...(query as any),
+      musicians_page: query.musicians_page,
+      musicians_per_page: query.musicians_per_page,
+      musicians_sort: query.musicians_sort,
+      musicians_sort_dir: query.musicians_sort_dir,
+      bands_page: query.bands_page,
+      bands_per_page: query.bands_per_page,
+      bands_sort: query.bands_sort,
+      bands_sort_dir: query.bands_sort_dir,
+      events_page: query.events_page,
+      events_per_page: query.events_per_page,
+      events_sort: query.events_sort,
+      events_sort_dir: query.events_sort_dir,
+      filters: query.filters,
     });
     return new HiringDashboardPresenter(output);
   }
 
   @Get(":id/analytics")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Consultar analytics do estabelecimento",
     description:

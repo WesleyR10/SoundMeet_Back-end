@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 
-import { EstablishmentAnalytics } from "../../core/establishment/domain/establishment-analytics.entity";
+import { EstablishmentAnalytics } from "../../core/establishment/domain/establishment-analytics.read-model";
 import { IEstablishmentAnalyticsRepository } from "../../core/establishment/domain/establishment-analytics.repository";
 import { BookingCancelledEvent } from "../../core/scheduling/domain/events/booking-cancelled.event";
 import { BookingCompletedEvent } from "../../core/scheduling/domain/events/booking-completed.event";

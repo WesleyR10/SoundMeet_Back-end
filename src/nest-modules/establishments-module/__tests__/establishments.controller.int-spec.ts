@@ -32,6 +32,7 @@ import { RemoveEventAttendeeUseCase } from "../../../core/events/application/use
 import { RemoveEventPerformerUseCase } from "../../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
 import { UpdateEventUseCase } from "../../../core/events/application/use-cases/update-event/update-event.use-case";
 import { EntityValidationError } from "../../../core/shared/domain/validators/validation.error";
+import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
   EstablishmentCollectionPresenter,
   EstablishmentPresenter,
@@ -47,7 +48,7 @@ describe("EstablishmentsController Integration Tests", () => {
     const repositoryInstance = new EstablishmentInMemoryRepository();
     const eventRepositoryInstance = new EventInMemoryRepository();
 
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [EstablishmentsController],
       providers: [
         {
@@ -184,7 +185,10 @@ describe("EstablishmentsController Integration Tests", () => {
           },
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule =
+      await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<EstablishmentsController>(EstablishmentsController);
     repository = module.get<IEstablishmentRepository>(
