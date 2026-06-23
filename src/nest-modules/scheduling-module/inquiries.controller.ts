@@ -7,15 +7,25 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { AcceptInquiryUseCase } from "../../core/scheduling/application/use-cases/accept-inquiry/accept-inquiry.use-case";
 import { BookingOutput } from "../../core/scheduling/application/use-cases/common/booking-output";
 import { InquiryOutput } from "../../core/scheduling/application/use-cases/common/inquiry-output";
+import { ConvertInquiryToBookingInput } from "../../core/scheduling/application/use-cases/convert-inquiry-to-booking/convert-inquiry-to-booking.input";
 import { ConvertInquiryToBookingUseCase } from "../../core/scheduling/application/use-cases/convert-inquiry-to-booking/convert-inquiry-to-booking.use-case";
+import { CreateInquiryInput } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.input";
 import { CreateInquiryUseCase } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.use-case";
 import { RejectInquiryUseCase } from "../../core/scheduling/application/use-cases/reject-inquiry/reject-inquiry.use-case";
+import { AuthGuard, Roles, RolesGuard } from "../auth-module";
 import { BookingPresenter } from "./booking.presenter";
 import { AcceptInquiryDto } from "./dto/accept-inquiry.dto";
 import { ConvertInquiryToBookingDto } from "./dto/convert-inquiry-to-booking.dto";
@@ -24,6 +34,8 @@ import { RejectInquiryDto } from "./dto/reject-inquiry.dto";
 import { InquiryPresenter } from "./inquiry.presenter";
 
 @ApiTags("Scheduling")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard)
 @Controller("scheduling/inquiries")
 export class InquiriesController {
   @Inject(CreateInquiryUseCase)
@@ -39,6 +51,7 @@ export class InquiriesController {
   private convertInquiryToBookingUseCase: ConvertInquiryToBookingUseCase;
 
   @Post()
+  @Roles("establishment", "musician", "admin")
   @ApiOperation({
     summary: "Criar inquiry",
     description:
@@ -46,11 +59,14 @@ export class InquiriesController {
   })
   @ApiResponse({ status: 201, type: InquiryPresenter })
   async create(@Body() dto: CreateInquiryDto) {
-    const output = await this.createInquiryUseCase.execute(dto as any);
+    const output = await this.createInquiryUseCase.execute(
+      new CreateInquiryInput(dto),
+    );
     return InquiriesController.serializeInquiry(output);
   }
 
   @Patch(":id/accept")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Aceitar inquiry",
     description: "Marca inquiry como aceita pelo músico/banda.",
@@ -66,6 +82,7 @@ export class InquiriesController {
   }
 
   @Patch(":id/reject")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Rejeitar inquiry",
     description: "Marca inquiry como rejeitada pelo músico/banda.",
@@ -84,6 +101,7 @@ export class InquiriesController {
   }
 
   @Post(":id/convert-to-booking")
+  @Roles("establishment", "musician", "admin")
   @HttpCode(201)
   @ApiOperation({
     summary: "Converter inquiry em booking",
@@ -96,10 +114,17 @@ export class InquiriesController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: ConvertInquiryToBookingDto,
   ) {
-    const output = await this.convertInquiryToBookingUseCase.execute({
-      ...(dto as any),
-      inquiry_id: id,
-    });
+    const output = await this.convertInquiryToBookingUseCase.execute(
+      new ConvertInquiryToBookingInput({
+        inquiry_id: id,
+        start_at: dto.start_at,
+        end_at: dto.end_at,
+        fee: dto.fee,
+        notes: dto.notes,
+        buffer_minutes: dto.buffer_minutes,
+        expires_at: dto.expires_at,
+      }),
+    );
     return InquiriesController.serializeBooking(output);
   }
 

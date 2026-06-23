@@ -5,17 +5,27 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { CancelBookingUseCase } from "../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.use-case";
 import { ConfirmBookingUseCase } from "../../core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case";
 import { ProposeBookingUseCase } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.use-case";
+import { AuthGuard, Roles, RolesGuard } from "../auth-module";
 import { BookingPresenter } from "./booking.presenter";
 import { CancelBookingDto } from "./dto/cancel-booking.dto";
 import { ProposeBookingDto } from "./dto/propose-booking.dto";
 
 @ApiTags("Scheduling")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard)
 @Controller("scheduling/bookings")
 export class BookingsController {
   @Inject(ProposeBookingUseCase)
@@ -28,6 +38,7 @@ export class BookingsController {
   private cancelUseCase: CancelBookingUseCase;
 
   @Post("propose")
+  @Roles("establishment", "musician", "admin")
   @ApiOperation({
     summary: "Propor booking",
     description:
@@ -40,6 +51,7 @@ export class BookingsController {
   }
 
   @Post(":id/confirm")
+  @Roles("establishment", "musician", "admin")
   @ApiOperation({
     summary: "Confirmar booking",
     description: "Confirma um booking e bloqueia agenda no intervalo + buffer.",
@@ -54,6 +66,7 @@ export class BookingsController {
   }
 
   @Post(":id/cancel")
+  @Roles("establishment", "musician", "admin")
   @ApiOperation({
     summary: "Cancelar booking",
     description: "Cancela um booking com motivo opcional.",
