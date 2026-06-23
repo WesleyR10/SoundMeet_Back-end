@@ -1,54 +1,42 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 
-import {
-  Audience,
-  AudienceId,
-  IAudienceRepository,
-} from "../../core/audience/domain";
+import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
+import { PointsSourceEnum } from "../../core/gamification/domain/value-objects/points-source.vo";
 import { RequestAcceptedEvent } from "../../core/request/domain/events/request-accepted.event";
 import { RequestCreatedEvent } from "../../core/request/domain/events/request-created.event";
 import { RequestPlayedEvent } from "../../core/request/domain/events/request-played.event";
 import { RequestRejectedEvent } from "../../core/request/domain/events/request-rejected.event";
-import {
-  IRequestRepository,
-  RequestSearchParams,
-} from "../../core/request/domain/request.repository";
-import { NotFoundError } from "../../core/shared/domain/errors/not-found.error";
+import { RequestEventProcessingService } from "./request-event-processing.service";
 
 @Injectable()
 export class RequestEventsHandlers {
   private readonly logger = new Logger(RequestEventsHandlers.name);
 
   constructor(
-    @Inject("AudienceRepository")
-    private readonly audienceRepo: IAudienceRepository,
-    @Inject("RequestRepository")
-    private readonly requestRepo: IRequestRepository,
+    @Inject(AddPointsUseCase)
+    private readonly addPointsUseCase: AddPointsUseCase,
+    private readonly eventProcessing: RequestEventProcessingService,
   ) {}
 
   @OnEvent(RequestCreatedEvent.name)
   async handleRequestCreated(event: RequestCreatedEvent) {
     try {
-      const audience = await this.audienceRepo.findById(
-        new AudienceId(event.audience_id),
+      await this.eventProcessing.processOnce(
+        `created:${event.aggregate_id.id}:${event.audience_id}`,
+        () =>
+          this.addPointsUseCase.execute({
+            user_id: event.audience_id,
+            source: PointsSourceEnum.REQUEST,
+            metadata: {
+              request_id: event.aggregate_id.id,
+              event_id: event.event_id,
+              musician_id: event.musician_id,
+              song_title: event.song_title,
+              artist: event.artist,
+            },
+          }),
       );
-      if (!audience) {
-        throw new NotFoundError(event.audience_id, Audience);
-      }
-
-      audience.makeMusicRequest(
-        event.musician_id,
-        event.song_title,
-        event.artist ?? "",
-        event.event_id,
-      );
-
-      if (!audience.getBadges().includes("Sugestor")) {
-        audience.addBadge("Sugestor");
-      }
-
-      await this.audienceRepo.update(audience);
     } catch (error) {
       this.logger.error(
         JSON.stringify({
@@ -62,17 +50,31 @@ export class RequestEventsHandlers {
   }
 
   @OnEvent(RequestAcceptedEvent.name)
-  handleRequestAccepted(event: RequestAcceptedEvent) {
-    this.logger.log(
-      JSON.stringify({
-        event: "request.accepted",
-        request_id: event.aggregate_id.id,
-        event_id: event.event_id,
-        audience_id: event.audience_id,
-        musician_id: event.musician_id,
-        occurred_on: event.occurred_on,
-      }),
-    );
+  async handleRequestAccepted(event: RequestAcceptedEvent) {
+    try {
+      await this.eventProcessing.processOnce(
+        `accepted:${event.aggregate_id.id}:${event.audience_id}`,
+        () =>
+          this.addPointsUseCase.execute({
+            user_id: event.audience_id,
+            source: PointsSourceEnum.ACCEPTED_REQUEST,
+            metadata: {
+              request_id: event.aggregate_id.id,
+              event_id: event.event_id,
+              musician_id: event.musician_id,
+            },
+          }),
+      );
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "request.accepted",
+          request_id: event.aggregate_id.id,
+          audience_id: event.audience_id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   @OnEvent(RequestRejectedEvent.name)
@@ -92,33 +94,21 @@ export class RequestEventsHandlers {
   @OnEvent(RequestPlayedEvent.name)
   async handleRequestPlayed(event: RequestPlayedEvent) {
     try {
-      const audience = await this.audienceRepo.findById(
-        new AudienceId(event.audience_id),
-      );
-      if (!audience) {
-        throw new NotFoundError(event.audience_id, Audience);
-      }
-
-      audience.addPointsForAction("correct_guess");
-
-      const playedCount = (
-        await this.requestRepo.search(
-          RequestSearchParams.create({
-            page: 1,
-            per_page: 1,
-            filter: {
-              audience_id: event.audience_id,
-              status: "played",
+      await this.eventProcessing.processOnce(
+        `played:${event.aggregate_id.id}:${event.audience_id}`,
+        () =>
+          this.addPointsUseCase.execute({
+            user_id: event.audience_id,
+            source: PointsSourceEnum.BONUS,
+            metadata: {
+              points: 10,
+              request_id: event.aggregate_id.id,
+              event_id: event.event_id,
+              musician_id: event.musician_id,
+              description: "Bonus points for a played request",
             },
           }),
-        )
-      ).total;
-
-      if (playedCount >= 5 && !audience.getBadges().includes("Acertador")) {
-        audience.addBadge("Acertador");
-      }
-
-      await this.audienceRepo.update(audience);
+      );
     } catch (error) {
       this.logger.error(
         JSON.stringify({

@@ -12,8 +12,12 @@ import { ListRequestsUseCase } from "../../core/request/application/use-cases/li
 import { MarkRequestPlayedUseCase } from "../../core/request/application/use-cases/mark-request-played/mark-request-played.use-case";
 import { RespondToRequestUseCase } from "../../core/request/application/use-cases/respond-to-request/respond-to-request.use-case";
 import { UpdateRequestUseCase } from "../../core/request/application/use-cases/update-request/update-request.use-case";
+import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import { IRequestRepository } from "../../core/request/domain/request.repository";
+import { IRequestVoteRepository } from "../../core/request/domain/request-vote.repository";
 import { RequestPrismaRepository } from "../../core/request/infra/db/prisma/request-prisma.repository";
+import { RequestVotePrismaRepository } from "../../core/request/infra/db/prisma/request-vote-prisma.repository";
+import { IClock } from "../../core/shared/application/clock.interface";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
@@ -30,6 +34,24 @@ export const REPOSITORIES = {
     },
     inject: [PrismaService],
   },
+  REQUEST_VOTE_REPOSITORY: {
+    provide: "RequestVoteRepository",
+    useExisting: RequestVotePrismaRepository,
+  },
+  REQUEST_VOTE_PRISMA_REPOSITORY: {
+    provide: RequestVotePrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new RequestVotePrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+};
+
+export const SERVICES = {
+  CLOCK: {
+    provide: "Clock",
+    useValue: { now: () => new Date() } satisfies IClock,
+  },
 };
 
 export const USE_CASES = {
@@ -41,6 +63,7 @@ export const USE_CASES = {
       musicianRepo: IMusicianRepository,
       audienceRepo: IAudienceRepository,
       configService: ConfigSchemaType,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
     ) => {
       return new CreateRequestUseCase(
@@ -50,6 +73,7 @@ export const USE_CASES = {
         audienceRepo,
         configService.get<number>("MAX_REQUESTS_PER_USER_PER_EVENT")!,
         configService.get<number>("REQUEST_COOLDOWN_MINUTES")!,
+        clock,
         domainEventMediator,
       );
     },
@@ -59,6 +83,7 @@ export const USE_CASES = {
       "MusicianRepository",
       "AudienceRepository",
       ConfigService,
+      SERVICES.CLOCK.provide,
       DomainEventMediator,
     ],
   },
@@ -153,12 +178,14 @@ export const USE_CASES = {
       requestRepo: IRequestRepository,
       eventRepo: IEventRepository,
       musicianRepo: IMusicianRepository,
+      clock: IClock,
       domainEventMediator: DomainEventMediator,
     ) => {
       return new MarkRequestPlayedUseCase(
         requestRepo,
         eventRepo,
         musicianRepo,
+        clock,
         domainEventMediator,
       );
     },
@@ -166,12 +193,27 @@ export const USE_CASES = {
       REPOSITORIES.REQUEST_REPOSITORY.provide,
       "EventRepository",
       "MusicianRepository",
+      SERVICES.CLOCK.provide,
       DomainEventMediator,
+    ],
+  },
+  VOTE_REQUEST_USE_CASE: {
+    provide: VoteRequestUseCase,
+    useFactory: (
+      requestRepo: IRequestRepository,
+      requestVoteRepo: IRequestVoteRepository,
+    ) => {
+      return new VoteRequestUseCase(requestRepo, requestVoteRepo);
+    },
+    inject: [
+      REPOSITORIES.REQUEST_REPOSITORY.provide,
+      REPOSITORIES.REQUEST_VOTE_REPOSITORY.provide,
     ],
   },
 };
 
 export const REQUESTS_PROVIDERS = {
   REPOSITORIES,
+  SERVICES,
   USE_CASES,
 };

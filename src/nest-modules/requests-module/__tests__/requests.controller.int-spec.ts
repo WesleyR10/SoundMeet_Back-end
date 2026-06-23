@@ -27,6 +27,7 @@ import {
 import { IRequestRepository } from "../../../core/request/domain/request.repository";
 import { RequestInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-in-memory.repository";
 import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
+import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
   MusicianRequestsPresenter,
   RequestCollectionPresenter,
@@ -50,7 +51,6 @@ describe("RequestsController Integration Tests", () => {
       event_id: new EventId(eventId),
       establishment_id: new Uuid(),
       name: "Event",
-      date: now,
       start_at: now,
       end_at: new Date(now.getTime() + 60 * 60 * 1000),
       status: "active",
@@ -90,7 +90,7 @@ describe("RequestsController Integration Tests", () => {
     musicianRepository = new MusicianInMemoryRepository();
     audienceRepository = new AudienceInMemoryRepository();
 
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [RequestsController],
       providers: [
         {
@@ -203,7 +203,10 @@ describe("RequestsController Integration Tests", () => {
           ],
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule =
+      await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<RequestsController>(RequestsController);
     repository = module.get<IRequestRepository>("RequestRepository");

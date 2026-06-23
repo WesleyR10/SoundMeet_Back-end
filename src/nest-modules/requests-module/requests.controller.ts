@@ -10,8 +10,15 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { RequestOutput } from "../../core/request/application/use-cases/common/request-output";
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
@@ -30,6 +37,9 @@ import { RespondToRequestInput } from "../../core/request/application/use-cases/
 import { RespondToRequestUseCase } from "../../core/request/application/use-cases/respond-to-request/respond-to-request.use-case";
 import { UpdateRequestInput } from "../../core/request/application/use-cases/update-request/update-request.input";
 import { UpdateRequestUseCase } from "../../core/request/application/use-cases/update-request/update-request.use-case";
+import { VoteRequestInput } from "../../core/request/application/use-cases/vote-request/vote-request.input";
+import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
+import { AuthGuard, Roles, RolesGuard } from "../auth-module";
 import { CreateRequestDto } from "./dto/create-request.dto";
 import { GetMusicianRequestsDto } from "./dto/get-musician-requests.dto";
 import { GetRequestSuggestionsDto } from "./dto/get-request-suggestions.dto";
@@ -37,6 +47,7 @@ import { MarkRequestPlayedDto } from "./dto/mark-request-played.dto";
 import { RespondToRequestDto } from "./dto/respond-to-request.dto";
 import { SearchRequestsDto } from "./dto/search-requests.dto";
 import { UpdateRequestDto } from "./dto/update-request.dto";
+import { VoteRequestDto } from "./dto/vote-request.dto";
 import {
   MusicianRequestsPresenter,
   RequestCollectionPresenter,
@@ -45,6 +56,8 @@ import {
 } from "./request.presenter";
 
 @ApiTags("Requests")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard)
 @Controller("requests")
 export class RequestsController {
   @Inject(CreateRequestUseCase)
@@ -74,7 +87,11 @@ export class RequestsController {
   @Inject(MarkRequestPlayedUseCase)
   private markRequestPlayedUseCase: MarkRequestPlayedUseCase;
 
+  @Inject(VoteRequestUseCase)
+  private voteRequestUseCase: VoteRequestUseCase;
+
   @Post()
+  @Roles("audience", "musician", "admin")
   @ApiOperation({
     summary: "Criar pedido musical",
     description: "Cria um pedido musical com regras anti-spam e gamificação.",
@@ -86,6 +103,7 @@ export class RequestsController {
   }
 
   @Get()
+  @Roles("musician", "establishment", "admin")
   @ApiOperation({
     summary: "Listar pedidos musicais",
     description: "Lista pedidos musicais com paginação, ordenação e filtros.",
@@ -96,58 +114,55 @@ export class RequestsController {
     return new RequestCollectionPresenter(output);
   }
 
-  @Get(":id")
+  @Get("musicians/:musician_id/suggestions")
+  @Roles("audience", "musician", "admin")
   @ApiOperation({
-    summary: "Buscar pedido musical por ID",
-    description: "Retorna os detalhes de um pedido musical.",
+    summary: "Sugerir músicas por estilo do músico",
+    description:
+      "Retorna sugestões baseadas no estilo do músico e histórico de pedidos.",
   })
-  @ApiParam({ name: "id", required: true, format: "uuid" })
-  @ApiResponse({ status: 200, type: RequestPresenter })
-  async findOne(
-    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  @ApiParam({ name: "musician_id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestSuggestionsPresenter })
+  async getSuggestions(
+    @Param("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    musician_id: string,
+    @Query() query: GetRequestSuggestionsDto,
   ) {
-    const input: GetRequestInput = { id };
-    const output = await this.getUseCase.execute(input);
-    return RequestsController.serialize(output);
-  }
-
-  @Patch(":id")
-  @ApiOperation({
-    summary: "Atualizar pedido musical",
-    description: "Atualiza os dados de um pedido musical pendente.",
-  })
-  @ApiParam({ name: "id", required: true, format: "uuid" })
-  @ApiResponse({ status: 200, type: RequestPresenter })
-  async update(
-    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
-    @Body() dto: UpdateRequestDto,
-  ) {
-    const input = new UpdateRequestInput({
-      id,
-      song_title: dto.song_title,
-      artist: dto.artist,
-      message: dto.message,
+    const input = new GetRequestSuggestionsInput({
+      musician_id,
+      limit: query.limit,
     });
-    const output = await this.updateUseCase.execute(input);
-    return RequestsController.serialize(output);
+    const output = await this.getRequestSuggestionsUseCase.execute(input);
+    return new RequestSuggestionsPresenter(output);
   }
 
-  @HttpCode(204)
-  @Delete(":id")
+  @Get("musicians/:musician_id")
+  @Roles("musician", "admin")
   @ApiOperation({
-    summary: "Remover pedido musical",
-    description: "Remove um pedido musical.",
+    summary: "Listar pedidos musicais de um músico",
+    description:
+      "Lista pedidos musicais de um músico com paginação, filtros e contagem de pendentes.",
   })
-  @ApiParam({ name: "id", required: true, format: "uuid" })
-  @ApiResponse({ status: 204 })
-  async remove(
-    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  @ApiParam({ name: "musician_id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianRequestsPresenter })
+  async getMusicianRequests(
+    @Param("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    musician_id: string,
+    @Query() query: GetMusicianRequestsDto,
   ) {
-    const input: DeleteRequestInput = { id };
-    await this.deleteUseCase.execute(input);
+    const input = new GetMusicianRequestsInput({
+      musician_id,
+      status: query.status,
+      page: query.page,
+      per_page: query.per_page,
+      limit: query.limit,
+    });
+    const output = await this.getMusicianRequestsUseCase.execute(input);
+    return new MusicianRequestsPresenter(output);
   }
 
   @Patch(":id/respond")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Responder pedido musical",
     description:
@@ -170,6 +185,7 @@ export class RequestsController {
   }
 
   @Patch(":id/played")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Marcar pedido como tocado",
     description: "Marca um pedido aceito como tocado e registra a execução.",
@@ -188,49 +204,80 @@ export class RequestsController {
     return RequestsController.serialize(output);
   }
 
-  @Get("musicians/:musician_id/suggestions")
+  @Post(":id/votes")
+  @Roles("audience", "admin")
   @ApiOperation({
-    summary: "Sugerir músicas por estilo do músico",
+    summary: "Votar em pedido musical",
     description:
-      "Retorna sugestões baseadas no estilo do músico e histórico de pedidos.",
+      "Registra ou atualiza o voto da audiência no pedido e recalcula a contagem canônica.",
   })
-  @ApiParam({ name: "musician_id", required: true, format: "uuid" })
-  @ApiResponse({ status: 200, type: RequestSuggestionsPresenter })
-  async getSuggestions(
-    @Param("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
-    musician_id: string,
-    @Query() query: GetRequestSuggestionsDto,
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestPresenter })
+  async vote(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: VoteRequestDto,
   ) {
-    const input = new GetRequestSuggestionsInput({
-      musician_id,
-      limit: query.limit,
+    const input = new VoteRequestInput({
+      request_id: id,
+      audience_id: dto.audience_id,
+      vote_type: dto.vote_type,
     });
-    const output = await this.getRequestSuggestionsUseCase.execute(input);
-    return new RequestSuggestionsPresenter(output);
+    const output = await this.voteRequestUseCase.execute(input);
+    return RequestsController.serialize(output);
   }
 
-  @Get("musicians/:musician_id")
+  @Get(":id")
+  @Roles("audience", "musician", "establishment", "admin")
   @ApiOperation({
-    summary: "Listar pedidos musicais de um músico",
-    description:
-      "Lista pedidos musicais de um músico com paginação, filtros e contagem de pendentes.",
+    summary: "Buscar pedido musical por ID",
+    description: "Retorna os detalhes de um pedido musical.",
   })
-  @ApiParam({ name: "musician_id", required: true, format: "uuid" })
-  @ApiResponse({ status: 200, type: MusicianRequestsPresenter })
-  async getMusicianRequests(
-    @Param("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
-    musician_id: string,
-    @Query() query: GetMusicianRequestsDto,
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestPresenter })
+  async findOne(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {
-    const input = new GetMusicianRequestsInput({
-      musician_id,
-      status: query.status,
-      page: query.page,
-      per_page: query.per_page,
-      limit: query.limit,
+    const input: GetRequestInput = { id };
+    const output = await this.getUseCase.execute(input);
+    return RequestsController.serialize(output);
+  }
+
+  @Patch(":id")
+  @Roles("audience", "admin")
+  @ApiOperation({
+    summary: "Atualizar pedido musical",
+    description: "Atualiza os dados de um pedido musical pendente.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestPresenter })
+  async update(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: UpdateRequestDto,
+  ) {
+    const input = new UpdateRequestInput({
+      id,
+      song_title: dto.song_title,
+      artist: dto.artist,
+      message: dto.message,
     });
-    const output = await this.getMusicianRequestsUseCase.execute(input);
-    return new MusicianRequestsPresenter(output);
+    const output = await this.updateUseCase.execute(input);
+    return RequestsController.serialize(output);
+  }
+
+  @HttpCode(204)
+  @Delete(":id")
+  @Roles("audience", "admin")
+  @ApiOperation({
+    summary: "Remover pedido musical",
+    description: "Remove um pedido musical.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
+  async remove(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const input: DeleteRequestInput = { id };
+    await this.deleteUseCase.execute(input);
   }
 
   static serialize(output: RequestOutput) {

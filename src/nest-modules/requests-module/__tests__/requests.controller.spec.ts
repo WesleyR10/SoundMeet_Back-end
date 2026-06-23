@@ -8,6 +8,7 @@ import { GetMusicianRequestsDto } from "../dto/get-musician-requests.dto";
 import { RespondToRequestDto } from "../dto/respond-to-request.dto";
 import { SearchRequestsDto } from "../dto/search-requests.dto";
 import { UpdateRequestDto } from "../dto/update-request.dto";
+import { VoteRequestDto } from "../dto/vote-request.dto";
 import {
   MusicianRequestsPresenter,
   RequestCollectionPresenter,
@@ -406,6 +407,51 @@ describe("RequestsController Unit Tests", () => {
 
       await expect(
         controller.getMusicianRequests(musician_id, query),
+      ).rejects.toThrow(error);
+    });
+  });
+
+  describe("vote", () => {
+    it("should vote on a request", async () => {
+      const id = "11111111-1111-1111-1111-111111111111";
+      const output = makeRequestOutput({ id, votes_count: 1 });
+      const mockVoteUseCase = {
+        execute: jest.fn().mockResolvedValue(output),
+      };
+      (controller as any).voteRequestUseCase = mockVoteUseCase;
+
+      const serializeSpy = jest.spyOn(RequestsController, "serialize");
+      const input: VoteRequestDto = {
+        audience_id: "33333333-3333-3333-3333-333333333333",
+        vote_type: "up" as any,
+      };
+
+      const presenter = await controller.vote(id, input);
+
+      expect(mockVoteUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request_id: id,
+          audience_id: input.audience_id,
+          vote_type: input.vote_type,
+        }),
+      );
+      expect(serializeSpy).toHaveBeenCalledWith(output);
+      expect(presenter).toBeInstanceOf(RequestPresenter);
+      expect(presenter).toStrictEqual(new RequestPresenter(output));
+    });
+
+    it("should throw when vote use case throws", async () => {
+      const error = new Error("vote error");
+      const mockVoteUseCase = {
+        execute: jest.fn().mockRejectedValue(error),
+      };
+      (controller as any).voteRequestUseCase = mockVoteUseCase;
+
+      await expect(
+        controller.vote("11111111-1111-1111-1111-111111111111", {
+          audience_id: "33333333-3333-3333-3333-333333333333",
+          vote_type: "down" as any,
+        }),
       ).rejects.toThrow(error);
     });
   });
