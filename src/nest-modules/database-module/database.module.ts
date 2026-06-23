@@ -13,8 +13,12 @@ import { PrismaService } from "./prisma/prisma.service";
 export function createMongoConnectionOptions(
   configService: ConfigSchemaType,
 ): MongooseModuleFactoryOptions {
+  const uri = configService.get<string>("MONGODB_URL");
+  if (!uri?.trim()) {
+    throw new Error("MONGODB_URL is not configured");
+  }
   return {
-    uri: configService.get<string>("MONGODB_URL")!,
+    uri,
     retryWrites: true,
     w: "majority" as const,
   };
@@ -36,13 +40,20 @@ export async function createRedisCacheOptions(configService: ConfigSchemaType) {
   };
 }
 
+const mongoModule =
+  process.env.MONGODB_URL && process.env.MONGODB_URL.trim().length > 0
+    ? [
+        MongooseModule.forRootAsync({
+          useFactory: createMongoConnectionOptions,
+          inject: [ConfigService],
+        }),
+      ]
+    : [];
+
 @Global()
 @Module({
   imports: [
-    MongooseModule.forRootAsync({
-      useFactory: createMongoConnectionOptions,
-      inject: [ConfigService],
-    }),
+    ...mongoModule,
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: createRedisCacheOptions,
@@ -50,6 +61,6 @@ export async function createRedisCacheOptions(configService: ConfigSchemaType) {
     }),
   ],
   providers: [PrismaService],
-  exports: [PrismaService, MongooseModule],
+  exports: [PrismaService, ...(mongoModule.length ? [MongooseModule] : [])],
 })
 export class DatabaseModule {}

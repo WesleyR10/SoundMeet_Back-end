@@ -36,7 +36,6 @@ describe("Schema Unit Tests", () => {
 
   const minimalRequired = {
     DATABASE_URL: "postgresql://user:pass@localhost:5432/soundmeet",
-    MONGODB_URL: "mongodb://localhost:27017/soundmeet",
     REDIS_URL: "redis://localhost:6379",
     RABBITMQ_URL: "amqp://localhost:5672",
     KEYCLOAK_URL: "http://localhost:8080",
@@ -49,7 +48,6 @@ describe("Schema Unit Tests", () => {
   describe("required env vars", () => {
     test("invalid cases", () => {
       expectValidate(schema, {}).toContain('"DATABASE_URL" is required');
-      expectValidate(schema, {}).toContain('"MONGODB_URL" is required');
       expectValidate(schema, {}).toContain('"REDIS_URL" is required');
       expectValidate(schema, {}).toContain('"RABBITMQ_URL" is required');
       expectValidate(schema, {}).toContain('"KEYCLOAK_URL" is required');
@@ -63,6 +61,13 @@ describe("Schema Unit Tests", () => {
 
     test("valid cases", () => {
       expectValidate(schema, minimalRequired).not.toContain("is required");
+    });
+
+    test("should allow MongoDB to be disabled while analytics Mongo is not active", () => {
+      expectValidate(schema, {
+        ...minimalRequired,
+        MONGODB_URL: "",
+      }).not.toContain("MONGODB_URL");
     });
   });
 

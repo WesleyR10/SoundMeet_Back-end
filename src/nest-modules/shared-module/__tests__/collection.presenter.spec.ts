@@ -1,7 +1,6 @@
 import { instanceToPlain } from "class-transformer";
 
 import { CollectionPresenter } from "../collection.presenter";
-import { PaginationPresenter } from "../pagination.presenter";
 
 class StubCollectionPresenter extends CollectionPresenter {
   data = [1, 2, 3];
@@ -17,14 +16,12 @@ describe("CollectionPresenter Unit Tests", () => {
         total: 4,
       });
 
-      expect(presenter["paginationPresenter"]).toBeInstanceOf(
-        PaginationPresenter,
-      );
-      expect(presenter["paginationPresenter"].current_page).toBe(1);
-      expect(presenter["paginationPresenter"].per_page).toBe(2);
-      expect(presenter["paginationPresenter"].last_page).toBe(3);
-      expect(presenter["paginationPresenter"].total).toBe(4);
-      expect(presenter.meta).toEqual(presenter["paginationPresenter"]);
+      expect(presenter.meta).toStrictEqual({
+        current_page: 1,
+        per_page: 2,
+        last_page: 3,
+        total: 4,
+      });
     });
   });
 

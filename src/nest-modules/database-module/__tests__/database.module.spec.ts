@@ -65,6 +65,14 @@ describe("DatabaseModule Unit Tests", () => {
         w: "majority",
       });
     });
+
+    it("should fail fast when MONGODB_URL is missing and Mongo is explicitly configured", () => {
+      const configService = createConfigService({});
+
+      expect(() => createMongoConnectionOptions(configService)).toThrow(
+        "MONGODB_URL is not configured",
+      );
+    });
   });
 
   describe("redis cache", () => {
