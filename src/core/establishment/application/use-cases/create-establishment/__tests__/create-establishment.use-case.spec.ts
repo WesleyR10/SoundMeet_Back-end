@@ -1,4 +1,4 @@
-import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { EstablishmentId } from "../../../../domain/establishment.aggregate";
 import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
 import { CreateEstablishmentInput } from "../create-establishment.input";
@@ -23,7 +23,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
-      InvalidEmailError,
+      EntityValidationError,
     );
   });
 
@@ -167,7 +167,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
-      InvalidEmailError,
+      EntityValidationError,
     );
   });
 });

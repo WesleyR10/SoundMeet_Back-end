@@ -4,7 +4,7 @@ import {
 } from "../../../../shared/application/pagination-output";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
-import { EstablishmentAnalytics } from "../../../domain/establishment-analytics.entity";
+import { EstablishmentAnalytics } from "../../../domain/establishment-analytics.read-model";
 import {
   EstablishmentAnalyticsFilter,
   EstablishmentAnalyticsSearchParams,

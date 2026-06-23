@@ -36,7 +36,7 @@ establishment/
 │   ├── establishment-profile.aggregate.ts # Agregado de perfil
 │   ├── establishment.repository.ts   # Interface do repositório
 │   ├── establishment.validator.ts    # Validações de domínio
-│   ├── establishment-analytics.entity.ts  # Entidade de analytics
+│   ├── establishment-analytics.read-model.ts  # Read model/projeção de analytics
 │   ├── establishment-analytics.repository.ts # Repositório de analytics
 │   ├── establishment-fake.builder.ts # Builder para testes
 │   └── events/              # Eventos de domínio
@@ -284,7 +284,7 @@ establishment/
 │   ├── establishment.repository.ts
 │   ├── establishment.validator.ts
 │   ├── establishment-fake.builder.ts
-│   ├── establishment-analytics.entity.ts
+│   ├── establishment-analytics.read-model.ts
 │   ├── establishment-analytics.repository.ts
 │   └── index.ts
 └── infra/

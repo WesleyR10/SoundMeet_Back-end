@@ -1,5 +1,5 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
-import { InvalidEmailError } from "../../../../../shared/domain/value-objects/email.vo";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import {
   Establishment,
   EstablishmentId,
@@ -40,7 +40,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
-      InvalidEmailError,
+      EntityValidationError,
     );
   });
 
@@ -157,7 +157,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
       email: "invalid-email",
     };
 
-    await expect(useCase.execute(input)).rejects.toThrow(InvalidEmailError);
+    await expect(useCase.execute(input)).rejects.toThrow(EntityValidationError);
   });
 
   it("should not change CNPJ when updating", async () => {

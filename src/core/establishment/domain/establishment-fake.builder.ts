@@ -1,6 +1,5 @@
 import { Chance } from "chance";
 
-import { CNPJ } from "../../shared/domain/value-objects/cnpj.vo";
 import { Email } from "../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../shared/domain/value-objects/phone.vo";
 import { Rating } from "../../shared/domain/value-objects/rating.vo";
@@ -43,6 +42,10 @@ export class EstablishmentFakeBuilder<TBuild = any> {
 
   private countObjs;
   private chance: Chance.Chance;
+
+  static aEstablishment() {
+    return new EstablishmentFakeBuilder<Establishment>();
+  }
 
   static anEstablishment() {
     return new EstablishmentFakeBuilder<Establishment>();

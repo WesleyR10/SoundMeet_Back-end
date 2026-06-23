@@ -4,7 +4,7 @@ import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/
 import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsId,
-} from "../../../domain/establishment-analytics.entity";
+} from "../../../domain/establishment-analytics.read-model";
 import {
   EstablishmentAnalyticsDailyMetrics,
   EstablishmentAnalyticsSearchParams,
@@ -302,7 +302,7 @@ export class EstablishmentAnalyticsPrismaRepository implements IEstablishmentAna
         this.prismaClient.event.count({
           where: {
             establishmentId: establishment_id,
-            date: { gte: day, lt: nextDay },
+            startTime: { gte: day, lt: nextDay },
             status: { not: "cancelled" },
           },
         }),
@@ -310,7 +310,7 @@ export class EstablishmentAnalyticsPrismaRepository implements IEstablishmentAna
           where: {
             event: {
               establishmentId: establishment_id,
-              date: { gte: day, lt: nextDay },
+              startTime: { gte: day, lt: nextDay },
             },
           },
         }),
@@ -351,7 +351,7 @@ export class EstablishmentAnalyticsPrismaRepository implements IEstablishmentAna
       events_hosted: eventsHosted,
       total_attendees: totalAttendees,
       musicians_hired: distinct.size,
-      total_spent: bookingAgg._sum.fee ?? 0,
+      total_spent: Number(bookingAgg._sum.fee ?? 0),
       avg_rating: establishment?.rating ?? 0,
     };
   }

@@ -1,5 +1,6 @@
+import { OperatingHours } from "@core/shared/domain/value-objects/operating-hours.vo";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { OperatingHours } from "../../../../shared/domain";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Notification } from "../../../../shared/domain/validators/notification";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";

@@ -1,10 +1,6 @@
-import {
-  Address,
-  AggregateRoot,
-  OperatingHours,
-  SocialLinks,
-  Uuid,
-} from "../../shared/domain";
+import { OperatingHours } from "@core/shared/domain/value-objects/operating-hours.vo";
+
+import { Address, AggregateRoot, SocialLinks, Uuid } from "../../shared/domain";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { EstablishmentProfileValidatorFactory } from "./establishment-profile.validator";
 import { EstablishmentProfileFakeBuilder } from "./establishment-profile-fake.builder";

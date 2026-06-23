@@ -7,7 +7,7 @@ import { SearchResult as DefaultSearchResult } from "../../shared/domain/reposit
 import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsId,
-} from "./establishment-analytics.entity";
+} from "./establishment-analytics.read-model";
 
 export type EstablishmentAnalyticsFilter = {
   establishment_id?: string | null;

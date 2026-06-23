@@ -1,9 +1,6 @@
-import {
-  Address,
-  OperatingHours,
-  SocialLinks,
-  Uuid,
-} from "../../../../shared/domain";
+import { OperatingHours } from "@core/shared/domain/value-objects/operating-hours.vo";
+
+import { Address, SocialLinks, Uuid } from "../../../../shared/domain";
 import { InvariantViolationError } from "../../../../shared/domain/errors/invariant-violation.error";
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { Email } from "../../../../shared/domain/value-objects/email.vo";

@@ -5,7 +5,7 @@ import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsConstructorProps,
   EstablishmentAnalyticsId,
-} from "./establishment-analytics.entity";
+} from "./establishment-analytics.read-model";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 

@@ -11,7 +11,7 @@ import {
 import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsId,
-} from "../../../../domain/establishment-analytics.entity";
+} from "../../../../domain/establishment-analytics.read-model";
 import {
   EstablishmentAnalyticsDailyMetrics,
   EstablishmentAnalyticsSearchParams,

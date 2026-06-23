@@ -35,6 +35,11 @@ export type EstablishmentAnalyticsUpdateCommand = {
   avg_rating?: number;
 };
 
+/**
+ * Projection/read model derived from events, bookings, attendance and spending.
+ * It is intentionally not an AggregateRoot; write authority remains in the
+ * bounded contexts that produce the metrics.
+ */
 export class EstablishmentAnalytics extends Entity {
   analytics_id: EstablishmentAnalyticsId;
   establishment_id: EstablishmentId;

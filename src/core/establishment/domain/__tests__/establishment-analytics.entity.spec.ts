@@ -1,5 +1,5 @@
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
-import { EstablishmentAnalytics } from "../establishment-analytics.entity";
+import { EstablishmentAnalytics } from "../establishment-analytics.read-model";
 
 describe("EstablishmentAnalytics Unit Tests", () => {
   it("should create with defaults", () => {

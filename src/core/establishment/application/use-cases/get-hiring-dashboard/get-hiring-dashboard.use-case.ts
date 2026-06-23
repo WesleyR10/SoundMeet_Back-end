@@ -150,8 +150,6 @@ export class GetHiringDashboardUseCase implements IUseCase<
             experience: item.profile.experience,
             instruments: item.profile.instruments,
             genres: item.profile.genres,
-            rating: item.profile.rating.value,
-            total_ratings: item.profile.total_ratings,
             created_at: item.profile.created_at,
             updated_at: item.profile.updated_at,
           }

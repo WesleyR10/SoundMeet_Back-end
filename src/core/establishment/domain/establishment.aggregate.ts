@@ -76,7 +76,22 @@ export class Establishment extends AggregateRoot {
     this.name = props.name;
     this.description = props.description ?? null;
     this.avatar = props.avatar ?? null;
-    this.cnpj = props.cnpj ? new CNPJ(props.cnpj) : null;
+    if (props.cnpj) {
+      try {
+        this.cnpj = new CNPJ(props.cnpj);
+      } catch (error) {
+        const message =
+          error instanceof InvalidCNPJError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Invalid cnpj";
+        this.notification.addError(message, "cnpj");
+        this.cnpj = null;
+      }
+    } else {
+      this.cnpj = null;
+    }
     this.email = props.email;
     this.phone = props.phone ?? null;
     this.website = props.website ?? null;

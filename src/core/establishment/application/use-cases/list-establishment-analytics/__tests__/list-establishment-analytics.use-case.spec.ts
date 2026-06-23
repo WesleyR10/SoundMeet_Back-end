@@ -2,7 +2,7 @@ import { EstablishmentId } from "../../../../domain/establishment.aggregate";
 import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsId,
-} from "../../../../domain/establishment-analytics.entity";
+} from "../../../../domain/establishment-analytics.read-model";
 import {
   EstablishmentAnalyticsFilter,
   EstablishmentAnalyticsSearchParams,

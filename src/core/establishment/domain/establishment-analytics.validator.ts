@@ -10,7 +10,7 @@ import {
 
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
-import { EstablishmentAnalytics } from "./establishment-analytics.entity";
+import { EstablishmentAnalytics } from "./establishment-analytics.read-model";
 
 export class EstablishmentAnalyticsRules {
   @IsUUID("4", { groups: ["establishment_id"] })

@@ -5,7 +5,7 @@ import {
   EstablishmentSearchParams,
   IEstablishmentRepository,
 } from "../../../domain/establishment.repository";
-import { EstablishmentAnalytics } from "../../../domain/establishment-analytics.entity";
+import { EstablishmentAnalytics } from "../../../domain/establishment-analytics.read-model";
 import { IEstablishmentAnalyticsRepository } from "../../../domain/establishment-analytics.repository";
 
 const toUtcDateOnly = (date: Date): Date => {
