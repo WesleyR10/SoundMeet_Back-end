@@ -10,13 +10,21 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { ActivateEventUseCase } from "../../core/events/application/use-cases/activate-event/activate-event.use-case";
 import { AddEventAttendeeUseCase } from "../../core/events/application/use-cases/add-event-attendee/add-event-attendee.use-case";
 import { AddEventPerformerUseCase } from "../../core/events/application/use-cases/add-event-performer/add-event-performer.use-case";
 import { CancelEventUseCase } from "../../core/events/application/use-cases/cancel-event/cancel-event.use-case";
+import { CreateEventInput } from "../../core/events/application/use-cases/create-event/create-event.input";
 import { CreateEventUseCase } from "../../core/events/application/use-cases/create-event/create-event.use-case";
 import { DeleteEventUseCase } from "../../core/events/application/use-cases/delete-event/delete-event.use-case";
 import { FinishEventUseCase } from "../../core/events/application/use-cases/finish-event/finish-event.use-case";
@@ -24,7 +32,9 @@ import { GetEventUseCase } from "../../core/events/application/use-cases/get-eve
 import { ListEventsUseCase } from "../../core/events/application/use-cases/list-events/list-events.use-case";
 import { RemoveEventAttendeeUseCase } from "../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
+import { UpdateEventInput } from "../../core/events/application/use-cases/update-event/update-event.input";
 import { UpdateEventUseCase } from "../../core/events/application/use-cases/update-event/update-event.use-case";
+import { AuthGuard, Public, Roles, RolesGuard } from "../auth-module";
 import { AddEventAttendeeDto } from "./dto/add-event-attendee.dto";
 import { AddEventPerformerDto } from "./dto/add-event-performer.dto";
 import { CreateEventDto } from "./dto/create-event.dto";
@@ -33,6 +43,8 @@ import { UpdateEventDto } from "./dto/update-event.dto";
 import { EventCollectionPresenter, EventPresenter } from "./event.presenter";
 
 @ApiTags("Events")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard)
 @Controller("establishments/:id/events")
 export class EventsController {
   @Inject(CreateEventUseCase)
@@ -72,6 +84,7 @@ export class EventsController {
   private removeEventPerformerUseCase: RemoveEventPerformerUseCase;
 
   @Post()
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Criar evento",
     description: "Cria um evento para o estabelecimento.",
@@ -82,14 +95,23 @@ export class EventsController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: CreateEventDto,
   ) {
-    const output = await this.createEventUseCase.execute({
-      ...(dto as any),
-      establishment_id: id,
-    });
+    const output = await this.createEventUseCase.execute(
+      new CreateEventInput({
+        establishment_id: id,
+        name: dto.name,
+        description: dto.description,
+        start_at: dto.start_at,
+        end_at: dto.end_at,
+        max_capacity: dto.max_capacity,
+        is_public: dto.is_public,
+        cover_charge: dto.cover_charge,
+      }),
+    );
     return new EventPresenter(output);
   }
 
   @Get()
+  @Public()
   @ApiOperation({
     summary: "Listar eventos do estabelecimento",
     description:
@@ -103,12 +125,17 @@ export class EventsController {
   ) {
     const output = await this.listEventsUseCase.execute({
       establishment_id: id,
-      ...(query as any),
+      page: query.page,
+      per_page: query.per_page,
+      sort: query.sort,
+      sort_dir: query.sort_dir,
+      filter: query.filter,
     });
     return new EventCollectionPresenter(output);
   }
 
   @Get(":event_id")
+  @Public()
   @ApiOperation({
     summary: "Buscar evento por ID",
     description: "Retorna os detalhes do evento do estabelecimento.",
@@ -129,6 +156,7 @@ export class EventsController {
   }
 
   @Patch(":event_id")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Atualizar evento",
     description: "Atualiza dados do evento.",
@@ -142,16 +170,25 @@ export class EventsController {
     event_id: string,
     @Body() dto: UpdateEventDto,
   ) {
-    const output = await this.updateEventUseCase.execute({
-      ...(dto as any),
-      id: event_id,
-      establishment_id: id,
-    });
+    const output = await this.updateEventUseCase.execute(
+      new UpdateEventInput({
+        id: event_id,
+        establishment_id: id,
+        name: dto.name,
+        description: dto.description,
+        start_at: dto.start_at,
+        end_at: dto.end_at,
+        max_capacity: dto.max_capacity,
+        is_public: dto.is_public,
+        cover_charge: dto.cover_charge,
+      }),
+    );
     return new EventPresenter(output);
   }
 
   @HttpCode(204)
   @Delete(":event_id")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Remover evento",
     description: "Remove o evento.",
@@ -171,6 +208,7 @@ export class EventsController {
   }
 
   @Post(":event_id/activate")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Ativar evento",
     description: "Ativa um evento (scheduled -> active).",
@@ -191,6 +229,7 @@ export class EventsController {
   }
 
   @Post(":event_id/cancel")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Cancelar evento",
     description: "Cancela um evento.",
@@ -211,6 +250,7 @@ export class EventsController {
   }
 
   @Post(":event_id/finish")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Finalizar evento",
     description: "Finaliza um evento (active -> completed).",
@@ -231,6 +271,7 @@ export class EventsController {
   }
 
   @Post(":event_id/attendees")
+  @Roles("audience", "establishment", "admin")
   @ApiOperation({
     summary: "Adicionar attendee",
     description: "Registra presença (incrementa capacidade atual).",
@@ -253,6 +294,7 @@ export class EventsController {
   }
 
   @Delete(":event_id/attendees/:audience_id")
+  @Roles("audience", "establishment", "admin")
   @ApiOperation({
     summary: "Remover attendee",
     description: "Remove presença (decrementa capacidade atual).",
@@ -278,6 +320,7 @@ export class EventsController {
 
   @HttpCode(204)
   @Post(":event_id/performers")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Adicionar performer",
     description: "Adiciona músico/banda no evento.",
@@ -294,12 +337,18 @@ export class EventsController {
     await this.addEventPerformerUseCase.execute({
       establishment_id: id,
       event_id,
-      ...(dto as any),
+      musician_id: dto.musician_id,
+      band_id: dto.band_id,
+      fee: dto.fee,
+      status: dto.status,
+      start_at: dto.start_at,
+      end_at: dto.end_at,
     });
   }
 
   @HttpCode(204)
   @Delete(":event_id/performers/:event_musician_id")
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Remover performer",
     description: "Remove músico/banda do evento.",

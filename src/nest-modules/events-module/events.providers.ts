@@ -12,8 +12,16 @@ import { ListEventsUseCase } from "../../core/events/application/use-cases/list-
 import { RemoveEventAttendeeUseCase } from "../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
 import { UpdateEventUseCase } from "../../core/events/application/use-cases/update-event/update-event.use-case";
-import { IEventRepository } from "../../core/events/domain";
-import { EventPrismaRepository } from "../../core/events/infra/db/prisma";
+import {
+  IEventAttendeeRepository,
+  IEventMusicianRepository,
+  IEventRepository,
+} from "../../core/events/domain";
+import {
+  EventAttendeePrismaRepository,
+  EventMusicianPrismaRepository,
+  EventPrismaRepository,
+} from "../../core/events/infra/db/prisma";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
@@ -26,6 +34,28 @@ export const REPOSITORIES = {
     provide: EventPrismaRepository,
     useFactory: (prismaService: PrismaService) => {
       return new EventPrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  EVENT_ATTENDEE_REPOSITORY: {
+    provide: "EventAttendeeRepository",
+    useExisting: EventAttendeePrismaRepository,
+  },
+  EVENT_ATTENDEE_PRISMA_REPOSITORY: {
+    provide: EventAttendeePrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new EventAttendeePrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  EVENT_MUSICIAN_REPOSITORY: {
+    provide: "EventMusicianRepository",
+    useExisting: EventMusicianPrismaRepository,
+  },
+  EVENT_MUSICIAN_PRISMA_REPOSITORY: {
+    provide: EventMusicianPrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new EventMusicianPrismaRepository(prismaService);
     },
     inject: [PrismaService],
   },
@@ -90,31 +120,55 @@ export const USE_CASES = {
   },
   ADD_EVENT_ATTENDEE_USE_CASE: {
     provide: AddEventAttendeeUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new AddEventAttendeeUseCase(repo);
+    useFactory: (
+      repo: IEventRepository,
+      eventAttendeeRepo: IEventAttendeeRepository,
+    ) => {
+      return new AddEventAttendeeUseCase(repo, eventAttendeeRepo);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.EVENT_REPOSITORY.provide,
+      REPOSITORIES.EVENT_ATTENDEE_REPOSITORY.provide,
+    ],
   },
   REMOVE_EVENT_ATTENDEE_USE_CASE: {
     provide: RemoveEventAttendeeUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new RemoveEventAttendeeUseCase(repo);
+    useFactory: (
+      repo: IEventRepository,
+      eventAttendeeRepo: IEventAttendeeRepository,
+    ) => {
+      return new RemoveEventAttendeeUseCase(repo, eventAttendeeRepo);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.EVENT_REPOSITORY.provide,
+      REPOSITORIES.EVENT_ATTENDEE_REPOSITORY.provide,
+    ],
   },
   ADD_EVENT_PERFORMER_USE_CASE: {
     provide: AddEventPerformerUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new AddEventPerformerUseCase(repo);
+    useFactory: (
+      repo: IEventRepository,
+      eventMusicianRepo: IEventMusicianRepository,
+    ) => {
+      return new AddEventPerformerUseCase(repo, eventMusicianRepo);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.EVENT_REPOSITORY.provide,
+      REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
+    ],
   },
   REMOVE_EVENT_PERFORMER_USE_CASE: {
     provide: RemoveEventPerformerUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new RemoveEventPerformerUseCase(repo);
+    useFactory: (
+      repo: IEventRepository,
+      eventMusicianRepo: IEventMusicianRepository,
+    ) => {
+      return new RemoveEventPerformerUseCase(repo, eventMusicianRepo);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.EVENT_REPOSITORY.provide,
+      REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
+    ],
   },
 };
 

@@ -8,6 +8,8 @@ import {
   ValidateIf,
 } from "class-validator";
 
+import { EventMusicianStatus } from "../../../core/events/domain/event-musician.aggregate";
+
 export class AddEventPerformerDto {
   @ValidateIf((o) => o.band_id === undefined || o.band_id === null)
   @IsString()
@@ -28,7 +30,7 @@ export class AddEventPerformerDto {
 
   @IsString()
   @IsOptional()
-  status?: string;
+  status?: EventMusicianStatus;
 
   @IsDate()
   @IsOptional()

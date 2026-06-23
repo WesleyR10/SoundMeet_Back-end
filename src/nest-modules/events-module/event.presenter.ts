@@ -10,7 +10,6 @@ export class EventPresenter {
   establishment_id: string;
   name: string;
   description: string | null;
-  date: Date;
   start_at: Date;
   end_at: Date;
   status: EventStatus;
@@ -28,7 +27,6 @@ export class EventPresenter {
     this.establishment_id = output.establishment_id;
     this.name = output.name;
     this.description = output.description;
-    this.date = output.date;
     this.start_at = output.start_at;
     this.end_at = output.end_at;
     this.status = output.status as EventStatus;
