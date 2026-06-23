@@ -13,7 +13,10 @@ export class VoteSongUseCase implements IUseCase<
   VoteSongInput,
   AudienceOutput
 > {
-  constructor(private audienceRepository: IAudienceRepository) {}
+  constructor(
+    private audienceRepository: IAudienceRepository,
+    private readonly voteRequestUseCase: IUseCase<any, any>,
+  ) {}
 
   async execute(input: VoteSongInput): Promise<AudienceOutput> {
     const audienceId = new AudienceId(input.audience_id);
@@ -27,14 +30,11 @@ export class VoteSongUseCase implements IUseCase<
       throw new EntityValidationError(audience.notification.toJSON());
     }
 
-    // Votar na música
-    audience.voteForSong(input.request_id, input.vote);
-
-    if (audience.notification.hasErrors()) {
-      throw new EntityValidationError(audience.notification.toJSON());
-    }
-
-    await this.audienceRepository.update(audience);
+    await this.voteRequestUseCase.execute({
+      request_id: input.request_id,
+      audience_id: input.audience_id,
+      vote_type: input.vote,
+    });
 
     return AudienceOutputMapper.toOutput(audience);
   }

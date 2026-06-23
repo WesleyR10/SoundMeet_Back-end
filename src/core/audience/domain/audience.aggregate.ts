@@ -28,7 +28,10 @@ export type AudienceConstructorProps = {
   nickname?: string | null;
   avatar?: string | null;
   phone?: Phone | string | null;
-  points?: AudiencePoints | number | { total: number; monthly: number };
+  points?:
+    | AudiencePoints
+    | number
+    | { total: number; monthly: number; lastUpdated?: Date };
   level?:
     | AudienceLevel
     | number
@@ -96,7 +99,7 @@ export class Audience extends AggregateRoot {
       this.points = AudiencePoints.fromData(
         props.points.total,
         props.points.monthly,
-        new Date(),
+        props.points.lastUpdated ?? new Date(),
       );
     } else {
       this.points = AudiencePoints.fromData(

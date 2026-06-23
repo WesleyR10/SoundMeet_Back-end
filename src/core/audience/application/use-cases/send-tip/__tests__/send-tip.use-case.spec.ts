@@ -11,10 +11,14 @@ import { SendTipUseCase } from "../send-tip.use-case";
 describe("SendTipUseCase Unit Tests", () => {
   let useCase: SendTipUseCase;
   let repository: AudienceInMemoryRepository;
+  let paymentSendTipUseCase: { execute: jest.Mock };
 
   beforeEach(() => {
     repository = new AudienceInMemoryRepository();
-    useCase = new SendTipUseCase(repository);
+    paymentSendTipUseCase = {
+      execute: jest.fn().mockResolvedValue({ id: "tip-id", status: "pending" }),
+    };
+    useCase = new SendTipUseCase(repository, paymentSendTipUseCase as any);
   });
 
   it("should throw error when audience not found", async () => {
@@ -53,12 +57,12 @@ describe("SendTipUseCase Unit Tests", () => {
           payment_method: "pix",
         },
         expected: {
-          points_earned: 5,
+          points_earned: 0,
           new_badges: [],
           tip_metadata: {
             musician_id: "musician_123",
             amount: 5.0,
-            status: "success",
+            status: "pending",
           },
         },
       },
@@ -76,7 +80,7 @@ describe("SendTipUseCase Unit Tests", () => {
           },
         },
         expected: {
-          points_earned: 25,
+          points_earned: 0,
           new_badges: [],
           tip_metadata: {
             musician_id: "musician_456",
@@ -85,7 +89,7 @@ describe("SendTipUseCase Unit Tests", () => {
             establishment_id: "establishment_789",
             event_id: "event_101",
             payment_method: "pix",
-            status: "success",
+            status: "pending",
           },
         },
       },
@@ -103,7 +107,8 @@ describe("SendTipUseCase Unit Tests", () => {
 
       const output = await useCase.execute(fullInput);
 
-      expect(spyUpdate).toHaveBeenCalledTimes(1);
+      expect(spyUpdate).not.toHaveBeenCalled();
+      expect(paymentSendTipUseCase.execute).toHaveBeenCalledTimes(1);
       expect(output.audience.id).toBe(audience.audience_id.id);
       expect(output.points_earned).toBe(expected.points_earned);
       expect(output.new_badges).toEqual(expected.new_badges);
@@ -113,7 +118,7 @@ describe("SendTipUseCase Unit Tests", () => {
       // Verify audience was updated in repository
       const updatedAudience = await repository.findById(audience.audience_id);
       expect(updatedAudience).toBeDefined();
-      expect(updatedAudience!.totalPoints).toBe(expected.points_earned);
+      expect(updatedAudience!.totalPoints).toBe(audience.totalPoints);
     });
   });
 
@@ -138,13 +143,13 @@ describe("SendTipUseCase Unit Tests", () => {
     const output1 = await useCase.execute(input1);
     const output2 = await useCase.execute(input2);
 
-    expect(output1.points_earned).toBe(10);
-    expect(output2.points_earned).toBe(15);
-    expect(output2.audience.points.total).toBe(25); // 10 + 15 points
+    expect(output1.points_earned).toBe(0);
+    expect(output2.points_earned).toBe(0);
+    expect(output2.audience.points.total).toBe(audience.totalPoints);
 
     // Verify final state in repository
     const finalAudience = await repository.findById(audience.audience_id);
-    expect(finalAudience!.totalPoints).toBe(25);
+    expect(finalAudience!.totalPoints).toBe(audience.totalPoints);
   });
 
   it("should handle tip with all optional fields", async () => {
@@ -179,7 +184,7 @@ describe("SendTipUseCase Unit Tests", () => {
       network_type: "wifi",
       transaction_id: "txn_123456789",
     });
-    expect(output.points_earned).toBe(50); // 1 point per real
+    expect(output.points_earned).toBe(0);
   });
 
   it("should handle large tip amounts correctly", async () => {
@@ -196,8 +201,8 @@ describe("SendTipUseCase Unit Tests", () => {
 
     const output = await useCase.execute(input);
 
-    expect(output.points_earned).toBe(100);
+    expect(output.points_earned).toBe(0);
     expect(output.tip_metadata.amount).toBe(100.0);
-    expect(output.audience.points.total).toBe(100);
+    expect(output.audience.points.total).toBe(audience.totalPoints);
   });
 });

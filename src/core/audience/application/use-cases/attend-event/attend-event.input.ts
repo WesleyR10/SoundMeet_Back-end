@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsUUID } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
 
 export class AttendEventInput {
   @IsString()
@@ -10,4 +10,9 @@ export class AttendEventInput {
   @IsNotEmpty()
   @IsUUID()
   event_id: string;
+
+  @IsString()
+  @IsOptional()
+  @IsUUID()
+  establishment_id?: string;
 }

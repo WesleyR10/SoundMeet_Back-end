@@ -1,7 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { Points } from "../../../../shared/domain/value-objects/points.vo";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import {
@@ -11,7 +10,10 @@ import {
 import { SendTipInput } from "./send-tip.input";
 
 export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
-  constructor(private readonly audienceRepository: IAudienceRepository) {}
+  constructor(
+    private readonly audienceRepository: IAudienceRepository,
+    private readonly sendTipUseCase: IUseCase<any, any>,
+  ) {}
 
   async execute(input: SendTipInput): Promise<SendTipOutput> {
     const audienceId = new AudienceId(input.id);
@@ -21,33 +23,29 @@ export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
       throw new NotFoundError(input.id, Audience);
     }
 
-    // Calculate points earned from tip (1 point per real)
-    const tipPoints = Points.createTip(input.amount, {
-      musician_id: input.musician_id,
-      amount: input.amount,
-      message: input.message,
-      payment_method: input.payment_method,
-      establishment_id: input.establishment_id,
-      event_id: input.event_id,
-    });
-
-    // Send tip using aggregate method (only requires 3 parameters)
-    audience.sendTip(input.musician_id, input.amount, input.message);
-
-    // Validate the aggregate after changes
+    audience.ensureIsActive();
     if (audience.notification.hasErrors()) {
       throw new EntityValidationError(audience.notification.toJSON());
     }
 
-    // Update the audience in repository
-    await this.audienceRepository.update(audience);
+    const tip = await this.sendTipUseCase.execute({
+      audience_id: input.id,
+      musician_id: input.musician_id,
+      event_id: input.event_id,
+      amount: input.amount,
+      message: input.message,
+      payment_method: input.payment_method,
+      is_anonymous: input.is_anonymous,
+      metadata: input.metadata,
+    });
 
     return {
       audience: AudienceOutputMapper.toOutput(audience),
-      points_earned: tipPoints.value,
-      new_badges: [], // TODO: Implement badge logic for tips
-      new_level: undefined, // TODO: Implement level update logic
+      points_earned: 0,
+      new_badges: [],
+      new_level: undefined,
       tip_metadata: {
+        tip_id: tip.id,
         musician_id: input.musician_id,
         amount: input.amount,
         message: input.message,
@@ -56,7 +54,7 @@ export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
         event_id: input.event_id,
         metadata: input.metadata,
         sent_at: new Date(),
-        status: "success",
+        status: tip.status ?? "pending",
       },
     };
   }
@@ -68,6 +66,7 @@ export type SendTipOutput = {
   new_badges: string[];
   new_level: number | undefined;
   tip_metadata: {
+    tip_id: string;
     musician_id: string;
     amount: number;
     message?: string;

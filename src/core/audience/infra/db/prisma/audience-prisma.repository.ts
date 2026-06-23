@@ -30,10 +30,13 @@ export class AudiencePrismaRepository implements IAudienceRepository {
           points: modelProps.points,
           monthly_points: modelProps.monthly_points,
           level: modelProps.level,
+          last_points_update: modelProps.last_points_update,
           favorite_genres: modelProps.favorite_genres,
           favorite_artists: modelProps.favorite_artists,
           favorite_instruments: modelProps.favorite_instruments,
           preferred_languages: modelProps.preferred_languages,
+          location: modelProps.location,
+          social_links: modelProps.social_links,
           notification_settings: modelProps.notification_settings,
           privacy_settings: modelProps.privacy_settings,
           discovery_settings: modelProps.discovery_settings,
@@ -64,10 +67,13 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         points: modelProps.points,
         monthly_points: modelProps.monthly_points,
         level: modelProps.level,
+        last_points_update: modelProps.last_points_update,
         favorite_genres: modelProps.favorite_genres,
         favorite_artists: modelProps.favorite_artists,
         favorite_instruments: modelProps.favorite_instruments,
         preferred_languages: modelProps.preferred_languages,
+        location: modelProps.location,
+        social_links: modelProps.social_links,
         notification_settings: modelProps.notification_settings,
         privacy_settings: modelProps.privacy_settings,
         discovery_settings: modelProps.discovery_settings,
@@ -104,10 +110,13 @@ export class AudiencePrismaRepository implements IAudienceRepository {
           points: modelProps.points,
           monthly_points: modelProps.monthly_points,
           level: modelProps.level,
+          last_points_update: modelProps.last_points_update,
           favorite_genres: modelProps.favorite_genres,
           favorite_artists: modelProps.favorite_artists,
           favorite_instruments: modelProps.favorite_instruments,
           preferred_languages: modelProps.preferred_languages,
+          location: modelProps.location,
+          social_links: modelProps.social_links,
           notification_settings: modelProps.notification_settings,
           privacy_settings: modelProps.privacy_settings,
           discovery_settings: modelProps.discovery_settings,
@@ -143,11 +152,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
     const model = await this.prisma.audience.findUnique({
       where: { id: id.id },
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return model ? this.mapToEntityWithBadges(model) : null;
@@ -157,11 +162,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
     const models = await this.prisma.audience.findMany({
       where: { id: { in: ids.map((id) => id.id) } },
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return models.map((model) => this.mapToEntityWithBadges(model));
@@ -170,11 +171,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
   async findAll(): Promise<Audience[]> {
     const models = await this.prisma.audience.findMany({
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return models.map((model) => this.mapToEntityWithBadges(model));
@@ -217,11 +214,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
         skip: offset,
         take: limit,
         include: {
-          badges: {
-            include: {
-              badge: true,
-            },
-          },
+          badges: true,
         },
       }),
       this.prisma.audience.count({ where }),
@@ -302,11 +295,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
     const model = await this.prisma.audience.findUnique({
       where: { email },
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return model ? this.mapToEntityWithBadges(model) : null;
@@ -317,11 +306,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       where: { is_active: true },
       orderBy: { created_at: "desc" },
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return models.map((model) => this.mapToEntityWithBadges(model));
@@ -337,11 +322,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       },
       orderBy: { points: "desc" },
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return models.map((model) => this.mapToEntityWithBadges(model));
@@ -353,11 +334,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       orderBy: { points: "desc" },
       take: limit,
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return models.map((model) => this.mapToEntityWithBadges(model));
@@ -371,11 +348,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       },
       orderBy: { points: "desc" },
       include: {
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
+        badges: true,
       },
     });
     return models.map((model) => this.mapToEntityWithBadges(model));
@@ -404,7 +377,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
 
   private mapToEntityWithBadges(model: any): Audience {
     const badges =
-      model.badges?.map((userBadge: any) => userBadge.badge.name) || [];
+      model.badges?.map((userBadge: any) => userBadge.badge_type) || [];
 
     return AudienceModelMapper.toEntity({
       id: model.id,
@@ -416,6 +389,7 @@ export class AudiencePrismaRepository implements IAudienceRepository {
       points: model.points,
       monthly_points: model.monthly_points,
       level: model.level,
+      last_points_update: model.last_points_update,
       badges,
       favorite_genres: model.favorite_genres,
       favorite_artists: model.favorite_artists,

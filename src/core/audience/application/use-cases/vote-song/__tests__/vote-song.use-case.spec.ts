@@ -12,10 +12,12 @@ import { VoteSongUseCase } from "../vote-song.use-case";
 describe("VoteSongUseCase Unit Tests", () => {
   let useCase: VoteSongUseCase;
   let repository: AudienceInMemoryRepository;
+  let voteRequestUseCase: { execute: jest.Mock };
 
   beforeEach(() => {
     repository = new AudienceInMemoryRepository();
-    useCase = new VoteSongUseCase(repository);
+    voteRequestUseCase = { execute: jest.fn().mockResolvedValue({}) };
+    useCase = new VoteSongUseCase(repository, voteRequestUseCase as any);
   });
 
   it("should throw error when audience not found", async () => {
@@ -71,7 +73,7 @@ describe("VoteSongUseCase Unit Tests", () => {
           vote: "up",
         },
         expected: {
-          points_added: 1,
+          points_added: 0,
         },
       },
       {
@@ -80,7 +82,7 @@ describe("VoteSongUseCase Unit Tests", () => {
           vote: "down",
         },
         expected: {
-          points_added: 1,
+          points_added: 0,
         },
       },
     ];
@@ -98,6 +100,7 @@ describe("VoteSongUseCase Unit Tests", () => {
       const output = await useCase.execute(fullInput);
 
       expect(output.id).toBe(audience.audience_id.id);
+      expect(voteRequestUseCase.execute).toHaveBeenCalledTimes(1);
       expect(output.points.total).toBe(initialPoints + expected.points_added);
       expect(output.is_active).toBe(true);
 

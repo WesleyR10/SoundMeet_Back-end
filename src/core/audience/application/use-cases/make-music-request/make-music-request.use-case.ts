@@ -1,4 +1,6 @@
+import { PointsSourceEnum } from "../../../../gamification/domain/value-objects/points-source.vo";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
@@ -13,7 +15,11 @@ export class MakeMusicRequestUseCase implements IUseCase<
   MakeMusicRequestInput,
   MakeMusicRequestOutput
 > {
-  constructor(private audienceRepository: IAudienceRepository) {}
+  constructor(
+    private audienceRepository: IAudienceRepository,
+    private readonly createRequestUseCase: IUseCase<any, any>,
+    private readonly addPointsUseCase: IUseCase<any, any>,
+  ) {}
 
   async execute(input: MakeMusicRequestInput): Promise<MakeMusicRequestOutput> {
     // Find the audience
@@ -25,28 +31,40 @@ export class MakeMusicRequestUseCase implements IUseCase<
       throw new NotFoundError(input.id, Audience);
     }
 
-    audience.makeMusicRequest(
-      input.musician_id,
-      input.song_title,
-      input.artist_name,
-    );
-
+    audience.ensureIsActive();
     if (audience.notification.hasErrors()) {
       throw new EntityValidationError(audience.notification.toJSON());
     }
 
-    // Check if audience should get "Sugestor" badge
-    const currentBadges = audience.getBadges();
-    const newBadges: string[] = [];
-    if (!currentBadges.includes("Sugestor")) {
-      audience.addBadge("Sugestor");
-      newBadges.push("Sugestor");
+    if (!input.event_id) {
+      throw new InvalidArgumentError(
+        "event_id is required to create a canonical music request",
+      );
     }
 
-    // Save the updated audience
-    await this.audienceRepository.update(audience);
+    const request = await this.createRequestUseCase.execute({
+      event_id: input.event_id,
+      audience_id: input.id,
+      musician_id: input.musician_id,
+      song_title: input.song_title,
+      artist: input.artist_name,
+      message: input.message,
+      library_id: input.metadata?.library_id ?? null,
+    });
+
+    await this.addPointsUseCase.execute({
+      user_id: input.id,
+      source: PointsSourceEnum.REQUEST,
+      metadata: {
+        request_id: request.id,
+        musician_id: input.musician_id,
+        event_id: input.event_id,
+        description: "Pedido musical enviado",
+      },
+    });
 
     const requestMetadata: MakeMusicRequestOutput["request_metadata"] = {
+      request_id: request.id,
       musician_id: input.musician_id,
       song_title: input.song_title,
       artist_name: input.artist_name,
@@ -67,7 +85,7 @@ export class MakeMusicRequestUseCase implements IUseCase<
     return {
       audience: AudienceOutputMapper.toOutput(audience),
       points_earned: 25, // Points for making a request
-      new_badges: newBadges,
+      new_badges: [],
       new_level: audience.currentLevel,
       request_metadata: requestMetadata,
     };
@@ -80,6 +98,7 @@ export type MakeMusicRequestOutput = {
   new_badges: string[];
   new_level: any; // Level type
   request_metadata: {
+    request_id: string;
     musician_id: string;
     song_title: string;
     artist_name: string;

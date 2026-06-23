@@ -2,6 +2,7 @@ import { UserInteraction } from "../../../../../gamification/domain/user-interac
 import { UserInteractionInMemoryRepository } from "../../../../../gamification/infra/db/in-memory/user-interaction-in-memory.repository";
 import { Musician } from "../../../../../musician/domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../../musician/infra/db/in-memory/musician-in-memory.repository";
+import { InvalidArgumentError } from "../../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Points } from "../../../../../shared/domain/value-objects/points.vo";
 import {
@@ -24,10 +25,12 @@ describe("ScanQRUseCase Unit Tests", () => {
     repository = new AudienceInMemoryRepository();
     userInteractionRepo = new UserInteractionInMemoryRepository();
     musicianRepository = new MusicianInMemoryRepository();
+    const uowMock = { do: async (fn: () => Promise<unknown>) => fn() } as any;
     useCase = new ScanQRUseCase(
       repository,
       userInteractionRepo,
       musicianRepository,
+      uowMock,
     );
   });
 
@@ -35,8 +38,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     const audienceId = new Uuid();
     const input: ScanQRInput = {
       id: audienceId.id,
-      qr_code: "musician_123",
-      musician_id: "musician_123",
+      qr_code: `soundmeet://musician/${new Uuid().id}`,
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -44,11 +46,23 @@ describe("ScanQRUseCase Unit Tests", () => {
     );
   });
 
+  it("should throw NotFoundError when musician does not exist", async () => {
+    const audience = AudienceFakeBuilder.aAudience().build();
+    repository.items = [audience];
+    const nonExistentMusicianId = new Uuid();
+
+    await expect(() =>
+      useCase.execute({
+        id: audience.audience_id.id,
+        qr_code: `soundmeet://musician/${nonExistentMusicianId.id}`,
+      }),
+    ).rejects.toThrow(new NotFoundError(nonExistentMusicianId.id, Musician));
+  });
+
   it("should throw error when id is not valid", async () => {
     const input: ScanQRInput = {
       id: "invalid-id",
-      qr_code: "musician_123",
-      musician_id: "musician_123",
+      qr_code: `soundmeet://musician/${new Uuid().id}`,
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -60,8 +74,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     const arrange = [
       {
         input: {
-          qr_code: "musician_123",
-          musician_id: "musician_123",
+          qr_code: "dynamic",
         },
         expected: {
           points_earned: {
@@ -70,15 +83,13 @@ describe("ScanQRUseCase Unit Tests", () => {
           },
           new_badges: ["iniciante"],
           scan_metadata: {
-            musician_id: "musician_123",
-            qr_code: "musician_123",
+            qr_code: "dynamic",
           },
         },
       },
       {
         input: {
-          qr_code: "musician_456",
-          musician_id: "musician_456",
+          qr_code: "dynamic",
           establishment_id: "establishment_789",
           event_id: "event_101",
           location: {
@@ -97,8 +108,7 @@ describe("ScanQRUseCase Unit Tests", () => {
           },
           new_badges: ["iniciante"],
           scan_metadata: {
-            musician_id: "musician_456",
-            qr_code: "musician_456",
+            qr_code: "dynamic",
             establishment_id: "establishment_789",
             event_id: "event_101",
           },
@@ -116,6 +126,7 @@ describe("ScanQRUseCase Unit Tests", () => {
       const fullInput = {
         id: audience.audience_id.id,
         ...input,
+        qr_code: `soundmeet://musician/${musician.musician_id.id}`,
         musician_id: musician.musician_id.id,
       };
 
@@ -129,6 +140,7 @@ describe("ScanQRUseCase Unit Tests", () => {
       expect(output.new_badges).toEqual(expected.new_badges);
       expect(output.scan_metadata).toMatchObject({
         ...expected.scan_metadata,
+        qr_code: fullInput.qr_code,
         musician_id: musician.musician_id.id,
       });
       expect(output.scan_metadata.scanned_at).toBeInstanceOf(Date);
@@ -147,7 +159,7 @@ describe("ScanQRUseCase Unit Tests", () => {
 
     const input: ScanQRInput = {
       id: audience.audience_id.id,
-      qr_code: "musician_123",
+      qr_code: `soundmeet://musician/${musician.musician_id.id}`,
       musician_id: musician.musician_id.id,
       establishment_id: "establishment_1",
       location: {
@@ -199,7 +211,7 @@ describe("ScanQRUseCase Unit Tests", () => {
 
     const input: ScanQRInput = {
       id: audience.audience_id.id,
-      qr_code: "qr_code_limit",
+      qr_code: `soundmeet://musician/${musicianId}`,
       musician_id: musicianId,
     };
 
@@ -220,13 +232,13 @@ describe("ScanQRUseCase Unit Tests", () => {
 
     const input1: ScanQRInput = {
       id: audience.audience_id.id,
-      qr_code: "musician_123",
+      qr_code: `soundmeet://musician/${musician1.musician_id.id}`,
       musician_id: musician1.musician_id.id,
     };
 
     const input2: ScanQRInput = {
       id: audience.audience_id.id,
-      qr_code: "musician_456",
+      qr_code: `soundmeet://musician/${musician2.musician_id.id}`,
       musician_id: musician2.musician_id.id,
     };
 
@@ -256,7 +268,7 @@ describe("ScanQRUseCase Unit Tests", () => {
 
     const input: ScanQRInput = {
       id: audience.audience_id.id,
-      qr_code: "musician_123",
+      qr_code: `soundmeet://musician/${musician.musician_id.id}`,
       musician_id: musician.musician_id.id,
     };
 
@@ -266,5 +278,59 @@ describe("ScanQRUseCase Unit Tests", () => {
     expect(output.points_earned.value).toBe(10);
     expect(output.new_level).toBeDefined();
     expect(output.audience.points.total).toBe(100); // 90 + 10 = 100
+  });
+
+  it("should reject QR code with invalid scheme", async () => {
+    const audience = AudienceFakeBuilder.aAudience().build();
+    repository.items = [audience];
+
+    await expect(() =>
+      useCase.execute({
+        id: audience.audience_id.id,
+        qr_code: `https://soundmeet.app/musician/${new Uuid().id}`,
+      }),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("should reject QR code with invalid musician UUID", async () => {
+    const audience = AudienceFakeBuilder.aAudience().build();
+    repository.items = [audience];
+
+    await expect(() =>
+      useCase.execute({
+        id: audience.audience_id.id,
+        qr_code: "soundmeet://musician/musician_123",
+      }),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("should reject musician_id different from QR code", async () => {
+    const audience = AudienceFakeBuilder.aAudience().build();
+    repository.items = [audience];
+    const musician = Musician.fake().aMusician().build();
+    musicianRepository.items = [musician];
+
+    await expect(() =>
+      useCase.execute({
+        id: audience.audience_id.id,
+        qr_code: `soundmeet://musician/${musician.musician_id.id}`,
+        musician_id: new Uuid().id,
+      }),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("should reject inactive musician before scoring", async () => {
+    const audience = AudienceFakeBuilder.aAudience().build();
+    repository.items = [audience];
+    const musician = Musician.fake().aMusician().deactivate().build();
+    musicianRepository.items = [musician];
+
+    await expect(() =>
+      useCase.execute({
+        id: audience.audience_id.id,
+        qr_code: `soundmeet://musician/${musician.musician_id.id}`,
+      }),
+    ).rejects.toThrow(InvalidArgumentError);
+    expect(userInteractionRepo.items).toHaveLength(0);
   });
 });

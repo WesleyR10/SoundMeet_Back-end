@@ -10,10 +10,15 @@ import { AttendEventUseCase } from "../attend-event.use-case";
 describe("AttendEventUseCase Unit Tests", () => {
   let useCase: AttendEventUseCase;
   let repository: AudienceInMemoryRepository;
+  let addEventAttendeeUseCase: { execute: jest.Mock };
 
   beforeEach(() => {
     repository = new AudienceInMemoryRepository();
-    useCase = new AttendEventUseCase(repository);
+    addEventAttendeeUseCase = { execute: jest.fn().mockResolvedValue({}) };
+    useCase = new AttendEventUseCase(
+      repository,
+      addEventAttendeeUseCase as any,
+    );
   });
 
   it("should throw error when audience not found", async () => {
@@ -63,25 +68,28 @@ describe("AttendEventUseCase Unit Tests", () => {
       {
         input: {
           event_id: "550e8400-e29b-41d4-a716-446655440000",
+          establishment_id: new Uuid().id,
         },
         expected: {
-          points_added: 30,
+          points_added: 0,
         },
       },
       {
         input: {
           event_id: "550e8400-e29b-41d4-a716-446655440001",
+          establishment_id: new Uuid().id,
         },
         expected: {
-          points_added: 30,
+          points_added: 0,
         },
       },
       {
         input: {
           event_id: "550e8400-e29b-41d4-a716-446655440002",
+          establishment_id: new Uuid().id,
         },
         expected: {
-          points_added: 30,
+          points_added: 0,
         },
       },
     ];
@@ -99,6 +107,7 @@ describe("AttendEventUseCase Unit Tests", () => {
       const output = await useCase.execute(fullInput);
 
       expect(output.id).toBe(audience.audience_id.id);
+      expect(addEventAttendeeUseCase.execute).toHaveBeenCalledTimes(1);
       expect(output.points.total).toBe(initialPoints + expected.points_added);
       expect(output.is_active).toBe(true);
 
@@ -118,12 +127,13 @@ describe("AttendEventUseCase Unit Tests", () => {
     const input: AttendEventInput = {
       audience_id: audience.audience_id.id,
       event_id: "550e8400-e29b-41d4-a716-446655440000",
+      establishment_id: new Uuid().id,
     };
 
     const output = await useCase.execute(input);
 
     expect(output.id).toBe(audience.audience_id.id);
-    expect(output.points.total).toBe(initialPoints + 30);
+    expect(output.points.total).toBe(initialPoints);
     expect(output.is_active).toBe(true);
   });
 
@@ -138,6 +148,7 @@ describe("AttendEventUseCase Unit Tests", () => {
     const input: AttendEventInput = {
       audience_id: audience.audience_id.id,
       event_id: "550e8400-e29b-41d4-a716-446655440000",
+      establishment_id: new Uuid().id,
     };
 
     const output = await useCase.execute(input);
@@ -168,12 +179,13 @@ describe("AttendEventUseCase Unit Tests", () => {
     const input: AttendEventInput = {
       audience_id: audience.audience_id.id,
       event_id: "550e8400-e29b-41d4-a716-446655440000",
+      establishment_id: new Uuid().id,
     };
 
     const output = await useCase.execute(input);
 
     expect(output.id).toBe(audience.audience_id.id);
-    expect(output.points.total).toBe(30); // Valor esperado baseado no fake builder
+    expect(output.points.total).toBe(audience.totalPoints);
     expect(output.is_active).toBe(true);
   });
 });

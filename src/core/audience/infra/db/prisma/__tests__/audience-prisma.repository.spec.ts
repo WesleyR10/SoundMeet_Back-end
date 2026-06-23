@@ -29,8 +29,7 @@ describe("AudiencePrismaRepository", () => {
     it("should insert a new audience", async () => {
       const audience = AudienceFakeBuilder.aAudience().build();
       const modelProps = AudienceModelMapper.toModel(audience);
-      const { badges, location, social_links, ...dataWithoutBadges } =
-        modelProps;
+      const { badges, ...dataWithoutBadges } = modelProps;
 
       (prisma.audience.create as jest.Mock).mockResolvedValue(modelProps);
 
@@ -50,8 +49,7 @@ describe("AudiencePrismaRepository", () => {
       ];
       const modelsProps = audiences.map((entity) => {
         const modelProps = AudienceModelMapper.toModel(entity);
-        const { badges, location, social_links, ...dataWithoutBadges } =
-          modelProps;
+        const { badges, ...dataWithoutBadges } = modelProps;
         return dataWithoutBadges;
       });
 
@@ -76,7 +74,7 @@ describe("AudiencePrismaRepository", () => {
       const modelWithBadges = {
         ...modelProps,
         badges: audience.badges.map((badgeName) => ({
-          badge: { name: badgeName },
+          badge_type: badgeName,
         })),
       };
 
@@ -103,11 +101,7 @@ describe("AudiencePrismaRepository", () => {
       expect(prisma.audience.findUnique).toHaveBeenCalledWith({
         where: { id: audience.audience_id.id },
         include: {
-          badges: {
-            include: {
-              badge: true,
-            },
-          },
+          badges: true,
         },
       });
     });
@@ -134,9 +128,7 @@ describe("AudiencePrismaRepository", () => {
         return {
           ...modelProps,
           badges: entity.badges.map((badgeName) => ({
-            badge: {
-              name: badgeName,
-            },
+            badge_type: badgeName,
           })),
         };
       });
@@ -200,10 +192,13 @@ describe("AudiencePrismaRepository", () => {
           points: modelProps.points,
           monthly_points: modelProps.monthly_points,
           level: modelProps.level,
+          last_points_update: modelProps.last_points_update,
           favorite_genres: modelProps.favorite_genres,
           favorite_artists: modelProps.favorite_artists,
           favorite_instruments: modelProps.favorite_instruments,
           preferred_languages: modelProps.preferred_languages,
+          location: modelProps.location,
+          social_links: modelProps.social_links,
           notification_settings: modelProps.notification_settings,
           privacy_settings: modelProps.privacy_settings,
           discovery_settings: modelProps.discovery_settings,
@@ -262,9 +257,7 @@ describe("AudiencePrismaRepository", () => {
         return {
           ...modelProps,
           badges: entity.badges.map((badgeName) => ({
-            badge: {
-              name: badgeName,
-            },
+            badge_type: badgeName,
           })),
         };
       });
@@ -280,7 +273,7 @@ describe("AudiencePrismaRepository", () => {
         orderBy: { created_at: "asc" },
         skip: 0,
         take: 15,
-        include: { badges: { include: { badge: true } } },
+        include: { badges: true },
       });
       expect(result.items).toHaveLength(2);
       expect(result.items[0].audience_id.id).toBe(audiences[0].audience_id.id);
@@ -331,9 +324,7 @@ describe("AudiencePrismaRepository", () => {
       const modelWithBadges = {
         ...modelProps,
         badges: audience.badges.map((badgeName) => ({
-          badge: {
-            name: badgeName,
-          },
+          badge_type: badgeName,
         })),
       };
 
@@ -358,7 +349,7 @@ describe("AudiencePrismaRepository", () => {
         orderBy: { created_at: "asc" },
         skip: 0,
         take: 15,
-        include: { badges: { include: { badge: true } } },
+        include: { badges: true },
       });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].audience_id.id).toBe(audience.audience_id.id);
@@ -387,9 +378,7 @@ describe("AudiencePrismaRepository", () => {
       const modelWithBadges = {
         ...modelProps,
         badges: audience.badges.map((badgeName) => ({
-          badge: {
-            name: badgeName,
-          },
+          badge_type: badgeName,
         })),
       };
 
@@ -409,7 +398,7 @@ describe("AudiencePrismaRepository", () => {
         orderBy: { created_at: "asc" },
         skip: 10,
         take: 10,
-        include: { badges: { include: { badge: true } } },
+        include: { badges: true },
       });
     });
 
@@ -419,9 +408,7 @@ describe("AudiencePrismaRepository", () => {
       const modelWithBadges = {
         ...modelProps,
         badges: audience.badges.map((badgeName) => ({
-          badge: {
-            name: badgeName,
-          },
+          badge_type: badgeName,
         })),
       };
 
@@ -443,7 +430,7 @@ describe("AudiencePrismaRepository", () => {
         orderBy: { name: "desc" },
         skip: 0,
         take: 2,
-        include: { badges: { include: { badge: true } } },
+        include: { badges: true },
       });
     });
 
@@ -453,9 +440,7 @@ describe("AudiencePrismaRepository", () => {
       const modelWithBadges = {
         ...modelProps,
         badges: audience.badges.map((badgeName) => ({
-          badge: {
-            name: badgeName,
-          },
+          badge_type: badgeName,
         })),
       };
 
@@ -475,7 +460,7 @@ describe("AudiencePrismaRepository", () => {
         orderBy: { created_at: "asc" },
         skip: 0,
         take: 15,
-        include: { badges: { include: { badge: true } } },
+        include: { badges: true },
       });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].audience_id.id).toBe(audience.audience_id.id);

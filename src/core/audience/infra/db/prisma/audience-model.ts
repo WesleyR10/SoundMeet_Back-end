@@ -8,6 +8,7 @@ export type AudienceModel = {
   points: number;
   monthly_points: number;
   level: number;
+  last_points_update?: Date;
   badges: string[];
   favorite_genres: string[];
   favorite_artists: string[];

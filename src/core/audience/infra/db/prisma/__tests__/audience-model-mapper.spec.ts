@@ -33,6 +33,7 @@ describe("AudienceModelMapper", () => {
         points: audience.points.total,
         monthly_points: audience.points.monthly,
         level: audience.level.level,
+        last_points_update: audience.points.lastUpdated,
         badges: audience.badges,
         favorite_genres: audience.favorite_genres,
         favorite_artists: audience.favorite_artists,

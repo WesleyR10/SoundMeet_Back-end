@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsObject, IsOptional, IsString } from "class-validator";
+import {
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 
 export type ScanQRInput = {
   id: string;
@@ -16,6 +22,7 @@ export type ScanQRInput = {
 export class ScanQRInputValidator {
   @IsString()
   @IsNotEmpty()
+  @IsUUID()
   id: string;
 
   @IsString()
@@ -24,14 +31,17 @@ export class ScanQRInputValidator {
 
   @IsString()
   @IsOptional()
+  @IsUUID()
   musician_id?: string;
 
   @IsString()
   @IsOptional()
+  @IsUUID()
   establishment_id?: string;
 
   @IsString()
   @IsOptional()
+  @IsUUID()
   event_id?: string;
 
   @IsObject()

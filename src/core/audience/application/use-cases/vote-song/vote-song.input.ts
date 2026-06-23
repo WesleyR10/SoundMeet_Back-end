@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsString } from "class-validator";
+import { IsIn, IsNotEmpty, IsString, IsUUID } from "class-validator";
 
 export type VoteSongInputConstructorProps = {
   audience_id: string;
@@ -9,10 +9,12 @@ export type VoteSongInputConstructorProps = {
 export class VoteSongInput {
   @IsString()
   @IsNotEmpty()
+  @IsUUID()
   audience_id: string;
 
   @IsString()
   @IsNotEmpty()
+  @IsUUID()
   request_id: string;
 
   @IsString()
