@@ -126,7 +126,6 @@ export class UserBadgePresenter {
 export class RankingPresenter {
   id: string;
   user_id: string;
-  establishment_id: string | null;
   ranking_type: string;
   period: string;
   position: number;
@@ -135,7 +134,6 @@ export class RankingPresenter {
   period_start: Date;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   period_end: Date;
-  metadata: any | null;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   created_at: Date;
   @Transform(({ value }: { value: Date }) => value.toISOString())
@@ -149,14 +147,12 @@ export class RankingPresenter {
   constructor(output: RankingOutput) {
     this.id = output.id;
     this.user_id = output.user_id;
-    this.establishment_id = output.establishment_id;
     this.ranking_type = output.ranking_type;
     this.period = output.period;
     this.position = output.position;
     this.score = output.score;
     this.period_start = output.period_start;
     this.period_end = output.period_end;
-    this.metadata = output.metadata;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
     this.is_current_period = output.is_current_period;

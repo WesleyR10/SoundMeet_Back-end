@@ -1,3 +1,5 @@
+import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
+import { CalculatePointsUseCase } from "../../core/gamification/application/use-cases/calculate-points/calculate-points.use-case";
 import { GetBadgeUseCase } from "../../core/gamification/application/use-cases/get-badge/get-badge.use-case";
 import { GetLeaderboardUseCase } from "../../core/gamification/application/use-cases/get-leaderboard/get-leaderboard.use-case";
 import { GetUserBadgesUseCase } from "../../core/gamification/application/use-cases/get-user-badges/get-user-badges.use-case";
@@ -8,10 +10,12 @@ import { IBadgeRepository } from "../../core/gamification/domain/badge.repositor
 import { IRankingRepository } from "../../core/gamification/domain/ranking.repository";
 import { IUserBadgeRepository } from "../../core/gamification/domain/user-badge.repository";
 import { IUserPointsRepository } from "../../core/gamification/domain/user-points.repository";
+import { IUserScoreRepository } from "../../core/gamification/domain/user-score.repository";
 import { BadgePrismaRepository } from "../../core/gamification/infra/db/prisma/badge-prisma.repository";
 import { RankingPrismaRepository } from "../../core/gamification/infra/db/prisma/ranking-prisma.repository";
 import { UserBadgePrismaRepository } from "../../core/gamification/infra/db/prisma/user-badge-prisma.repository";
 import { UserPointsPrismaRepository } from "../../core/gamification/infra/db/prisma/user-points-prisma.repository";
+import { UserScorePrismaRepository } from "../../core/gamification/infra/db/prisma/user-score-prisma.repository";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
 export const REPOSITORIES = {
@@ -34,6 +38,17 @@ export const REPOSITORIES = {
     provide: UserPointsPrismaRepository,
     useFactory: (prismaService: PrismaService) => {
       return new UserPointsPrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  USER_SCORE_REPOSITORY: {
+    provide: "UserScoreRepository",
+    useExisting: UserScorePrismaRepository,
+  },
+  USER_SCORE_PRISMA_REPOSITORY: {
+    provide: UserScorePrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new UserScorePrismaRepository(prismaService);
     },
     inject: [PrismaService],
   },
@@ -62,6 +77,32 @@ export const REPOSITORIES = {
 };
 
 export const USE_CASES = {
+  ADD_POINTS_USE_CASE: {
+    provide: AddPointsUseCase,
+    useFactory: (
+      userPointsRepo: IUserPointsRepository,
+      userScoreRepo: IUserScoreRepository,
+    ) => {
+      return new AddPointsUseCase(userPointsRepo, userScoreRepo);
+    },
+    inject: [
+      REPOSITORIES.USER_POINTS_REPOSITORY.provide,
+      REPOSITORIES.USER_SCORE_REPOSITORY.provide,
+    ],
+  },
+  CALCULATE_POINTS_USE_CASE: {
+    provide: CalculatePointsUseCase,
+    useFactory: (
+      userPointsRepo: IUserPointsRepository,
+      userScoreRepo: IUserScoreRepository,
+    ) => {
+      return new CalculatePointsUseCase(userPointsRepo, userScoreRepo);
+    },
+    inject: [
+      REPOSITORIES.USER_POINTS_REPOSITORY.provide,
+      REPOSITORIES.USER_SCORE_REPOSITORY.provide,
+    ],
+  },
   LIST_BADGES_USE_CASE: {
     provide: ListBadgesUseCase,
     useFactory: (badgeRepo: IBadgeRepository) => {
