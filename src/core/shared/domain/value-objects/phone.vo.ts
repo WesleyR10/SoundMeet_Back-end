@@ -1,3 +1,4 @@
+import { Either } from "../either";
 import { ValueObject } from "../value-object";
 
 export class Phone extends ValueObject {
@@ -12,6 +13,10 @@ export class Phone extends ValueObject {
     this.countryCode = parsed.countryCode;
     this.number = parsed.number;
     this.validate();
+  }
+
+  static create(value: string): Either<Phone, InvalidPhoneError> {
+    return Either.safe<Phone, InvalidPhoneError>(() => new Phone(value));
   }
 
   private normalize(phone: string): string {

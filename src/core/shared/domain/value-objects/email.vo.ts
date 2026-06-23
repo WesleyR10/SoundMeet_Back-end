@@ -1,3 +1,4 @@
+import { Either } from "../either";
 import { ValueObject } from "../value-object";
 
 export class Email extends ValueObject {
@@ -7,6 +8,10 @@ export class Email extends ValueObject {
     super();
     this.value = value;
     this.validate();
+  }
+
+  static create(value: string): Either<Email, InvalidEmailError> {
+    return Either.safe<Email, InvalidEmailError>(() => new Email(value));
   }
 
   private validate(): void {
