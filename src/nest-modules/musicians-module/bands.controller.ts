@@ -10,17 +10,28 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
+import { AddBandMemberInput } from "../../core/musician/application/use-cases/add-band-member/add-band-member.input";
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
 import { BandOutput } from "../../core/musician/application/use-cases/common/band-output";
+import { CreateBandInput } from "../../core/musician/application/use-cases/create-band/create-band.input";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
 import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
+import { UpdateBandInput } from "../../core/musician/application/use-cases/update-band/update-band.input";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
+import { AuthGuard, Public, Roles, RolesGuard } from "../auth-module";
 import { BandCollectionPresenter, BandPresenter } from "./band.presenter";
 import { AddBandMemberDto } from "./dto/add-band-member.dto";
 import { CreateBandDto } from "./dto/create-band.dto";
@@ -29,6 +40,8 @@ import { SearchBandsDto } from "./dto/search-bands.dto";
 import { UpdateBandDto } from "./dto/update-band.dto";
 
 @ApiTags("Bands")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard)
 @Controller("bands")
 export class BandsController {
   @Inject(CreateBandUseCase)
@@ -53,17 +66,21 @@ export class BandsController {
   private removeBandMemberUseCase: RemoveBandMemberUseCase;
 
   @Post()
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Criar banda",
     description: "Cria uma banda com gêneros e membros opcionais.",
   })
   @ApiResponse({ status: 201, type: BandPresenter })
   async create(@Body() dto: CreateBandDto) {
-    const output = await this.createBandUseCase.execute(dto as any);
+    const output = await this.createBandUseCase.execute(
+      new CreateBandInput(dto),
+    );
     return BandsController.serialize(output);
   }
 
   @Get()
+  @Public()
   @ApiOperation({
     summary: "Listar bandas",
     description: "Lista bandas com paginação, ordenação e filtros.",
@@ -75,6 +92,7 @@ export class BandsController {
   }
 
   @Get(":id")
+  @Public()
   @ApiOperation({
     summary: "Buscar banda por ID",
     description: "Retorna os detalhes da banda, incluindo membros.",
@@ -89,6 +107,7 @@ export class BandsController {
   }
 
   @Patch(":id")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Atualizar banda",
     description: "Atualiza dados da banda.",
@@ -99,15 +118,23 @@ export class BandsController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: UpdateBandDto,
   ) {
-    const output = await this.updateBandUseCase.execute({
-      ...(dto as any),
-      id,
-    });
+    const output = await this.updateBandUseCase.execute(
+      new UpdateBandInput({
+        id,
+        name: dto.name,
+        description: dto.description,
+        avatar: dto.avatar,
+        genres: dto.genres,
+        priceRange: dto.priceRange,
+        is_active: dto.is_active,
+      }),
+    );
     return BandsController.serialize(output);
   }
 
   @HttpCode(204)
   @Delete(":id")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Excluir banda",
     description: "Exclui uma banda pelo ID.",
@@ -121,6 +148,7 @@ export class BandsController {
   }
 
   @Post(":id/members")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Adicionar membro na banda",
     description: "Adiciona um músico como membro de uma banda.",
@@ -132,16 +160,19 @@ export class BandsController {
     band_id: string,
     @Body() dto: AddBandMemberDto,
   ) {
-    const input = {
-      ...(dto as any),
+    const input = new AddBandMemberInput({
       band_id,
-    };
+      musician_id: dto.musician_id,
+      role: dto.role,
+      instrument: dto.instrument,
+    });
     const output = await this.addBandMemberUseCase.execute(input);
     return BandsController.serialize(output);
   }
 
   @HttpCode(204)
   @Delete(":id/members/:musicianId")
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Remover membro da banda",
     description: "Remove um músico de uma banda.",

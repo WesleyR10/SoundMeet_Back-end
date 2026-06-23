@@ -10,8 +10,15 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
@@ -20,6 +27,14 @@ import { GetMusicianUseCase } from "../../core/musician/application/use-cases/ge
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
+import {
+  AuthGuard,
+  CurrentUserContextGuard,
+  MusicianOwnershipGuard,
+  Public,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
 import { CreateMusicianDto } from "./dto/create-musician.dto";
 import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
@@ -30,6 +45,8 @@ import {
 } from "./musician.presenter";
 
 @ApiTags("Musicians")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("musicians")
 export class MusiciansController {
   @Inject(CreateMusicianUseCase)
@@ -51,6 +68,7 @@ export class MusiciansController {
   private listUseCase: ListMusiciansUseCase;
 
   @Post()
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Criar músico",
     description: "Cria um perfil de músico e gera QR Code permanente.",
@@ -62,6 +80,7 @@ export class MusiciansController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({
     summary: "Listar músicos",
     description: "Lista músicos com paginação, ordenação e filtros.",
@@ -73,6 +92,7 @@ export class MusiciansController {
   }
 
   @Get(":id")
+  @Public()
   @ApiOperation({
     summary: "Buscar músico por ID",
     description: "Retorna os detalhes do perfil do músico.",
@@ -87,6 +107,8 @@ export class MusiciansController {
   }
 
   @Patch(":id")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar músico",
     description: "Atualiza dados do perfil do músico.",
@@ -105,6 +127,8 @@ export class MusiciansController {
   }
 
   @Patch(":id/profile")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar perfil do músico",
     description:
@@ -122,6 +146,8 @@ export class MusiciansController {
 
   @HttpCode(204)
   @Delete(":id")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Remover músico",
     description: "Remove o perfil do músico.",

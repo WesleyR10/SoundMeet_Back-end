@@ -13,6 +13,7 @@ import {
 } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
@@ -31,7 +32,7 @@ describe("MusiciansController Integration Tests", () => {
   beforeEach(async () => {
     const repositoryInstance = new MusicianInMemoryRepository();
 
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [MusiciansController],
       providers: [
         {
@@ -75,7 +76,10 @@ describe("MusiciansController Integration Tests", () => {
           inject: ["MusicianRepository"],
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule =
+      await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<MusiciansController>(MusiciansController);
     repository = module.get<IMusicianRepository>("MusicianRepository");

@@ -243,8 +243,6 @@ describe("MusiciansController Unit Tests", () => {
           experience: 5,
           instruments: ["Guitar"],
           genres: ["Rock"],
-          rating: 0,
-          total_ratings: 0,
           created_at: new Date("2025-01-01T00:00:00.000Z"),
           updated_at: new Date("2025-01-01T00:00:00.000Z"),
         },

@@ -14,6 +14,7 @@ import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memory/band-in-memory.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import { BandPresenter } from "../band.presenter";
 import { BandsController } from "../bands.controller";
 import { CreateBandFixture } from "../testing/band-fixture";
@@ -27,7 +28,7 @@ describe("BandsController Integration Tests", () => {
     const bandRepositoryInstance = new BandInMemoryRepository();
     const musicianRepositoryInstance = new MusicianInMemoryRepository();
 
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [BandsController],
       providers: [
         {
@@ -78,7 +79,10 @@ describe("BandsController Integration Tests", () => {
           inject: ["BandRepository"],
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule =
+      await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<BandsController>(BandsController);
     bandRepository = module.get<IBandRepository>("BandRepository");
