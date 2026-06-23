@@ -1,0 +1,323 @@
+{
+  "realm": "soundmeet",
+  "enabled": true,
+  "displayName": "SoundMeet",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      {
+        "name": "audience",
+        "description": "Usuário público que interage com eventos, QR Code, pedidos musicais e gorjetas."
+      },
+      {
+        "name": "musician",
+        "description": "Músico ou artista com acesso a catálogo, uploads, IA musical, agenda e perfil."
+      },
+      {
+        "name": "establishment",
+        "description": "Estabelecimento que gerencia perfil, eventos, agenda e contratação."
+      },
+      {
+        "name": "admin",
+        "description": "Administrador global da plataforma SoundMeet."
+      },
+      {
+        "name": "support",
+        "description": "Suporte operacional com acesso controlado a rotinas internas."
+      }
+    ],
+    "client": {
+      "soundmeet-api": [
+        {
+          "name": "establishment_owner",
+          "description": "Responsável por um ou mais estabelecimentos."
+        },
+        {
+          "name": "establishment_staff",
+          "description": "Equipe operacional de um estabelecimento."
+        },
+        {
+          "name": "band_manager",
+          "description": "Gerencia banda, membros e agenda."
+        },
+        {
+          "name": "band_member",
+          "description": "Membro de banda."
+        },
+        {
+          "name": "event_manager",
+          "description": "Gerencia eventos e escala de performers."
+        },
+        {
+          "name": "payment_manager",
+          "description": "Consulta e opera fluxos financeiros permitidos."
+        },
+        {
+          "name": "analytics_viewer",
+          "description": "Consulta dashboards e métricas."
+        },
+        {
+          "name": "ai_operator",
+          "description": "Executa operações de IA musical protegidas."
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "soundmeet-api",
+      "name": "SoundMeet API",
+      "description": "Resource server da API NestJS.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "access.token.lifespan": "900",
+        "client_credentials.use_refresh_token": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "organization_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "organization_id",
+            "claim.name": "organization_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "establishment_ids",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "establishment_ids",
+            "claim.name": "establishment_ids",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "aggregate.attrs": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "band_ids",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "band_ids",
+            "claim.name": "band_ids",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "aggregate.attrs": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "soundmeet-web",
+      "name": "SoundMeet Web",
+      "description": "Aplicação web pública do SoundMeet.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "https://soundmeet.app/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://soundmeet.app"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    },
+    {
+      "clientId": "soundmeet-mobile",
+      "name": "SoundMeet Mobile",
+      "description": "Aplicativo mobile público do SoundMeet.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "soundmeet://auth/callback",
+        "com.soundmeet.app://auth/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "soundmeet-admin",
+      "name": "SoundMeet Admin",
+      "description": "Console administrativo da plataforma.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3002/*",
+        "https://admin.soundmeet.app/*"
+      ],
+      "webOrigins": ["http://localhost:3002", "https://admin.soundmeet.app"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "soundmeet",
+      "attributes": {
+        "tenant_id": ["soundmeet"],
+        "organization_id": ["soundmeet"]
+      },
+      "subGroups": [
+        {
+          "name": "audiences",
+          "realmRoles": ["audience"]
+        },
+        {
+          "name": "musicians",
+          "realmRoles": ["musician"]
+        },
+        {
+          "name": "establishments",
+          "realmRoles": ["establishment"],
+          "subGroups": [
+            {
+              "name": "_template",
+              "subGroups": [
+                {
+                  "name": "owners",
+                  "clientRoles": {
+                    "soundmeet-api": ["establishment_owner"]
+                  }
+                },
+                {
+                  "name": "staff",
+                  "clientRoles": {
+                    "soundmeet-api": ["establishment_staff", "event_manager"]
+                  }
+                },
+                {
+                  "name": "analytics",
+                  "clientRoles": {
+                    "soundmeet-api": ["analytics_viewer"]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "bands",
+          "subGroups": [
+            {
+              "name": "_template",
+              "subGroups": [
+                {
+                  "name": "managers",
+                  "realmRoles": ["musician"],
+                  "clientRoles": {
+                    "soundmeet-api": ["band_manager"]
+                  }
+                },
+                {
+                  "name": "members",
+                  "realmRoles": ["musician"],
+                  "clientRoles": {
+                    "soundmeet-api": ["band_member"]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "admins",
+          "realmRoles": ["admin"]
+        },
+        {
+          "name": "support",
+          "realmRoles": ["support"]
+        }
+      ]
+    }
+  ]
+}
