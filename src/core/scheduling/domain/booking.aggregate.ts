@@ -25,6 +25,8 @@ export type BookingConstructorProps = {
   fee?: number | null;
   notes?: string | null;
   status?: BookingStatus | string;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
   buffer_minutes?: number;
   expires_at?: Date | null;
   free_cancellation_hours?: number;
@@ -60,6 +62,8 @@ export class Booking extends AggregateRoot {
   fee: number | null;
   notes: string | null;
   status: BookingStatus;
+  cancelled_by: string | null;
+  cancellation_reason: string | null;
   buffer_minutes: number;
   expires_at: Date | null;
   free_cancellation_hours: number;
@@ -84,6 +88,8 @@ export class Booking extends AggregateRoot {
       props.status instanceof BookingStatus
         ? props.status
         : BookingStatus.create(props.status || BookingStatusEnum.PENDING);
+    this.cancelled_by = props.cancelled_by ?? null;
+    this.cancellation_reason = props.cancellation_reason ?? null;
     this.buffer_minutes = props.buffer_minutes ?? 0;
     this.expires_at = props.expires_at ?? null;
     this.free_cancellation_hours =
@@ -187,6 +193,8 @@ export class Booking extends AggregateRoot {
 
     if (this.status.isExpired()) {
       this.status = BookingStatus.cancelled();
+      this.cancelled_by = cancelled_by;
+      this.cancellation_reason = reason ?? null;
       this.cancelled_at = now;
       this.updated_at = now;
       this.applyEvent(
@@ -216,6 +224,8 @@ export class Booking extends AggregateRoot {
     }
 
     this.status = BookingStatus.cancelled();
+    this.cancelled_by = cancelled_by;
+    this.cancellation_reason = reason ?? null;
     this.cancelled_at = now;
     this.updated_at = now;
     this.applyEvent(
@@ -306,6 +316,8 @@ export class Booking extends AggregateRoot {
       fee: this.fee,
       notes: this.notes,
       status: this.status.value,
+      cancelled_by: this.cancelled_by,
+      cancellation_reason: this.cancellation_reason,
       buffer_minutes: this.buffer_minutes,
       expires_at: this.expires_at,
       free_cancellation_hours: this.free_cancellation_hours,

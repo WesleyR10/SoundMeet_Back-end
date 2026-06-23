@@ -109,6 +109,31 @@ export class BookingInMemoryRepository
     });
   }
 
+  async countConfirmedOnDayByMusician(
+    musician_id: string,
+    day: Date,
+  ): Promise<number> {
+    const [start, end] = this.getUtcDayRange(day);
+    return this.items.filter(
+      (booking) =>
+        booking.status.isConfirmed() &&
+        booking.musician_id?.id === musician_id &&
+        booking.start_at >= start &&
+        booking.start_at < end,
+    ).length;
+  }
+
+  async countConfirmedOnDayByBand(band_id: string, day: Date): Promise<number> {
+    const [start, end] = this.getUtcDayRange(day);
+    return this.items.filter(
+      (booking) =>
+        booking.status.isConfirmed() &&
+        booking.band_id?.id === band_id &&
+        booking.start_at >= start &&
+        booking.start_at < end,
+    ).length;
+  }
+
   protected async applyFilter(
     items: Booking[],
     filter: BookingFilter | null,
@@ -190,5 +215,14 @@ export class BookingInMemoryRepository
           return item[sort];
         })
       : super.applySort(items, "created_at", "desc");
+  }
+
+  private getUtcDayRange(day: Date): [Date, Date] {
+    const start = new Date(
+      Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()),
+    );
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return [start, end];
   }
 }

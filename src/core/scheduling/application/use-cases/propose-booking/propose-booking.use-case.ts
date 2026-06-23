@@ -94,6 +94,20 @@ export class ProposeBookingUseCase implements IUseCase<
         );
         throw new EntityValidationError(entity.notification.toJSON());
       }
+
+      if (availability?.max_shows_per_day !== null && availability) {
+        const showsToday = await this.bookingRepo.countConfirmedOnDayByMusician(
+          entity.musician_id.id,
+          entity.start_at,
+        );
+        if (showsToday >= availability.max_shows_per_day!) {
+          entity.notification.addError(
+            "Musician reached the maximum shows per day",
+            "max_shows_per_day",
+          );
+          throw new EntityValidationError(entity.notification.toJSON());
+        }
+      }
     }
 
     if (entity.band_id) {
@@ -124,6 +138,20 @@ export class ProposeBookingUseCase implements IUseCase<
           "conflict",
         );
         throw new EntityValidationError(entity.notification.toJSON());
+      }
+
+      if (availability?.max_shows_per_day !== null && availability) {
+        const showsToday = await this.bookingRepo.countConfirmedOnDayByBand(
+          entity.band_id.id,
+          entity.start_at,
+        );
+        if (showsToday >= availability.max_shows_per_day!) {
+          entity.notification.addError(
+            "Band reached the maximum shows per day",
+            "max_shows_per_day",
+          );
+          throw new EntityValidationError(entity.notification.toJSON());
+        }
       }
 
       if (this.bandRepo) {

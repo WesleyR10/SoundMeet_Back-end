@@ -1,3 +1,5 @@
+import { BookingStatus as PrismaBookingStatus } from "@prisma/client";
+
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 
@@ -11,7 +13,9 @@ export type BookingModelProps = {
   end_at: Date;
   fee: number | null;
   notes: string | null;
-  status: string;
+  status: PrismaBookingStatus;
+  cancelled_by: string | null;
+  cancellation_reason: string | null;
   buffer_minutes: number;
   expires_at: Date | null;
   free_cancellation_hours: number;
@@ -34,7 +38,9 @@ export class BookingModelMapper {
       end_at: entity.end_at,
       fee: entity.fee,
       notes: entity.notes,
-      status: entity.status.value,
+      status: entity.status.value as PrismaBookingStatus,
+      cancelled_by: entity.cancelled_by,
+      cancellation_reason: entity.cancellation_reason,
       buffer_minutes: entity.buffer_minutes,
       expires_at: entity.expires_at,
       free_cancellation_hours: entity.free_cancellation_hours,
@@ -55,9 +61,11 @@ export class BookingModelMapper {
       event_id: model.eventId,
       start_at: model.start_at,
       end_at: model.end_at,
-      fee: model.fee,
+      fee: model.fee !== null ? Number(model.fee) : null,
       notes: model.notes,
       status: model.status,
+      cancelled_by: model.cancelled_by,
+      cancellation_reason: model.cancellation_reason,
       buffer_minutes: model.buffer_minutes,
       expires_at: model.expires_at,
       free_cancellation_hours: model.free_cancellation_hours,

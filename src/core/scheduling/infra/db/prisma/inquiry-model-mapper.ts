@@ -1,3 +1,5 @@
+import { InquiryStatus as PrismaInquiryStatus } from "@prisma/client";
+
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { Inquiry, InquiryId } from "../../../domain/inquiry.aggregate";
 
@@ -9,7 +11,7 @@ export type InquiryModelProps = {
   eventId: string | null;
   subject: string | null;
   initial_message: string | null;
-  status: string;
+  status: PrismaInquiryStatus;
   expires_at: Date | null;
   accepted_at: Date | null;
   rejected_at: Date | null;
@@ -30,7 +32,7 @@ export class InquiryModelMapper {
       eventId: entity.event_id?.id ?? null,
       subject: entity.subject,
       initial_message: entity.initial_message,
-      status: entity.status.value,
+      status: entity.status.value as PrismaInquiryStatus,
       expires_at: entity.expires_at,
       accepted_at: entity.accepted_at,
       rejected_at: entity.rejected_at,

@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
@@ -199,6 +199,37 @@ export class BookingPrismaRepository implements IBookingRepository {
     return rows.map((row) => BookingModelMapper.toEntity(row));
   }
 
+  async countConfirmedOnDayByMusician(
+    musician_id: string,
+    day: Date,
+  ): Promise<number> {
+    const [start, end] = this.getUtcDayRange(day);
+    return this.prisma.booking.count({
+      where: {
+        status: "confirmed",
+        musicianId: musician_id,
+        start_at: {
+          gte: start,
+          lt: end,
+        },
+      },
+    });
+  }
+
+  async countConfirmedOnDayByBand(band_id: string, day: Date): Promise<number> {
+    const [start, end] = this.getUtcDayRange(day);
+    return this.prisma.booking.count({
+      where: {
+        status: "confirmed",
+        bandId: band_id,
+        start_at: {
+          gte: start,
+          lt: end,
+        },
+      },
+    });
+  }
+
   async findPendingExpired(now: Date): Promise<Booking[]> {
     const models = await this.prisma.booking.findMany({
       where: {
@@ -239,7 +270,7 @@ export class BookingPrismaRepository implements IBookingRepository {
         id: entity.booking_id.id,
         status: {
           in: expected_statuses,
-        },
+        } as Prisma.BookingWhereInput["status"],
       },
       data: modelProps,
     });
@@ -260,7 +291,7 @@ export class BookingPrismaRepository implements IBookingRepository {
           id: entity.booking_id.id,
           status: {
             in: expected_statuses,
-          },
+          } as Prisma.BookingWhereInput["status"],
         },
         data: modelProps,
       });
@@ -361,5 +392,14 @@ export class BookingPrismaRepository implements IBookingRepository {
 
   getEntity(): new (...args: any[]) => Booking {
     return Booking;
+  }
+
+  private getUtcDayRange(day: Date): [Date, Date] {
+    const start = new Date(
+      Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()),
+    );
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return [start, end];
   }
 }

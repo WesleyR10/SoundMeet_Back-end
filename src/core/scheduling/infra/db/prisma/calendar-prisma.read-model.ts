@@ -1,4 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import {
+  BookingStatus as PrismaBookingStatus,
+  PrismaClient,
+} from "@prisma/client";
 
 import {
   BookingReadModel,
@@ -80,13 +83,13 @@ export class CalendarPrismaReadModel implements ICalendarReadModel {
       target.type === "musician"
         ? {
             musicianId: target.id,
-            status: { in: statuses },
+            status: { in: statuses as PrismaBookingStatus[] },
             start_at: { lt: range.end_at },
             end_at: { gt: range.start_at },
           }
         : {
             bandId: target.id,
-            status: { in: statuses },
+            status: { in: statuses as PrismaBookingStatus[] },
             start_at: { lt: range.end_at },
             end_at: { gt: range.start_at },
           };

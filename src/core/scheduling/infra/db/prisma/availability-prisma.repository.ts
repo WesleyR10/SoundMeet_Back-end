@@ -1,9 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
-import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   Availability,
@@ -15,6 +13,7 @@ import {
   AvailabilitySearchResult,
   IAvailabilityRepository,
 } from "../../../domain/availability.repository";
+import { AvailabilityModelMapper } from "./availability-model-mapper";
 
 type CalendarSettingsModel = {
   id: string;
@@ -514,40 +513,11 @@ export class AvailabilityPrismaRepository implements IAvailabilityRepository {
           orderBy: { start_at: "asc" },
         });
 
-    const entity = new Availability({
-      availability_id: new AvailabilityId(settings.id),
-      musician_id: targetMusicianId,
-      band_id: targetBandId,
-      timezone: settings.timezone,
-      default_buffer_minutes: settings.default_buffer_minutes,
-      max_shows_per_day: settings.max_shows_per_day,
-      weekly_rules: (weeklyRules as any[]).map((r) => ({
-        id: new Uuid(r.id),
-        weekday: r.weekday,
-        start_time: r.start_time,
-        end_time: r.end_time,
-        is_available: r.is_available,
-        created_at: r.created_at,
-      })),
-      is_active: settings.is_active,
-      created_at: settings.created_at,
-      updated_at: settings.updated_at,
-      unavailabilities: (unavailabilities as any[]).map((u) => ({
-        id: new Uuid(u.id),
-        start_at: u.start_at,
-        end_at: u.end_at,
-        reason: u.reason ?? null,
-        created_at: u.created_at,
-      })),
-    });
-
-    entity.validate();
-
-    if (entity.notification.hasErrors()) {
-      throw new LoadEntityError(entity.notification.toJSON());
-    }
-
-    return entity;
+    return AvailabilityModelMapper.toEntity(
+      settings,
+      weeklyRules as any[],
+      unavailabilities as any[],
+    );
   }
 
   getEntity(): new (...args: any[]) => Availability {
