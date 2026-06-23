@@ -1,4 +1,5 @@
 import { MusicianPrismaRepository } from "@core/musician/infra/db/prisma/musician-prisma.repository";
+import { PrismaUnitOfWork } from "@core/shared/infra/db/prisma/prisma-unit-of-work";
 
 import { AttendEventUseCase } from "../../core/audience/application/use-cases/attend-event/attend-event.use-case";
 import { CompleteProfileUseCase } from "../../core/audience/application/use-cases/complete-profile/complete-profile.use-case";
@@ -16,9 +17,14 @@ import { UpdateAudienceUseCase } from "../../core/audience/application/use-cases
 import { VoteSongUseCase } from "../../core/audience/application/use-cases/vote-song/vote-song.use-case";
 import { IAudienceRepository } from "../../core/audience/domain/audience.repository";
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
+import { AddEventAttendeeUseCase } from "../../core/events/application/use-cases/add-event-attendee/add-event-attendee.use-case";
+import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
 import { IUserInteractionRepository } from "../../core/gamification/domain/user-interaction.repository";
 import { UserInteractionPrismaRepository } from "../../core/gamification/infra/db/prisma/user-interaction-prisma.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { SendTipUseCase as PaymentSendTipUseCase } from "../../core/payment/application/use-cases/send-tip/send-tip.use-case";
+import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
+import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
 export const REPOSITORIES = {
@@ -102,10 +108,13 @@ export const USE_CASES = {
   },
   ATTEND_EVENT_USE_CASE: {
     provide: AttendEventUseCase,
-    useFactory: (audienceRepo: IAudienceRepository) => {
-      return new AttendEventUseCase(audienceRepo);
+    useFactory: (
+      audienceRepo: IAudienceRepository,
+      addEventAttendeeUseCase: AddEventAttendeeUseCase,
+    ) => {
+      return new AttendEventUseCase(audienceRepo, addEventAttendeeUseCase);
     },
-    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide],
+    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide, AddEventAttendeeUseCase],
   },
   SCAN_QR_USE_CASE: {
     provide: ScanQRUseCase,
@@ -113,35 +122,61 @@ export const USE_CASES = {
       audienceRepo: IAudienceRepository,
       userInteractionRepo: IUserInteractionRepository,
       musicianRepo: IMusicianRepository,
+      prismaService: PrismaService,
     ) => {
-      return new ScanQRUseCase(audienceRepo, userInteractionRepo, musicianRepo);
+      const uow = new PrismaUnitOfWork(prismaService);
+      return new ScanQRUseCase(
+        audienceRepo,
+        userInteractionRepo,
+        musicianRepo,
+        uow,
+      );
     },
     inject: [
       REPOSITORIES.AUDIENCE_REPOSITORY.provide,
       REPOSITORIES.USER_INTERACTION_REPOSITORY.provide,
       REPOSITORIES.MUSICIAN_REPOSITORY.provide,
+      PrismaService,
     ],
   },
   MAKE_MUSIC_REQUEST_USE_CASE: {
     provide: MakeMusicRequestUseCase,
-    useFactory: (audienceRepo: IAudienceRepository) => {
-      return new MakeMusicRequestUseCase(audienceRepo);
+    useFactory: (
+      audienceRepo: IAudienceRepository,
+      createRequestUseCase: CreateRequestUseCase,
+      addPointsUseCase: AddPointsUseCase,
+    ) => {
+      return new MakeMusicRequestUseCase(
+        audienceRepo,
+        createRequestUseCase,
+        addPointsUseCase,
+      );
     },
-    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.AUDIENCE_REPOSITORY.provide,
+      CreateRequestUseCase,
+      AddPointsUseCase,
+    ],
   },
   VOTE_SONG_USE_CASE: {
     provide: VoteSongUseCase,
-    useFactory: (audienceRepo: IAudienceRepository) => {
-      return new VoteSongUseCase(audienceRepo);
+    useFactory: (
+      audienceRepo: IAudienceRepository,
+      voteRequestUseCase: VoteRequestUseCase,
+    ) => {
+      return new VoteSongUseCase(audienceRepo, voteRequestUseCase);
     },
-    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide],
+    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide, VoteRequestUseCase],
   },
   SEND_TIP_USE_CASE: {
     provide: SendTipUseCase,
-    useFactory: (audienceRepo: IAudienceRepository) => {
-      return new SendTipUseCase(audienceRepo);
+    useFactory: (
+      audienceRepo: IAudienceRepository,
+      sendTipUseCase: PaymentSendTipUseCase,
+    ) => {
+      return new SendTipUseCase(audienceRepo, sendTipUseCase);
     },
-    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide],
+    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide, PaymentSendTipUseCase],
   },
   SHARE_SOCIAL_MEDIA_USE_CASE: {
     provide: ShareSocialMediaUseCase,

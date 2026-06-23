@@ -10,8 +10,15 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { AttendEventUseCase } from "../../core/audience/application/use-cases/attend-event/attend-event.use-case";
 import { AudienceOutput } from "../../core/audience/application/use-cases/common/audience-output";
@@ -28,6 +35,7 @@ import { SendTipUseCase } from "../../core/audience/application/use-cases/send-t
 import { ShareSocialMediaUseCase } from "../../core/audience/application/use-cases/share-social-media/share-social-media.use-case";
 import { UpdateAudienceUseCase } from "../../core/audience/application/use-cases/update-audience/update-audience.use-case";
 import { VoteSongUseCase } from "../../core/audience/application/use-cases/vote-song/vote-song.use-case";
+import { AuthGuard, Public, Roles, RolesGuard } from "../auth-module";
 import { MusicianCollectionPresenter } from "../musicians-module/musician.presenter";
 import {
   AudienceCollectionPresenter,
@@ -50,6 +58,8 @@ import { UpdateAudienceDto } from "./dto/update-audience.dto";
 import { VoteSongDto } from "./dto/vote-song.dto";
 
 @ApiTags("Audience")
+@ApiBearerAuth("JWT-auth")
+@UseGuards(AuthGuard, RolesGuard)
 @Controller("audiences")
 export class AudiencesController {
   @Inject(CreateAudienceUseCase)
@@ -95,17 +105,19 @@ export class AudiencesController {
   private recommendMusiciansUseCase: RecommendMusiciansUseCase;
 
   @Post()
+  @Public()
   @ApiOperation({
     summary: "Criar usuário do público",
     description: "Cria um usuário do público com preferências e gamificação.",
   })
   @ApiResponse({ status: 201, type: AudiencePresenter })
   async create(@Body() createAudienceDto: CreateAudienceDto) {
-    const output = await this.createUseCase.execute(createAudienceDto as any);
+    const output = await this.createUseCase.execute(createAudienceDto);
     return AudiencesController.serialize(output);
   }
 
   @Get()
+  @Roles("admin")
   @ApiOperation({
     summary: "Listar usuários do público",
     description:
@@ -118,6 +130,7 @@ export class AudiencesController {
   }
 
   @Get(":id")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Buscar usuário do público por ID",
     description: "Retorna os detalhes do perfil do público.",
@@ -132,6 +145,7 @@ export class AudiencesController {
   }
 
   @Patch(":id")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Atualizar usuário do público",
     description: "Atualiza dados do perfil do público.",
@@ -143,14 +157,22 @@ export class AudiencesController {
     @Body() updateAudienceDto: UpdateAudienceDto,
   ) {
     const output = await this.updateUseCase.execute({
-      ...(updateAudienceDto as any),
       id,
+      name: updateAudienceDto.name,
+      nickname: updateAudienceDto.nickname,
+      avatar: updateAudienceDto.avatar,
+      phone: updateAudienceDto.phone,
+      favorite_genres: updateAudienceDto.favorite_genres,
+      favorite_artists: updateAudienceDto.favorite_artists,
+      favorite_instruments: updateAudienceDto.favorite_instruments,
+      is_active: updateAudienceDto.is_active,
     });
     return AudiencesController.serialize(output);
   }
 
   @HttpCode(204)
   @Delete(":id")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Remover usuário do público",
     description: "Remove o perfil do público.",
@@ -164,6 +186,7 @@ export class AudiencesController {
   }
 
   @Patch(":id/complete-profile")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Completar perfil do público",
     description: "Completa o perfil e atualiza configurações e preferências.",
@@ -175,13 +198,23 @@ export class AudiencesController {
     @Body() body: CompleteProfileDto,
   ) {
     const output = await this.completeProfileUseCase.execute({
-      ...(body as any),
       audience_id: id,
+      name: body.name,
+      nickname: body.nickname,
+      avatar: body.avatar,
+      phone: body.phone,
+      favorite_genres: body.favorite_genres,
+      favorite_artists: body.favorite_artists,
+      favorite_instruments: body.favorite_instruments,
+      notification_settings: body.notification_settings,
+      privacy_settings: body.privacy_settings,
+      discovery_settings: body.discovery_settings,
     });
     return AudiencesController.serialize(output);
   }
 
   @Post(":id/scan-qr")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Escanear QR Code",
     description: "Registra scan de QR Code e aplica pontuação/gamificação.",
@@ -193,13 +226,19 @@ export class AudiencesController {
     @Body() body: ScanQRDto,
   ) {
     const output = await this.scanQRUseCase.execute({
-      ...(body as any),
       id,
+      qr_code: body.qr_code,
+      musician_id: body.musician_id,
+      establishment_id: body.establishment_id,
+      event_id: body.event_id,
+      location: body.location,
+      metadata: body.metadata,
     });
     return new ScanQRPresenter(output);
   }
 
   @Post(":id/music-requests")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Fazer pedido musical",
     description: "Cria um pedido musical e aplica pontuação/gamificação.",
@@ -211,13 +250,23 @@ export class AudiencesController {
     @Body() body: MakeMusicRequestDto,
   ) {
     const output = await this.makeMusicRequestUseCase.execute({
-      ...(body as any),
       id,
+      musician_id: body.musician_id,
+      song_title: body.song_title,
+      artist_name: body.artist_name,
+      genre: body.genre,
+      difficulty: body.difficulty,
+      event_id: body.event_id,
+      establishment_id: body.establishment_id,
+      message: body.message,
+      is_priority: body.is_priority,
+      metadata: body.metadata,
     });
     return new MakeMusicRequestPresenter(output);
   }
 
   @Post(":id/votes")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Votar em música",
     description: "Registra voto e aplica pontuação/gamificação.",
@@ -229,13 +278,15 @@ export class AudiencesController {
     @Body() body: VoteSongDto,
   ) {
     const output = await this.voteSongUseCase.execute({
-      ...(body as any),
       audience_id: id,
+      request_id: body.request_id,
+      vote: body.vote,
     });
     return AudiencesController.serialize(output);
   }
 
   @Post(":id/tips")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Enviar gorjeta",
     description: "Registra gorjeta e aplica pontuação/gamificação.",
@@ -247,13 +298,21 @@ export class AudiencesController {
     @Body() body: SendTipDto,
   ) {
     const output = await this.sendTipUseCase.execute({
-      ...(body as any),
       id,
+      musician_id: body.musician_id,
+      amount: body.amount,
+      message: body.message,
+      payment_method: body.payment_method,
+      event_id: body.event_id,
+      establishment_id: body.establishment_id,
+      is_anonymous: body.is_anonymous,
+      metadata: body.metadata,
     });
     return new SendTipPresenter(output);
   }
 
   @Post(":id/social-shares")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Compartilhar em rede social",
     description: "Registra compartilhamento e aplica pontuação/gamificação.",
@@ -265,13 +324,16 @@ export class AudiencesController {
     @Body() body: ShareSocialMediaDto,
   ) {
     const output = await this.shareSocialMediaUseCase.execute({
-      ...(body as any),
       audience_id: id,
+      request_id: body.request_id,
+      platform: body.platform,
+      message: body.message,
     });
     return AudiencesController.serialize(output);
   }
 
   @Post(":id/indications")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Indicar músico para estabelecimento",
     description: "Registra indicação e aplica pontuação/gamificação.",
@@ -283,13 +345,16 @@ export class AudiencesController {
     @Body() body: IndicateMusicianDto,
   ) {
     const output = await this.indicateMusicianUseCase.execute({
-      ...(body as any),
       audience_id: id,
+      musician_id: body.musician_id,
+      establishment_id: body.establishment_id,
+      message: body.message,
     });
     return AudiencesController.serialize(output);
   }
 
   @Post(":id/attend-event")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Participar de evento",
     description: "Registra participação em evento e aplica pontuação.",
@@ -301,13 +366,15 @@ export class AudiencesController {
     @Body() body: AttendEventDto,
   ) {
     const output = await this.attendEventUseCase.execute({
-      ...(body as any),
       audience_id: id,
+      event_id: body.event_id,
+      establishment_id: body.establishment_id,
     });
     return AudiencesController.serialize(output);
   }
 
   @Get(":id/recommendations/musicians")
+  @Roles("audience", "admin")
   @ApiOperation({
     summary: "Recomendar músicos para o público",
     description:
@@ -321,7 +388,11 @@ export class AudiencesController {
   ) {
     const output = await this.recommendMusiciansUseCase.execute({
       audience_id: id,
-      ...(query as any),
+      page: query.page,
+      per_page: query.per_page,
+      sort: query.sort,
+      sort_dir: query.sort_dir,
+      only_active: query.only_active,
     });
     return new MusicianCollectionPresenter(output);
   }

@@ -27,6 +27,7 @@ import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
 import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
+import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import { MusicianCollectionPresenter } from "../../musicians-module/musician.presenter";
 import {
   AudienceCollectionPresenter,
@@ -54,7 +55,7 @@ describe("AudiencesController Integration Tests", () => {
     const userInteractionRepositoryInstance =
       new UserInteractionInMemoryRepository();
 
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [AudiencesController],
       providers: [
         {
@@ -105,7 +106,17 @@ describe("AudiencesController Integration Tests", () => {
             repo: IAudienceRepository,
             userInteractionRepo: IUserInteractionRepository,
             musicianRepo: IMusicianRepository,
-          ) => new ScanQRUseCase(repo, userInteractionRepo, musicianRepo),
+          ) => {
+            const uowMock = {
+              do: async (fn: () => Promise<unknown>) => fn(),
+            } as any;
+            return new ScanQRUseCase(
+              repo,
+              userInteractionRepo,
+              musicianRepo,
+              uowMock,
+            );
+          },
           inject: [
             "AudienceRepository",
             "UserInteractionRepository",
@@ -120,25 +131,68 @@ describe("AudiencesController Integration Tests", () => {
         },
         {
           provide: AttendEventUseCase,
-          useFactory: (repo: IAudienceRepository) =>
-            new AttendEventUseCase(repo),
-          inject: ["AudienceRepository"],
+          useFactory: (repo: IAudienceRepository, addEventAttendee: any) =>
+            new AttendEventUseCase(repo, addEventAttendee),
+          inject: ["AudienceRepository", "AddEventAttendeeUseCase"],
         },
         {
           provide: MakeMusicRequestUseCase,
-          useFactory: (repo: IAudienceRepository) =>
-            new MakeMusicRequestUseCase(repo),
-          inject: ["AudienceRepository"],
+          useFactory: (
+            repo: IAudienceRepository,
+            createRequest: any,
+            addPoints: any,
+          ) => new MakeMusicRequestUseCase(repo, createRequest, addPoints),
+          inject: [
+            "AudienceRepository",
+            "CreateRequestUseCase",
+            "AddPointsUseCase",
+          ],
         },
         {
           provide: VoteSongUseCase,
-          useFactory: (repo: IAudienceRepository) => new VoteSongUseCase(repo),
-          inject: ["AudienceRepository"],
+          useFactory: (repo: IAudienceRepository, voteRequest: any) =>
+            new VoteSongUseCase(repo, voteRequest),
+          inject: ["AudienceRepository", "VoteRequestUseCase"],
         },
         {
           provide: SendTipUseCase,
-          useFactory: (repo: IAudienceRepository) => new SendTipUseCase(repo),
-          inject: ["AudienceRepository"],
+          useFactory: (repo: IAudienceRepository, paymentSendTip: any) =>
+            new SendTipUseCase(repo, paymentSendTip),
+          inject: ["AudienceRepository", "PaymentSendTipUseCase"],
+        },
+        {
+          provide: "AddEventAttendeeUseCase",
+          useValue: {
+            execute: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: "CreateRequestUseCase",
+          useValue: {
+            execute: jest
+              .fn()
+              .mockResolvedValue({ id: "request-id", status: "pending" }),
+          },
+        },
+        {
+          provide: "AddPointsUseCase",
+          useValue: {
+            execute: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: "VoteRequestUseCase",
+          useValue: {
+            execute: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: "PaymentSendTipUseCase",
+          useValue: {
+            execute: jest
+              .fn()
+              .mockResolvedValue({ id: "tip-id", status: "pending" }),
+          },
         },
         {
           provide: ShareSocialMediaUseCase,
@@ -161,7 +215,9 @@ describe("AudiencesController Integration Tests", () => {
           inject: ["AudienceRepository", "MusicianRepository"],
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule = await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<AudiencesController>(AudiencesController);
     audienceRepository = module.get<IAudienceRepository>("AudienceRepository");
@@ -355,14 +411,16 @@ describe("AudiencesController Integration Tests", () => {
     await musicianRepository.insert(musician);
 
     const presenter = await controller.scanQR(audience.audience_id.id, {
-      qr_code: "qr_code",
+      qr_code: `soundmeet://musician/${musician.musician_id.id}`,
       musician_id: musician.musician_id.id,
     } as any);
 
     expect(presenter).toBeInstanceOf(ScanQRPresenter);
     expect(presenter.audience.id).toBe(audience.audience_id.id);
     expect(presenter.points_earned.value).toBe(10);
-    expect(presenter.scan_metadata.qr_code).toBe("qr_code");
+    expect(presenter.scan_metadata.qr_code).toBe(
+      `soundmeet://musician/${musician.musician_id.id}`,
+    );
 
     const interactions = await userInteractionRepository.findByUserId(
       audience.audience_id.id,
@@ -411,8 +469,8 @@ describe("AudiencesController Integration Tests", () => {
 
     expect(presenter).toBeInstanceOf(SendTipPresenter);
     expect(presenter.audience.id).toBe(audience.audience_id.id);
-    expect(presenter.points_earned).toBe(10);
-    expect(presenter.tip_metadata.status).toBe("success");
+    expect(presenter.points_earned).toBe(0);
+    expect(presenter.tip_metadata.status).toBe("pending");
   });
 
   it("should recommend musicians based on audience preferences", async () => {
