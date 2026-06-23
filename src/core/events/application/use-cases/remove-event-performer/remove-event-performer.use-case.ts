@@ -1,4 +1,11 @@
-import { Event, EventId, IEventRepository } from "@core/events/domain";
+import {
+  Event,
+  EventId,
+  EventMusician,
+  EventMusicianId,
+  IEventMusicianRepository,
+  IEventRepository,
+} from "@core/events/domain";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -15,7 +22,10 @@ export class RemoveEventPerformerUseCase implements IUseCase<
   RemoveEventPerformerInput,
   RemoveEventPerformerOutput
 > {
-  constructor(private readonly eventRepo: IEventRepository) {}
+  constructor(
+    private readonly eventRepo: IEventRepository,
+    private readonly eventMusicianRepo: IEventMusicianRepository,
+  ) {}
 
   async execute(
     input: RemoveEventPerformerInput,
@@ -26,6 +36,12 @@ export class RemoveEventPerformerUseCase implements IUseCase<
       throw new NotFoundError(input.event_id, Event);
     }
 
-    await this.eventRepo.removePerformer(eventId, input.event_musician_id);
+    const eventMusicianId = new EventMusicianId(input.event_musician_id);
+    const performer = await this.eventMusicianRepo.findById(eventMusicianId);
+    if (!performer || performer.event_id.id !== input.event_id) {
+      throw new NotFoundError(input.event_musician_id, EventMusician);
+    }
+
+    await this.eventMusicianRepo.delete(eventMusicianId);
   }
 }

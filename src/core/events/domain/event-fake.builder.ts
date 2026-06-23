@@ -1,6 +1,7 @@
 import { Chance } from "chance";
 
 import { Uuid } from "../../shared/domain";
+import { InvariantViolationError } from "../../shared/domain/errors/invariant-violation.error";
 import { Event, EventId, EventStatus } from "./event.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
@@ -11,7 +12,6 @@ export class EventFakeBuilder<TBuild = any> {
   private _name: PropOrFactory<string> = (_index) =>
     `Event ${this.chance.word()} ${this.chance.integer({ min: 1, max: 999 })}`;
   private _description: PropOrFactory<string | null> = (_index) => null;
-  private _date: PropOrFactory<Date> = (_index) => new Date();
   private _start_at: PropOrFactory<Date> = (_index) =>
     new Date(Date.now() + 60 * 60 * 1000);
   private _end_at: PropOrFactory<Date> = (_index) =>
@@ -25,6 +25,10 @@ export class EventFakeBuilder<TBuild = any> {
 
   private countObjs;
   private chance: Chance.Chance;
+
+  static aEvent() {
+    return new EventFakeBuilder<Event>();
+  }
 
   static anEvent() {
     return new EventFakeBuilder<Event>();
@@ -56,11 +60,6 @@ export class EventFakeBuilder<TBuild = any> {
 
   withDescription(valueOrFactory: PropOrFactory<string | null>) {
     this._description = valueOrFactory;
-    return this;
-  }
-
-  withDate(valueOrFactory: PropOrFactory<Date>) {
-    this._date = valueOrFactory;
     return this;
   }
 
@@ -113,7 +112,6 @@ export class EventFakeBuilder<TBuild = any> {
         establishment_id: this.callFactory(this._establishment_id, index),
         name: this.callFactory(this._name, index),
         description: this.callFactory(this._description, index),
-        date: this.callFactory(this._date, index),
         start_at: this.callFactory(this._start_at, index),
         end_at: this.callFactory(this._end_at, index),
         status: this.callFactory(this._status, index),
@@ -130,6 +128,25 @@ export class EventFakeBuilder<TBuild = any> {
     });
 
     return this.countObjs === 1 ? (events[0] as any) : (events as any);
+  }
+
+  get event_id() {
+    return this.getValue("event_id");
+  }
+
+  get created_at() {
+    return this.getValue("created_at");
+  }
+
+  private getValue(prop: any) {
+    const optional = ["event_id", "created_at"];
+    const privateProp = `_${prop}` as keyof this;
+    if (!this[privateProp] && optional.includes(prop)) {
+      throw new InvariantViolationError(
+        `Property ${prop} not have a factory, use 'with' methods`,
+      );
+    }
+    return this.callFactory(this[privateProp] as any, 0);
   }
 
   private callFactory<T>(factoryOrValue: PropOrFactory<T>, index: number): T {

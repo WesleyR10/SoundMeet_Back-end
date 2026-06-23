@@ -20,16 +20,18 @@ export class UpdateEventUseCase implements IUseCase<
       throw new NotFoundError(input.id, Event);
     }
 
-    entity.update({
-      name: input.name,
-      description: input.description,
-      date: input.date,
-      start_at: input.start_at,
-      end_at: input.end_at,
-      max_capacity: input.max_capacity,
-      is_public: input.is_public,
-      cover_charge: input.cover_charge,
-    });
+    entity.update(
+      {
+        name: input.name,
+        description: input.description,
+        start_at: input.start_at,
+        end_at: input.end_at,
+        max_capacity: input.max_capacity,
+        is_public: input.is_public,
+        cover_charge: input.cover_charge,
+      },
+      new Date(),
+    );
 
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());

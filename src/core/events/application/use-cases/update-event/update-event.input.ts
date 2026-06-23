@@ -16,7 +16,6 @@ export type UpdateEventInputConstructorProps = {
   establishment_id: string;
   name?: string;
   description?: string | null;
-  date?: Date;
   start_at?: Date;
   end_at?: Date;
   max_capacity?: number | null;
@@ -42,10 +41,6 @@ export class UpdateEventInput {
   @IsOptional()
   @MaxLength(2000)
   description?: string | null;
-
-  @IsDate()
-  @IsOptional()
-  date?: Date;
 
   @IsDate()
   @IsOptional()
@@ -75,7 +70,6 @@ export class UpdateEventInput {
     this.establishment_id = props.establishment_id;
     this.name = props.name;
     this.description = props.description;
-    this.date = props.date;
     this.start_at = props.start_at;
     this.end_at = props.end_at;
     this.max_capacity = props.max_capacity;

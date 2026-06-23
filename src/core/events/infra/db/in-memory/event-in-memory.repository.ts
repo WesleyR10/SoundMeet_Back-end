@@ -69,11 +69,11 @@ export class EventInMemoryRepository
       }
 
       if (filter.date_gte) {
-        matches = matches && event.date >= (filter.date_gte as any);
+        matches = matches && event.start_at >= (filter.date_gte as any);
       }
 
       if (filter.date_lte) {
-        matches = matches && event.date <= (filter.date_lte as any);
+        matches = matches && event.start_at <= (filter.date_lte as any);
       }
 
       return matches;

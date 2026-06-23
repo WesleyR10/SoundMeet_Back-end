@@ -24,7 +24,7 @@ export class FinishEventUseCase implements IUseCase<
       throw new NotFoundError(input.event_id, Event);
     }
 
-    entity.finish();
+    entity.finish(new Date());
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
     }

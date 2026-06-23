@@ -70,27 +70,6 @@ export interface IEventRepository extends ISearchableRepository<
   EventSearchParams,
   EventSearchResult
 > {
-  addAttendee(event_id: EventId, audience_id: string): Promise<void>;
-  removeAttendee(event_id: EventId, audience_id: string): Promise<void>;
   isAudienceAttendee(event_id: EventId, audience_id: string): Promise<boolean>;
-  addPerformer(
-    event_id: EventId,
-    performer: {
-      musician_id?: string | null;
-      band_id?: string | null;
-      fee?: number | null;
-      status?: string;
-      start_at?: Date | null;
-      end_at?: Date | null;
-    },
-  ): Promise<void>;
-  removePerformer(event_id: EventId, event_musician_id: string): Promise<void>;
-  removePerformerByTarget(
-    event_id: EventId,
-    target: {
-      musician_id?: string | null;
-      band_id?: string | null;
-    },
-  ): Promise<void>;
   isMusicianPerformer(event_id: EventId, musician_id: string): Promise<boolean>;
 }

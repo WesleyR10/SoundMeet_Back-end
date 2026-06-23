@@ -24,7 +24,7 @@ export class ActivateEventUseCase implements IUseCase<
       throw new NotFoundError(input.event_id, Event);
     }
 
-    entity.activate();
+    entity.activate(new Date());
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
     }

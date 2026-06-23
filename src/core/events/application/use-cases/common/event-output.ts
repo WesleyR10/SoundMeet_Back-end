@@ -5,7 +5,6 @@ export type EventOutput = {
   establishment_id: string;
   name: string;
   description: string | null;
-  date: Date;
   start_at: Date;
   end_at: Date;
   status: string;
@@ -24,7 +23,6 @@ export class EventOutputMapper {
       establishment_id: entity.establishment_id.id,
       name: entity.name,
       description: entity.description,
-      date: entity.date,
       start_at: entity.start_at,
       end_at: entity.end_at,
       status: entity.status,

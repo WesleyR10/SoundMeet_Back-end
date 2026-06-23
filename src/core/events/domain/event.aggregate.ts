@@ -1,6 +1,13 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
 import { EventValidatorFactory } from "./event.validator";
 import { EventFakeBuilder } from "./event-fake.builder";
+import { EventActivatedEvent } from "./events/event-activated.event";
+import { EventAttendeeAddedEvent } from "./events/event-attendee-added.event";
+import { EventAttendeeRemovedEvent } from "./events/event-attendee-removed.event";
+import { EventCancelledEvent } from "./events/event-cancelled.event";
+import { EventCreatedEvent } from "./events/event-created.event";
+import { EventFinishedEvent } from "./events/event-finished.event";
+import { EventUpdatedEvent } from "./events/event-updated.event";
 
 export type EventStatus = "scheduled" | "active" | "completed" | "cancelled";
 
@@ -9,7 +16,6 @@ export type EventConstructorProps = {
   establishment_id: Uuid;
   name: string;
   description?: string | null;
-  date: Date;
   start_at: Date;
   end_at: Date;
   status?: EventStatus;
@@ -25,7 +31,6 @@ export type EventCreateCommand = {
   establishment_id: string;
   name: string;
   description?: string | null;
-  date: Date;
   start_at: Date;
   end_at: Date;
   max_capacity?: number | null;
@@ -36,7 +41,6 @@ export type EventCreateCommand = {
 export type EventUpdateCommand = {
   name?: string;
   description?: string | null;
-  date?: Date;
   start_at?: Date;
   end_at?: Date;
   max_capacity?: number | null;
@@ -51,7 +55,6 @@ export class Event extends AggregateRoot {
   establishment_id: Uuid;
   name: string;
   description: string | null;
-  date: Date;
   start_at: Date;
   end_at: Date;
   status: EventStatus;
@@ -68,7 +71,6 @@ export class Event extends AggregateRoot {
     this.establishment_id = props.establishment_id;
     this.name = props.name;
     this.description = props.description ?? null;
-    this.date = props.date;
     this.start_at = props.start_at;
     this.end_at = props.end_at;
     this.status = props.status ?? "scheduled";
@@ -85,26 +87,39 @@ export class Event extends AggregateRoot {
       establishment_id: new Uuid(command.establishment_id),
       name: command.name,
       description: command.description,
-      date: command.date,
       start_at: command.start_at,
       end_at: command.end_at,
       max_capacity: command.max_capacity ?? null,
       is_public: command.is_public ?? true,
       cover_charge: command.cover_charge ?? null,
     });
-    entity.validate();
+    if (entity.validate()) {
+      entity.applyEvent(
+        new EventCreatedEvent({
+          event_id: entity.event_id,
+          establishment_id: entity.establishment_id.id,
+          name: entity.name,
+          description: entity.description,
+          start_at: entity.start_at,
+          end_at: entity.end_at,
+          status: entity.status,
+          max_capacity: entity.max_capacity,
+          current_capacity: entity.current_capacity,
+          is_public: entity.is_public,
+          cover_charge: entity.cover_charge,
+          created_at: entity.created_at,
+        }),
+      );
+    }
     return entity;
   }
 
-  update(command: EventUpdateCommand): void {
+  update(command: EventUpdateCommand, updated_at: Date): void {
     if (command.name !== undefined) {
       this.name = command.name;
     }
     if (command.description !== undefined) {
       this.description = command.description;
-    }
-    if (command.date !== undefined) {
-      this.date = command.date;
     }
     if (command.start_at !== undefined) {
       this.start_at = command.start_at;
@@ -122,11 +137,28 @@ export class Event extends AggregateRoot {
       this.cover_charge = command.cover_charge;
     }
 
-    this.updated_at = new Date();
-    this.validate();
+    this.updated_at = updated_at;
+    if (this.validate()) {
+      this.applyEvent(
+        new EventUpdatedEvent({
+          event_id: this.event_id,
+          establishment_id: this.establishment_id.id,
+          name: this.name,
+          description: this.description,
+          start_at: this.start_at,
+          end_at: this.end_at,
+          status: this.status,
+          max_capacity: this.max_capacity,
+          current_capacity: this.current_capacity,
+          is_public: this.is_public,
+          cover_charge: this.cover_charge,
+          updated_at: this.updated_at,
+        }),
+      );
+    }
   }
 
-  activate(): void {
+  activate(activated_at: Date): void {
     if (this.status === "cancelled") {
       this.notification.addError("Event is cancelled", "status");
       return;
@@ -136,28 +168,52 @@ export class Event extends AggregateRoot {
       return;
     }
     this.status = "active";
-    this.updated_at = new Date();
+    this.updated_at = activated_at;
+    if (this.validate()) {
+      this.applyEvent(
+        new EventActivatedEvent({
+          event_id: this.event_id,
+          activated_at,
+        }),
+      );
+    }
   }
 
-  cancel(): void {
+  cancel(cancelled_at: Date): void {
     if (this.status === "completed") {
       this.notification.addError("Event is completed", "status");
       return;
     }
     this.status = "cancelled";
-    this.updated_at = new Date();
+    this.updated_at = cancelled_at;
+    if (this.validate()) {
+      this.applyEvent(
+        new EventCancelledEvent({
+          event_id: this.event_id,
+          cancelled_at,
+        }),
+      );
+    }
   }
 
-  finish(): void {
+  finish(finished_at: Date): void {
     if (this.status === "cancelled") {
       this.notification.addError("Event is cancelled", "status");
       return;
     }
     this.status = "completed";
-    this.updated_at = new Date();
+    this.updated_at = finished_at;
+    if (this.validate()) {
+      this.applyEvent(
+        new EventFinishedEvent({
+          event_id: this.event_id,
+          finished_at,
+        }),
+      );
+    }
   }
 
-  addAttendee(): void {
+  addAttendee(audience_id: string, added_at: Date): void {
     if (this.status === "cancelled" || this.status === "completed") {
       this.notification.addError("Event is not accepting attendees", "status");
       return;
@@ -170,10 +226,20 @@ export class Event extends AggregateRoot {
       return;
     }
     this.current_capacity += 1;
-    this.updated_at = new Date();
+    this.updated_at = added_at;
+
+    this.applyEvent(
+      new EventAttendeeAddedEvent({
+        event_id: this.event_id,
+        audience_id,
+        current_capacity: this.current_capacity,
+        max_capacity: this.max_capacity,
+        added_at,
+      }),
+    );
   }
 
-  removeAttendee(): void {
+  removeAttendee(audience_id: string, removed_at: Date): void {
     if (this.current_capacity <= 0) {
       this.notification.addError(
         "Event current capacity cannot be negative",
@@ -182,7 +248,17 @@ export class Event extends AggregateRoot {
       return;
     }
     this.current_capacity -= 1;
-    this.updated_at = new Date();
+    this.updated_at = removed_at;
+
+    this.applyEvent(
+      new EventAttendeeRemovedEvent({
+        event_id: this.event_id,
+        audience_id,
+        current_capacity: this.current_capacity,
+        max_capacity: this.max_capacity,
+        removed_at,
+      }),
+    );
   }
 
   validate(fields?: string[]): boolean {
@@ -244,7 +320,6 @@ export class Event extends AggregateRoot {
       establishment_id: this.establishment_id.id,
       name: this.name,
       description: this.description,
-      date: this.date,
       start_at: this.start_at,
       end_at: this.end_at,
       status: this.status,

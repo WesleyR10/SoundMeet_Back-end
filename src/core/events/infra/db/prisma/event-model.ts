@@ -1,12 +1,13 @@
+import { EventStatus } from "@prisma/client";
+
 export type EventModel = {
   id: string;
   establishmentId: string;
   name: string;
   description: string | null;
-  date: Date;
   startTime: Date;
   endTime: Date;
-  status: string;
+  status: EventStatus;
   maxCapacity: number | null;
   currentCapacity: number;
   isPublic: boolean;

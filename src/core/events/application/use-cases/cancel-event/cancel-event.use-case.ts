@@ -24,7 +24,7 @@ export class CancelEventUseCase implements IUseCase<
       throw new NotFoundError(input.event_id, Event);
     }
 
-    entity.cancel();
+    entity.cancel(new Date());
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
     }

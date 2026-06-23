@@ -1,4 +1,8 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  EventMusicianStatus as PrismaEventMusicianStatus,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -15,7 +19,7 @@ import {
 import { EventModelMapper } from "./event-model-mapper";
 
 export class EventPrismaRepository implements IEventRepository {
-  sortableFields: string[] = ["date", "startTime", "created_at", "name"];
+  sortableFields: string[] = ["startTime", "created_at", "name"];
 
   constructor(private prisma: PrismaClient) {}
 
@@ -28,7 +32,6 @@ export class EventPrismaRepository implements IEventRepository {
           establishmentId: modelProps.establishmentId,
           name: modelProps.name,
           description: modelProps.description,
-          date: modelProps.date,
           startTime: modelProps.startTime,
           endTime: modelProps.endTime,
           status: modelProps.status,
@@ -60,7 +63,6 @@ export class EventPrismaRepository implements IEventRepository {
           establishmentId: m.establishmentId,
           name: m.name,
           description: m.description,
-          date: m.date,
           startTime: m.startTime,
           endTime: m.endTime,
           status: m.status,
@@ -89,7 +91,6 @@ export class EventPrismaRepository implements IEventRepository {
         data: {
           name: modelProps.name,
           description: modelProps.description,
-          date: modelProps.date,
           startTime: modelProps.startTime,
           endTime: modelProps.endTime,
           status: modelProps.status,
@@ -396,7 +397,8 @@ export class EventPrismaRepository implements IEventRepository {
         where: { id: existing.id },
         data: {
           fee: performer.fee ?? null,
-          status: performer.status ?? "confirmed",
+          status: (performer.status ??
+            "confirmed") as PrismaEventMusicianStatus,
           startTime: performer.start_at ?? null,
           endTime: performer.end_at ?? null,
         },
@@ -410,7 +412,7 @@ export class EventPrismaRepository implements IEventRepository {
         musicianId: performer.musician_id ?? null,
         bandId: performer.band_id ?? null,
         fee: performer.fee ?? null,
-        status: performer.status ?? "confirmed",
+        status: (performer.status ?? "confirmed") as PrismaEventMusicianStatus,
         startTime: performer.start_at ?? null,
         endTime: performer.end_at ?? null,
       },
@@ -481,10 +483,10 @@ export class EventPrismaRepository implements IEventRepository {
       where.establishmentId = filter.establishment_id;
     }
     if (filter.status) {
-      where.status = String(filter.status);
+      where.status = filter.status as Prisma.EventWhereInput["status"];
     }
     if (filter.date_gte || filter.date_lte) {
-      where.date = {
+      where.startTime = {
         ...(filter.date_gte && { gte: filter.date_gte }),
         ...(filter.date_lte && { lte: filter.date_lte }),
       };
@@ -509,9 +511,6 @@ export class EventPrismaRepository implements IEventRepository {
       throw new InvalidArgumentError(`Invalid sort field: ${sort}`);
     }
 
-    if (sort === "date") {
-      return { date: direction };
-    }
     if (sort === "startTime") {
       return { startTime: direction };
     }

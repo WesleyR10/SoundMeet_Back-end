@@ -16,7 +16,6 @@ export class CreateEventUseCase implements IUseCase<
       establishment_id: input.establishment_id,
       name: input.name,
       description: input.description,
-      date: input.date,
       start_at: input.start_at,
       end_at: input.end_at,
       max_capacity: input.max_capacity ?? null,

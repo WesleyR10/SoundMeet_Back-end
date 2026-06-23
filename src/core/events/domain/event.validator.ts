@@ -30,9 +30,6 @@ export class EventRules {
   @IsString({ groups: ["description"] })
   description?: string;
 
-  @IsDate({ groups: ["date"] })
-  date: Date;
-
   @IsDate({ groups: ["start_at"] })
   start_at: Date;
 
@@ -69,7 +66,6 @@ export class EventRules {
       establishment_id: entity.establishment_id?.id ?? entity.establishment_id,
       name: entity.name,
       description: entity.description,
-      date: entity.date,
       start_at: entity.start_at,
       end_at: entity.end_at,
       status: entity.status,
@@ -89,7 +85,6 @@ export class EventValidator extends ClassValidatorFields {
           "establishment_id",
           "name",
           "description",
-          "date",
           "start_at",
           "end_at",
           "status",
