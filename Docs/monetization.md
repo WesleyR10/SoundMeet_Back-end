@@ -1,8 +1,8 @@
 # 💰 Ideias Detalhadas de Monetização e Funcionalidades
 
-*Expansão completa das estratégias de revenue para a Plataforma Música Viva*
+*Expansão completa das estratégias de revenue da plataforma SoundMeet*
 
-📋 **Documento Principal**: [music.md](music.md) - Base conceitual da plataforma
+📋 **Visão de produto**: [features.md](features.md) · **Regras implementadas**: [business-rules.md](business-rules.md)
 
 ---
 

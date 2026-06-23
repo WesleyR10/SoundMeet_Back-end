@@ -1,6 +1,6 @@
-# Git Workflow - Supermarket WR
+# Git Workflow - SoundMeet
 
-Este documento descreve o workflow Git utilizado no projeto, seguindo as melhores práticas do **Git Flow** e **CommintLint**.
+Este documento descreve o workflow Git utilizado no projeto, seguindo as melhores práticas do **Git Flow** e **Conventional Commits / CommitLint**.
 
 ## 🏗️ Estrutura de Branches
 
@@ -47,15 +47,18 @@ type(scope): description
 ### Escopos (Opcional)
 
 - **`project`**: Configuração do projeto
-- **`database`**: Banco de dados e schema
-- **`core`**: Entidades e lógica de domínio
+- **`database`**: Banco de dados e schema (Prisma)
+- **`core`**: Agregados, VOs e lógica de domínio
 - **`docker`**: Configuração de containers
-- **`dev`**: Ambiente de desenvolvimento
-- **`auth`**: Autenticação e autorização
-- **`api`**: APIs e endpoints
-- **`inventory`**: Controle de estoque
-- **`sales`**: Sistema de vendas
-- **`client`**: Gestão de clientes
+- **`auth`**: Autenticação e autorização (Keycloak)
+- **`api`**: Controllers, módulos NestJS e endpoints
+- **`musician`**: Domínio músico/banda
+- **`establishment`**: Domínio estabelecimentos
+- **`audience`**: Domínio público
+- **`request`**: Pedidos musicais
+- **`payment`**: Gorjetas, transações e carteira
+- **`gamification`**: Pontos, badges, rankings
+- **`ai-cifra`** / **`ai-audio`** / **`synced-lyrics`**: Subsistema de IA musical
 
 ### Exemplos
 
@@ -64,8 +67,8 @@ feat(auth): add JWT authentication system
 fix(database): resolve connection timeout issue
 docs(api): update API documentation
 style(core): format code according to prettier
-refactor(inventory): extract product validation logic
-test(sales): add unit tests for payment processing
+refactor(payment): extract tip split calculation logic
+test(request): add unit tests for accept/reject flow
 chore(build): update dependencies
 ci(deploy): add GitHub Actions workflow
 ```

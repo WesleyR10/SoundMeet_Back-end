@@ -2,7 +2,7 @@
 
 Este documento resume as principais regras de negócio da plataforma SoundMeet, cruzando:
 
-- o que foi especificado em Features-SoundMeet.md ([1])
+- o que foi especificado em [features.md](features.md) ([1])
 - com o que já está implementado no código
 
 Marcações:
@@ -134,7 +134,7 @@ Marcações:
 - [ ] Gestão completa de eventos (confirmação, lembretes, pagamentos automatizados)
 - [ ] Módulo de marketing (integração social, geração de artes, campanhas, cupons)
 
-Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas ainda não possuem fluxos completos (ex.: controllers, realtime, chat). A base de reservas e disponibilidade está concentrada no domínio _Scheduling_.
+Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não possuem fluxos completos (ex.: controllers, realtime, chat). A base de reservas e disponibilidade está concentrada no domínio _Scheduling_.
 
 ---
 
@@ -204,7 +204,7 @@ Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas 
 
 - [x] Pontuação por ações do público (scan, pedidos, acertos, gorjetas, social, etc.)  
        Código: audience.aggregate.ts ([13]) em conjunto com VO `Points` e `AudiencePoints`.  
-       Regras alinhadas com _Gamificação Avançada_ em _Features-SoundMeet_:
+       Regras alinhadas com _Gamificação Avançada_ em _Features_:
   - Scan QR: +10 pts
   - Pedido musical: +25 pts
   - Pedido aceito/tocado: +50 pts
@@ -322,8 +322,8 @@ Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas 
 
 **Gorjetas (Tip)**
 
-- [x] Entidade Tip com vínculo a público, músico e banda  
-       Código: tip.entity.ts ([19]).  
+- [x] Agregado Tip com vínculo a público, músico e banda  
+       Código: tip.aggregate.ts ([19]).  
        Regras:
   - Campos: `tip_id`, `user_id` (opcional), `musician_id`, `band_id`, `amount`, `message`, `is_anonymous`, `show_in_wall`, `status`, `payment_method`, `pix_key`.
   - `create` valida valores (amount > 0, pelo menos um destinatário).
@@ -334,7 +334,7 @@ Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas 
        A base está nos QR codes de Musician/Establishment e na entidade `Tip` com `pix_key`. O fluxo completo de geração/gestão de PIX está modelado, mas ainda não há integração real com provedores externos de PIX.
 
 - [x] Mensagem personalizada com a gorjeta  
-       Código: tip.entity.ts ([19]).  
+       Código: tip.aggregate.ts ([19]).  
        Regra: mensagem opcional é persistida juntamente com a gorjeta.
 
 - [~] Wall público de apoiadores  
@@ -343,14 +343,14 @@ Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas 
 **Carteiras e transações**
 
 - [x] Carteira financeira para músicos (MusicianWallet)  
-       Código: musician-wallet.entity.ts ([20]).  
+       Código: musician-wallet.aggregate.ts ([20]).  
        Regras:
   - Cada músico possui uma `MusicianWallet` com `balance` (`Money` VO), `pix_key` e histórico de timestamps.
   - `receiveFunds` e `withdrawFunds` validam saldo e valores positivos.
   - `updatePixKey` atualiza a chave de saque.
 
 - [x] Registro de transações financeiras (Transaction)  
-       Código: transaction.entity.ts ([21]).  
+       Código: transaction.aggregate.ts ([21]).  
        Regras:
   - Tipos: `TIP`, `WITHDRAWAL`, etc.
   - Cálculo de `net_amount` = `amount - fee`.
@@ -375,7 +375,7 @@ Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas 
 **Monetização e planos**
 
 - [ ] Planos de assinatura para músicos e estabelecimentos (valores, limites, taxas diferenciadas)  
-       Ainda não há agregados específicos de plano, cobrança recorrente ou lógica de pricing implementados, apesar de descritos na seção “Resumo de Monetização” em _Features-SoundMeet_.
+       Ainda não há agregados específicos de plano, cobrança recorrente ou lógica de pricing implementados, apesar de descritos na seção “Resumo de Monetização” em _Features_.
 
 ---
 
@@ -433,7 +433,7 @@ Essas funcionalidades estão descritas em detalhes em _Features-SoundMeet_, mas 
   - Flags: `isCurrentPeriod`, `isTopPosition`, `getPositionMedal`.
 
 - [~] Algoritmo completo de ranking mensal (Top Fãs, Top Sugestões, Top Discoverers, etc.)  
-  Estrutura de `Ranking` e `UserPoints` já está pronta, com use-cases para cálculo e leaderboard; contudo, a lógica fina de cada tipo de ranking (combinações específicas de métricas) ainda pode ser expandida para refletir todos os cenários descritos em _Features-SoundMeet_.
+  Estrutura de `Ranking` e `UserPoints` já está pronta, com use-cases para cálculo e leaderboard; contudo, a lógica fina de cada tipo de ranking (combinações específicas de métricas) ainda pode ser expandida para refletir todos os cenários descritos em _Features_.
 
 ---
 
@@ -444,7 +444,7 @@ Além dos pontos marcados como `[ ]` e `[~]` acima, os seguintes blocos de funci
 - Marketplace com Reels/Vídeos (upload, streaming, revenue sharing por views)
 - Sistema de “Memórias Musicais” (álbum de momentos, timeline pessoal, analytics visuais)
 - Integrações externas completas:
-  - APIs de cifras (Cifra Club, Ultimate Guitar, MusicXML)
+  - Pipeline próprio de cifras (`ai-cifra-module`) + folha de cifra (LRC + acordes) + MusicXML export
   - Verificação automática de compartilhamentos sociais via APIs
   - Integrações de analytics (GA4, Pixel, social listening)
 - Segmentação avançada por instrumentos e proximidade com feed de Reels
@@ -452,37 +452,37 @@ Além dos pontos marcados como `[ ]` e `[~]` acima, os seguintes blocos de funci
 - Programas especiais de carreira, talent shows virtuais e parcerias avançadas de marketplace
 - Gestão detalhada de planos pagos (músicos, estabelecimentos, marketplace) com billing recorrente
 
-Esses itens já estão bem descritos em Features-SoundMeet.md ([1]), e o código atual fornece boa parte da base de domínio (QR codes, pedidos, gorjetas, gamificação, rankings). Porém ainda serão necessários novos agregados, use-cases e integrações de infraestrutura para chegar à visão completa da plataforma.
+Esses itens estão descritos em [features.md](features.md) ([1]), e o código atual fornece boa parte da base de domínio (QR codes, pedidos, gorjetas, gamificação, rankings). Porém ainda serão necessários novos agregados, use-cases e integrações de infraestrutura para chegar à visão completa da plataforma.
 
-[1]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/Docs/Features-SoundMeet.md
-[2]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/musician/domain/musician.aggregate.ts
-[3]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/musician/domain/band.aggregate.ts
-[4]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case.ts
-[5]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/musician/infra/db/in-memory/musician-in-memory.repository.ts
-[6]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/establishment/domain/establishment.aggregate.ts
-[7]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/scheduling/domain/booking.aggregate.ts
-[8]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/scheduling/application/use-cases/propose-booking/propose-booking.use-case.ts
-[9]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case.ts
-[10]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/scheduling/domain/availability.aggregate.ts
-[11]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/scheduling/infra/db/prisma/availability-prisma.repository.ts
-[12]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/prisma/schema.prisma
-[13]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/audience/domain/audience.aggregate.ts
-[14]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/value-objects/user-level.vo.ts
-[15]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/audience/application/use-cases/make-music-request/make-music-request.use-case.ts
-[16]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/audience/application/use-cases/recommend-musicians/recommend-musicians.use-case.ts
-[17]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/request/domain/request.aggregate.ts
-[18]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/user-points.aggregate.ts
-[19]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/payment/domain/tip.entity.ts
-[20]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/payment/domain/musician-wallet.entity.ts
-[21]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/payment/domain/transaction.entity.ts
-[22]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case.ts
-[23]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/value-objects/points-source.vo.ts
-[24]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/application/use-cases/calculate-points/calculate-points.use-case.ts
-[25]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/user-badge.aggregate.ts
-[26]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/value-objects/badge-type.vo.ts
-[27]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/application/use-cases/award-badge/award-badge.use-case.ts
-[28]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/user-interaction.aggregate.ts
-[29]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/value-objects/interaction-metadata.vo.ts
-[30]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/ranking.aggregate.ts
-[31]: file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/core/gamification/domain/value-objects/ranking-type.vo.ts
+[1]: features.md
+[2]: ../src/core/musician/domain/musician.aggregate.ts
+[3]: ../src/core/musician/domain/band.aggregate.ts
+[4]: ../src/core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case.ts
+[5]: ../src/core/musician/infra/db/in-memory/musician-in-memory.repository.ts
+[6]: ../src/core/establishment/domain/establishment.aggregate.ts
+[7]: ../src/core/scheduling/domain/booking.aggregate.ts
+[8]: ../src/core/scheduling/application/use-cases/propose-booking/propose-booking.use-case.ts
+[9]: ../src/core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case.ts
+[10]: ../src/core/scheduling/domain/availability.aggregate.ts
+[11]: ../src/core/scheduling/infra/db/prisma/availability-prisma.repository.ts
+[12]: ../prisma/schema.prisma
+[13]: ../src/core/audience/domain/audience.aggregate.ts
+[14]: ../src/core/gamification/domain/value-objects/user-level.vo.ts
+[15]: ../src/core/audience/application/use-cases/make-music-request/make-music-request.use-case.ts
+[16]: ../src/core/audience/application/use-cases/recommend-musicians/recommend-musicians.use-case.ts
+[17]: ../src/core/request/domain/request.aggregate.ts
+[18]: ../src/core/gamification/domain/user-points.aggregate.ts
+[19]: ../src/core/payment/domain/tip.aggregate.ts
+[20]: ../src/core/payment/domain/musician-wallet.aggregate.ts
+[21]: ../src/core/payment/domain/transaction.aggregate.ts
+[22]: ../src/core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case.ts
+[23]: ../src/core/gamification/domain/value-objects/points-source.vo.ts
+[24]: ../src/core/gamification/application/use-cases/calculate-points/calculate-points.use-case.ts
+[25]: ../src/core/gamification/domain/user-badge.aggregate.ts
+[26]: ../src/core/gamification/domain/value-objects/badge-type.vo.ts
+[27]: ../src/core/gamification/application/use-cases/award-badge/award-badge.use-case.ts
+[28]: ../src/core/gamification/domain/user-interaction.aggregate.ts
+[29]: ../src/core/gamification/domain/value-objects/interaction-metadata.vo.ts
+[30]: ../src/core/gamification/domain/ranking.aggregate.ts
+[31]: ../src/core/gamification/domain/value-objects/ranking-type.vo.ts
 

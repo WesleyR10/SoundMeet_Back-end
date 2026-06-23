@@ -1,30 +1,61 @@
-# 🎵 SOUNDMEET - Plataforma de Conexão Musical
+# SoundMeet — Visão de Produto
 
-### SOUNDMEET
+**Conceito:** Som + encontro social · **Slogan:** "Onde o som encontra pessoas"
 
-- Conceito : Som + encontro social
-- Por quê : Foca no encontro através da música
-- Slogan : "Onde o som encontra pessoas"
+Plataforma que conecta músicos, público e estabelecimentos em eventos ao vivo via QR code, pedidos musicais, gorjetas e gamificação.
 
-_Este documento serve como base para debate e desenvolvimento da plataforma SOUNDMEET_
+## Documentos relacionados
 
-📋 **Documentos Relacionados**:
+| Documento | Conteúdo |
+|-----------|----------|
+| [business-rules.md](business-rules.md) | Regras de negócio × estado no código (`[x]/[~]/[ ]`) |
+| [monetization.md](monetization.md) | Planos, preços, estratégias de receita (detalhes de cada feature) |
+| [qr-code.md](qr-code.md) | Spec do QR (perfil permanente + validação) |
+| [roadmap.md](roadmap.md) | Próximas tarefas de implementação (passo a passo) |
+| [AI-musician/](AI-musician/README.md) | Pipeline de cifras e folha de cifra |
 
-- [Ideias Detalhadas de Monetização e Funcionalidades](monetizacao-ideias.md) - Expansão completa das estratégias de revenue
+## Índice
 
-## 🔄 Fluxo de Uso Principal
+1. [Fluxo principal](#fluxo-principal)
+2. [Ideias futuras (P&D)](#ideias-futuras-pd)
+3. [Músicos](#músicos)
+4. [Estabelecimentos](#estabelecimentos)
+5. [Público](#público)
+6. [Gamificação avançada](#gamificação-avançada)
+7. [Folha de cifra e pipeline de IA](#folha-de-cifra-e-pipeline-de-ia)
+8. [Segmentação por instrumentos](#segmentação-por-instrumentos)
+9. [IA e integrações futuras](#ia-e-integrações-futuras)
+10. [Memórias musicais](#memórias-musicais)
+11. [Marketplace com reels](#marketplace-com-reels)
+12. [Resumo de monetização](#resumo-de-monetização)
 
-1. **Músico/Banda**: Cria perfil único → Gera QR code permanente do perfil
-2. **Público**: Escaneia QR → Acessa perfil (bio, histórico) → Faz pedidos/votos → Dá gorjetas
-3. **Estabelecimento**: Monitora engajamento → Contrata talentos → Promove eventos → Analytics de público
+---
 
-## 🎯 Sistema de Interação
+## Fluxo principal
 
-### Para Músicos
+1. **Músico/Banda** — cria perfil → gera QR permanente vinculado ao perfil
+2. **Público** — escaneia QR → acessa perfil → pede músicas / vota → dá gorjetas
+3. **Estabelecimento** — busca talentos → contrata → analytics de público
+
+---
+
+## Ideias futuras (P&D)
+
+<a id="ideias-futuras-pd"></a>
+
+- **Mood/Emotion (recomendação, playlist, tags)**: base para evoluir “descoberta” e “contexto” usando `chords/key + embeddings`. Referência: https://github.com/AMAAI-Lab/Music2Emotion
+- **Restauração/masterização com prompts (premium)**: melhorar qualidade do áudio antes/depois do upload (ex.: reduzir reverb, corrigir clipping, ajustar tonalidade). Referência: https://github.com/AMAAI-Lab/SonicMaster
+- **Referência de produto (UX/contexto)**: app de playlist por emoção/contexto para inspiração de fluxo e UI, não é dataset de acordes. Referência: https://github.com/AMAAI-Lab/calm-me-down
+
+---
+
+## Músicos
+
+<a id="músicos"></a>
 
 - **QR Code Permanente**: Código único vinculado ao perfil (não por apresentação)
 - **Controle de Pedidos**: Moderação inteligente e limite anti-spam por evento
-- **Analytics Detalhados** [(Ver Detalhes)](monetizacao-ideias.md#analytics-detalhados):
+- **Analytics Detalhados** [(Ver Detalhes)](monetization.md#analytics-detalhados):
   ├── Engajamento: taxa de scaneamento, tempo de interação (relatório pós-evento opcional)
   ├── Preferências: gêneros mais pedidos, horários de pico por categoria musical
   ├── Desempenho: comparação entre eventos, evolução temporal
@@ -34,11 +65,13 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   │ ├── **Funcionamento**: Categorização automática baseada nas músicas mais pedidas
   │ └── **Benefício**: Direcionar melhor o repertório e eventos futuros
   └── Monetização: gorjetas por música, momento, frequência (análise por estilo musical)
-- **Monetização Especializada** [(Ver Detalhes)](monetizacao-ideias.md#monetização-especializada):
+- **Monetização Especializada** [(Ver Detalhes)](monetization.md#monetização-especializada):
   ├── **Músico Solo**: Gorjetas individuais, metas pessoais
   └── **Banda**: Divisão automática por membro, percentuais customizáveis
 
 ### Para Estabelecimentos
+
+<a id="estabelecimentos"></a>
 
 - **Dashboard de Contratação**:
   ├── Busca inteligente por músicos/bandas locais
@@ -99,6 +132,8 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
 
 ### Para o Público
 
+<a id="público"></a>
+
 - **Experiência de Descoberta**:
   ├── Acesso ao perfil do músico (bio, estilo, histórico)
   ├── Surpresa musical (repertório não revelado em momento algum)
@@ -106,7 +141,7 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── Descobrimento de novos talentos locais
   └── **Sistema de Indicação**: Compartilhamento de músicos com estabelecimentos para eventos
 
-- **Sistema de Pedidos Inteligente** [(Ver Detalhes)](monetizacao-ideias.md#sistema-de-pedidos):
+- **Sistema de Pedidos Inteligente** [(Ver Detalhes)](monetization.md#sistema-de-pedidos):
   ├── Sugestões baseadas no estilo do músico
   ├── Limite de pedidos por pessoa para evitar spam
   ├── Votação democrática: músico coloca música em votação (repertório próprio ou pedidos aceitos, 2-3 min entre músicas)
@@ -117,7 +152,7 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   │ ├── **Privacidade**: evita birra ao não mostrar pedidos recusados de outros
   │ └── **Transparência**: mantém o foco na experiência individual do usuário
 
-- **Gorjetas Diretas** [(Ver Detalhes)](monetizacao-ideias.md#gorjetas-diretas---implementação):
+- **Gorjetas Diretas** [(Ver Detalhes)](monetization.md#gorjetas-diretas---implementação):
   ├── QR Code único permanente por perfil + opção "Copia e Cola" PIX
   │ ├── **Público**: Facilidade de pagamento instantâneo sem cadastro
   │ ├── **Vantagem**: Experiência rápida e sem complicações
@@ -138,7 +173,9 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   │ ├── **Vantagem**: Confiança no sistema de pagamentos
   │ └── **Benefício**: Segurança e organização financeira
 
-### 🎮 Gamificação Avançada (Sistema Detalhado)
+## Gamificação avançada
+
+<a id="gamificação-avançada"></a>
 
 **Sistema de Pontuação**:
 
@@ -234,7 +271,7 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── **Funcionamento**: Combinação de múltiplas métricas
   └── **Benefício**: Destaque como membro premium da comunidade
 
-**Recompensas Exclusivas** [(Ver Detalhes)](monetizacao-ideias.md#gamificação-avançada):
+**Recompensas Exclusivas** [(Ver Detalhes)](monetization.md#gamificação-avançada):
 
 - 💎 **Acesso Antecipado**: Primeiro a ver novos recursos
   ├── **Público**: Preview de funcionalidades antes do lançamento
@@ -282,45 +319,49 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── **Funcionamento**: Agenda de experiências premium
   └── **Benefício**: Desenvolvimento musical e conexão única
 
-## 🔄 Integração com APIs de Cifra (Sistema Avançado)
+## Folha de cifra e pipeline de IA
 
-**Conector com Plataformas Existentes**:
+<a id="folha-de-cifra-e-pipeline-de-ia"></a>
 
-- 🔗 **Cifra Club API**: Acesso automático a cifras oficiais
-- 🎸 **Ultimate Guitar**: Integração com database internacional
-- 📝 **MusicXML**: Suporte a formatos profissionais
+> **Estratégia:** pipeline próprio (`ai-cifra-module` + worker MIR). Spec técnica: [AI-musician/chord-sheet.md](AI-musician/chord-sheet.md)
 
-**Funcionalidades para Músicos**:
+**Geração automática a partir de áudio**:
 
-- 📋 **Biblioteca Pessoal**: Cifras salvas no perfil do músico
-- ✏️ **Editor Personalizado**:
-  ├── Edição de cifras apenas para uso próprio
+- Inferência de acordes, BPM, tonalidade e timeline via worker (ChordFormer + pós-processamento)
+- Job/fila + RabbitMQ — padrão já existente no backend
+- Folha unificada: letra (LRC) + acordes ancorados por token
+
+**Funcionalidades para músicos**:
+
+- 📋 **Biblioteca pessoal**: cifras geradas e salvas no perfil
+- ✏️ **Editor personalizado**:
+  ├── Edição de cifras para uso próprio
   ├── Anotações privadas (alterações, dicas, acordes)
   ├── Versões customizadas por música
-  └── Nenhuma alteração no arquivo original da plataforma
-- 🎶 **Transposição Inteligente**:
+  └── Correções colaborativas (feedback → retreino/heurísticas)
+- 🎶 **Transposição inteligente**:
   ├── Adaptação automática para diferentes tons
   └── Opções de complexidade (simples/avançado)
-- ⚡ **Sincronização em Tempo Real**:
+- ⚡ **Sincronização em tempo real**:
   ├── Cifras disponíveis durante apresentações
   ├── Acesso offline prévio aos ensaios
   └── Compartilhamento seguro com banda (se aplicável)
 
-**API de Cifras**: Busca automática de cifras (Ultimate Guitar, Cifra Club)
-├── **Público**: Acesso rápido ao repertório completo
-├── **Vantagem**: Elimina necessidade de pesquisa manual
-├── **Funcionamento**: Integração REST com APIs públicas
-└── **Benefício**: Repertório ilimitado sempre disponível
+**Letras sincronizadas (LRC)**:
 
-- **Histórico**: Salva todas as cifras usadas em cada apresentação
-  ├── **Público**: Registro completo do desempenho
-  ├── **Vantagem**: Analytics de repertório popular
-  ├── **Funcionamento**: Database de histórico por show
-  └── **Benefício**: Melhoria contínua do setlist
+- LRCLIB + ingest UGC — ver [external-apis.md](AI-musician/external-apis.md)
+- Alinhamento acorde ↔ letra (Modo A: ASR; Modo B: heurístico)
 
-## 🎸 Segmentação por Instrumentos (Sistema Completo)
+- **Histórico**: salva cifras usadas em cada apresentação
+  ├── Registro completo do desempenho
+  ├── Analytics de repertório popular
+  └── Melhoria contínua do setlist
 
-**Sistema de Busca Avançada** [(Ver Detalhes)](monetizacao-ideias.md#segmentação-por-instrumentos):
+## Segmentação por instrumentos
+
+<a id="segmentação-por-instrumentos"></a>
+
+**Sistema de Busca Avançada** [(Ver Detalhes)](monetization.md#segmentação-por-instrumentos):
 
 - 🔍 **Filtros por Instrumento**: Público encontra músicos específicos por instrumento
   ├── **Funcionamento**: Público busca músicos por instrumentos específicos
@@ -346,7 +387,7 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── **Teste de afinação**: ferramenta para verificar se instrumentos estão afinados
   └── **Biblioteca de backing tracks**: base de músicas de apoio para práticas
 
-**Formação de Bandas Inteligente** [(Ver Detalhes)](monetizacao-ideias.md#formação-de-bandas):
+**Formação de Bandas Inteligente** [(Ver Detalhes)](monetization.md#formação-de-bandas):
 
 - 🤝 **Matching Automático**:
   ├── Alerta de Substituição: violonista falta → sugere substitutos
@@ -367,7 +408,7 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── Agendamento: marcador de ensaios e encontros
 - 🔄 **Integração com Reels**: Vídeos mostrando habilidades específicas
 
-**Estatísticas e Insights de Mercado** [(Ver Detalhes)](monetizacao-ideias.md#estatísticas-de-mercado):
+**Estatísticas e Insights de Mercado** [(Ver Detalhes)](monetization.md#estatísticas-de-mercado):
 
 - 📊 **Popularidade por Instrumento**:
   ├── Demanda relativa no mercado (dados para divulgação paga)
@@ -385,7 +426,9 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   └── Analytics Premium: relatórios detalhados por assinatura
 - 📈 **Monetização de Dados**: Venda de insights de mercado para escolas de música
 
-## 🤖 Detalhamento da IA [(Ver Detalhes)](monetizacao-ideias.md#integrações-futuras)
+## IA e integrações futuras
+
+<a id="ia-e-integrações-futuras"></a>
 
 - **Recomendação Inteligente**: Sugere músicas baseadas em histórico e tendências
 - **Análise de Performance**: Feedback automático sobre setlists e engajamento
@@ -396,7 +439,9 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
 - **Influencer Marketing**: Conexão com influenciadores musicais
 - **Análise de Sentimento**: Monitora reação do público em tempo real
 
-## 📸 Sistema de "Memórias Musicais"
+## Memórias musicais
+
+<a id="memórias-musicais"></a>
 
 ### 1. Álbum de Momentos
 
@@ -421,13 +466,15 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   └── Compartilhamento seletivo com fãs e contratantes
 - **Benefício**: Ferramenta de marketing pessoal e registro de evolução artística
 
-## 🎬 Marketplace com Reels/Vídeos (Plataforma Completa)
+## Marketplace com reels
+
+<a id="marketplace-com-reels"></a>
 
 **Tipos de Conteúdo Exclusivo**:
 
 - 🎤 **Performances Ao Vivo**: Gravações de shows e apresentações
 
-- 📚 **Aulas e Masterclasses** [(Ver Detalhes)](monetizacao-ideias.md#aulas-e-masterclasses):
+- 📚 **Aulas e Masterclasses** [(Ver Detalhes)](monetization.md#aulas-e-masterclasses):
   ├── Modelo Assinatura: acesso ilimitado por mensalidade
   ├── Aulas Particulares: conexão aluno-professor com taxa da plataforma
   ├── Cursos Certificados: programas completos com certificação
@@ -438,21 +485,21 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
 - 🎵 **Covers e Versões**: Releituras autorais de músicas
 - 💡 **Tutoriais Rápidos**: Dicas em formato reel/short
 
-**Sistema de Monetização Avançado** [(Ver Detalhes)](monetizacao-ideias.md#sistema-de-monetização-avançado):
+**Sistema de Monetização Avançado** [(Ver Detalhes)](monetization.md#sistema-de-monetização-avançado):
 
-- 💰 **Revenue Sharing** [(Ver Detalhes)](monetizacao-ideias.md#revenue-sharing):
+- 💰 **Revenue Sharing** [(Ver Detalhes)](monetization.md#revenue-sharing):
   ├── 70% para o criador / 30% para plataforma
   ├── Pagamentos por views (RPM personalizado)
   ├── Bonificação por engajamento (comentários, shares)
   └── Sistema de metas e bônus de performance
 
-- 🔒 **Conteúdo Premium** [(Ver Detalhes)](monetizacao-ideias.md#conteúdo-premium):
+- 🔒 **Conteúdo Premium** [(Ver Detalhes)](monetization.md#conteúdo-premium):
   ├── Aulas exclusivas com assinatura
   ├── Performances raras por pay-per-view
   ├── Pacotes de masterclasses completas
   └── Acesso antecipado a lançamentos
 
-- 🎁 **Sistema de Gorjetas** [(Ver Detalhes)](monetizacao-ideias.md#sistema-de-gorjetas):
+- 🎁 **Sistema de Gorjetas** [(Ver Detalhes)](monetization.md#sistema-de-gorjetas):
   ├── Doações diretas nos vídeos
   ├── Super thanks durante transmissões
   ├── Presentes digitais convertíveis
@@ -506,10 +553,11 @@ _Este documento serve como base para debate e desenvolvimento da plataforma SOUN
   ├── Workshops de monetização e marketing
   └── Oportunidades de performances reais
 
-## 💰 Resumo de Monetização [(Ver Detalhes)](monetizacao-ideias.md#resumo-de-monetização)
+## Resumo de monetização
 
-- **Músicos**: Planos freemium (R$ 39,90 individual / R$ 79,90 banda) [(Ver Detalhes)](monetizacao-ideias.md#planos-para-músicos)
-- **Estabelecimentos**: Planos Básico (R$ 149/mês) e Premium (R$ 299/mês) [(Ver Detalhes)](monetizacao-ideias.md#planos-para-estabelecimentos)
-- **Marketplace**: 10% sobre cachês + taxas de eventos especiais [(Ver Detalhes)](monetizacao-ideias.md#marketplace---expansão)
-- **Gorjetas**: Taxas reduzidas conforme plano (8% free → 3% premium) [(Ver Detalhes)](monetizacao-ideias.md#gorjetas-diretas---implementação)
+<a id="resumo-de-monetização"></a>
 
+- **Músicos**: Planos freemium (R$ 39,90 individual / R$ 79,90 banda) [(Ver Detalhes)](monetization.md#planos-para-músicos)
+- **Estabelecimentos**: Planos Básico (R$ 149/mês) e Premium (R$ 299/mês) [(Ver Detalhes)](monetization.md#planos-para-estabelecimentos)
+- **Marketplace**: 10% sobre cachês + taxas de eventos especiais [(Ver Detalhes)](monetization.md#marketplace---expansão)
+- **Gorjetas**: Taxas reduzidas conforme plano (8% free → 3% premium) [(Ver Detalhes)](monetization.md#gorjetas-diretas---implementação)
