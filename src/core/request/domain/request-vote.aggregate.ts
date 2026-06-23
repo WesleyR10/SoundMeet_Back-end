@@ -1,16 +1,12 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
 import { RequestVoteValidatorFactory } from "./request-vote.validator";
 import { RequestVoteFakeBuilder } from "./request-vote-fake.builder";
+import { RequestVoteType } from "./value-objects/request-vote-type.vo";
 
 export class RequestVoteId extends Uuid {}
 
-export enum RequestVoteType {
-  UP = "up",
-  DOWN = "down",
-}
-
 export type RequestVoteConstructorProps = {
-  vote_id?: RequestVoteId;
+  request_vote_id?: RequestVoteId;
   request_id: string;
   audience_id: string;
   vote_type: RequestVoteType | string;
@@ -24,7 +20,7 @@ export type RequestVoteCreateCommand = {
 };
 
 export class RequestVote extends AggregateRoot {
-  vote_id: RequestVoteId;
+  request_vote_id: RequestVoteId;
   request_id: Uuid;
   audience_id: Uuid;
   vote_type: RequestVoteType;
@@ -32,7 +28,7 @@ export class RequestVote extends AggregateRoot {
 
   constructor(props: RequestVoteConstructorProps) {
     super();
-    this.vote_id = props.vote_id ?? new RequestVoteId();
+    this.request_vote_id = props.request_vote_id ?? new RequestVoteId();
     this.request_id = new Uuid(props.request_id);
     this.audience_id = new Uuid(props.audience_id);
     this.vote_type =
@@ -43,7 +39,7 @@ export class RequestVote extends AggregateRoot {
   }
 
   get entity_id(): RequestVoteId {
-    return this.vote_id;
+    return this.request_vote_id;
   }
 
   static create(command: RequestVoteCreateCommand): RequestVote {
@@ -56,6 +52,14 @@ export class RequestVote extends AggregateRoot {
     return RequestVoteFakeBuilder;
   }
 
+  changeVoteType(vote_type: RequestVoteType | string): void {
+    this.vote_type =
+      vote_type === RequestVoteType.DOWN
+        ? RequestVoteType.DOWN
+        : RequestVoteType.UP;
+    this.validate(["vote_type"]);
+  }
+
   validate(fields?: string[]) {
     const validator = RequestVoteValidatorFactory.create();
     return validator.validate(this.notification, this, fields);
@@ -63,7 +67,7 @@ export class RequestVote extends AggregateRoot {
 
   toJSON() {
     return {
-      vote_id: this.vote_id.id,
+      request_vote_id: this.request_vote_id.id,
       request_id: this.request_id.id,
       audience_id: this.audience_id.id,
       vote_type: this.vote_type,

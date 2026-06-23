@@ -245,6 +245,28 @@ export class RequestInMemoryRepository
       .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
   }
 
+  async atomicIncrementVotes(request_id: string): Promise<void> {
+    const item = this.items.find((r) => r.request_id.id === request_id);
+    if (item) {
+      item.updateVotesCount(item.votes_count + 1);
+    }
+  }
+
+  async findByStatus(status: string): Promise<Request[]> {
+    return this.items.filter((item) => item.status.value === status);
+  }
+
+  async countByStatus(status: string): Promise<number> {
+    return this.items.filter((item) => item.status.value === status).length;
+  }
+
+  async countByMusicianId(
+    musician_id: import("../../../../shared/domain/value-objects/uuid.vo").Uuid,
+  ): Promise<number> {
+    return this.items.filter((item) => item.musician_id.id === musician_id.id)
+      .length;
+  }
+
   async findPopularSongs(
     musician_id?: string,
     limit: number = 10,

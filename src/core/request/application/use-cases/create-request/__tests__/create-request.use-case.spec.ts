@@ -32,7 +32,6 @@ describe("CreateRequestUseCase Unit Tests", () => {
       event_id: new EventId(eventId),
       establishment_id: new Uuid(),
       name: "Event",
-      date: now,
       start_at: now,
       end_at: new Date(now.getTime() + 60 * 60 * 1000),
       status: "active",
@@ -111,7 +110,7 @@ describe("CreateRequestUseCase Unit Tests", () => {
         await eventRepository.addAttendee(new EventId(eventId), audienceId);
 
         for (let i = 0; i < 10; i++) {
-          const request = Request.create({
+          const request = new Request({
             event_id: eventId,
             audience_id: audienceId,
             musician_id: new Uuid().id,
@@ -192,7 +191,7 @@ describe("CreateRequestUseCase Unit Tests", () => {
         await eventRepository.addAttendee(new EventId(eventId), audienceId);
 
         await repository.insert(
-          Request.create({
+          new Request({
             event_id: eventId,
             audience_id: audienceId,
             musician_id: musicianId,
@@ -242,7 +241,7 @@ describe("CreateRequestUseCase Unit Tests", () => {
     await eventRepository.addAttendee(new EventId(eventId), audienceId);
 
     // Create a recent request with the same song for one musician
-    const existingRequest = Request.create({
+    const existingRequest = new Request({
       event_id: eventId,
       audience_id: audienceId,
       musician_id: musicianId,

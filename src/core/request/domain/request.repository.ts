@@ -4,6 +4,7 @@ import {
   SearchParamsConstructorProps,
 } from "../../shared/domain/repository/search-params";
 import { SearchResult as DefaultSearchResult } from "../../shared/domain/repository/search-result";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { Request, RequestId } from "./request.aggregate";
 
 export type RequestFilter = {
@@ -90,4 +91,8 @@ export interface IRequestRepository extends ISearchableRepository<
     musician_id?: string,
     limit?: number,
   ): Promise<{ song_title: string; artist?: string; count: number }[]>;
+  atomicIncrementVotes(request_id: string): Promise<void>;
+  findByStatus(status: string): Promise<Request[]>;
+  countByStatus(status: string): Promise<number>;
+  countByMusicianId(musician_id: Uuid): Promise<number>;
 }

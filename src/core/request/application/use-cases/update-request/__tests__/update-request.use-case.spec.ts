@@ -28,7 +28,6 @@ describe("UpdateRequestUseCase Unit Tests", () => {
       event_id: new EventId(eventId),
       establishment_id: new Uuid(),
       name: "Event",
-      date: now,
       start_at: now,
       end_at: new Date(now.getTime() + 60 * 60 * 1000),
       status: "active",

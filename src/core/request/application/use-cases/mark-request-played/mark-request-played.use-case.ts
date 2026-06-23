@@ -4,6 +4,7 @@ import {
   Musician,
   MusicianId,
 } from "../../../../musician/domain";
+import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
@@ -23,6 +24,7 @@ export class MarkRequestPlayedUseCase implements IUseCase<
     private requestRepo: IRequestRepository,
     private eventRepo: IEventRepository,
     private musicianRepo: IMusicianRepository,
+    private readonly clock: IClock = { now: () => new Date() },
     private readonly domainEventMediator?: DomainEventMediator,
   ) {}
 
@@ -41,7 +43,9 @@ export class MarkRequestPlayedUseCase implements IUseCase<
       entity.musician_id.id,
     );
 
-    const playedAt = input.played_at ? new Date(input.played_at) : undefined;
+    const playedAt = input.played_at
+      ? new Date(input.played_at)
+      : this.clock.now();
     entity.markAsPlayed(playedAt);
 
     if (entity.notification.hasErrors()) {

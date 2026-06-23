@@ -285,7 +285,7 @@ export class RequestPrismaRepository implements IRequestRepository {
 
   async findByStatus(status: string): Promise<Request[]> {
     const models = await this.prisma.musicRequest.findMany({
-      where: { status },
+      where: { status: status as any },
       orderBy: { created_at: "desc" },
     });
     return models.map((model) => RequestModelMapper.toEntity(model));
@@ -382,7 +382,7 @@ export class RequestPrismaRepository implements IRequestRepository {
 
   async countByStatus(status: string): Promise<number> {
     return this.prisma.musicRequest.count({
-      where: { status },
+      where: { status: status as any },
     });
   }
 
@@ -493,6 +493,14 @@ export class RequestPrismaRepository implements IRequestRepository {
       artist: item.artistName,
       count: item._count.songTitle,
     }));
+  }
+
+  async atomicIncrementVotes(request_id: string): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE "music_requests"
+      SET "votesCount" = "votesCount" + 1
+      WHERE "id" = ${request_id}
+    `;
   }
 
   private buildWhereClause(filter?: RequestFilter | null) {

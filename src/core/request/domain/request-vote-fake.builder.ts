@@ -1,15 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
 
-import {
-  RequestVote,
-  RequestVoteId,
-  RequestVoteType,
-} from "./request-vote.entity";
+import { RequestVote, RequestVoteId } from "./request-vote.aggregate";
+import { RequestVoteType } from "./value-objects/request-vote-type.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
 export class RequestVoteFakeBuilder<TBuild = any> {
-  private _vote_id: PropOrFactory<RequestVoteId> | undefined = undefined;
+  private _request_vote_id: PropOrFactory<RequestVoteId> | undefined =
+    undefined;
   private _request_id: PropOrFactory<string> = (_index) => uuidv4();
   private _audience_id: PropOrFactory<string> = (_index) => uuidv4();
   private _vote_type: PropOrFactory<RequestVoteType> = (_index) =>
@@ -31,7 +29,7 @@ export class RequestVoteFakeBuilder<TBuild = any> {
   }
 
   withVoteId(valueOrFactory: PropOrFactory<RequestVoteId>) {
-    this._vote_id = valueOrFactory;
+    this._request_vote_id = valueOrFactory;
     return this;
   }
 
@@ -63,9 +61,9 @@ export class RequestVoteFakeBuilder<TBuild = any> {
   build(): TBuild {
     const votes = new Array(this.countObjs).fill(undefined).map((_, index) => {
       const vote = new RequestVote({
-        vote_id: !this._vote_id
+        request_vote_id: !this._request_vote_id
           ? undefined
-          : this.callFactory(this._vote_id, index),
+          : this.callFactory(this._request_vote_id, index),
         request_id: this.callFactory(this._request_id, index),
         audience_id: this.callFactory(this._audience_id, index),
         vote_type: this.callFactory(this._vote_type, index),

@@ -37,7 +37,7 @@ export class CreateRequestUseCase implements IUseCase<
     private audienceRepo: IAudienceRepository,
     private readonly maxRequestsPerUserPerEvent: number,
     private readonly requestCooldownMinutes: number,
-    private readonly clock: IClock,
+    private readonly clock: IClock = { now: () => new Date() },
     private readonly domainEventMediator?: DomainEventMediator,
   ) {}
 
@@ -126,7 +126,6 @@ export class CreateRequestUseCase implements IUseCase<
       song_title: input.song_title,
       artist: input.artist,
       message: input.message,
-      created_at: now,
     });
 
     const policy = new CanMakeRequestPolicy();

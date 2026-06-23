@@ -2,7 +2,8 @@ import { IsIn, IsNotEmpty, IsUUID } from "class-validator";
 
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
-import { RequestVote, RequestVoteType } from "./request-vote.entity";
+import { RequestVote } from "./request-vote.aggregate";
+import { RequestVoteType } from "./value-objects/request-vote-type.vo";
 
 export class RequestVoteRules {
   @IsUUID(4, { groups: ["request_id"] })

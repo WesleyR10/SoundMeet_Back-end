@@ -1,3 +1,5 @@
+import { MusicRequestStatus } from "@prisma/client";
+
 import { Request, RequestId } from "../../../domain/request.aggregate";
 
 export type RequestModelProps = {
@@ -9,7 +11,7 @@ export type RequestModelProps = {
   songTitle: string;
   artistName: string;
   message: string | null;
-  status: string;
+  status: MusicRequestStatus;
   rejectionReason: string | null;
   priority: number;
   votesCount: number;
@@ -33,7 +35,7 @@ export class RequestModelMapper {
       songTitle: entity.song_title.value,
       artistName: entity.artist || "",
       message: entity.message?.value || null,
-      status: entity.status.value,
+      status: entity.status.value as MusicRequestStatus,
       rejectionReason: entity.rejection_reason,
       priority,
       votesCount: entity.votes_count,
