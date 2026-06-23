@@ -84,11 +84,6 @@ export class MusicianModelMapper {
       price_notes: profile.priceRange?.notes ?? null,
       location: profile.location.toJSON() as unknown as JsonValue,
       socialLinks: (profile.socialLinks ?? null) as unknown as JsonValue | null,
-      experience: profile.experience,
-      instruments: profile.instruments,
-      genres: profile.genres,
-      rating: profile.rating.value,
-      totalRatings: profile.total_ratings,
       created_at: profile.created_at,
       updated_at: profile.updated_at,
     };
@@ -107,8 +102,8 @@ export class MusicianModelMapper {
             model.profile.price_max !== null
               ? new PriceRange({
                   model: model.profile.price_model as PriceModel,
-                  min: model.profile.price_min,
-                  max: model.profile.price_max,
+                  min: Number(model.profile.price_min),
+                  max: Number(model.profile.price_max),
                   currency: model.profile.price_currency
                     ? toDomainCurrency(model.profile.price_currency)
                     : undefined,
@@ -117,11 +112,9 @@ export class MusicianModelMapper {
               : null,
           location: Location.fromJSON(model.profile.location),
           socialLinks: toSocialLinks(model.profile.socialLinks),
-          experience: model.profile.experience,
-          instruments: model.profile.instruments,
-          genres: model.profile.genres,
-          rating: model.profile.rating,
-          total_ratings: model.profile.totalRatings,
+          experience: model.experience_years ?? 0,
+          instruments: model.instruments ?? [],
+          genres: model.genres ?? [],
           created_at: model.profile.created_at,
           updated_at: model.profile.updated_at,
         });

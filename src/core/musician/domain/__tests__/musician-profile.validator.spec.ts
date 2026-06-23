@@ -79,8 +79,6 @@ describe("MusicianProfileRules Unit Tests", () => {
     expect(rules.instruments).toEqual(profile.instruments);
     expect(rules.genres).toEqual(profile.genres);
     expect(rules.socialLinks).toBe(profile.socialLinks);
-    expect(rules.rating).toBe(profile.rating.value);
-    expect(rules.total_ratings).toBe(profile.total_ratings);
     expect(rules.created_at).toBe(profile.created_at);
     expect(rules.updated_at).toBe(profile.updated_at);
   });

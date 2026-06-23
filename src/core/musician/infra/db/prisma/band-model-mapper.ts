@@ -37,6 +37,7 @@ export class BandModelMapper {
       description: entity.description ?? null,
       avatar: entity.avatar ?? null,
       genres: entity.genres,
+      qr_code: entity.qr_code ?? null,
       price_model: entity.priceRange?.model ?? null,
       price_min: entity.priceRange?.min ?? null,
       price_max: entity.priceRange?.max ?? null,
@@ -70,6 +71,7 @@ export class BandModelMapper {
       description: model.description ?? undefined,
       avatar: model.avatar ?? undefined,
       genres: model.genres,
+      qr_code: model.qr_code ?? null,
       members: (model.members ?? []).map((m) => ({
         member_id: new Uuid(m.id),
         musician_id: new Uuid(m.musicianId),

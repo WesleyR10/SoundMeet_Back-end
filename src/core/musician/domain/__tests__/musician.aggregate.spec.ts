@@ -387,16 +387,16 @@ describe("Musician Unit Tests with validator", () => {
       expect(musician.notification.hasErrors()).toBe(true);
     });
 
-    test("should throw an error when email is invalid", () => {
-      expect(() =>
-        Musician.create({
-          name: "John Doe",
-          email: "invalid-email",
-          phone: "+5511999999999",
-          genres: ["Rock"],
-          instruments: ["Guitar"],
-        }),
-      ).toThrow();
+    test("should have validation errors when email is invalid", () => {
+      const musician = Musician.create({
+        name: "John Doe",
+        email: "invalid-email",
+        phone: "+5511999999999",
+        genres: ["Rock"],
+        instruments: ["Guitar"],
+      });
+
+      expect(musician.notification.hasErrors()).toBe(true);
     });
 
     test("should create a valid musician", () => {

@@ -20,6 +20,7 @@ export type BandConstructorProps = {
   description?: string | null;
   avatar?: string | null;
   genres: string[];
+  qr_code?: string | null;
   members?: BandMemberProps[];
   priceRange?: PriceRange | null;
   is_active?: boolean;
@@ -43,6 +44,7 @@ export class Band extends AggregateRoot {
   description: string | null;
   avatar: string | null;
   genres: string[];
+  qr_code: string | null;
   members: BandMemberProps[];
   priceRange: PriceRange | null;
   is_active: boolean;
@@ -56,6 +58,7 @@ export class Band extends AggregateRoot {
     this.description = props.description ?? null;
     this.avatar = props.avatar ?? null;
     this.genres = props.genres;
+    this.qr_code = props.qr_code ?? null;
     this.members = (props.members ?? []).map((member) => ({
       ...member,
       member_id: member.member_id ?? new Uuid(),
@@ -101,6 +104,11 @@ export class Band extends AggregateRoot {
 
   changeAvatar(avatar: string | null): void {
     this.avatar = avatar;
+    this.updated_at = new Date();
+  }
+
+  generateQRCode(code: string): void {
+    this.qr_code = code;
     this.updated_at = new Date();
   }
 
@@ -180,6 +188,7 @@ export class Band extends AggregateRoot {
       description: this.description,
       avatar: this.avatar,
       genres: this.genres,
+      qr_code: this.qr_code,
       members: this.members.map((m) => ({
         member_id: m.member_id?.id,
         musician_id: m.musician_id.id,

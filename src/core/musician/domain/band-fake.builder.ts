@@ -1,6 +1,6 @@
 import { Chance } from "chance";
 
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+import { InvariantViolationError } from "../../shared/domain/errors/invariant-violation.error";
 import { Band, BandId, BandMemberProps } from "./band.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
@@ -156,7 +156,9 @@ export class BandFakeBuilder<TBuild = any> {
     const optional = ["band_id", "created_at", "updated_at"];
     const privateProp = `_${prop}` as keyof this;
     if (!this[privateProp] && optional.includes(prop)) {
-      throw new Error(`Property ${prop} not has a factory, use 'with' methods`);
+      throw new InvariantViolationError(
+        `Property ${prop} not have a factory, use 'with' methods`,
+      );
     }
     return this.callFactory(this[privateProp], 0);
   }

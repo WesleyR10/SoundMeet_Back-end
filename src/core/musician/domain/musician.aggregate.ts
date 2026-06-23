@@ -172,7 +172,7 @@ export class Musician extends AggregateRoot {
 
   updateInstruments(instruments: string[]): void {
     this.instruments = instruments;
-    this.validate();
+    this.validate(["instruments"]);
   }
 
   updateExperience(years: number): void {

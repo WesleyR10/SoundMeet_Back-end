@@ -27,8 +27,6 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     expect(profile.experience).toBe(0);
     expect(profile.instruments).toEqual([]);
     expect(profile.genres).toEqual([]);
-    expect(profile.rating.value).toBe(0);
-    expect(profile.total_ratings).toBe(0);
     expect(profile.created_at).toBeInstanceOf(Date);
     expect(profile.updated_at).toBeInstanceOf(Date);
 
@@ -50,8 +48,6 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
       experience: 10,
       instruments: ["Guitar"],
       genres: ["Rock"],
-      rating: 4.2,
-      total_ratings: 10,
       created_at,
       updated_at,
       priceRange,
@@ -65,8 +61,6 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     expect(profile.experience).toBe(10);
     expect(profile.instruments).toEqual(["Guitar"]);
     expect(profile.genres).toEqual(["Rock"]);
-    expect(profile.rating.value).toBe(4.2);
-    expect(profile.total_ratings).toBe(10);
     expect(profile.created_at).toBe(created_at);
     expect(profile.updated_at).toBe(updated_at);
   });
@@ -134,26 +128,5 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     profile.updateGenres(["Rock", "Pop"]);
     expect(profile.instruments).toEqual(["Guitar", "Vocals"]);
     expect(profile.genres).toEqual(["Rock", "Pop"]);
-  });
-
-  test("should update rating average", () => {
-    const profile = MusicianProfile.fake()
-      .aProfile()
-      .withRating(0)
-      .withTotalRatings(0)
-      .build();
-    profile.addRating(5);
-    expect(profile.total_ratings).toBe(1);
-    expect(profile.rating.value).toBe(5);
-
-    profile.addRating(3);
-    expect(profile.total_ratings).toBe(2);
-    expect(profile.rating.value).toBe(4);
-  });
-
-  test("should reject invalid rating", () => {
-    const profile = MusicianProfile.fake().aProfile().build();
-    profile.addRating(0);
-    expect(profile.notification.hasErrors()).toBe(true);
   });
 });

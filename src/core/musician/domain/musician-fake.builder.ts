@@ -104,6 +104,10 @@ export class MusicianFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withCreatedAt(valueOrFactory: PropOrFactory<Date>) {
+    return this.withcreated_at(valueOrFactory);
+  }
+
   withInvalidNameEmpty(value: "" = "") {
     this._name = value;
     return this;

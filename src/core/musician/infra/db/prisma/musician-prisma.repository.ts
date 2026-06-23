@@ -9,6 +9,7 @@ import {
   MusicianSearchParams,
   MusicianSearchResult,
 } from "../../../domain/musician.repository";
+import { MusicianModel } from "./musician-model";
 import { MusicianModelMapper } from "./musician-model-mapper";
 
 export class MusicianPrismaRepository implements IMusicianRepository {
@@ -172,7 +173,9 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       include: { profile: true },
     });
 
-    return model ? MusicianModelMapper.toEntity(model) : null;
+    return model
+      ? MusicianModelMapper.toEntity(model as unknown as MusicianModel)
+      : null;
   }
 
   async findByIds(ids: MusicianId[]): Promise<Musician[]> {
@@ -184,14 +187,18 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       },
       include: { profile: true },
     });
-    return models.map((m) => MusicianModelMapper.toEntity(m));
+    return models.map((m) =>
+      MusicianModelMapper.toEntity(m as unknown as MusicianModel),
+    );
   }
 
   async findAll(): Promise<Musician[]> {
     const models = await this.prisma.musician.findMany({
       include: { profile: true },
     });
-    return models.map((model) => MusicianModelMapper.toEntity(model));
+    return models.map((model) =>
+      MusicianModelMapper.toEntity(model as unknown as MusicianModel),
+    );
   }
 
   async existsById(
@@ -241,7 +248,9 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       this.prisma.musician.count({ where }),
     ]);
 
-    const entities = musicians.map((m) => MusicianModelMapper.toEntity(m));
+    const entities = musicians.map((m) =>
+      MusicianModelMapper.toEntity(m as unknown as MusicianModel),
+    );
 
     return new MusicianSearchResult({
       items: entities,

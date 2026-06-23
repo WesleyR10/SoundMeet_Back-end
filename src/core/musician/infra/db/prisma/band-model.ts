@@ -14,6 +14,7 @@ export type BandModel = {
   description: string | null;
   avatar: string | null;
   genres: string[];
+  qr_code: string | null;
   price_model: string | null;
   price_min: number | null;
   price_max: number | null;

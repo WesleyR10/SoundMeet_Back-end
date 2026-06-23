@@ -26,8 +26,6 @@ export class MusicianProfileFakeBuilder<TBuild = any> {
     this.chance.integer({ min: 0, max: 50 });
   private _instruments: PropOrFactory<string[]> = (_index) => ["Guitar"];
   private _genres: PropOrFactory<string[]> = (_index) => ["Rock"];
-  private _rating: PropOrFactory<number> = (_index) => 0;
-  private _total_ratings: PropOrFactory<number> = (_index) => 0;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
 
   private countObjs;
@@ -89,16 +87,6 @@ export class MusicianProfileFakeBuilder<TBuild = any> {
     return this;
   }
 
-  withRating(valueOrFactory: PropOrFactory<number>) {
-    this._rating = valueOrFactory;
-    return this;
-  }
-
-  withTotalRatings(valueOrFactory: PropOrFactory<number>) {
-    this._total_ratings = valueOrFactory;
-    return this;
-  }
-
   withCreatedAt(valueOrFactory: PropOrFactory<Date>) {
     this._created_at = valueOrFactory;
     return this;
@@ -119,8 +107,6 @@ export class MusicianProfileFakeBuilder<TBuild = any> {
           experience: this.callFactory(this._experience, index),
           instruments: this.callFactory(this._instruments, index),
           genres: this.callFactory(this._genres, index),
-          rating: this.callFactory(this._rating, index),
-          total_ratings: this.callFactory(this._total_ratings, index),
           ...(this._created_at && {
             created_at: this.callFactory(this._created_at, index),
           }),

@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Max,
   Min,
 } from "class-validator";
 
@@ -43,15 +42,6 @@ export class MusicianProfileRules {
   @IsObject({ groups: ["location"] })
   location: object;
 
-  @IsNumber({}, { groups: ["rating"] })
-  @Min(0, { groups: ["rating"] })
-  @Max(5, { groups: ["rating"] })
-  rating: number;
-
-  @IsNumber({}, { groups: ["total_ratings"] })
-  @Min(0, { groups: ["total_ratings"] })
-  total_ratings: number;
-
   @IsDate({ groups: ["created_at"] })
   @IsOptional({ groups: ["created_at"] })
   created_at: Date;
@@ -70,8 +60,6 @@ export class MusicianProfileRules {
     this.location = entity?.location?.toJSON
       ? entity.location.toJSON()
       : entity?.location;
-    this.rating = entity?.rating?.value ?? entity?.rating;
-    this.total_ratings = entity?.total_ratings ?? entity?.totalRatings;
     this.created_at = entity?.created_at;
     this.updated_at = entity?.updated_at;
   }
@@ -89,8 +77,6 @@ export class MusicianProfileValidator extends ClassValidatorFields {
           "socialLinks",
           "priceRange",
           "location",
-          "rating",
-          "total_ratings",
           "created_at",
           "updated_at",
         ];

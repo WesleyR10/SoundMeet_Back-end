@@ -127,7 +127,7 @@ export class BandPrismaRepository implements IBandRepository {
   async findById(entity_id: BandId): Promise<Band | null> {
     const model = await this.prisma.band.findUnique({
       where: { id: entity_id.id },
-      include: { members: true },
+      include: { members: { orderBy: { role: "asc" } } },
     });
 
     return model ? BandModelMapper.toEntity(model as any) : null;
@@ -140,14 +140,14 @@ export class BandPrismaRepository implements IBandRepository {
           in: ids.map((id) => id.id),
         },
       },
-      include: { members: true },
+      include: { members: { orderBy: { role: "asc" } } },
     });
     return models.map((m) => BandModelMapper.toEntity(m as any));
   }
 
   async findAll(): Promise<Band[]> {
     const models = await this.prisma.band.findMany({
-      include: { members: true },
+      include: { members: { orderBy: { role: "asc" } } },
     });
     return models.map((model) => BandModelMapper.toEntity(model as any));
   }
@@ -194,7 +194,7 @@ export class BandPrismaRepository implements IBandRepository {
         orderBy,
         skip: offset,
         take: limit,
-        include: { members: true },
+        include: { members: { orderBy: { role: "asc" } } },
       }),
       this.prisma.band.count({ where }),
     ]);

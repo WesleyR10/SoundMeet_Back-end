@@ -22,8 +22,6 @@ export type MusicianProfileOutput = {
   experience: number;
   instruments: string[];
   genres: string[];
-  rating: number;
-  total_ratings: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -88,8 +86,6 @@ export class MusicianOutputMapper {
             experience: entity.profile.experience,
             instruments: entity.profile.instruments,
             genres: entity.profile.genres,
-            rating: entity.profile.rating.value,
-            total_ratings: entity.profile.total_ratings,
             created_at: entity.profile.created_at,
             updated_at: entity.profile.updated_at,
           }

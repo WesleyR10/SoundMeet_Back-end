@@ -36,11 +36,6 @@ export type MusicianProfileModel = {
   price_notes: string | null;
   location: JsonValue;
   socialLinks: JsonValue | null;
-  experience: number;
-  instruments: string[];
-  genres: string[];
-  rating: number;
-  totalRatings: number;
   created_at: Date;
   updated_at: Date;
 };
