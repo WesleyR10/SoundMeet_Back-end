@@ -10,8 +10,8 @@ export type RankingModelProps = {
   id: string;
   type: string;
   period: string;
-  user_id: string;
-  establishment_id: string | null;
+  audienceId: string;
+  establishmentId: string | null;
   position: number;
   score: number;
   period_start: Date;
@@ -28,8 +28,8 @@ export class RankingModelMapper {
       id: entity.ranking_id.id,
       type: entity.ranking_type,
       period: entity.period,
-      user_id: entity.user_id.id,
-      establishment_id: entity.establishment_id?.id ?? null,
+      audienceId: entity.user_id.id,
+      establishmentId: entity.establishment_id?.id ?? null,
       position: entity.position,
       score: entity.score,
       period_start: entity.period_start,
@@ -42,18 +42,20 @@ export class RankingModelMapper {
   }
 
   static toEntity(model: RankingModelProps): Ranking {
-    if (!model.user_id) {
+    if (!model.audienceId) {
       throw new LoadEntityError([
         {
-          user_id: [`Ranking ${model.id} has missing user_id data in database`],
+          audienceId: [
+            `Ranking ${model.id} has missing audienceId data in database`,
+          ],
         },
       ]);
     }
     return new Ranking({
       ranking_id: new RankingId(model.id),
-      user_id: new Uuid(model.user_id),
-      establishment_id: model.establishment_id
-        ? new Uuid(model.establishment_id)
+      user_id: new Uuid(model.audienceId),
+      establishment_id: model.establishmentId
+        ? new Uuid(model.establishmentId)
         : null,
       ranking_type: model.type as RankingTypeEnum,
       period: model.period as RankingPeriodEnum,

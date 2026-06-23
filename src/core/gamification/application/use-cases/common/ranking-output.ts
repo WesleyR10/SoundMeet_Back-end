@@ -3,6 +3,7 @@ import { Ranking } from "../../../domain/ranking.aggregate";
 export type RankingOutput = {
   id: string;
   user_id: string;
+  establishment_id: string | null;
   ranking_type: string;
   period: string;
   position: number;

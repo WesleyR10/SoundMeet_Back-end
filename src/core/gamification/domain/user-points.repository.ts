@@ -10,7 +10,8 @@ export type UserPointsFilter = {
   audienceId?: string | null;
   points_gte?: number | null;
   points_lte?: number | null;
-  source?: string | null;
+  current_level?: number | null;
+  is_active?: boolean | null;
 };
 
 export class UserPointsSearchParams extends DefaultSearchParams<UserPointsFilter> {
@@ -46,8 +47,12 @@ export class UserPointsSearchParams extends DefaultSearchParams<UserPointsFilter
           points_lte: _value.points_lte,
         }),
       ...(_value &&
-        _value.source && {
-          source: _value.source,
+        typeof _value.current_level === "number" && {
+          current_level: _value.current_level,
+        }),
+      ...(_value &&
+        typeof _value.is_active === "boolean" && {
+          is_active: _value.is_active,
         }),
     };
 

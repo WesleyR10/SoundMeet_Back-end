@@ -2,7 +2,7 @@ import { AggregateRoot, Uuid } from "../../shared/domain";
 import { UserScoreValidatorFactory } from "./user-score.validator";
 import { UserScoreFakeBuilder } from "./user-score-fake.builder";
 import { UserScoreId } from "./value-objects/gamification-id.vo";
-import { ScoreTypeEnum } from "./value-objects/score-type.vo";
+import { ScoreType, ScoreTypeEnum } from "./value-objects/score-type.vo";
 
 export { UserScoreId } from "./value-objects/gamification-id.vo";
 
@@ -102,6 +102,7 @@ export class UserScore extends AggregateRoot {
       [ScoreTypeEnum.SOCIAL_SHARE]: "Compartilhou nas redes sociais",
       [ScoreTypeEnum.PROFILE_VIEW]: "Visualizou perfil",
       [ScoreTypeEnum.EVENT_ATTENDANCE]: "Participou de evento",
+      [ScoreTypeEnum.BONUS]: "Recebeu bônus",
     };
 
     return descriptions[this.score_type] ?? "";
@@ -139,15 +140,6 @@ export class UserScore extends AggregateRoot {
   }
 
   private static getDefaultPoints(score_type: ScoreTypeEnum): number {
-    const pointsMap = {
-      [ScoreTypeEnum.QR_SCAN]: 10,
-      [ScoreTypeEnum.REQUEST_SENT]: 25,
-      [ScoreTypeEnum.REQUEST_ACCEPTED]: 50,
-      [ScoreTypeEnum.TIP_GIVEN]: 1,
-      [ScoreTypeEnum.SOCIAL_SHARE]: 50,
-      [ScoreTypeEnum.PROFILE_VIEW]: 5,
-      [ScoreTypeEnum.EVENT_ATTENDANCE]: 20,
-    };
-    return pointsMap[score_type] ?? 0;
+    return new ScoreType(score_type).getPoints();
   }
 }

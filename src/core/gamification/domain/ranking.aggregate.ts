@@ -19,12 +19,14 @@ export {
 export type RankingConstructorProps = {
   ranking_id?: RankingId;
   user_id: Uuid;
+  establishment_id?: Uuid | null;
   ranking_type: RankingTypeEnum;
   period: RankingPeriodEnum;
   position: number;
   score: number;
   period_start: Date;
   period_end: Date;
+  metadata?: any | null;
   is_active?: boolean;
   created_at?: Date;
   updated_at?: Date;
@@ -43,12 +45,14 @@ export type RankingCreateCommand = {
 export class Ranking extends AggregateRoot {
   ranking_id: RankingId;
   user_id: Uuid;
+  establishment_id: Uuid | null;
   ranking_type: RankingTypeEnum;
   period: RankingPeriodEnum;
   position: number;
   score: number;
   period_start: Date;
   period_end: Date;
+  metadata: any | null;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -57,12 +61,14 @@ export class Ranking extends AggregateRoot {
     super();
     this.ranking_id = props.ranking_id ?? RankingId.create();
     this.user_id = props.user_id;
+    this.establishment_id = props.establishment_id ?? null;
     this.ranking_type = props.ranking_type;
     this.period = props.period;
     this.position = props.position;
     this.score = props.score;
     this.period_start = props.period_start;
     this.period_end = props.period_end;
+    this.metadata = props.metadata ?? null;
     this.is_active = props.is_active ?? true;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
@@ -224,6 +230,7 @@ export class Ranking extends AggregateRoot {
     return {
       ranking_id: this.ranking_id.id,
       user_id: this.user_id.id,
+      establishment_id: this.establishment_id?.id ?? null,
       ranking_type: this.ranking_type,
       period: this.period,
       position: this.position,

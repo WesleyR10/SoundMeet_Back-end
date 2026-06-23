@@ -19,7 +19,7 @@ export class UserPointsInMemoryRepository
   >
   implements IUserPointsRepository
 {
-  sortableFields: string[] = ["points", "created_at"];
+  sortableFields: string[] = ["total_points", "current_level", "created_at"];
 
   async search(props: UserPointsSearchParams): Promise<UserPointsSearchResult> {
     const result = await super.search(props);
@@ -93,6 +93,6 @@ export class UserPointsInMemoryRepository
   ) {
     return sort
       ? super.applySort(items, sort, sort_dir)
-      : super.applySort(items, "points", "desc");
+      : super.applySort(items, "total_points", "desc");
   }
 }

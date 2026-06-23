@@ -1,5 +1,9 @@
 import { InvalidArgumentError } from "../../../shared/domain/errors/invalid-argument.error";
 import { ValueObject } from "../../../shared/domain/value-object";
+import {
+  GamificationAction,
+  getGamificationPoints,
+} from "./gamification-points";
 
 export enum ScoreTypeEnum {
   QR_SCAN = "qr_scan",
@@ -9,7 +13,19 @@ export enum ScoreTypeEnum {
   SOCIAL_SHARE = "social_share",
   PROFILE_VIEW = "profile_view",
   EVENT_ATTENDANCE = "event_attendance",
+  BONUS = "bonus",
 }
+
+const SCORE_TYPE_TO_ACTION: Record<ScoreTypeEnum, GamificationAction> = {
+  [ScoreTypeEnum.QR_SCAN]: GamificationAction.SCAN_QR,
+  [ScoreTypeEnum.REQUEST_SENT]: GamificationAction.REQUEST,
+  [ScoreTypeEnum.REQUEST_ACCEPTED]: GamificationAction.ACCEPTED_REQUEST,
+  [ScoreTypeEnum.TIP_GIVEN]: GamificationAction.TIP,
+  [ScoreTypeEnum.SOCIAL_SHARE]: GamificationAction.SOCIAL_SHARE,
+  [ScoreTypeEnum.PROFILE_VIEW]: GamificationAction.PROFILE_VIEW,
+  [ScoreTypeEnum.EVENT_ATTENDANCE]: GamificationAction.EVENT_ATTENDANCE,
+  [ScoreTypeEnum.BONUS]: GamificationAction.BONUS,
+};
 
 export class ScoreType extends ValueObject {
   constructor(readonly value: ScoreTypeEnum) {
@@ -55,18 +71,12 @@ export class ScoreType extends ValueObject {
     return new ScoreType(ScoreTypeEnum.EVENT_ATTENDANCE);
   }
 
-  getPoints(): number {
-    const pointsMap = {
-      [ScoreTypeEnum.QR_SCAN]: 10,
-      [ScoreTypeEnum.REQUEST_SENT]: 25,
-      [ScoreTypeEnum.REQUEST_ACCEPTED]: 50,
-      [ScoreTypeEnum.TIP_GIVEN]: 1, // 1 ponto por real
-      [ScoreTypeEnum.SOCIAL_SHARE]: 50,
-      [ScoreTypeEnum.PROFILE_VIEW]: 5,
-      [ScoreTypeEnum.EVENT_ATTENDANCE]: 20,
-    };
+  static BONUS(): ScoreType {
+    return new ScoreType(ScoreTypeEnum.BONUS);
+  }
 
-    return pointsMap[this.value];
+  getPoints(): number {
+    return getGamificationPoints(SCORE_TYPE_TO_ACTION[this.value]);
   }
 
   toString(): string {

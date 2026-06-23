@@ -1,4 +1,8 @@
 import { ValueObject } from "../../../shared/domain/value-object";
+import {
+  GamificationAction,
+  getGamificationPoints,
+} from "./gamification-points";
 
 export enum PointsSourceEnum {
   SCAN_QR = "scan_qr",
@@ -83,22 +87,8 @@ export class PointsSource extends ValueObject {
   }
 
   getPointsValue(): number {
-    switch (this.value) {
-      case PointsSourceEnum.SCAN_QR:
-        return 10;
-      case PointsSourceEnum.REQUEST:
-        return 25;
-      case PointsSourceEnum.ACCEPTED_REQUEST:
-        return 50;
-      case PointsSourceEnum.SOCIAL_SHARE:
-        return 50;
-      case PointsSourceEnum.TIP:
-        return 1; // 1 ponto por real
-      case PointsSourceEnum.BONUS:
-        return 0; // Valor variável
-      default:
-        return 0;
-    }
+    // Os valores de PointsSourceEnum coincidem com GamificationAction.
+    return getGamificationPoints(this.value as unknown as GamificationAction);
   }
 
   toString(): string {

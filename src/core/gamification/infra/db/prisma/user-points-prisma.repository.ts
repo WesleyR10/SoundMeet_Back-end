@@ -13,7 +13,7 @@ import {
 import { UserPointsModelMapper } from "./user-points-model-mapper";
 
 export class UserPointsPrismaRepository implements IUserPointsRepository {
-  sortableFields: string[] = ["points", "created_at"];
+  sortableFields: string[] = ["total_points", "current_level", "created_at"];
 
   constructor(private prismaClient: PrismaClient) {}
 
@@ -118,22 +118,22 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
         where.audienceId = props.filter.audienceId;
       }
       if (props.filter.points_gte !== undefined) {
-        where.points = {
-          ...where.points,
+        where.total_points = {
+          ...where.total_points,
           gte: props.filter.points_gte,
         };
       }
       if (props.filter.points_lte !== undefined) {
-        where.points = {
-          ...where.points,
+        where.total_points = {
+          ...where.total_points,
           lte: props.filter.points_lte,
         };
       }
-      if (props.filter.source) {
-        where.source = {
-          contains: props.filter.source,
-          mode: "insensitive",
-        };
+      if (props.filter.current_level !== undefined) {
+        where.current_level = props.filter.current_level;
+      }
+      if (props.filter.is_active !== undefined) {
+        where.is_active = props.filter.is_active;
       }
     }
 
@@ -141,7 +141,7 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
     if (props.sort && this.sortableFields.includes(props.sort)) {
       orderBy[props.sort] = props.sort_dir || "desc";
     } else {
-      orderBy.points = "desc";
+      orderBy.total_points = "desc";
     }
 
     const [models, count] = await Promise.all([
@@ -163,7 +163,7 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
   }
 
   async findByUserId(user_id: string): Promise<UserPoints | null> {
-    const model = await this.prismaClient.userPoints.findFirst({
+    const model = await this.prismaClient.userPoints.findUnique({
       where: { audienceId: user_id },
     });
     return model ? UserPointsModelMapper.toEntity(model) : null;
@@ -171,25 +171,15 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
 
   async findTopUsers(limit: number = 10): Promise<UserPoints[]> {
     const models = await this.prismaClient.userPoints.findMany({
-      orderBy: { points: "desc" },
+      orderBy: { total_points: "desc" },
       take: limit,
     });
     return models.map((model) => UserPointsModelMapper.toEntity(model));
   }
 
   async findByLevel(level: number): Promise<UserPoints[]> {
-    // Como o schema não tem current_level, vamos buscar por pontos
-    // Assumindo que cada nível tem uma faixa de pontos
-    const minPoints = level * 100; // Exemplo: nível 1 = 100 pontos
-    const maxPoints = (level + 1) * 100 - 1;
-
     const models = await this.prismaClient.userPoints.findMany({
-      where: {
-        points: {
-          gte: minPoints,
-          lte: maxPoints,
-        },
-      },
+      where: { current_level: level },
     });
     return models.map((model) => UserPointsModelMapper.toEntity(model));
   }

@@ -10,22 +10,15 @@ import {
 import { UserBadgeModelMapper } from "./user-badge-model-mapper";
 
 export class UserBadgePrismaRepository implements IUserBadgeRepository {
-  sortableFields: string[] = ["earnedAt", "progress"];
+  sortableFields: string[] = ["created_at", "progress"];
 
   constructor(private prismaClient: PrismaClient) {}
 
   async insert(entity: UserBadge): Promise<void> {
     const model = UserBadgeModelMapper.toModel(entity);
-    // Convertendo para o formato Prisma
     try {
       await this.prismaClient.userBadge.create({
-        data: {
-          id: model.id,
-          audienceId: model.user_id,
-          badgeId: model.badge_type,
-          earnedAt: model.created_at,
-          progress: model.progress,
-        },
+        data: model,
       });
     } catch (error: any) {
       throw mapPrismaErrorToDomainError(error, {
@@ -37,16 +30,9 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
   }
 
   async bulkInsert(entities: UserBadge[]): Promise<void> {
-    const models = entities.map((entity) => {
-      const model = UserBadgeModelMapper.toModel(entity);
-      return {
-        id: model.id,
-        audienceId: model.user_id,
-        badgeId: model.badge_type,
-        earnedAt: model.created_at,
-        progress: model.progress,
-      };
-    });
+    const models = entities.map((entity) =>
+      UserBadgeModelMapper.toModel(entity),
+    );
     try {
       await this.prismaClient.userBadge.createMany({
         data: models,
@@ -65,10 +51,12 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
       await this.prismaClient.userBadge.update({
         where: { id: entity.user_badge_id.id },
         data: {
-          audienceId: model.user_id,
-          badgeId: model.badge_type,
-          earnedAt: model.created_at,
+          audienceId: model.audienceId,
+          badge_type: model.badge_type,
           progress: model.progress,
+          is_unlocked: model.is_unlocked,
+          unlocked_at: model.unlocked_at,
+          updated_at: model.updated_at,
         },
       });
     } catch (error: any) {
@@ -103,7 +91,7 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
 
   async findAll(): Promise<UserBadge[]> {
     const models = await this.prismaClient.userBadge.findMany({
-      orderBy: { earnedAt: "desc" },
+      orderBy: { created_at: "desc" },
     });
     return models.map((model) => UserBadgeModelMapper.toEntity(model));
   }
@@ -145,17 +133,18 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
         where.audienceId = props.filter.user_id;
       }
       if (props.filter.badge_type) {
-        where.badgeId = props.filter.badge_type;
+        where.badge_type = props.filter.badge_type;
       }
-      // Note: is_unlocked e progress não existem no schema Prisma atual
-      // Estes filtros serão ignorados por enquanto
+      if (typeof props.filter.is_unlocked === "boolean") {
+        where.is_unlocked = props.filter.is_unlocked;
+      }
     }
 
     const orderBy: any = {};
     if (props.sort && this.sortableFields.includes(props.sort)) {
       orderBy[props.sort] = props.sort_dir || "desc";
     } else {
-      orderBy.earnedAt = "desc";
+      orderBy.created_at = "desc";
     }
 
     const [models, count] = await Promise.all([
@@ -181,7 +170,7 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
   async findByUserId(user_id: string): Promise<UserBadge[]> {
     const models = await this.prismaClient.userBadge.findMany({
       where: { audienceId: user_id },
-      orderBy: { earnedAt: "desc" },
+      orderBy: { created_at: "desc" },
     });
     return models.map((model) => UserBadgeModelMapper.toEntity(model));
   }
@@ -191,22 +180,24 @@ export class UserBadgePrismaRepository implements IUserBadgeRepository {
     badge_type: string,
   ): Promise<UserBadge | null> {
     const model = await this.prismaClient.userBadge.findFirst({
-      where: { audienceId: user_id, badgeId: badge_type },
+      where: { audienceId: user_id, badge_type },
     });
     return model ? UserBadgeModelMapper.toEntity(model) : null;
   }
 
   async findUnlockedByUser(user_id: string): Promise<UserBadge[]> {
-    // Como não temos is_unlocked no schema, vamos considerar todos como "unlocked"
     const models = await this.prismaClient.userBadge.findMany({
-      where: { audienceId: user_id },
-      orderBy: { earnedAt: "desc" },
+      where: { audienceId: user_id, is_unlocked: true },
+      orderBy: { unlocked_at: "desc" },
     });
     return models.map((model) => UserBadgeModelMapper.toEntity(model));
   }
 
   async findInProgressByUser(user_id: string): Promise<UserBadge[]> {
-    // Como não temos is_unlocked no schema, retornamos array vazio por enquanto
-    return [];
+    const models = await this.prismaClient.userBadge.findMany({
+      where: { audienceId: user_id, is_unlocked: false },
+      orderBy: { created_at: "desc" },
+    });
+    return models.map((model) => UserBadgeModelMapper.toEntity(model));
   }
 }

@@ -112,8 +112,8 @@ export class RankingPrismaRepository implements IRankingRepository {
     const model = await this.prismaClient.ranking.findFirst({
       where: {
         type: period_type,
-        user_id,
-        establishment_id,
+        audienceId: user_id,
+        establishmentId: establishment_id,
       },
       orderBy: { created_at: "desc" },
     });
@@ -131,7 +131,7 @@ export class RankingPrismaRepository implements IRankingRepository {
       where: {
         type: ranking_type,
         period,
-        user_id,
+        audienceId: user_id,
         period_start: {
           gte: period_start,
         },
@@ -151,7 +151,7 @@ export class RankingPrismaRepository implements IRankingRepository {
     const models = await this.prismaClient.ranking.findMany({
       where: {
         type: period_type,
-        establishment_id,
+        establishmentId: establishment_id,
       },
       orderBy: { score: "desc" },
       take: limit || 10,
@@ -202,7 +202,7 @@ export class RankingPrismaRepository implements IRankingRepository {
         where.period = props.filter.period;
       }
       if (props.filter.user_id) {
-        where.user_id = props.filter.user_id;
+        where.audienceId = props.filter.user_id;
       }
       if (props.filter.position_max) {
         where.position = {
@@ -284,7 +284,7 @@ export class RankingPrismaRepository implements IRankingRepository {
     const model = await this.prismaClient.ranking.findFirst({
       where: {
         type,
-        user_id,
+        audienceId: user_id,
       },
       orderBy: { created_at: "desc" },
     });
