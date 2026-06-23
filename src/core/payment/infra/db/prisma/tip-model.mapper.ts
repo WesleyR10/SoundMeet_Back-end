@@ -1,8 +1,12 @@
-import { Tip as PrismaTip } from "@prisma/client";
+import {
+  CurrencyEnum,
+  Tip as PrismaTip,
+  TipStatus as PrismaTipStatus,
+} from "@prisma/client";
 
 import { Money } from "../../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
-import { Tip } from "../../../domain/tip.entity";
+import { Tip } from "../../../domain/tip.aggregate";
 import { PaymentMethod, TipStatus } from "../../../domain/tip-enums";
 import { PixKey } from "../../../domain/value-objects/pix-key.vo";
 
@@ -13,9 +17,10 @@ export type TipModelProps = {
   bandId: string | null;
   eventId: string | null;
   amount: number;
+  currency: CurrencyEnum;
   message: string | null;
   paymentMethod: string;
-  status: string;
+  status: PrismaTipStatus;
   transactionId: string | null;
   pixKey: string | null;
   pixKeyType: string | null;
@@ -34,9 +39,10 @@ export class TipModelMapper {
       bandId: entity.band_id?.id ?? null,
       eventId: entity.event_id?.id || null,
       amount: entity.amount.amount,
+      currency: CurrencyEnum.BRL,
       message: entity.message,
       paymentMethod: entity.payment_method,
-      status: entity.status,
+      status: entity.status as PrismaTipStatus,
       transactionId: entity.transaction_id,
       pixKey: entity.pix_key?.key || null,
       pixKeyType: entity.pix_key?.type || null,
@@ -67,7 +73,7 @@ export class TipModelMapper {
       musician_id: model.musicianId ? new Uuid(model.musicianId) : null,
       band_id: model.bandId ? new Uuid(model.bandId) : null,
       event_id: model.eventId ? new Uuid(model.eventId) : null,
-      amount: new Money(model.amount),
+      amount: new Money(Number(model.amount)),
       message: model.message,
       payment_method: model.paymentMethod as PaymentMethod,
       status: model.status as TipStatus,

@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { IUnitOfWork } from "../../../../shared/domain/repository/unit-of-work.interface";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
@@ -15,12 +16,19 @@ import { TransactionModelMapper } from "./transaction-model.mapper";
 export class TransactionPrismaRepository implements ITransactionRepository {
   sortableFields: string[] = ["created_at", "amount", "status", "type"];
 
-  constructor(private prisma: PrismaClient) {}
+  constructor(
+    private prisma: PrismaClient,
+    private readonly uow?: IUnitOfWork<Prisma.TransactionClient>,
+  ) {}
+
+  private get client(): PrismaClient | Prisma.TransactionClient {
+    return this.uow?.getTransaction() ?? this.prisma;
+  }
 
   async insert(entity: Transaction): Promise<void> {
     const modelProps = TransactionModelMapper.toModel(entity);
     try {
-      await this.prisma.transaction.create({
+      await this.client.transaction.create({
         data: modelProps,
       });
     } catch (error: any) {
@@ -37,7 +45,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
       TransactionModelMapper.toModel(entity),
     );
     try {
-      await this.prisma.transaction.createMany({
+      await this.client.transaction.createMany({
         data: modelsProps,
       });
     } catch (error: any) {
@@ -51,7 +59,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
   async update(entity: Transaction): Promise<void> {
     const modelProps = TransactionModelMapper.toModel(entity);
     try {
-      await this.prisma.transaction.update({
+      await this.client.transaction.update({
         where: { id: entity.transaction_id.id },
         data: modelProps,
       });
@@ -66,7 +74,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
 
   async delete(entity_id: Uuid): Promise<void> {
     try {
-      await this.prisma.transaction.delete({
+      await this.client.transaction.delete({
         where: { id: entity_id.id },
       });
     } catch (error: any) {
@@ -79,7 +87,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
   }
 
   async findById(entity_id: Uuid): Promise<Transaction | null> {
-    const model = await this.prisma.transaction.findUnique({
+    const model = await this.client.transaction.findUnique({
       where: { id: entity_id.id },
     });
 
@@ -87,12 +95,12 @@ export class TransactionPrismaRepository implements ITransactionRepository {
   }
 
   async findAll(): Promise<Transaction[]> {
-    const models = await this.prisma.transaction.findMany();
+    const models = await this.client.transaction.findMany();
     return models.map((model) => TransactionModelMapper.toEntity(model));
   }
 
   async findByIds(ids: Uuid[]): Promise<Transaction[]> {
-    const models = await this.prisma.transaction.findMany({
+    const models = await this.client.transaction.findMany({
       where: {
         id: {
           in: ids.map((id) => id.id),
@@ -111,7 +119,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
       );
     }
 
-    const existingModels = await this.prisma.transaction.findMany({
+    const existingModels = await this.client.transaction.findMany({
       where: {
         id: {
           in: ids.map((id) => id.id),
@@ -139,13 +147,13 @@ export class TransactionPrismaRepository implements ITransactionRepository {
     const { where, orderBy } = this.buildSearchQuery(props);
 
     const [models, count] = await Promise.all([
-      this.prisma.transaction.findMany({
+      this.client.transaction.findMany({
         where,
         orderBy,
         skip: offset,
         take: limit,
       }),
-      this.prisma.transaction.count({ where }),
+      this.client.transaction.count({ where }),
     ]);
 
     const entities = models.map((model) =>
@@ -162,7 +170,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
 
   // Métodos específicos do domínio
   async findByMusicianId(musicianId: string): Promise<Transaction[]> {
-    const models = await this.prisma.transaction.findMany({
+    const models = await this.client.transaction.findMany({
       where: { musicianId },
       orderBy: { created_at: "desc" },
     });
@@ -170,7 +178,7 @@ export class TransactionPrismaRepository implements ITransactionRepository {
   }
 
   async findByUserId(userId: string): Promise<Transaction[]> {
-    const models = await this.prisma.transaction.findMany({
+    const models = await this.client.transaction.findMany({
       where: { userId },
       orderBy: { created_at: "desc" },
     });

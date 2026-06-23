@@ -27,7 +27,7 @@ describe("GetMusicianTransactionsUseCase", () => {
     await txRepo.bulkInsert([t1, t2]);
 
     const output = await useCase.execute({
-      musician_id: "m-1",
+      musician_id: "123e4567-e89b-12d3-a456-426614174001",
       page: 1,
       per_page: 2,
     });

@@ -1,4 +1,4 @@
-import { Tip } from "../../../domain/tip.entity";
+import { Tip } from "../../../domain/tip.aggregate";
 
 export type TipOutput = {
   id: string;

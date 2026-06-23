@@ -8,7 +8,7 @@ export * from "./domain/musician-wallet.aggregate";
 export * from "./domain/repositories/musician-wallet.repository";
 export * from "./domain/repositories/tip.repository";
 export * from "./domain/repositories/transaction.repository";
-export * from "./domain/tip.entity";
+export * from "./domain/tip.aggregate";
 export * from "./domain/transaction.aggregate";
 export * from "./domain/validators/musician-wallet.validator";
 export * from "./domain/validators/tip.validator";

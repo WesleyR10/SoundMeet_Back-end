@@ -1,5 +1,5 @@
 import { PaymentMethod, TipInMemoryRepository, TipStatus } from "@core/payment";
-import { TipId } from "@core/payment/domain/tip.entity";
+import { TipId } from "@core/payment/domain/tip.aggregate";
 import { PixKeyType } from "@core/payment/domain/value-objects/pix-key.vo";
 
 import { SendTipUseCase } from "../send-tip.use-case";

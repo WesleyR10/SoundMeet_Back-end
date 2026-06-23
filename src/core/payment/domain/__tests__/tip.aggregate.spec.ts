@@ -1,4 +1,4 @@
-import { Tip } from "../tip.entity";
+import { Tip } from "../tip.aggregate";
 import { PaymentMethod, TipStatus } from "../tip-enums";
 
 describe("Tip Aggregate", () => {

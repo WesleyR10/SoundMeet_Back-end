@@ -2,7 +2,7 @@ import { Chance } from "chance";
 
 import { Money } from "../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { PaymentMethod, Tip, TipId, TipStatus } from "./tip.entity";
+import { PaymentMethod, Tip, TipId, TipStatus } from "./tip.aggregate";
 import { PixKey } from "./value-objects/pix-key.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);

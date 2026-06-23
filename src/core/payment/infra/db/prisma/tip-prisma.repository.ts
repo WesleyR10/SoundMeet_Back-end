@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { IUnitOfWork } from "../../../../shared/domain/repository/unit-of-work.interface";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   ITipRepository,
@@ -8,18 +9,25 @@ import {
   TipSearchParams,
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
-import { Tip, TipId } from "../../../domain/tip.entity";
+import { Tip, TipId } from "../../../domain/tip.aggregate";
 import { TipModelMapper } from "./tip-model.mapper";
 
 export class TipPrismaRepository implements ITipRepository {
   sortableFields: string[] = ["created_at", "amount", "status"];
 
-  constructor(private prisma: PrismaClient) {}
+  constructor(
+    private prisma: PrismaClient,
+    private readonly uow?: IUnitOfWork<Prisma.TransactionClient>,
+  ) {}
+
+  private get client(): PrismaClient | Prisma.TransactionClient {
+    return this.uow?.getTransaction() ?? this.prisma;
+  }
 
   async insert(entity: Tip): Promise<void> {
     const modelProps = TipModelMapper.toModel(entity);
     try {
-      await this.prisma.tip.create({
+      await this.client.tip.create({
         data: {
           ...modelProps,
           musicianId: modelProps.musicianId ?? null,
@@ -47,7 +55,7 @@ export class TipPrismaRepository implements ITipRepository {
       };
     });
     try {
-      await this.prisma.tip.createMany({
+      await this.client.tip.createMany({
         data: modelsProps,
       });
     } catch (error: any) {
@@ -61,7 +69,7 @@ export class TipPrismaRepository implements ITipRepository {
   async update(entity: Tip): Promise<void> {
     const modelProps = TipModelMapper.toModel(entity);
     try {
-      await this.prisma.tip.update({
+      await this.client.tip.update({
         where: { id: entity.tip_id.id },
         data: modelProps,
       });
@@ -76,7 +84,7 @@ export class TipPrismaRepository implements ITipRepository {
 
   async delete(entity_id: TipId): Promise<void> {
     try {
-      await this.prisma.tip.delete({
+      await this.client.tip.delete({
         where: { id: entity_id.id },
       });
     } catch (error: any) {
@@ -90,7 +98,7 @@ export class TipPrismaRepository implements ITipRepository {
 
   async findById(entity_id: TipId | string): Promise<Tip | null> {
     const id = entity_id instanceof TipId ? entity_id.id : entity_id;
-    const model = await this.prisma.tip.findUnique({
+    const model = await this.client.tip.findUnique({
       where: { id },
     });
 
@@ -98,12 +106,12 @@ export class TipPrismaRepository implements ITipRepository {
   }
 
   async findAll(): Promise<Tip[]> {
-    const models = await this.prisma.tip.findMany();
+    const models = await this.client.tip.findMany();
     return models.map((model) => TipModelMapper.toEntity(model));
   }
 
   async findByIds(ids: TipId[]): Promise<Tip[]> {
-    const models = await this.prisma.tip.findMany({
+    const models = await this.client.tip.findMany({
       where: {
         id: {
           in: ids.map((id) => id.id),
@@ -122,7 +130,7 @@ export class TipPrismaRepository implements ITipRepository {
       );
     }
 
-    const existingModels = await this.prisma.tip.findMany({
+    const existingModels = await this.client.tip.findMany({
       where: {
         id: {
           in: ids.map((id) => id.id),
@@ -148,13 +156,13 @@ export class TipPrismaRepository implements ITipRepository {
     const { where, orderBy } = this.buildSearchQuery(props);
 
     const [models, count] = await Promise.all([
-      this.prisma.tip.findMany({
+      this.client.tip.findMany({
         where,
         orderBy,
         skip: offset,
         take: limit,
       }),
-      this.prisma.tip.count({ where }),
+      this.client.tip.count({ where }),
     ]);
 
     const entities = models.map((model) => TipModelMapper.toEntity(model));
@@ -169,7 +177,7 @@ export class TipPrismaRepository implements ITipRepository {
 
   // Métodos específicos do domínio
   async findByMusicianId(musicianId: string): Promise<Tip[]> {
-    const models = await this.prisma.tip.findMany({
+    const models = await this.client.tip.findMany({
       where: { musicianId },
       orderBy: { created_at: "desc" },
     });

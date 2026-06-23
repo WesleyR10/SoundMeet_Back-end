@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { IUnitOfWork } from "../../../../shared/domain/repository/unit-of-work.interface";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { MusicianWallet } from "../../../domain/musician-wallet.aggregate";
@@ -15,12 +16,19 @@ import { MusicianWalletModelMapper } from "./musician-wallet-model.mapper";
 export class MusicianWalletPrismaRepository implements IMusicianWalletRepository {
   sortableFields: string[] = ["created_at", "balance", "totalEarned"];
 
-  constructor(private prisma: PrismaClient) {}
+  constructor(
+    private prisma: PrismaClient,
+    private readonly uow?: IUnitOfWork<Prisma.TransactionClient>,
+  ) {}
+
+  private get client(): PrismaClient | Prisma.TransactionClient {
+    return this.uow?.getTransaction() ?? this.prisma;
+  }
 
   async insert(entity: MusicianWallet): Promise<void> {
     const modelProps = MusicianWalletModelMapper.toModel(entity);
     try {
-      await this.prisma.musicianWallet.create({
+      await this.client.musicianWallet.create({
         data: modelProps,
       });
     } catch (error: any) {
@@ -37,7 +45,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
       MusicianWalletModelMapper.toModel(entity),
     );
     try {
-      await this.prisma.musicianWallet.createMany({
+      await this.client.musicianWallet.createMany({
         data: modelsProps,
       });
     } catch (error: any) {
@@ -51,7 +59,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   async update(entity: MusicianWallet): Promise<void> {
     const modelProps = MusicianWalletModelMapper.toModel(entity);
     try {
-      await this.prisma.musicianWallet.update({
+      await this.client.musicianWallet.update({
         where: { id: entity.wallet_id.id },
         data: modelProps,
       });
@@ -66,7 +74,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
 
   async delete(entity_id: Uuid): Promise<void> {
     try {
-      await this.prisma.musicianWallet.delete({
+      await this.client.musicianWallet.delete({
         where: { id: entity_id.id },
       });
     } catch (error: any) {
@@ -79,7 +87,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async findById(entity_id: Uuid): Promise<MusicianWallet | null> {
-    const model = await this.prisma.musicianWallet.findUnique({
+    const model = await this.client.musicianWallet.findUnique({
       where: { id: entity_id.id },
     });
 
@@ -87,12 +95,12 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async findAll(): Promise<MusicianWallet[]> {
-    const models = await this.prisma.musicianWallet.findMany();
+    const models = await this.client.musicianWallet.findMany();
     return models.map((model) => MusicianWalletModelMapper.toEntity(model));
   }
 
   async findByIds(ids: Uuid[]): Promise<MusicianWallet[]> {
-    const models = await this.prisma.musicianWallet.findMany({
+    const models = await this.client.musicianWallet.findMany({
       where: {
         id: {
           in: ids.map((id) => id.id),
@@ -111,7 +119,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
       );
     }
 
-    const existingModels = await this.prisma.musicianWallet.findMany({
+    const existingModels = await this.client.musicianWallet.findMany({
       where: {
         id: {
           in: ids.map((id) => id.id),
@@ -139,13 +147,13 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
     const { where, orderBy } = this.buildSearchQuery(props);
 
     const [models, count] = await Promise.all([
-      this.prisma.musicianWallet.findMany({
+      this.client.musicianWallet.findMany({
         where,
         orderBy,
         skip: offset,
         take: limit,
       }),
-      this.prisma.musicianWallet.count({ where }),
+      this.client.musicianWallet.count({ where }),
     ]);
 
     const entities = models.map((model) =>
@@ -161,7 +169,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async findByMusicianId(musicianId: string): Promise<MusicianWallet | null> {
-    const model = await this.prisma.musicianWallet.findUnique({
+    const model = await this.client.musicianWallet.findUnique({
       where: { musicianId },
     });
     return model ? MusicianWalletModelMapper.toEntity(model) : null;

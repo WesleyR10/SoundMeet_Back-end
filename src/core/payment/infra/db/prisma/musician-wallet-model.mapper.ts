@@ -1,4 +1,7 @@
-import { MusicianWallet as PrismaMusicianWallet } from "@prisma/client";
+import {
+  CurrencyEnum,
+  MusicianWallet as PrismaMusicianWallet,
+} from "@prisma/client";
 
 import { Money } from "../../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
@@ -14,6 +17,7 @@ export type MusicianWalletModelProps = {
   balance: number;
   totalEarned: number;
   totalWithdrawn: number;
+  currency: CurrencyEnum;
   pixKey: string | null;
   pixKeyType: string | null;
   bankAccount: any | null;
@@ -30,6 +34,7 @@ export class MusicianWalletModelMapper {
       balance: entity.balance.amount,
       totalEarned: entity.total_earned.amount,
       totalWithdrawn: entity.total_withdrawn.amount,
+      currency: CurrencyEnum.BRL,
       pixKey: entity.pix_key?.key || null,
       pixKeyType: entity.pix_key?.type || null,
       bankAccount: entity.bank_account,
@@ -43,9 +48,9 @@ export class MusicianWalletModelMapper {
     return new MusicianWallet({
       wallet_id: new MusicianWalletId(model.id),
       musician_id: new Uuid(model.musicianId),
-      balance: new Money(model.balance),
-      total_earned: new Money(model.totalEarned),
-      total_withdrawn: new Money(model.totalWithdrawn),
+      balance: new Money(Number(model.balance)),
+      total_earned: new Money(Number(model.totalEarned)),
+      total_withdrawn: new Money(Number(model.totalWithdrawn)),
       pix_key: model.pixKey
         ? new PixKey(model.pixKey, (model.pixKeyType as any) || "unknown")
         : null,

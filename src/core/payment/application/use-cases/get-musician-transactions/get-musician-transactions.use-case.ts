@@ -1,8 +1,9 @@
-import { Transaction } from "@core/payment";
 import {
   ITransactionRepository,
+  TransactionOutput,
+  TransactionOutputMapper,
   TransactionSearchParams,
-} from "@core/payment/domain/repositories";
+} from "@core/payment";
 import {
   TransactionStatus,
   TransactionType,
@@ -19,17 +20,6 @@ export type GetMusicianTransactionsInput = SearchInput<{
   type?: string;
 }> & {
   musician_id: string;
-};
-
-export type TransactionOutput = {
-  id: string;
-  type: string;
-  amount: number;
-  fee: number;
-  net_amount: number;
-  status: string;
-  payment_method: string;
-  created_at: Date;
 };
 
 export type GetMusicianTransactionsOutput = PaginationOutput<TransactionOutput>;
@@ -56,16 +46,7 @@ export class GetMusicianTransactionsUseCase implements IUseCase<
     });
 
     const result = await this.txRepo.search(params);
-    const items = result.items.map((t: Transaction) => ({
-      id: t.transaction_id.id,
-      type: t.type,
-      amount: t.amount.amount,
-      fee: t.fee.amount,
-      net_amount: t.net_amount.amount,
-      status: t.status,
-      payment_method: t.payment_method,
-      created_at: t.created_at,
-    }));
+    const items = result.items.map((t) => TransactionOutputMapper.toOutput(t));
     return PaginationOutputMapper.toOutput(items, result);
   }
 }

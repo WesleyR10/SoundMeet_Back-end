@@ -10,8 +10,16 @@ import {
   TransactionInMemoryRepository,
 } from "@core/payment";
 import { IMusicianWalletRepository } from "@core/payment/domain/repositories/musician-wallet.repository";
+import { DomainEventMediator } from "@core/shared/domain/events/domain-event-mediator";
+import { IUnitOfWork } from "@core/shared/domain/repository/unit-of-work.interface";
 
 import { ConfirmTipPaymentUseCase } from "../confirm-tip-payment.use-case";
+
+const uowMock: IUnitOfWork = { do: async (fn) => fn() } as IUnitOfWork;
+const domainEventMediatorMock = {
+  publish: jest.fn(),
+  publishIntegrationEvents: jest.fn(),
+} as unknown as DomainEventMediator;
 
 class MusicianWalletRepoStub implements IMusicianWalletRepository {
   sortableFields: string[] = ["created_at"];
@@ -110,6 +118,8 @@ describe("ConfirmTipPaymentUseCase", () => {
       txRepo,
       walletRepo,
       bandRepo,
+      uowMock,
+      domainEventMediatorMock,
     );
 
     const tip = Tip.create({

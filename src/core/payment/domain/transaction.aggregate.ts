@@ -18,6 +18,7 @@ export type TransactionConstructorProps = {
   net_amount: Money;
   status?: TransactionStatus;
   payment_method: PaymentMethod;
+  external_id?: string | null;
   metadata?: Record<string, any> | null;
   created_at?: Date;
   updated_at?: Date;
@@ -47,6 +48,7 @@ export class Transaction extends AggregateRoot {
   net_amount: Money;
   status: TransactionStatus;
   payment_method: PaymentMethod;
+  external_id: string | null;
   metadata: Record<string, any> | null;
   created_at: Date;
   updated_at: Date;
@@ -63,6 +65,7 @@ export class Transaction extends AggregateRoot {
     this.net_amount = props.net_amount;
     this.status = props.status ?? TransactionStatus.PENDING;
     this.payment_method = props.payment_method;
+    this.external_id = props.external_id ?? null;
     this.metadata = props.metadata ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
@@ -128,12 +131,14 @@ export class Transaction extends AggregateRoot {
       transaction_id: this.transaction_id.id,
       user_id: this.user_id?.id ?? null,
       musician_id: this.musician_id?.id ?? null,
+      band_id: this.band_id?.id ?? null,
       type: this.type,
       amount: this.amount.amount,
       fee: this.fee.amount,
       net_amount: this.net_amount.amount,
       status: this.status,
       payment_method: this.payment_method,
+      external_id: this.external_id,
       metadata: this.metadata,
       created_at: this.created_at,
       updated_at: this.updated_at,

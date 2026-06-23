@@ -15,6 +15,8 @@ import {
 import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { NotFoundError } from "@core/shared/domain/errors";
+import { DomainEventMediator } from "@core/shared/domain/events/domain-event-mediator";
+import { IUnitOfWork } from "@core/shared/domain/repository/unit-of-work.interface";
 import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
 
 export type ConfirmTipPaymentInput = {
@@ -43,11 +45,24 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
     private readonly txRepo: ITransactionRepository,
     private readonly walletRepo: IMusicianWalletRepository,
     private readonly bandRepo: IBandRepository,
+    private readonly uow: IUnitOfWork,
+    private readonly domainEventMediator: DomainEventMediator,
   ) {}
 
   async execute(
     input: ConfirmTipPaymentInput,
   ): Promise<ConfirmTipPaymentOutput> {
+    const { tip, ...output } = await this.uow.do(() => this.confirm(input));
+
+    await this.domainEventMediator.publish(tip);
+    await this.domainEventMediator.publishIntegrationEvents(tip);
+
+    return output;
+  }
+
+  private async confirm(
+    input: ConfirmTipPaymentInput,
+  ): Promise<{ tip: Tip } & ConfirmTipPaymentOutput> {
     const tip = await this.tipRepo.findById(new TipId(input.tip_id));
     if (!tip) {
       throw new NotFoundError(input.tip_id, Tip);
@@ -136,10 +151,9 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
           }
         }
       } else {
-        // Fallback if band has no members? assign to band leader or keep in band wallet?
-        // Assuming band must have members or we treat it like a musician wallet if we had a BandWallet
-        // For now, if no members, maybe funds are lost or remain in transaction?
-        // Let's assume valid band has members. If not, log warning.
+        throw new EntityValidationError([
+          { band_id: ["Band has no active members to receive tip funds"] },
+        ]);
       }
     } else {
       // Direct musician tip
@@ -176,6 +190,7 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
     }
 
     return {
+      tip,
       tip_id: tip.tip_id.id,
       transaction_id: transaction.transaction_id.id,
       wallet_balance: displayedBalance,

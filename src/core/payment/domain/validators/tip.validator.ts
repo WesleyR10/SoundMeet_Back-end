@@ -12,7 +12,7 @@ import {
 
 import { ClassValidatorFields } from "../../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../../shared/domain/validators/notification";
-import { Tip } from "../tip.entity";
+import { Tip } from "../tip.aggregate";
 import { PaymentMethod, TipStatus } from "../tip-enums";
 
 export class TipRules {

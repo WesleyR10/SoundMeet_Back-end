@@ -6,7 +6,7 @@ import {
   TipSearchParams,
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
-import { Tip, TipId } from "../../../domain/tip.entity";
+import { Tip, TipId } from "../../../domain/tip.aggregate";
 
 export class TipInMemoryRepository
   extends InMemorySearchableRepository<Tip, TipId, TipFilter>

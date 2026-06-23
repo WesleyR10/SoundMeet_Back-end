@@ -1,7 +1,7 @@
 import { ISearchableRepository } from "../../../shared/domain/repository/repository-interface";
 import { SearchParams } from "../../../shared/domain/repository/search-params";
 import { SearchResult } from "../../../shared/domain/repository/search-result";
-import { Tip, TipId } from "../tip.entity";
+import { Tip, TipId } from "../tip.aggregate";
 
 export type TipFilter = {
   musician_id?: string;
