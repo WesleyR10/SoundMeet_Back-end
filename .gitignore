@@ -3,6 +3,9 @@
 /dist-dev
 /node_modules
 
+.venv
+.venv-dev
+
 # Logs
 logs
 *.log
@@ -37,6 +40,7 @@ lerna-debug.log*
 
 # Environment variables
 .env
+.env.e2e
 .env.local
 .env.development.local
 .env.test.local
@@ -132,3 +136,17 @@ public
 # Temporary folders
 tmp/
 temp/
+
+# Python / ML (ai-cifra-mir-worker spillover)
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.hypothesis/
+*.csv
+
+# graphify (auto-gerado, não commitar)
+graphify-out/
+
+# Claude Code (configuração local do assistente, não é documentação do projeto)
+.claude/

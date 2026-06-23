@@ -19,6 +19,59 @@ enum CurrencyEnum {
   EUR
 }
 
+// Enums de máquina de estado de domínio (valores idênticos aos VOs/uniões do domínio).
+// Status operacionais de worker (ai-audio, ai-cifra, synced-lyrics) permanecem String
+// por serem telemetria evolutiva, não máquinas de estado de domínio.
+enum EventStatus {
+  scheduled
+  active
+  completed
+  cancelled
+}
+
+enum EventMusicianStatus {
+  confirmed
+  pending
+  cancelled
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+  expired
+}
+
+enum InquiryStatus {
+  open
+  accepted
+  rejected
+  converted
+  expired
+}
+
+enum TipStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum MusicRequestStatus {
+  pending
+  accepted
+  rejected
+  played
+}
+
 // =================== =====================
 // DOMÍNIO MUSICIAN
 // ========================================
@@ -43,19 +96,26 @@ model Musician {
   updated_at       DateTime @updatedAt
 
   // Relacionamentos
-  profile            MusicianProfile?
-  bands              BandMember[]
-  requests           MusicRequest[]
-  tips               Tip[]
-  events             EventMusician[]
-  analytics          MusicianAnalytics[]
-  library            MusicLibrary[]
-  interactions       UserInteraction[]
-  bookings           Booking[]
-  inquiries          Inquiry[]
-  calendar_settings  MusicianCalendarSettings?
-  availability_rules MusicianAvailabilityRule[]
-  unavailabilities   MusicianUnavailability[]
+  profile                  MusicianProfile?
+  bands                    BandMember[]
+  requests                 MusicRequest[]
+  tips                     Tip[]
+  events                   EventMusician[]
+  analytics                MusicianAnalytics[]
+  library                  MusicLibrary[]
+  interactions             UserInteraction[]
+  bookings                 Booking[]
+  inquiries                Inquiry[]
+  calendar_settings        MusicianCalendarSettings?
+  availability_rules       MusicianAvailabilityRule[]
+  unavailabilities         MusicianUnavailability[]
+  ai_audio_uploads         AiAudioUpload[]
+  ai_audio_separation_jobs AiAudioSeparationJob[]
+  ai_cifra_uploads         AiCifraUpload[]
+  ai_cifra_analysis_jobs   AiCifraAnalysisJob[]
+  synced_lyrics_bulk_jobs  SyncedLyricsBulkJob[]
+  wallet                   MusicianWallet?
+  transactions             Transaction[]
 
   @@map("musicians")
 }
@@ -63,18 +123,13 @@ model Musician {
 model MusicianProfile {
   id             String        @id @default(uuid())
   musicianId     String        @unique
-  instruments    String[] // ["guitar", "vocals", "piano"]
-  genres         String[] // ["rock", "pop", "jazz"]
-  experience     Int // anos de experiência
   price_model    String? // "per_event" | "per_hour"
-  price_min      Float?
-  price_max      Float?
+  price_min      Decimal?      @db.Decimal(12, 2)
+  price_max      Decimal?      @db.Decimal(12, 2)
   price_currency CurrencyEnum? @default(BRL)
   price_notes    String?
   location       Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
   socialLinks    Json? // {instagram: "@musician", youtube: "channel"}
-  rating         Float         @default(0)
-  totalRatings   Int           @default(0)
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
 
@@ -89,9 +144,10 @@ model Band {
   description    String?
   avatar         String?
   genres         String[]
+  qr_code        String?       @unique
   price_model    String? // "per_event" | "per_hour"
-  price_min      Float?
-  price_max      Float?
+  price_min      Decimal?      @db.Decimal(12, 2)
+  price_max      Decimal?      @db.Decimal(12, 2)
   price_currency CurrencyEnum? @default(BRL)
   price_notes    String?
   is_active      Boolean       @default(true)
@@ -106,6 +162,7 @@ model Band {
   calendar_settings  BandCalendarSettings?
   availability_rules BandAvailabilityRule[]
   unavailabilities   BandUnavailability[]
+  transactions       Transaction[]
 
   @@map("bands")
 }
@@ -138,30 +195,52 @@ model BandMember {
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
   @@unique([bandId, musicianId])
+  @@index([bandId, role])
   @@map("band_members")
 }
 
 model MusicLibrary {
-  id         String   @id @default(uuid())
-  musicianId String
-  title      String
-  artist     String
-  genre      String?
-  key        String? // Tom da música
-  bpm        Int?
-  lyrics     String?
-  chords     Json? // Cifras customizadas
-  notes      String? // Anotações pessoais
-  difficulty Int      @default(1) // 1-5
-  isFavorite Boolean  @default(false)
-  source     String? // "cifra_club", "ultimate_guitar", "custom"
-  sourceId   String? // ID da fonte externa
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id                             String    @id @default(uuid())
+  musicianId                     String
+  title                          String
+  artist                         String
+  genre                          String?
+  key                            String? // Tom da música
+  bpm                            Int?
+  lyrics                         String?
+  chords                         Json? // Cifras customizadas
+  structure_segments             Json? // Segmentação estrutural (ex.: intro/verse/chorus)
+  chord_sheet                    Json?
+  chord_sheet_version            Int       @default(0)
+  renderable_chord_sheet         Json?
+  renderable_chord_sheet_version Int       @default(0)
+  notes                          String? // Anotações pessoais
+  difficulty                     Int       @default(1) // 1-5
+  isFavorite                     Boolean   @default(false)
+  source                         String? // "cifra_club", "ultimate_guitar", "custom"
+  sourceId                       String? // ID da fonte externa
+  // [SyncedLyrics] — campos abaixo são gerenciados exclusivamente por SyncedLyricsModelMapper.
+  // NÃO escrever via MusicLibraryModelMapper. Aggregate: SyncedLyrics em src/core/synced-lyrics/.
+  lrc_raw                        String?
+  lrc_normalized                 Json?
+  lrc_provider                   String?
+  lrc_provider_meta              Json?
+  lrc_hash                       String?
+  lrc_version                    Int       @default(1)
+  lrc_pipeline_version           Int       @default(1)
+  lrc_quality_flags              String[]  @default([])
+  lrc_coverage_ms                Int?
+  lrc_has_word_timestamps        Boolean   @default(false)
+  lrc_last_synced_at             DateTime?
+  created_at                     DateTime  @default(now())
+  updated_at                     DateTime  @updatedAt
 
-  musician Musician       @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  requests MusicRequest[]
+  musician         Musician        @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  requests         MusicRequest[]
+  ai_cifra_uploads AiCifraUpload[]
 
+  @@index([artist, title])
+  @@index([lrc_hash])
   @@map("music_library")
 }
 
@@ -231,10 +310,9 @@ model Event {
   establishmentId String
   name            String
   description     String?
-  date            DateTime
   startTime       DateTime
   endTime         DateTime
-  status          String   @default("scheduled") // "scheduled", "active", "completed", "cancelled"
+  status          EventStatus @default(scheduled)
   maxCapacity     Int?
   currentCapacity Int      @default(0)
   isPublic        Boolean  @default(true)
@@ -258,11 +336,12 @@ model EventMusician {
   eventId    String
   musicianId String?
   bandId     String?
-  fee        Float?
-  status     String    @default("confirmed") // "confirmed", "pending", "cancelled"
+  fee        Decimal?  @db.Decimal(12, 2)
+  status     EventMusicianStatus @default(confirmed)
   startTime  DateTime?
   endTime    DateTime?
   created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
   event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
@@ -279,9 +358,11 @@ model Booking {
   bandId                  String?
   start_at                DateTime
   end_at                  DateTime
-  fee                     Float? // Custo da reserva
-  status                  String    @default("pending") // "pending", "confirmed", "cancelled", "completed"
+  fee                     Decimal?  @db.Decimal(12, 2) // Custo da reserva
+  status                  BookingStatus @default(pending)
   notes                   String? // Notas adicionais sobre a reserva
+  cancelled_by            String? // "establishment" | "musician" | "band"
+  cancellation_reason     String?
   buffer_minutes          Int       @default(0)
   expires_at              DateTime?
   free_cancellation_hours Int       @default(72)
@@ -311,7 +392,7 @@ model Inquiry {
   bandId           String?
   subject          String?
   initial_message  String?
-  status           String    @default("open") // "open", "accepted", "rejected", "converted", "expired"
+  status           InquiryStatus @default(open)
   expires_at       DateTime?
   accepted_at      DateTime?
   rejected_at      DateTime?
@@ -371,6 +452,7 @@ model MusicianUnavailability {
   end_at     DateTime
   reason     String?
   created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
@@ -400,6 +482,7 @@ model BandUnavailability {
   end_at     DateTime
   reason     String?
   created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
 
@@ -440,11 +523,12 @@ model Audience {
   votes          RequestVote[]
   tips           Tip[]
   attendances    EventAttendee[]
-  points_history UserPoints[]
+  points_summary UserPoints?
   badges         UserBadge[]
   interactions   UserInteraction[]
   scores         UserScore[]
   rankings       Ranking[]
+  transactions   Transaction[]
 
   @@map("audiences")
 }
@@ -476,6 +560,7 @@ model UserInteraction {
   audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Cascade)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
 
+  @@index([audienceId, type, created_at])
   @@map("user_interactions")
 }
 
@@ -484,22 +569,22 @@ model UserInteraction {
 // ========================================
 
 model MusicRequest {
-  id         String    @id @default(uuid())
-  eventId    String
-  audienceId String
-  musicianId String
-  libraryId  String?
-  songTitle  String
-  artistName String
-  message    String?
-  status     String    @default("pending") // "pending", "accepted", "rejected", "played"
+  id              String             @id @default(uuid())
+  eventId         String
+  audienceId      String
+  musicianId      String
+  libraryId       String?
+  songTitle       String
+  artistName      String
+  message         String?
+  status          MusicRequestStatus @default(pending)
   rejectionReason String?
-  priority   Int       @default(0)
-  votesCount Int       @default(0)
-  playedAt   DateTime?
-  respondedAt DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
+  priority        Int                @default(0)
+  votesCount      Int                @default(0)
+  playedAt        DateTime?
+  respondedAt     DateTime?
+  created_at      DateTime           @default(now())
+  updated_at      DateTime           @updatedAt
 
   event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
   audience Audience         @relation(fields: [audienceId], references: [id], onDelete: Cascade)
@@ -514,6 +599,8 @@ model MusicRequest {
   @@index([status, created_at])
   @@index([eventId, musicianId])
   @@index([audienceId, musicianId, status])
+  @@index([eventId, status, created_at])
+  @@index([eventId, status, priority])
   @@map("music_requests")
 }
 
@@ -547,14 +634,20 @@ model RequestFeedback {
 // DOMÍNIO GAMIFICATION
 // ========================================
 
+// Projeção/resumo de pontuação por usuário (read model).
+// A fonte de verdade (ledger imutável de eventos) é o model UserScore (user_scores).
 model UserPoints {
-  id          String   @id @default(uuid())
-  audienceId  String
-  points      Int
-  source      String // "scan_qr", "request", "tip", "share", "accepted_request"
-  description String?
-  metadata    Json? // Dados adicionais
-  created_at  DateTime @default(now())
+  id                  String   @id @default(uuid())
+  audienceId          String   @unique
+  total_points        Int      @default(0)
+  total_scans         Int      @default(0)
+  total_requests      Int      @default(0)
+  total_tips          Decimal  @default(0) @db.Decimal(12, 2) // soma monetária das gorjetas dadas
+  total_social_shares Int      @default(0)
+  current_level       Int      @default(1)
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 
   audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
 
@@ -574,22 +667,26 @@ model Badge {
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
-  userBadges UserBadge[]
-
   @@map("badges")
 }
 
+// Badges conquistados/em progresso por usuário (agregado UserBadge).
+// O tipo do badge é o enum de domínio BadgeType (self-contained com pontos requeridos),
+// não uma FK para o catálogo Badge.
 model UserBadge {
-  id         String   @id @default(uuid())
-  audienceId String
-  badgeId    String
-  earnedAt   DateTime @default(now())
-  progress   Json? // Progresso para badges com múltiplos níveis
+  id          String    @id @default(uuid())
+  audienceId  String
+  badge_type  String
+  progress    Int       @default(0)
+  is_unlocked Boolean   @default(false)
+  unlocked_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
 
   audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
-  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
-  @@unique([audienceId, badgeId])
+  @@unique([audienceId, badge_type])
+  @@index([badge_type])
   @@map("user_badges")
 }
 
@@ -602,32 +699,32 @@ model UserScore {
   description  String?
   created_at   DateTime @default(now())
 
-  audience Audience @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  audience Audience @relation(fields: [user_id], references: [id], onDelete: Restrict)
 
   @@map("user_scores")
 }
 
 model Ranking {
-  id               String   @id @default(uuid())
-  type             String // "monthly_fans", "top_supporters", "discoverers"
-  period           String // "2024-01", "2024-02"
-  user_id          String
-  establishment_id String?
-  position         Int
-  score            Int
-  period_start     DateTime
-  period_end       DateTime
-  is_active        Boolean  @default(true)
-  metadata         Json?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  id              String   @id @default(uuid())
+  type            String // "monthly_fans", "top_supporters", "discoverers"
+  period          String // "2024-01", "2024-02"
+  audienceId      String   @map("user_id")
+  establishmentId String?  @map("establishment_id")
+  position        Int
+  score           Int
+  period_start    DateTime
+  period_end      DateTime
+  is_active       Boolean  @default(true)
+  metadata        Json?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
-  audience      Audience       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  establishment Establishment? @relation(fields: [establishment_id], references: [id], onDelete: SetNull)
+  audience      Audience       @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  establishment Establishment? @relation(fields: [establishmentId], references: [id], onDelete: SetNull)
 
   @@index([type, period])
-  @@index([user_id, type, period])
-  @@index([establishment_id, type, period])
+  @@index([audienceId, type, period])
+  @@index([establishmentId, type, period])
   @@map("rankings")
 }
 
@@ -636,64 +733,225 @@ model Ranking {
 // ========================================
 
 model Tip {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   audienceId    String
   musicianId    String?
   bandId        String?
   eventId       String?
-  amount        Float
+  amount        Decimal     @db.Decimal(12, 2)
+  currency      CurrencyEnum @default(BRL)
   message       String?
   paymentMethod String // "pix", "credit_card", "wallet"
-  status        String   @default("pending") // "pending", "completed", "failed", "refunded"
+  status        TipStatus   @default(pending)
   transactionId String?
   pixKey        String?
   pixKeyType    String?
-  isAnonymous   Boolean  @default(false)
-  showInWall    Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  isAnonymous   Boolean     @default(false)
+  showInWall    Boolean     @default(true)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
 
-  audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Restrict)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
   band     Band?     @relation(fields: [bandId], references: [id], onDelete: SetNull)
   event    Event?    @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
+  @@index([audienceId, status, created_at])
+  @@index([musicianId, status, created_at])
+  @@index([bandId, status, created_at])
+  @@index([status, created_at])
   @@map("tips")
 }
 
 model Transaction {
-  id            String   @id @default(uuid())
+  id            String            @id @default(uuid())
   userId        String?
   musicianId    String?
   bandId        String?
   type          String // "tip", "booking_fee", "commission"
-  amount        Float
-  fee           Float    @default(0)
-  netAmount     Float
-  status        String   @default("pending")
+  amount        Decimal           @db.Decimal(12, 2)
+  fee           Decimal           @default(0) @db.Decimal(12, 2)
+  netAmount     Decimal           @db.Decimal(12, 2)
+  currency      CurrencyEnum      @default(BRL)
+  status        TransactionStatus @default(pending)
   paymentMethod String
   externalId    String? // ID do provedor de pagamento
   metadata      Json?
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
 
+  audience Audience? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band     Band?     @relation(fields: [bandId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([musicianId])
+  @@index([bandId])
+  @@index([externalId])
   @@map("transactions")
 }
 
 model MusicianWallet {
-  id             String   @id @default(uuid())
-  musicianId     String   @unique
-  balance        Float    @default(0)
-  totalEarned    Float    @default(0)
-  totalWithdrawn Float    @default(0)
+  id             String       @id @default(uuid())
+  musicianId     String       @unique
+  balance        Decimal      @default(0) @db.Decimal(12, 2)
+  totalEarned    Decimal      @default(0) @db.Decimal(12, 2)
+  totalWithdrawn Decimal      @default(0) @db.Decimal(12, 2)
+  currency       CurrencyEnum @default(BRL)
   pixKey         String?
   pixKeyType     String?
   bankAccount    Json? // Dados bancários
-  is_active      Boolean  @default(true)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  is_active      Boolean      @default(true)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
   @@map("musician_wallets")
+}
+
+// ========================================
+// DOMÍNIO AI AUDIO
+// ========================================
+
+model AiAudioUpload {
+  id                  String   @id @default(uuid())
+  musicianId          String
+  original_filename   String
+  content_type        String
+  file_size           Int
+  object_key          String
+  upload_method       String
+  multipart_upload_id String?
+  duration_seconds    Int?
+  codec               String?
+  sample_rate         Int?
+  channels            Int?
+  status              String
+  rejected_reason     String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  musician Musician               @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  jobs     AiAudioSeparationJob[]
+
+  @@index([musicianId, status, created_at])
+  @@map("ai_audio_uploads")
+}
+
+model AiAudioSeparationJob {
+  id               String    @id @default(uuid())
+  aiAudioUploadId  String
+  musicianId       String
+  model_id         String
+  output_prefix    String
+  output_format    String?
+  status           String
+  progress_percent Int       @default(0)
+  progress_stage   String?
+  error_code       String?
+  error_message    String?
+  started_at       DateTime?
+  finished_at      DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  upload   AiAudioUpload             @relation(fields: [aiAudioUploadId], references: [id], onDelete: Cascade)
+  musician Musician                  @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  outputs  AiAudioSeparationOutput[]
+
+  @@index([musicianId, status, created_at])
+  @@map("ai_audio_separation_jobs")
+}
+
+model AiAudioSeparationOutput {
+  id           String   @id @default(uuid())
+  jobId        String
+  stem_name    String
+  object_key   String
+  content_type String
+  file_size    Int?
+  created_at   DateTime @default(now())
+
+  job AiAudioSeparationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("ai_audio_separation_outputs")
+}
+
+// ========================================
+// DOMÍNIO AI CIFRA
+// ========================================
+
+model AiCifraUpload {
+  id                String   @id @default(uuid())
+  musicianId        String
+  musicLibraryId    String?
+  original_filename String
+  content_type      String
+  file_size         Int
+  object_key        String
+  upload_method     String
+  status            String
+  rejected_reason   String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  musician     Musician             @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  musicLibrary MusicLibrary?        @relation(fields: [musicLibraryId], references: [id], onDelete: SetNull)
+  jobs         AiCifraAnalysisJob[]
+
+  @@index([musicianId, status, created_at])
+  @@index([musicLibraryId])
+  @@map("ai_cifra_uploads")
+}
+
+model AiCifraAnalysisJob {
+  id               String    @id @default(uuid())
+  aiCifraUploadId  String
+  musicianId       String
+  model_id         String
+  status           String
+  progress_percent Int       @default(0)
+  progress_stage   String?
+  error_code       String?
+  error_message    String?
+  started_at       DateTime?
+  finished_at      DateTime?
+  bpm              Int?
+  key              String?
+  time_signature   String?
+  chords           Json?
+  segments         Json?
+  artifacts        Json?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  upload   AiCifraUpload @relation(fields: [aiCifraUploadId], references: [id], onDelete: Cascade)
+  musician Musician      @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@index([musicianId, status, created_at])
+  @@map("ai_cifra_analysis_jobs")
+}
+
+model SyncedLyricsBulkJob {
+  id            String    @id @default(uuid())
+  musicianId    String
+  status        String
+  total         Int       @default(0)
+  processed     Int       @default(0)
+  success       Int       @default(0)
+  failed        Int       @default(0)
+  error_summary Json?
+  started_at    DateTime?
+  finished_at   DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  @@index([musicianId, status, created_at])
+  @@map("synced_lyrics_bulk_jobs")
 }
 
 // ========================================

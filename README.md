@@ -1,5 +1,16 @@
 # SoundMeet Backend
 
+## Docs e roadmap
+
+- Features do produto: [Features-SoundMeet.md](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/Docs/Features-SoundMeet.md)
+- Worker de cifras (MIR): [ai-cifra-mir-worker/README.md](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/ai-cifra-mir-worker/README.md)
+
+### Futuras features (P&D)
+
+- Mood/Emotion (recomendação, playlist, tags): referência em https://github.com/AMAAI-Lab/Music2Emotion
+- Restauração/masterização com prompts (feature premium): referência em https://github.com/AMAAI-Lab/SonicMaster
+- App referência de UX/contexto para playlists por emoção: https://github.com/AMAAI-Lab/calm-me-down
+
 ## Rotas (HTTP)
 
 ### Prefixo global

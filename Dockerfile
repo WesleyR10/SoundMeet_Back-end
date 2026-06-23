@@ -32,7 +32,7 @@ RUN rm -f src/metadata.ts && npm run build && npm prune --omit=dev
 
 # Estágio de produção
 FROM node:20-alpine AS production
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat yt-dlp
 WORKDIR /app
 
 # Criar usuário não-root

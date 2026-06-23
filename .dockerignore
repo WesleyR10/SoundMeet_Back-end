@@ -12,6 +12,19 @@ dist/
 dist-dev/
 envs/
 node_modules/
+.venv/
+.venv-dev/
+.venv-hf/
+# Worker de ML (Python) — não faz parte da imagem do app NestJS (comunicação via HTTP)
+ai-cifra-mir-worker/
+# Caches e dados pesados
+.cache/
+.pytest_cache/
+.tmp/
+artifacts/
+audio/
+audio_raw/
+*.log
 *.sqlite
 docker-compose*.yaml
 docker-compose*.yml

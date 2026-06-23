@@ -1,4 +1,3 @@
-
 x-logging: &default-logging
   driver: json-file
   options:
@@ -25,7 +24,20 @@ services:
       - MONGODB_URL=mongodb://soundmeet:soundmeet123@mongo:27017/soundmeet?authSource=admin
       - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://soundmeet:soundmeet123@rabbitmq:5672
-      - KEYCLOAK_URL=http://keycloak:8080
+      - AUTH_JWT_VALIDATION_MODE=keycloak
+      - KEYCLOAK_URL=http://localhost:8080
+      - KEYCLOAK_REALM=soundmeet
+      - KEYCLOAK_CLIENT_ID=soundmeet-api
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-soundmeet-api-local-secret}
+      - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/soundmeet/protocol/openid-connect/certs
+      - KEYCLOAK_JWKS_CACHE_TTL_SECONDS=300
+      - KEYCLOAK_VERIFY_AUDIENCE=false
+      - AI_CIFRA_ANALYSIS_HTTP_BASE_URL=http://ai-cifra-worker:8000
+      - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
+      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v12
+      - AI_CIFRA_SIMPMUSIC_YTDLP_BIN=yt-dlp
+      - AI_CIFRA_MUSIFY_PIPED_BASE_URL=https://api.piped.private.coffee
+      - AI_CIFRA_MUSIFY_PIPED_TIMEOUT_MS=10000
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
       - MINIO_ACCESS_KEY=soundmeet
@@ -34,15 +46,15 @@ services:
       - SWAGGER_EXAMPLES_REQUIRED_ONLY=false
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       mongo:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       keycloak:
-        condition: service_started
+        condition: service_healthy
     networks:
       - soundmeet-network
     logging: *default-logging
@@ -156,7 +168,9 @@ services:
 
   # RabbitMQ - Mensageria
   rabbitmq:
-    image: rabbitmq:3.12-management-alpine
+    build:
+      context: ./docker/rabbitmq-delayed
+    image: soundmeet-rabbitmq-delayed:3.12-management-alpine
     container_name: soundmeet-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: soundmeet
@@ -247,6 +261,192 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  ai-cifra-worker:
+    build:
+      context: ./ai-cifra-mir-worker
+      dockerfile: Dockerfile
+    container_name: soundmeet-ai-cifra-worker
+    init: true
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - /home/wesleyr10/Programação/Projetos/SoundMeet:/home/wesleyr10/Programação/Projetos/SoundMeet
+    environment:
+      - AI_CIFRA_STORAGE_PROVIDER=minio
+      - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
+      - AI_CIFRA_ENABLE_NEURAL_CHORDS=true
+      - AI_CIFRA_ENABLE_V12=true
+      - AI_CIFRA_OMAR_RQ_DEVICE=cpu
+      - AI_CIFRA_MAX_AUDIO_SECONDS=800
+      - HF_HOME=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
+      - AWS_REGION=us-east-1
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=soundmeet
+      - MINIO_SECRET_KEY=soundmeet123
+      - MINIO_BUCKET=soundmeet-media
+      - LASTFM_API_KEY=${LASTFM_API_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - minio
+      - redis
+    networks:
+      - soundmeet-network
+    logging: *default-logging
+
+  ai-cifra-worker-gpu:
+    build:
+      context: ./ai-cifra-mir-worker
+      dockerfile: Dockerfile
+      target: gpu-runtime
+    container_name: soundmeet-ai-cifra-worker-gpu
+    profiles: ["gpu"]
+    init: true
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./ai-cifra-mir-worker/artifacts:/app/artifacts:ro
+      - model-cache:/root/.cache/huggingface
+    environment:
+      - AI_CIFRA_STORAGE_PROVIDER=minio
+      - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
+      - AI_CIFRA_ENABLE_NEURAL_CHORDS=1
+      - AI_CIFRA_ENABLE_V12=1
+      - AI_CIFRA_OMAR_RQ_DEVICE=cuda
+      - AI_CIFRA_MAX_AUDIO_SECONDS=600
+      - AWS_REGION=us-east-1
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=soundmeet
+      - MINIO_SECRET_KEY=soundmeet123
+      - MINIO_BUCKET=soundmeet-media
+      - LASTFM_API_KEY=${LASTFM_API_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - minio
+      - redis
+    networks:
+      - soundmeet-network
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  ai-cifra-train:
+    build:
+      context: ..
+      dockerfile: soundmeet-backend/ai-cifra-mir-worker/Dockerfile.train
+    image: soundmeet-ai-cifra-train:local
+    container_name: soundmeet-ai-cifra-train
+    profiles: ["train"]
+    init: true
+    restart: "no"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    working_dir: /home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/ai-cifra-mir-worker
+    volumes:
+      - /home/wesleyr10/Programação/Projetos/SoundMeet:/home/wesleyr10/Programação/Projetos/SoundMeet
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONUTF8=1
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - HF_HOME=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
+      - HF_TOKEN=${HF_TOKEN}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    command:
+      - bash
+      - -lc
+      - |
+        set -eux
+        # Ignora o script de reparo pois estamos usando o diretorio audio_raw (mp3) fornecido
+        # python tools/repair_chords1217_audio_from_hf.py --audio-dir ... --prefer-local-zip
+
+        # O script de treino vai procurar os arquivos em audio_raw
+        python tools/marble_fit_omar_rq_crnn.py \
+          --data-dir artifacts/datasets/chords1217_guitarset_mic_v2 \
+          --out-dir artifacts/marble_runs/omar_rq_crnn_v2 \
+          --omar-model-id mtg-upf/omar-rq-multifeature-25hz-fsq \
+          --audio-backend soundfile \
+          --force-prepare \
+          --include-guitarset --guitarset-audio mic --guitarset-val-ratio 0.1 \
+          --accelerator auto --devices 1 \
+          --omar-device cuda \
+          --max-epochs 30 \
+          --limit-train-batches 1.0 --limit-val-batches 1.0 \
+          --num-sanity-val-steps 0 \
+          --time-dim-mismatch-tol 64 \
+          --batch-size 2 \
+          --num-workers 4 \
+          --clip-seconds 30
+        chown -R 1000:1000 artifacts || true
+
+  ai-cifra-export:
+    build:
+      context: ..
+      dockerfile: soundmeet-backend/ai-cifra-mir-worker/Dockerfile.train
+    image: soundmeet-ai-cifra-train:local
+    container_name: soundmeet-ai-cifra-export
+    profiles: ["train"]
+    init: true
+    restart: "no"
+    working_dir: /home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/ai-cifra-mir-worker
+    volumes:
+      - /home/wesleyr10/Programação/Projetos/SoundMeet:/home/wesleyr10/Programação/Projetos/SoundMeet
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONUTF8=1
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - HF_HOME=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
+    command:
+      - bash
+      - -lc
+      - |
+        set -eux
+
+        CKPT_PATH="$$(ls -t artifacts/marble_runs/omar_rq_crnn_v2/checkpoints/last*.ckpt 2>/dev/null | head -n 1)"
+        if [ -z "$$CKPT_PATH" ]; then
+          echo "nenhum checkpoint encontrado em artifacts/marble_runs/omar_rq_crnn_v2/checkpoints" 1>&2
+          exit 1
+        fi
+        python tools/marble_export_crnn_head.py \
+          --ckpt "$$CKPT_PATH" \
+          --out-dir artifacts/exports/omar_rq_crnn_v2 \
+          --export-onnx
+
+        python tools/build_chordonomicon_prior.py \
+          --chordonomicon-hf \
+          --max-rows 0 \
+          --out artifacts/exports/omar_rq_crnn_v2/chord_prior.json
+
+        python tools/write_export_manifest.py \
+          --dataset-dir artifacts/datasets/chords1217_guitarset_mic_v2 \
+          --exports-dir artifacts/exports/omar_rq_crnn_v2 \
+          --expect-chords1217 1217 \
+          --require-no-missing-audio
+        chown -R 1000:1000 artifacts || true
+
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: soundmeet-cadvisor
@@ -298,6 +498,7 @@ volumes:
   rabbitmq_data:
   minio_data:
   uptime_kuma_data:
+  model-cache:
 
 networks:
   soundmeet-network:
