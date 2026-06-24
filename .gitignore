@@ -150,3 +150,6 @@ graphify-out/
 
 # Claude Code (configuração local do assistente, não é documentação do projeto)
 .claude/
+
+# Music samples
+sample/
