@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -23,6 +24,17 @@ export class AcceptInquiryUseCase implements IUseCase<
     const entity = await this.inquiryRepo.findById(inquiryId);
     if (!entity) {
       throw new NotFoundError(input.inquiry_id, Inquiry);
+    }
+
+    if (input.requesting_user_id && !input.is_admin) {
+      const isOwner =
+        entity.musician_id?.id === input.requesting_user_id ||
+        entity.band_id?.id === input.requesting_user_id;
+      if (!isOwner) {
+        throw new ForbiddenException(
+          "Você não tem permissão para aceitar esta inquiry.",
+        );
+      }
     }
 
     entity.accept(this.clock.now());

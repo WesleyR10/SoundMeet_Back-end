@@ -2,8 +2,11 @@ import { OmitType } from "@nestjs/swagger";
 
 import { CancelBookingInput } from "../../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.input";
 
-export class CancelBookingInputWithoutId extends OmitType(CancelBookingInput, [
+export class CancelBookingInputBody extends OmitType(CancelBookingInput, [
   "booking_id",
+  "cancelled_by",
+  "requesting_user_id",
+  "is_admin",
 ] as const) {}
 
-export class CancelBookingDto extends CancelBookingInputWithoutId {}
+export class CancelBookingDto extends CancelBookingInputBody {}

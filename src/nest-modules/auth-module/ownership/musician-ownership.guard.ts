@@ -26,7 +26,10 @@ export class MusicianOwnershipGuard implements CanActivate {
       return true;
     }
 
-    const resourceId = request.params["id"] ?? request.params["musicianId"];
+    const resourceId =
+      request.params["id"] ??
+      request.params["musicianId"] ??
+      request.params["musician_id"];
 
     if (!resourceId) {
       return true;

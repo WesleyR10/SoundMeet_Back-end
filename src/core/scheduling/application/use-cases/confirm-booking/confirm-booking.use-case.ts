@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { Band, BandId } from "../../../../musician/domain/band.aggregate";
 import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
@@ -32,6 +33,18 @@ export class ConfirmBookingUseCase implements IUseCase<
     const entity = await this.bookingRepo.findById(bookingId);
     if (!entity) {
       throw new NotFoundError(input.booking_id, Booking);
+    }
+
+    if (input.requesting_user_id && !input.is_admin) {
+      const isOwner =
+        entity.establishment_id.id === input.requesting_user_id ||
+        entity.musician_id?.id === input.requesting_user_id ||
+        entity.band_id?.id === input.requesting_user_id;
+      if (!isOwner) {
+        throw new ForbiddenException(
+          "Você não tem permissão para confirmar este booking.",
+        );
+      }
     }
 
     const now = this.clock.now();
@@ -74,6 +87,7 @@ export class ConfirmBookingUseCase implements IUseCase<
             await this.bookingRepo.countConfirmedOnDayByMusician(
               entity.musician_id.id,
               entity.start_at,
+              availability.timezone,
             );
           if (showsToday >= availability.max_shows_per_day!) {
             entity.notification.addError(
@@ -123,6 +137,7 @@ export class ConfirmBookingUseCase implements IUseCase<
           const showsToday = await this.bookingRepo.countConfirmedOnDayByBand(
             entity.band_id.id,
             entity.start_at,
+            availability.timezone,
           );
           if (showsToday >= availability.max_shows_per_day!) {
             entity.notification.addError(
@@ -181,77 +196,108 @@ export class ConfirmBookingUseCase implements IUseCase<
 
     entityToUpdate.confirm(now);
 
-    const transactionalConfirm = (this.bookingRepo as any)
-      .confirmWithBandMembersAvailability as
-      | undefined
-      | ((
-          booking: Booking,
-          expected_statuses: BookingStatusEnum[],
-          band_member_ids: string[],
-          candidateStart: Date,
-          candidateEnd: Date,
-        ) => Promise<boolean>);
+    type AtomicConfirmFn = (
+      booking: Booking,
+      expected_statuses: BookingStatusEnum[],
+      conflictTargetType: "musician" | "band",
+      conflictTargetId: string,
+      candidateStart: Date,
+      candidateEnd: Date,
+      band_member_ids?: string[],
+    ) => Promise<{ success: boolean; conflictFound: boolean }>;
 
-    const updated =
-      bandMembers && typeof transactionalConfirm === "function"
-        ? await transactionalConfirm(
-            entityToUpdate,
-            [BookingStatusEnum.PENDING],
-            bandMembers.map((m) => m.musician_id.id),
-            candidateStart,
-            candidateEnd,
-          )
-        : await this.bookingRepo.updateWithStatus(entityToUpdate, [
-            BookingStatusEnum.PENDING,
-          ]);
-    if (!updated) {
-      entityToUpdate.notification.addError(
-        "Only pending bookings can be confirmed",
-        "status",
+    const atomicConfirm = (this.bookingRepo as any)
+      .confirmAtomically as AtomicConfirmFn | undefined;
+
+    if (typeof atomicConfirm === "function") {
+      const conflictTargetType = entity.musician_id ? "musician" : "band";
+      const conflictTargetId = (
+        entity.musician_id ?? entity.band_id!
+      ).id;
+
+      const result = await atomicConfirm(
+        entityToUpdate,
+        [BookingStatusEnum.PENDING],
+        conflictTargetType,
+        conflictTargetId,
+        candidateStart,
+        candidateEnd,
+        bandMembers?.map((m) => m.musician_id.id),
       );
-      throw new EntityValidationError(entityToUpdate.notification.toJSON());
-    }
 
-    if (bandMembers && this.availabilityRepo && !transactionalConfirm) {
-      await Promise.all(
-        bandMembers.map(async (member) => {
-          const availability = await this.availabilityRepo!.findByMusicianId(
-            member.musician_id.id,
-          );
+      if (result.conflictFound) {
+        const field = conflictTargetType === "musician" ? "conflict" : "conflict";
+        entityToUpdate.notification.addError(
+          conflictTargetType === "musician"
+            ? "Musician already has a confirmed booking for this period"
+            : "Band already has a confirmed booking for this period",
+          field,
+        );
+        throw new EntityValidationError(entityToUpdate.notification.toJSON());
+      }
 
-          if (!availability) {
-            const newAvailability = Availability.create({
-              musician_id: member.musician_id.id,
-              unavailabilities: [
-                {
-                  start_at: candidateStart,
-                  end_at: candidateEnd,
-                  reason: `Band booking ${entityToUpdate.booking_id.id}`,
-                },
-              ],
-            });
-            await this.availabilityRepo!.insert(newAvailability);
-            return;
-          }
+      if (!result.success) {
+        entityToUpdate.notification.addError(
+          "Only pending bookings can be confirmed",
+          "status",
+        );
+        throw new EntityValidationError(entityToUpdate.notification.toJSON());
+      }
+    } else {
+      // Fallback para repositório in-memory (testes): sem race condition real
+      const updated = await this.bookingRepo.updateWithStatus(entityToUpdate, [
+        BookingStatusEnum.PENDING,
+      ]);
+      if (!updated) {
+        entityToUpdate.notification.addError(
+          "Only pending bookings can be confirmed",
+          "status",
+        );
+        throw new EntityValidationError(entityToUpdate.notification.toJSON());
+      }
 
-          if (
-            !availability.isAvailable(
+      if (bandMembers && this.availabilityRepo) {
+        await Promise.all(
+          bandMembers.map(async (member) => {
+            const availability =
+              await this.availabilityRepo!.findByMusicianId(
+                member.musician_id.id,
+              );
+
+            if (!availability) {
+              const newAvailability = Availability.create({
+                musician_id: member.musician_id.id,
+                unavailabilities: [
+                  {
+                    start_at: candidateStart,
+                    end_at: candidateEnd,
+                    reason: `Band booking ${entityToUpdate.booking_id.id}`,
+                  },
+                ],
+              });
+              await this.availabilityRepo!.insert(newAvailability);
+              return;
+            }
+
+            if (
+              !availability.isAvailable(
+                candidateStart,
+                candidateEnd,
+                this.dateTimeService,
+              )
+            ) {
+              return;
+            }
+
+            availability.addUnavailability(
               candidateStart,
               candidateEnd,
-              this.dateTimeService,
-            )
-          ) {
-            return;
-          }
-
-          availability.addUnavailability(
-            candidateStart,
-            candidateEnd,
-            `Band booking ${entityToUpdate.booking_id.id}`,
-          );
-          await this.availabilityRepo!.update(availability);
-        }),
-      );
+              `Band booking ${entityToUpdate.booking_id.id}`,
+            );
+            await this.availabilityRepo!.update(availability);
+          }),
+        );
+      }
     }
 
     if (this.domainEventMediator) {

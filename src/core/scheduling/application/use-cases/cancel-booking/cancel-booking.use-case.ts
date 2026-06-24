@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -24,6 +25,18 @@ export class CancelBookingUseCase implements IUseCase<
     const entity = await this.bookingRepo.findById(bookingId);
     if (!entity) {
       throw new NotFoundError(input.booking_id, Booking);
+    }
+
+    if (input.requesting_user_id && !input.is_admin) {
+      const isOwner =
+        entity.establishment_id.id === input.requesting_user_id ||
+        entity.musician_id?.id === input.requesting_user_id ||
+        entity.band_id?.id === input.requesting_user_id;
+      if (!isOwner) {
+        throw new ForbiddenException(
+          "Você não tem permissão para cancelar este booking.",
+        );
+      }
     }
 
     const now = this.clock.now();

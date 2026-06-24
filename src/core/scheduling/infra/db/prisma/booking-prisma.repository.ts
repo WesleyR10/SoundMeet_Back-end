@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { DateTime } from "luxon";
 
 import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
@@ -202,8 +203,9 @@ export class BookingPrismaRepository implements IBookingRepository {
   async countConfirmedOnDayByMusician(
     musician_id: string,
     day: Date,
+    timezone?: string,
   ): Promise<number> {
-    const [start, end] = this.getUtcDayRange(day);
+    const [start, end] = this.getLocalDayRange(day, timezone);
     return this.prisma.booking.count({
       where: {
         status: "confirmed",
@@ -216,8 +218,12 @@ export class BookingPrismaRepository implements IBookingRepository {
     });
   }
 
-  async countConfirmedOnDayByBand(band_id: string, day: Date): Promise<number> {
-    const [start, end] = this.getUtcDayRange(day);
+  async countConfirmedOnDayByBand(
+    band_id: string,
+    day: Date,
+    timezone?: string,
+  ): Promise<number> {
+    const [start, end] = this.getLocalDayRange(day, timezone);
     return this.prisma.booking.count({
       where: {
         status: "confirmed",
@@ -275,6 +281,97 @@ export class BookingPrismaRepository implements IBookingRepository {
       data: modelProps,
     });
     return result.count === 1;
+  }
+
+  async confirmAtomically(
+    entity: Booking,
+    expected_statuses: BookingStatusEnum[],
+    conflictTargetType: "musician" | "band",
+    conflictTargetId: string,
+    candidateStart: Date,
+    candidateEnd: Date,
+    band_member_ids?: string[],
+  ): Promise<{ success: boolean; conflictFound: boolean }> {
+    return this.prisma.$transaction(async (tx) => {
+      // Serializa confirms para o mesmo músico/banda evitando double-booking
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${conflictTargetId}))`;
+
+      // Re-verifica conflito dentro da transação (check atômico)
+      const column =
+        conflictTargetType === "musician" ? `"musicianId"` : `"bandId"`;
+      const conflicts = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "bookings"
+        WHERE "status" = 'confirmed'
+          AND ${Prisma.raw(column)} = ${conflictTargetId}
+          AND ("start_at" - ("buffer_minutes" * INTERVAL '1 minute')) < ${candidateEnd}
+          AND ("end_at"   + ("buffer_minutes" * INTERVAL '1 minute')) > ${candidateStart}
+          AND "id" != ${entity.booking_id.id}
+      `;
+
+      if (conflicts.length > 0) {
+        return { success: false, conflictFound: true };
+      }
+
+      const modelProps = BookingModelMapper.toModel(entity);
+      const result = await tx.booking.updateMany({
+        where: {
+          id: entity.booking_id.id,
+          status: {
+            in: expected_statuses,
+          } as Prisma.BookingWhereInput["status"],
+        },
+        data: modelProps,
+      });
+
+      if (result.count !== 1) {
+        return { success: false, conflictFound: false };
+      }
+
+      if (band_member_ids?.length) {
+        for (const musicianId of band_member_ids) {
+          const settings = await tx.musicianCalendarSettings.findUnique({
+            where: { musicianId },
+          });
+
+          if (!settings) {
+            await tx.musicianCalendarSettings.create({
+              data: {
+                id: new Uuid().id,
+                musicianId,
+                timezone: "UTC",
+                default_buffer_minutes: 0,
+                max_shows_per_day: null,
+                is_active: true,
+              },
+            });
+          }
+
+          const overlap = await tx.musicianUnavailability.findFirst({
+            where: {
+              musicianId,
+              start_at: { lt: candidateEnd },
+              end_at: { gt: candidateStart },
+            },
+            select: { id: true },
+          });
+
+          if (overlap) continue;
+
+          await tx.musicianUnavailability.create({
+            data: {
+              id: new Uuid().id,
+              musicianId,
+              start_at: candidateStart,
+              end_at: candidateEnd,
+              reason: `Band booking ${entity.booking_id.id}`,
+              created_at: new Date(),
+            },
+          });
+        }
+      }
+
+      return { success: true, conflictFound: false };
+    });
   }
 
   async confirmWithBandMembersAvailability(
@@ -392,6 +489,16 @@ export class BookingPrismaRepository implements IBookingRepository {
 
   getEntity(): new (...args: any[]) => Booking {
     return Booking;
+  }
+
+  private getLocalDayRange(day: Date, timezone?: string): [Date, Date] {
+    if (!timezone || timezone === "UTC") {
+      return this.getUtcDayRange(day);
+    }
+    const local = DateTime.fromJSDate(day, { zone: timezone });
+    const start = local.startOf("day").toJSDate();
+    const end = local.startOf("day").plus({ days: 1 }).toJSDate();
+    return [start, end];
   }
 
   private getUtcDayRange(day: Date): [Date, Date] {

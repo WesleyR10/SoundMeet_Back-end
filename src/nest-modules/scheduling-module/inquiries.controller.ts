@@ -25,7 +25,14 @@ import { ConvertInquiryToBookingUseCase } from "../../core/scheduling/applicatio
 import { CreateInquiryInput } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.input";
 import { CreateInquiryUseCase } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.use-case";
 import { RejectInquiryUseCase } from "../../core/scheduling/application/use-cases/reject-inquiry/reject-inquiry.use-case";
-import { AuthGuard, Roles, RolesGuard } from "../auth-module";
+import {
+  AuthGuard,
+  CurrentUser,
+  CurrentUserContextGuard,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
+import { AuthenticatedUser } from "../auth-module/interfaces/authenticated-user.interface";
 import { BookingPresenter } from "./booking.presenter";
 import { AcceptInquiryDto } from "./dto/accept-inquiry.dto";
 import { ConvertInquiryToBookingDto } from "./dto/convert-inquiry-to-booking.dto";
@@ -35,7 +42,7 @@ import { InquiryPresenter } from "./inquiry.presenter";
 
 @ApiTags("Scheduling")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("scheduling/inquiries")
 export class InquiriesController {
   @Inject(CreateInquiryUseCase)
@@ -76,8 +83,13 @@ export class InquiriesController {
   async accept(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() _dto: AcceptInquiryDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const output = await this.acceptInquiryUseCase.execute({ inquiry_id: id });
+    const output = await this.acceptInquiryUseCase.execute({
+      inquiry_id: id,
+      requesting_user_id: user.userId,
+      is_admin: user.isAdmin,
+    });
     return InquiriesController.serializeInquiry(output);
   }
 
@@ -92,10 +104,13 @@ export class InquiriesController {
   async reject(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: RejectInquiryDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const output = await this.rejectInquiryUseCase.execute({
       inquiry_id: id,
       reason: dto.reason ?? null,
+      requesting_user_id: user.userId,
+      is_admin: user.isAdmin,
     });
     return InquiriesController.serializeInquiry(output);
   }

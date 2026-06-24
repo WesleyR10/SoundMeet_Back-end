@@ -93,7 +93,12 @@ export interface IBookingRepository extends ISearchableRepository<
   countConfirmedOnDayByMusician(
     musician_id: string,
     day: Date,
+    timezone?: string,
   ): Promise<number>;
 
-  countConfirmedOnDayByBand(band_id: string, day: Date): Promise<number>;
+  countConfirmedOnDayByBand(
+    band_id: string,
+    day: Date,
+    timezone?: string,
+  ): Promise<number>;
 }

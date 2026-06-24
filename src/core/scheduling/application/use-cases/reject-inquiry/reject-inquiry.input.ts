@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -9,6 +10,8 @@ import {
 export type RejectInquiryInputConstructorProps = {
   inquiry_id: string;
   reason?: string | null;
+  requesting_user_id?: string | null;
+  is_admin?: boolean;
 };
 
 export class RejectInquiryInput {
@@ -21,10 +24,21 @@ export class RejectInquiryInput {
   @IsOptional()
   reason?: string | null;
 
+  @IsString()
+  @IsUUID()
+  @IsOptional()
+  requesting_user_id?: string | null;
+
+  @IsBoolean()
+  @IsOptional()
+  is_admin?: boolean;
+
   constructor(props: RejectInquiryInputConstructorProps) {
     if (!props) return;
     this.inquiry_id = props.inquiry_id;
     this.reason = props.reason;
+    this.requesting_user_id = props.requesting_user_id;
+    this.is_admin = props.is_admin ?? false;
   }
 }
 

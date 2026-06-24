@@ -112,6 +112,7 @@ export class BookingInMemoryRepository
   async countConfirmedOnDayByMusician(
     musician_id: string,
     day: Date,
+    _timezone?: string,
   ): Promise<number> {
     const [start, end] = this.getUtcDayRange(day);
     return this.items.filter(
@@ -123,7 +124,11 @@ export class BookingInMemoryRepository
     ).length;
   }
 
-  async countConfirmedOnDayByBand(band_id: string, day: Date): Promise<number> {
+  async countConfirmedOnDayByBand(
+    band_id: string,
+    day: Date,
+    _timezone?: string,
+  ): Promise<number> {
     const [start, end] = this.getUtcDayRange(day);
     return this.items.filter(
       (booking) =>
