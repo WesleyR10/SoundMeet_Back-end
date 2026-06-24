@@ -5,15 +5,20 @@ import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
 import { ICalendarReadModel } from "../../core/scheduling/application/gateways/calendar-read-model.interface";
 import { AcceptInquiryUseCase } from "../../core/scheduling/application/use-cases/accept-inquiry/accept-inquiry.use-case";
+import { AddUnavailabilityUseCase } from "../../core/scheduling/application/use-cases/add-unavailability/add-unavailability.use-case";
 import { CancelBookingUseCase } from "../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.use-case";
 import { ConfirmBookingUseCase } from "../../core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case";
 import { ConvertInquiryToBookingUseCase } from "../../core/scheduling/application/use-cases/convert-inquiry-to-booking/convert-inquiry-to-booking.use-case";
 import { CreateInquiryUseCase } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.use-case";
 import { ExpirePendingBookingsUseCase } from "../../core/scheduling/application/use-cases/expire-pending-bookings/expire-pending-bookings.use-case";
+import { GetAvailabilityUseCase } from "../../core/scheduling/application/use-cases/get-availability/get-availability.use-case";
 import { GetFreeBusyUseCase } from "../../core/scheduling/application/use-cases/get-free-busy/get-free-busy.use-case";
 import { GetMonthSlotsUseCase } from "../../core/scheduling/application/use-cases/get-month-slots/get-month-slots.use-case";
 import { ProposeBookingUseCase } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.use-case";
 import { RejectInquiryUseCase } from "../../core/scheduling/application/use-cases/reject-inquiry/reject-inquiry.use-case";
+import { RemoveUnavailabilityUseCase } from "../../core/scheduling/application/use-cases/remove-unavailability/remove-unavailability.use-case";
+import { SetAvailabilitySettingsUseCase } from "../../core/scheduling/application/use-cases/set-availability-settings/set-availability-settings.use-case";
+import { SetWeeklyRulesUseCase } from "../../core/scheduling/application/use-cases/set-weekly-rules/set-weekly-rules.use-case";
 import { IAvailabilityRepository } from "../../core/scheduling/domain/availability.repository";
 import { IBookingRepository } from "../../core/scheduling/domain/booking.repository";
 import { IInquiryRepository } from "../../core/scheduling/domain/inquiry.repository";
@@ -274,6 +279,41 @@ export const USE_CASES = {
       REPOSITORIES.CALENDAR_READ_MODEL.provide,
       SERVICES.DATE_TIME_SERVICE.provide,
     ],
+  },
+  GET_AVAILABILITY_USE_CASE: {
+    provide: GetAvailabilityUseCase,
+    useFactory: (availabilityRepo: IAvailabilityRepository) => {
+      return new GetAvailabilityUseCase(availabilityRepo);
+    },
+    inject: [REPOSITORIES.AVAILABILITY_REPOSITORY.provide],
+  },
+  SET_AVAILABILITY_SETTINGS_USE_CASE: {
+    provide: SetAvailabilitySettingsUseCase,
+    useFactory: (availabilityRepo: IAvailabilityRepository) => {
+      return new SetAvailabilitySettingsUseCase(availabilityRepo);
+    },
+    inject: [REPOSITORIES.AVAILABILITY_REPOSITORY.provide],
+  },
+  SET_WEEKLY_RULES_USE_CASE: {
+    provide: SetWeeklyRulesUseCase,
+    useFactory: (availabilityRepo: IAvailabilityRepository) => {
+      return new SetWeeklyRulesUseCase(availabilityRepo);
+    },
+    inject: [REPOSITORIES.AVAILABILITY_REPOSITORY.provide],
+  },
+  ADD_UNAVAILABILITY_USE_CASE: {
+    provide: AddUnavailabilityUseCase,
+    useFactory: (availabilityRepo: IAvailabilityRepository) => {
+      return new AddUnavailabilityUseCase(availabilityRepo);
+    },
+    inject: [REPOSITORIES.AVAILABILITY_REPOSITORY.provide],
+  },
+  REMOVE_UNAVAILABILITY_USE_CASE: {
+    provide: RemoveUnavailabilityUseCase,
+    useFactory: (availabilityRepo: IAvailabilityRepository) => {
+      return new RemoveUnavailabilityUseCase(availabilityRepo);
+    },
+    inject: [REPOSITORIES.AVAILABILITY_REPOSITORY.provide],
   },
 };
 

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../database-module/database.module";
 import { MusiciansModule } from "../musicians-module/musicians.module";
+import { AvailabilityController } from "./availability.controller";
 import { BookingsController } from "./bookings.controller";
 import { CalendarController } from "./calendar.controller";
 import { InquiriesController } from "./inquiries.controller";
@@ -9,7 +10,12 @@ import { SCHEDULING_PROVIDERS } from "./scheduling.providers";
 
 @Module({
   imports: [DatabaseModule, MusiciansModule],
-  controllers: [BookingsController, CalendarController, InquiriesController],
+  controllers: [
+    AvailabilityController,
+    BookingsController,
+    CalendarController,
+    InquiriesController,
+  ],
   providers: [
     ...Object.values(SCHEDULING_PROVIDERS.REPOSITORIES),
     ...Object.values(SCHEDULING_PROVIDERS.EVENTS),
