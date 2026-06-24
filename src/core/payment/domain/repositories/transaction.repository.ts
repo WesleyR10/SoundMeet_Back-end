@@ -27,4 +27,5 @@ export interface ITransactionRepository extends ISearchableRepository<
 > {
   findByMusicianId(musicianId: string): Promise<Transaction[]>;
   findByUserId(userId: string): Promise<Transaction[]>;
+  findByExternalId(externalId: string): Promise<Transaction | null>;
 }

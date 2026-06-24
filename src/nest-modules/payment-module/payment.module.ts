@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
+import { AsaasWebhookController } from "./asaas-webhook.controller";
 import { DatabaseModule } from "../database-module/database.module";
 import { GamificationModule } from "../gamification-module/gamification.module";
 import { MusiciansModule } from "../musicians-module/musicians.module";
@@ -11,7 +12,7 @@ import { PaymentEventsHandlers } from "./payment-events.handlers";
 
 @Module({
   imports: [DatabaseModule, MusiciansModule, GamificationModule],
-  controllers: [PaymentController],
+  controllers: [PaymentController, AsaasWebhookController],
   providers: [
     ...Object.values(PAYMENT_PROVIDERS.REPOSITORIES),
     ...Object.values(PAYMENT_PROVIDERS.INFRA_PROVIDERS),

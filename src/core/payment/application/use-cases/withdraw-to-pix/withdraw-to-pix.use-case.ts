@@ -4,6 +4,7 @@ import {
   ITransactionRepository,
 } from "@core/payment/domain/repositories";
 import { TransactionType } from "@core/payment/domain/transaction-enums";
+import { IPixWithdrawGateway } from "@core/payment/infra/gateways/pix-withdraw-gateway.interface";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { NotFoundError } from "@core/shared/domain/errors";
 import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
@@ -27,6 +28,7 @@ export class WithdrawToPixUseCase implements IUseCase<
   constructor(
     private readonly walletRepo: IMusicianWalletRepository,
     private readonly txRepo: ITransactionRepository,
+    private readonly pixWithdrawGateway?: IPixWithdrawGateway,
   ) {}
 
   async execute(input: WithdrawToPixInput): Promise<WithdrawToPixOutput> {
@@ -41,7 +43,6 @@ export class WithdrawToPixUseCase implements IUseCase<
     if (wallet.notification.hasErrors()) {
       throw new EntityValidationError(wallet.notification.toJSON());
     }
-    await this.walletRepo.update(wallet);
 
     const tx = Transaction.create({
       musician_id: input.musician_id,
@@ -52,7 +53,21 @@ export class WithdrawToPixUseCase implements IUseCase<
       metadata: { kind: "withdraw" },
     });
 
-    tx.complete();
+    if (this.pixWithdrawGateway) {
+      const result = await this.pixWithdrawGateway.withdraw({
+        amount: input.amount,
+        pix_key: input.pix_key.key,
+        pix_key_type: input.pix_key.type,
+        description: "Saque SoundMeet",
+        external_reference: tx.transaction_id.id,
+      });
+      tx.external_id = result.transfer_id;
+      // Transaction fica PENDING — completed quando webhook TRANSFER_DONE chegar
+    } else {
+      tx.complete();
+    }
+
+    await this.walletRepo.update(wallet);
     await this.txRepo.insert(tx);
 
     return {

@@ -79,4 +79,8 @@ export class TransactionInMemoryRepository
   async findByUserId(userId: string): Promise<Transaction[]> {
     return this.items.filter((item) => item.user_id?.id === userId);
   }
+
+  async findByExternalId(externalId: string): Promise<Transaction | null> {
+    return this.items.find((item) => item.external_id === externalId) ?? null;
+  }
 }

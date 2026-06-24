@@ -1,3 +1,5 @@
+import { ConfigService } from "@nestjs/config";
+
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { ConfirmTipPaymentUseCase } from "../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
 import { GetMusicianWalletUseCase } from "../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
@@ -13,11 +15,14 @@ import {
   TipPrismaRepository,
   TransactionPrismaRepository,
 } from "../../core/payment/infra/db/prisma";
+import { AsaasGatewayAdapter } from "../../core/payment/infra/gateways/asaas-gateway.adapter";
 import { IPixGateway } from "../../core/payment/infra/gateways/pix-gateway.interface";
 import { PixGatewayMock } from "../../core/payment/infra/gateways/pix-gateway.mock";
+import { IPixWithdrawGateway } from "../../core/payment/infra/gateways/pix-withdraw-gateway.interface";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { PrismaUnitOfWork } from "../../core/shared/infra/db/prisma/prisma-unit-of-work";
 import { PrismaService } from "../database-module/prisma/prisma.service";
+import { EnvConfig } from "../config-module/config.schema";
 
 export const REPOSITORIES = {
   TIP_REPOSITORY: {
@@ -59,6 +64,15 @@ export const INFRA_PROVIDERS = {
   PIX_GATEWAY: {
     provide: "PixGateway",
     useClass: PixGatewayMock,
+  },
+  ASAAS_PIX_WITHDRAW_GATEWAY: {
+    provide: "AsaasPixWithdrawGateway",
+    useFactory: (configService: ConfigService<EnvConfig>): IPixWithdrawGateway => {
+      const apiUrl = configService.get<string>("ASAAS_API_URL")!;
+      const apiKey = configService.get<string>("ASAAS_API_KEY") ?? "";
+      return new AsaasGatewayAdapter(apiUrl, apiKey);
+    },
+    inject: [ConfigService],
   },
 };
 
@@ -108,12 +122,14 @@ export const USE_CASES = {
     useFactory: (
       walletRepo: IMusicianWalletRepository,
       txRepo: ITransactionRepository,
+      pixWithdrawGateway: IPixWithdrawGateway,
     ) => {
-      return new WithdrawToPixUseCase(walletRepo, txRepo);
+      return new WithdrawToPixUseCase(walletRepo, txRepo, pixWithdrawGateway);
     },
     inject: [
       REPOSITORIES.MUSICIAN_WALLET_REPOSITORY.provide,
       REPOSITORIES.TRANSACTION_REPOSITORY.provide,
+      INFRA_PROVIDERS.ASAAS_PIX_WITHDRAW_GATEWAY.provide,
     ],
   },
 };

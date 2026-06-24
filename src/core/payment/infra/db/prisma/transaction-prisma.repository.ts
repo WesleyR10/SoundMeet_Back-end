@@ -185,6 +185,13 @@ export class TransactionPrismaRepository implements ITransactionRepository {
     return models.map((model) => TransactionModelMapper.toEntity(model));
   }
 
+  async findByExternalId(externalId: string): Promise<Transaction | null> {
+    const model = await this.client.transaction.findFirst({
+      where: { externalId },
+    });
+    return model ? TransactionModelMapper.toEntity(model) : null;
+  }
+
   getEntity(): new (...args: any[]) => Transaction {
     return Transaction;
   }
