@@ -33,6 +33,8 @@ import { CreateAiCifraUploadUseCase } from "../../core/ai-cifra/application/use-
 import { RequestAiCifraAnalysisUseCase } from "../../core/ai-cifra/application/use-cases/request-ai-cifra-analysis/request-ai-cifra-analysis.use-case";
 import { ResolveAiCifraAudioCandidatesUseCase } from "../../core/ai-cifra/application/use-cases/resolve-ai-cifra-audio-candidates/resolve-ai-cifra-audio-candidates.use-case";
 import { MusifyPipedCatalogClient } from "../../core/ai-cifra/infra/audio-sources/musify-piped.catalog-client";
+import { Throttle } from "@nestjs/throttler";
+
 import { AuthGuard, Roles, RolesGuard } from "../auth-module";
 import { MusicLibraryCatalogService } from "../music-library-module/music-library.service";
 import {
@@ -187,6 +189,7 @@ export class AiCifraUploadsController {
   }
 
   @Post("preload/musify/catalog/analyses")
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({
     summary: "Pré-carregar cifras a partir de playlist/top hits (Musify)",
     description:
@@ -277,6 +280,7 @@ export class AiCifraUploadsController {
   }
 
   @Post("preload/popular/from-provider/analyses")
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({
     summary: "Pré-carregar folhas de cifra no banco (SimpMusic + fallback)",
     description:

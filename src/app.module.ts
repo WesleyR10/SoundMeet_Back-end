@@ -1,7 +1,14 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ConfigService } from "@nestjs/config";
 
 import { HealthController } from "./health.controller";
+import {
+  ConfigSchemaType,
+  EnvConfig,
+} from "./nest-modules/config-module/config.schema";
 import { AiAudioModule } from "./nest-modules/ai-audio-module/ai-audio.module";
 import { AiCifraModule } from "./nest-modules/ai-cifra-module/ai-cifra.module";
 import { AudiencesModule } from "./nest-modules/audiences-module/audiences.module";
@@ -33,6 +40,15 @@ const shouldRegisterRabbitmqHandlers =
 @Module({
   imports: [
     ConfigModuleRoot.forRoot(),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvConfig>) => [
+        {
+          ttl: (config.get<number>("RATE_LIMIT_TTL") ?? 60) * 1000,
+          limit: config.get<number>("RATE_LIMIT_MAX") ?? 100,
+        },
+      ],
+    }),
     RabbitmqModule.forRoot({ enableConsumers: shouldRegisterRabbitmqHandlers }),
 
     // Module
@@ -61,6 +77,6 @@ const shouldRegisterRabbitmqHandlers =
     // Domain modules removed
   ],
   controllers: [HealthController],
-  providers: [],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

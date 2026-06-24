@@ -19,6 +19,8 @@ import {
 import { GetAiAudioSeparationJobUseCase } from "../../core/ai-audio/application/use-cases/get-ai-audio-separation-job/get-ai-audio-separation-job.use-case";
 import { RequestAiAudioSeparationUseCase } from "../../core/ai-audio/application/use-cases/request-ai-audio-separation/request-ai-audio-separation.use-case";
 import { UpdateAiAudioSeparationJobProgressUseCase } from "../../core/ai-audio/application/use-cases/update-ai-audio-separation-job-progress/update-ai-audio-separation-job-progress.use-case";
+import { SkipThrottle } from "@nestjs/throttler";
+
 import {
   AuthGuard,
   InternalToken,
@@ -82,6 +84,7 @@ export class AiAudioController {
   }
 
   @Post("internal/separations/:id/progress")
+  @SkipThrottle()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_AUDIO_PROGRESS_TOKEN",

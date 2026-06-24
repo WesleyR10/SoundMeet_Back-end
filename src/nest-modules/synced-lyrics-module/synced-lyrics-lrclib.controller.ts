@@ -20,6 +20,8 @@ import {
 import { GetSyncedLyricsBulkJobUseCase } from "../../core/synced-lyrics/application/use-cases/get-synced-lyrics-bulk-job/get-synced-lyrics-bulk-job.use-case";
 import { MatchSyncedLyricsOnLrclibUseCase } from "../../core/synced-lyrics/application/use-cases/match-synced-lyrics-on-lrclib/match-synced-lyrics-on-lrclib.use-case";
 import { RequestSyncedLyricsBulkSyncUseCase } from "../../core/synced-lyrics/application/use-cases/request-synced-lyrics-bulk-sync/request-synced-lyrics-bulk-sync.use-case";
+import { SkipThrottle } from "@nestjs/throttler";
+
 import {
   AuthGuard,
   InternalToken,
@@ -71,6 +73,7 @@ export class SyncedLyricsLrclibController {
   }
 
   @Post("bulk-sync")
+  @SkipThrottle()
   @UseGuards(AuthGuard, RolesGuard, InternalTokenGuard)
   @Roles("musician", "admin")
   @InternalToken({
@@ -93,6 +96,7 @@ export class SyncedLyricsLrclibController {
   }
 
   @Get("bulk-jobs/:id")
+  @SkipThrottle()
   @UseGuards(AuthGuard, RolesGuard, InternalTokenGuard)
   @Roles("musician", "admin")
   @InternalToken({

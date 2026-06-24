@@ -29,6 +29,8 @@ import { MaterializeRenderableChordSheetsUseCase } from "../../core/synced-lyric
 import { SearchSyncedLyricsUseCase } from "../../core/synced-lyrics/application/use-cases/search-synced-lyrics/search-synced-lyrics.use-case";
 import { SyncSyncedLyricsForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/sync-synced-lyrics-for-music-library/sync-synced-lyrics-for-music-library.use-case";
 import { UpsertSyncedLyricsForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/upsert-synced-lyrics-for-music-library/upsert-synced-lyrics-for-music-library.use-case";
+import { SkipThrottle } from "@nestjs/throttler";
+
 import {
   AuthGuard,
   InternalToken,
@@ -199,6 +201,7 @@ export class SyncedLyricsController {
   }
 
   @Post("chord-sheets/materialize")
+  @SkipThrottle()
   @UseGuards(AuthGuard, RolesGuard, InternalTokenGuard)
   @Roles("musician", "admin")
   @InternalToken({
@@ -221,6 +224,7 @@ export class SyncedLyricsController {
   }
 
   @Post("chord-sheets/materialize-renderable")
+  @SkipThrottle()
   @UseGuards(AuthGuard, RolesGuard, InternalTokenGuard)
   @Roles("musician", "admin")
   @InternalToken({

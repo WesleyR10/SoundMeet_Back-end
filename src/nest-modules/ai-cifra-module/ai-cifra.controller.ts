@@ -21,6 +21,8 @@ import { FailAiCifraAnalysisJobUseCase } from "../../core/ai-cifra/application/u
 import { GetAiCifraAnalysisJobUseCase } from "../../core/ai-cifra/application/use-cases/get-ai-cifra-analysis-job/get-ai-cifra-analysis-job.use-case";
 import { RequestAiCifraAnalysisUseCase } from "../../core/ai-cifra/application/use-cases/request-ai-cifra-analysis/request-ai-cifra-analysis.use-case";
 import { UpdateAiCifraAnalysisJobProgressUseCase } from "../../core/ai-cifra/application/use-cases/update-ai-cifra-analysis-job-progress/update-ai-cifra-analysis-job-progress.use-case";
+import { SkipThrottle } from "@nestjs/throttler";
+
 import {
   AuthGuard,
   InternalToken,
@@ -91,6 +93,7 @@ export class AiCifraController {
   }
 
   @Post("internal/analyses/:id/progress")
+  @SkipThrottle()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_CIFRA_PROGRESS_TOKEN",
@@ -113,6 +116,7 @@ export class AiCifraController {
   }
 
   @Post("internal/analyses/:id/complete")
+  @SkipThrottle()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_CIFRA_PROGRESS_TOKEN",
@@ -136,6 +140,7 @@ export class AiCifraController {
   }
 
   @Post("internal/analyses/:id/fail")
+  @SkipThrottle()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_CIFRA_PROGRESS_TOKEN",
