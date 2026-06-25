@@ -159,6 +159,11 @@ export type EnvConfig = {
   FIREBASE_CLIENT_EMAIL?: string;
   FIREBASE_SERVICE_ACCOUNT_KEY?: string;
 
+  // Email — Resend
+  RESEND_API_KEY?: string;
+  MAIL_FROM?: string;
+  MAIL_BASE_URL?: string;
+
   // Rate Limiting
   RATE_LIMIT_TTL: number;
   RATE_LIMIT_MAX: number;

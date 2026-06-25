@@ -3,6 +3,8 @@ import { ConfigService } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
 
 import { ConfigSchemaType } from "../config-module/config.schema";
+import { DatabaseModule } from "../database-module/database.module";
+import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
 import { AuthJwtVerifier } from "./auth-jwt.verifier";
 import { CurrentUserContextGuard } from "./current-user-context.guard";
@@ -10,10 +12,12 @@ import { InternalTokenGuard } from "./internal-token.guard";
 import { EstablishmentOwnershipGuard } from "./ownership/establishment-ownership.guard";
 import { MusicianOwnershipGuard } from "./ownership/musician-ownership.guard";
 import { RolesGuard } from "./roles.guard";
+import { VerifyEmailService } from "./verify-email.service";
 
 @Global()
 @Module({
   imports: [
+    DatabaseModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigSchemaType) => ({
         secret: configService.get<string>("JWT_SECRET"),
@@ -25,6 +29,7 @@ import { RolesGuard } from "./roles.guard";
       global: true,
     }),
   ],
+  controllers: [AuthController],
   providers: [
     AuthJwtVerifier,
     AuthGuard,
@@ -33,6 +38,7 @@ import { RolesGuard } from "./roles.guard";
     CurrentUserContextGuard,
     EstablishmentOwnershipGuard,
     MusicianOwnershipGuard,
+    VerifyEmailService,
   ],
   exports: [
     JwtModule,

@@ -8,6 +8,8 @@ export * from "./decorators/current-user.decorator";
 export * from "./interfaces/authenticated-user.interface";
 export * from "./internal-token.decorator";
 export * from "./internal-token.guard";
+export * from "./ownership/audience-ownership.guard";
+export * from "./ownership/band-ownership.guard";
 export * from "./ownership/establishment-ownership.guard";
 export * from "./ownership/musician-ownership.guard";
 export * from "./roles.guard";

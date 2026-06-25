@@ -25,6 +25,7 @@ import { RabbitmqModule } from "./nest-modules/rabbitmq-module/rabbitmq.module";
 import { RequestsModule } from "./nest-modules/requests-module/requests.module";
 import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.module";
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
+import { MailModule } from "./nest-modules/mail-module/mail.module";
 
 const normalizeTransport = (value: string | undefined, fallback: string) =>
   (value ?? fallback).trim().toLowerCase();
@@ -52,6 +53,7 @@ const shouldRegisterRabbitmqHandlers =
     RabbitmqModule.forRoot({ enableConsumers: shouldRegisterRabbitmqHandlers }),
 
     // Module
+    MailModule,
     AuthModule,
     DatabaseModule,
     MusiciansModule,
