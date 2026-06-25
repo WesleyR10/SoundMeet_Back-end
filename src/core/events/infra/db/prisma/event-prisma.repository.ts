@@ -209,63 +209,47 @@ export class EventPrismaRepository implements IEventRepository {
     audience_id: string,
     now: Date = new Date(),
   ): Promise<void> {
-    const event = await this.findById(event_id);
-    if (!event) {
-      throw new NotFoundError(event_id.id, Event);
-    }
-
-    const existing = await this.prisma.eventAttendee.findUnique({
-      where: {
-        eventId_audienceId: {
-          eventId: event_id.id,
-          audienceId: audience_id,
-        },
-      },
-      select: { is_active: true },
-    });
-
-    if (existing?.is_active) {
-      return;
-    }
-
-    event.addAttendee(audience_id, now);
-    if (event.notification.hasErrors()) {
-      throw new EntityValidationError(event.notification.toJSON(), {
-        metadata: {
-          operation: "event.addAttendee",
-          event_id: event_id.id,
-          audience_id,
-        },
-      });
-    }
-
     try {
-      await this.prisma.$transaction([
-        this.prisma.eventAttendee.upsert({
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.eventAttendee.findUnique({
           where: {
             eventId_audienceId: {
               eventId: event_id.id,
               audienceId: audience_id,
             },
           },
-          update: {
-            is_active: true,
-            leftAt: null,
+          select: { is_active: true },
+        });
+
+        if (existing?.is_active) return;
+
+        // Atomic increment with capacity constraint — 0 rows = full
+        const affected = await tx.$executeRaw`
+          UPDATE events
+          SET current_capacity = current_capacity + 1, updated_at = ${now}
+          WHERE id = ${event_id.id}::uuid
+          AND (max_capacity IS NULL OR current_capacity < max_capacity)
+        `;
+
+        if (affected === 0) {
+          throw new EntityValidationError([
+            { current_capacity: ["Event has reached maximum capacity"] },
+          ]);
+        }
+
+        await tx.eventAttendee.upsert({
+          where: {
+            eventId_audienceId: {
+              eventId: event_id.id,
+              audienceId: audience_id,
+            },
           },
-          create: {
-            eventId: event_id.id,
-            audienceId: audience_id,
-          },
-        }),
-        this.prisma.event.update({
-          where: { id: event_id.id },
-          data: {
-            currentCapacity: event.current_capacity,
-            updated_at: event.updated_at,
-          },
-        }),
-      ]);
+          update: { is_active: true, leftAt: null },
+          create: { eventId: event_id.id, audienceId: audience_id },
+        });
+      });
     } catch (e: any) {
+      if (e instanceof EntityValidationError) throw e;
       throw mapPrismaErrorToDomainError(e, {
         entityClass: Event,
         id: event_id.id,
@@ -279,63 +263,40 @@ export class EventPrismaRepository implements IEventRepository {
     audience_id: string,
     now: Date = new Date(),
   ): Promise<void> {
-    const event = await this.findById(event_id);
-    if (!event) {
-      throw new NotFoundError(event_id.id, Event);
-    }
-
-    const existing = await this.prisma.eventAttendee.findUnique({
-      where: {
-        eventId_audienceId: {
-          eventId: event_id.id,
-          audienceId: audience_id,
-        },
-      },
-      select: { is_active: true },
-    });
-
-    if (!existing) {
-      throw new NotFoundError(audience_id, Event);
-    }
-
-    if (!existing.is_active) {
-      return;
-    }
-
-    event.removeAttendee(audience_id, now);
-    if (event.notification.hasErrors()) {
-      throw new EntityValidationError(event.notification.toJSON(), {
-        metadata: {
-          operation: "event.removeAttendee",
-          event_id: event_id.id,
-          audience_id,
-        },
-      });
-    }
-
     try {
-      await this.prisma.$transaction([
-        this.prisma.eventAttendee.update({
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.eventAttendee.findUnique({
           where: {
             eventId_audienceId: {
               eventId: event_id.id,
               audienceId: audience_id,
             },
           },
-          data: {
-            is_active: false,
-            leftAt: now,
+          select: { is_active: true },
+        });
+
+        if (!existing) throw new NotFoundError(audience_id, Event);
+        if (!existing.is_active) return;
+
+        await tx.eventAttendee.update({
+          where: {
+            eventId_audienceId: {
+              eventId: event_id.id,
+              audienceId: audience_id,
+            },
           },
-        }),
-        this.prisma.event.update({
-          where: { id: event_id.id },
-          data: {
-            currentCapacity: event.current_capacity,
-            updated_at: event.updated_at,
-          },
-        }),
-      ]);
+          data: { is_active: false, leftAt: now },
+        });
+
+        // Atomic decrement guarded against going below 0
+        await tx.$executeRaw`
+          UPDATE events
+          SET current_capacity = GREATEST(current_capacity - 1, 0), updated_at = ${now}
+          WHERE id = ${event_id.id}::uuid
+        `;
+      });
     } catch (e: any) {
+      if (e instanceof NotFoundError || e instanceof EntityValidationError) throw e;
       throw mapPrismaErrorToDomainError(e, {
         entityClass: Event,
         id: event_id.id,

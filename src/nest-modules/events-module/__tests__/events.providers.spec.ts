@@ -38,7 +38,7 @@ describe("Events providers", () => {
     await module.close();
   });
 
-  it("wires attendee and performer use cases with dedicated repositories", () => {
+  it("wires attendee and performer use cases", () => {
     expect(module.get(AddEventAttendeeUseCase)).toBeInstanceOf(
       AddEventAttendeeUseCase,
     );

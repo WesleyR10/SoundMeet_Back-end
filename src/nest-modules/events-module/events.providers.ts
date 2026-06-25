@@ -8,9 +8,12 @@ import { CreateEventUseCase } from "../../core/events/application/use-cases/crea
 import { DeleteEventUseCase } from "../../core/events/application/use-cases/delete-event/delete-event.use-case";
 import { FinishEventUseCase } from "../../core/events/application/use-cases/finish-event/finish-event.use-case";
 import { GetEventUseCase } from "../../core/events/application/use-cases/get-event/get-event.use-case";
+import { ListEventAttendeesUseCase } from "../../core/events/application/use-cases/list-event-attendees/list-event-attendees.use-case";
+import { ListEventMusiciansUseCase } from "../../core/events/application/use-cases/list-event-musicians/list-event-musicians.use-case";
 import { ListEventsUseCase } from "../../core/events/application/use-cases/list-events/list-events.use-case";
 import { RemoveEventAttendeeUseCase } from "../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
+import { UpdateEventMusicianStatusUseCase } from "../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import { UpdateEventUseCase } from "../../core/events/application/use-cases/update-event/update-event.use-case";
 import {
   IEventAttendeeRepository,
@@ -120,28 +123,55 @@ export const USE_CASES = {
   },
   ADD_EVENT_ATTENDEE_USE_CASE: {
     provide: AddEventAttendeeUseCase,
+    useFactory: (repo: IEventRepository) => {
+      return new AddEventAttendeeUseCase(repo);
+    },
+    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+  },
+  REMOVE_EVENT_ATTENDEE_USE_CASE: {
+    provide: RemoveEventAttendeeUseCase,
+    useFactory: (repo: IEventRepository) => {
+      return new RemoveEventAttendeeUseCase(repo);
+    },
+    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+  },
+  LIST_EVENT_ATTENDEES_USE_CASE: {
+    provide: ListEventAttendeesUseCase,
     useFactory: (
       repo: IEventRepository,
       eventAttendeeRepo: IEventAttendeeRepository,
     ) => {
-      return new AddEventAttendeeUseCase(repo, eventAttendeeRepo);
+      return new ListEventAttendeesUseCase(repo, eventAttendeeRepo);
     },
     inject: [
       REPOSITORIES.EVENT_REPOSITORY.provide,
       REPOSITORIES.EVENT_ATTENDEE_REPOSITORY.provide,
     ],
   },
-  REMOVE_EVENT_ATTENDEE_USE_CASE: {
-    provide: RemoveEventAttendeeUseCase,
+  LIST_EVENT_MUSICIANS_USE_CASE: {
+    provide: ListEventMusiciansUseCase,
     useFactory: (
       repo: IEventRepository,
-      eventAttendeeRepo: IEventAttendeeRepository,
+      eventMusicianRepo: IEventMusicianRepository,
     ) => {
-      return new RemoveEventAttendeeUseCase(repo, eventAttendeeRepo);
+      return new ListEventMusiciansUseCase(repo, eventMusicianRepo);
     },
     inject: [
       REPOSITORIES.EVENT_REPOSITORY.provide,
-      REPOSITORIES.EVENT_ATTENDEE_REPOSITORY.provide,
+      REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
+    ],
+  },
+  UPDATE_EVENT_MUSICIAN_STATUS_USE_CASE: {
+    provide: UpdateEventMusicianStatusUseCase,
+    useFactory: (
+      repo: IEventRepository,
+      eventMusicianRepo: IEventMusicianRepository,
+    ) => {
+      return new UpdateEventMusicianStatusUseCase(repo, eventMusicianRepo);
+    },
+    inject: [
+      REPOSITORIES.EVENT_REPOSITORY.provide,
+      REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
     ],
   },
   ADD_EVENT_PERFORMER_USE_CASE: {

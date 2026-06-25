@@ -1,7 +1,14 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsOptional, IsString, IsUUID } from "class-validator";
 
 export class AddEventAttendeeDto {
+  @ApiPropertyOptional({
+    format: "uuid",
+    description:
+      "ID da audiência (apenas para establishment/admin; audiences usam o próprio JWT).",
+  })
   @IsString()
-  @IsNotEmpty()
-  audience_id: string;
+  @IsUUID()
+  @IsOptional()
+  audience_id?: string;
 }

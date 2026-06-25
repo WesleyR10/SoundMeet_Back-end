@@ -72,4 +72,6 @@ export interface IEventRepository extends ISearchableRepository<
 > {
   isAudienceAttendee(event_id: EventId, audience_id: string): Promise<boolean>;
   isMusicianPerformer(event_id: EventId, musician_id: string): Promise<boolean>;
+  addAttendee(event_id: EventId, audience_id: string, now?: Date): Promise<void>;
+  removeAttendee(event_id: EventId, audience_id: string, now?: Date): Promise<void>;
 }
