@@ -20,12 +20,13 @@
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true,
     "useDefineForClassFields": false,
+    "jsx": "react",
     "paths": {
       "@core/*": [
         "./src/core/*"
       ]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["src/metadata.ts"]
 }
