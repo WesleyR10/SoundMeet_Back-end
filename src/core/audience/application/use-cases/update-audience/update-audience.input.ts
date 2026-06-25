@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -11,6 +12,7 @@ import {
 
 export type UpdateAudienceInputConstructorProps = {
   id: string;
+  email?: string;
   name?: string;
   nickname?: string | null;
   avatar?: string | null;
@@ -26,6 +28,10 @@ export class UpdateAudienceInput {
   @IsNotEmpty()
   @IsUUID()
   id: string;
+
+  @IsEmail()
+  @IsOptional()
+  email?: string;
 
   @IsString()
   @IsOptional()
@@ -67,6 +73,7 @@ export class UpdateAudienceInput {
   constructor(props: UpdateAudienceInputConstructorProps) {
     if (!props) return;
     this.id = props.id;
+    props.email !== undefined && (this.email = props.email);
     props.name !== undefined && (this.name = props.name);
     props.nickname !== undefined && (this.nickname = props.nickname);
     props.avatar !== undefined && (this.avatar = props.avatar);

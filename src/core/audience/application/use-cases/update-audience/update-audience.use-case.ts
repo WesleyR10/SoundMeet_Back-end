@@ -1,5 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
@@ -13,7 +14,10 @@ export class UpdateAudienceUseCase implements IUseCase<
   UpdateAudienceInput,
   UpdateAudienceOutput
 > {
-  constructor(private readonly audienceRepo: IAudienceRepository) {}
+  constructor(
+    private readonly audienceRepo: IAudienceRepository,
+    private readonly domainEventMediator?: DomainEventMediator,
+  ) {}
 
   async execute(input: UpdateAudienceInput): Promise<UpdateAudienceOutput> {
     const audienceId = new AudienceId(input.id);
@@ -21,6 +25,16 @@ export class UpdateAudienceUseCase implements IUseCase<
 
     if (!audience) {
       throw new NotFoundError(input.id, Audience);
+    }
+
+    if (input.email !== undefined && input.email !== audience.email.value) {
+      const existing = await this.audienceRepo.findByEmail(input.email);
+      if (existing && existing.audience_id.id !== audience.audience_id.id) {
+        throw new EntityValidationError([
+          { email: ["Email already in use by another audience member"] },
+        ]);
+      }
+      audience.changeEmail(input.email);
     }
 
     if (input.name !== undefined) {
@@ -64,6 +78,7 @@ export class UpdateAudienceUseCase implements IUseCase<
     }
 
     await this.audienceRepo.update(audience);
+    await this.domainEventMediator?.publish(audience);
 
     return AudienceOutputMapper.toOutput(audience);
   }

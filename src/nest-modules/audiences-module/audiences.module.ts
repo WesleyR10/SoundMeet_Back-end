@@ -21,6 +21,7 @@ import { AUDIENCES_PROVIDERS } from "./audiences.providers";
   controllers: [AudiencesController],
   providers: [
     ...Object.values(AUDIENCES_PROVIDERS.REPOSITORIES),
+    ...Object.values(AUDIENCES_PROVIDERS.EVENTS),
     ...Object.values(AUDIENCES_PROVIDERS.USE_CASES),
   ],
   exports: [AUDIENCES_PROVIDERS.REPOSITORIES.AUDIENCE_REPOSITORY.provide],

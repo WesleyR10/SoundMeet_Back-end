@@ -35,7 +35,14 @@ import { SendTipUseCase } from "../../core/audience/application/use-cases/send-t
 import { ShareSocialMediaUseCase } from "../../core/audience/application/use-cases/share-social-media/share-social-media.use-case";
 import { UpdateAudienceUseCase } from "../../core/audience/application/use-cases/update-audience/update-audience.use-case";
 import { VoteSongUseCase } from "../../core/audience/application/use-cases/vote-song/vote-song.use-case";
-import { AuthGuard, Public, Roles, RolesGuard } from "../auth-module";
+import {
+  AudienceOwnershipGuard,
+  AuthGuard,
+  CurrentUserContextGuard,
+  Public,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
 import { MusicianCollectionPresenter } from "../musicians-module/musician.presenter";
 import {
   AudienceCollectionPresenter,
@@ -59,7 +66,7 @@ import { VoteSongDto } from "./dto/vote-song.dto";
 
 @ApiTags("Audience")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("audiences")
 export class AudiencesController {
   @Inject(CreateAudienceUseCase)
@@ -146,6 +153,7 @@ export class AudiencesController {
 
   @Patch(":id")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar usuário do público",
     description: "Atualiza dados do perfil do público.",
@@ -173,6 +181,7 @@ export class AudiencesController {
   @HttpCode(204)
   @Delete(":id")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Remover usuário do público",
     description: "Remove o perfil do público.",
@@ -187,6 +196,7 @@ export class AudiencesController {
 
   @Patch(":id/complete-profile")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Completar perfil do público",
     description: "Completa o perfil e atualiza configurações e preferências.",
@@ -215,6 +225,7 @@ export class AudiencesController {
 
   @Post(":id/scan-qr")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Escanear QR Code",
     description: "Registra scan de QR Code e aplica pontuação/gamificação.",
@@ -239,6 +250,7 @@ export class AudiencesController {
 
   @Post(":id/music-requests")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Fazer pedido musical",
     description: "Cria um pedido musical e aplica pontuação/gamificação.",
@@ -267,6 +279,7 @@ export class AudiencesController {
 
   @Post(":id/votes")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Votar em música",
     description: "Registra voto e aplica pontuação/gamificação.",
@@ -287,6 +300,7 @@ export class AudiencesController {
 
   @Post(":id/tips")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Enviar gorjeta",
     description: "Registra gorjeta e aplica pontuação/gamificação.",
@@ -313,6 +327,7 @@ export class AudiencesController {
 
   @Post(":id/social-shares")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Compartilhar em rede social",
     description: "Registra compartilhamento e aplica pontuação/gamificação.",
@@ -334,6 +349,7 @@ export class AudiencesController {
 
   @Post(":id/indications")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Indicar músico para estabelecimento",
     description: "Registra indicação e aplica pontuação/gamificação.",
@@ -355,6 +371,7 @@ export class AudiencesController {
 
   @Post(":id/attend-event")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Participar de evento",
     description: "Registra participação em evento e aplica pontuação.",

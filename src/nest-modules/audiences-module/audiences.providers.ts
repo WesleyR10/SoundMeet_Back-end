@@ -16,7 +16,9 @@ import { ShareSocialMediaUseCase } from "../../core/audience/application/use-cas
 import { UpdateAudienceUseCase } from "../../core/audience/application/use-cases/update-audience/update-audience.use-case";
 import { VoteSongUseCase } from "../../core/audience/application/use-cases/vote-song/vote-song.use-case";
 import { IAudienceRepository } from "../../core/audience/domain/audience.repository";
+import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { AddEventAttendeeUseCase } from "../../core/events/application/use-cases/add-event-attendee/add-event-attendee.use-case";
 import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
 import { IUserInteractionRepository } from "../../core/gamification/domain/user-interaction.repository";
@@ -73,10 +75,13 @@ export const USE_CASES = {
   },
   UPDATE_AUDIENCE_USE_CASE: {
     provide: UpdateAudienceUseCase,
-    useFactory: (audienceRepo: IAudienceRepository) => {
-      return new UpdateAudienceUseCase(audienceRepo);
+    useFactory: (
+      audienceRepo: IAudienceRepository,
+      domainEventMediator: DomainEventMediator,
+    ) => {
+      return new UpdateAudienceUseCase(audienceRepo, domainEventMediator);
     },
-    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide],
+    inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide, DomainEventMediator],
   },
   DELETE_AUDIENCE_USE_CASE: {
     provide: DeleteAudienceUseCase,
@@ -204,7 +209,18 @@ export const USE_CASES = {
   },
 };
 
+export const EVENTS = {
+  DOMAIN_EVENT_MEDIATOR: {
+    provide: DomainEventMediator,
+    useFactory: (eventEmitter: EventEmitter2) => {
+      return new DomainEventMediator(eventEmitter);
+    },
+    inject: [EventEmitter2],
+  },
+};
+
 export const AUDIENCES_PROVIDERS = {
   REPOSITORIES,
   USE_CASES,
+  EVENTS,
 };

@@ -11,6 +11,7 @@ import { AudienceValidatorFactory } from "./audience.validator";
 import { AudienceFakeBuilder } from "./audience-fake.builder";
 import { AudienceBadgeEarnedEvent } from "./events/audience-badge-earned.event";
 import { AudienceCreatedEvent } from "./events/audience-created.event";
+import { AudienceEmailChangedEvent } from "./events/audience-email-changed.event";
 import { AudienceLevelUpgradedEvent } from "./events/audience-level-upgraded.event";
 import { AudiencePreferencesUpdatedEvent } from "./events/audience-preferences-updated.event";
 import { AudienceUpdatedEvent } from "./events/audience-updated.event";
@@ -352,6 +353,13 @@ export class Audience extends AggregateRoot {
       return;
     }
     this.dispatchUpdateEvent();
+    this.applyEvent(
+      new AudienceEmailChangedEvent({
+        audience_id: this.audience_id,
+        new_email: email,
+        name: this.name,
+      }),
+    );
   }
 
   changeNickname(nickname: string | null): void {

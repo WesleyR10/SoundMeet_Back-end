@@ -20,6 +20,10 @@ export type AudienceModel = {
   privacy_settings: any;
   discovery_settings: any;
   is_active: boolean;
+  email_verified_at?: Date | null;
+  email_pending?: string | null;
+  email_token?: string | null;
+  email_token_expires_at?: Date | null;
   created_at: Date;
   updated_at: Date;
 };
