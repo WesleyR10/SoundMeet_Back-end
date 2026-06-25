@@ -92,6 +92,10 @@ model Musician {
   total_ratings    Int      @default(0)
   is_active        Boolean  @default(true)
   is_verified      Boolean  @default(false)
+  email_verified_at      DateTime?
+  email_pending          String?
+  email_token            String?
+  email_token_expires_at DateTime?
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
@@ -263,10 +267,14 @@ model Establishment {
   rating             Float   @default(0)
   total_ratings      Int     @default(0)
 
-  is_active   Boolean  @default(true)
-  is_verified Boolean  @default(false)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  is_active              Boolean   @default(true)
+  is_verified            Boolean   @default(false)
+  email_verified_at      DateTime?
+  email_pending          String?
+  email_token            String?
+  email_token_expires_at DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
 
   // Relacionamentos
   profile   EstablishmentProfile?
@@ -514,9 +522,13 @@ model Audience {
   notification_settings Json? // Configurações de notificação
   privacy_settings      Json? // Configurações de privacidade
   discovery_settings    Json? // Configurações de descoberta musical
-  is_active             Boolean  @default(true)
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
+  is_active              Boolean   @default(true)
+  email_verified_at      DateTime?
+  email_pending          String?
+  email_token            String?
+  email_token_expires_at DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
 
   // Relacionamentos
   requests       MusicRequest[]
