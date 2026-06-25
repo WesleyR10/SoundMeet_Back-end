@@ -7,8 +7,36 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
+  "verifyEmail": true,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
+  "smtpServer": {
+    "host": "smtp.resend.com",
+    "port": "465",
+    "ssl": "true",
+    "starttls": "false",
+    "auth": "true",
+    "user": "resend",
+    "password": "${env.RESEND_API_KEY}",
+    "from": "${env.MAIL_FROM}",
+    "fromDisplayName": "SoundMeet"
+  },
+  "requiredActions": [
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 50
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30
+    }
+  ],
   "permanentLockout": false,
   "failureFactor": 5,
   "waitIncrementSeconds": 60,

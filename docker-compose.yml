@@ -208,12 +208,17 @@ services:
       KC_HTTP_ENABLED: true
       KC_HEALTH_ENABLED: true
       KC_METRICS_ENABLED: true
+      # Email — usados pelo realm-soundmeet.json via ${env.VAR} no import
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@soundmeet.com.br}
+    volumes:
+      - ./infra/keycloak/realm-soundmeet.json:/opt/keycloak/data/import/realm-soundmeet.json:ro
     ports:
       - "8080:8080"
     depends_on:
       postgres-keycloak:
         condition: service_healthy
-    command: start-dev
+    command: start-dev --import-realm
     networks:
       - soundmeet-network
     restart: unless-stopped
