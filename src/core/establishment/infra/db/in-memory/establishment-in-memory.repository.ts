@@ -21,6 +21,14 @@ export class EstablishmentInMemoryRepository
   >
   implements IEstablishmentRepository
 {
+  async findByEmail(email: string): Promise<Establishment | null> {
+    return (
+      this.items.find(
+        (e) => e.email.value.toLowerCase() === email.toLowerCase(),
+      ) ?? null
+    );
+  }
+
   async deleteProfile(establishment_id: EstablishmentId): Promise<void> {
     const entity = await this.findById(establishment_id);
     if (!entity) {

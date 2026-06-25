@@ -1,3 +1,4 @@
+import { InvalidOperationError } from "../../../../../shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import {
@@ -160,7 +161,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     await expect(useCase.execute(input)).rejects.toThrow(EntityValidationError);
   });
 
-  it("should not change CNPJ when updating", async () => {
+  it("should throw InvalidOperationError when trying to change CNPJ", async () => {
     const establishment = EstablishmentFakeBuilder.anEstablishment()
       .withCnpj("84244955000184")
       .build();
@@ -169,14 +170,9 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
     const input = {
       id: establishment.establishment_id.id,
       name: "Updated Name",
-      cnpj: "90.441.272/0001-10", // This should be ignored
+      cnpj: "90.441.272/0001-10",
     };
 
-    const output = await useCase.execute(input);
-
-    expect(output.cnpj).toEqual({
-      formatted: "84.244.955/0001-84",
-      value: "84244955000184",
-    }); // Original CNPJ preserved
+    await expect(useCase.execute(input)).rejects.toThrow(InvalidOperationError);
   });
 });

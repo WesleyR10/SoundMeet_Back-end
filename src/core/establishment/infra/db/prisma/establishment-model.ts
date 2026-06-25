@@ -35,6 +35,10 @@ export type EstablishmentModel = {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  email_verified_at?: Date | null;
+  email_pending?: string | null;
+  email_token?: string | null;
+  email_token_expires_at?: Date | null;
   created_at: Date;
   updated_at: Date;
   profile?: EstablishmentProfileModel | null;

@@ -9,6 +9,27 @@ import {
   validateSync,
 } from "class-validator";
 
+export type EstablishmentType =
+  | "bar"
+  | "restaurant"
+  | "club"
+  | "pub"
+  | "cafe"
+  | "hotel"
+  | "theater"
+  | "other";
+
+export const ESTABLISHMENT_TYPES: EstablishmentType[] = [
+  "bar",
+  "restaurant",
+  "club",
+  "pub",
+  "cafe",
+  "hotel",
+  "theater",
+  "other",
+];
+
 export type CreateEstablishmentInputConstructorProps = {
   name: string;
   description?: string;
@@ -17,7 +38,7 @@ export type CreateEstablishmentInputConstructorProps = {
   email: string;
   phone: string;
   website?: string;
-  establishment_type: "bar" | "restaurant" | "club";
+  establishment_type: EstablishmentType;
   is_active?: boolean;
 };
 
@@ -58,9 +79,9 @@ export class CreateEstablishmentInput {
 
   @IsString()
   @IsNotEmpty()
-  @IsIn(["bar", "restaurant", "club"])
+  @IsIn(ESTABLISHMENT_TYPES)
   @MaxLength(50)
-  establishment_type: "bar" | "restaurant" | "club";
+  establishment_type: EstablishmentType;
 
   @IsBoolean()
   @IsOptional()

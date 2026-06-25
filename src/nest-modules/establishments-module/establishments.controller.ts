@@ -34,6 +34,7 @@ import { ListEstablishmentAnalyticsUseCase } from "../../core/establishment/appl
 import { ListEstablishmentsUseCase } from "../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
   AuthGuard,
   CurrentUserContextGuard,
@@ -92,8 +93,11 @@ export class EstablishmentsController {
   @Inject(ListEstablishmentAnalyticsUseCase)
   private listAnalyticsUseCase: ListEstablishmentAnalyticsUseCase;
 
+  @Inject(VerifyEstablishmentUseCase)
+  private verifyUseCase: VerifyEstablishmentUseCase;
+
   @Post()
-  @Public()
+  @Roles("establishment", "admin")
   @ApiOperation({
     summary: "Criar estabelecimento",
     description: "Cria um estabelecimento e gera QR Code permanente.",
@@ -198,6 +202,21 @@ export class EstablishmentsController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {
     await this.deleteProfileUseCase.execute({ id });
+  }
+
+  @Post(":id/verify")
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Verificar estabelecimento",
+    description: "Marca o estabelecimento como verificado (apenas admin).",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: EstablishmentPresenter })
+  async verify(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const output = await this.verifyUseCase.execute({ id });
+    return EstablishmentsController.serialize(output);
   }
 
   @HttpCode(204)

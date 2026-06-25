@@ -11,12 +11,15 @@ import { ListEstablishmentsUseCase } from "../../core/establishment/application/
 import { RecalculateEstablishmentAnalyticsUseCase } from "../../core/establishment/application/use-cases/recalculate-establishment-analytics/recalculate-establishment-analytics.use-case";
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import { IEstablishmentRepository } from "../../core/establishment/domain/establishment.repository";
 import { IEstablishmentAnalyticsRepository } from "../../core/establishment/domain/establishment-analytics.repository";
+import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { EstablishmentAnalyticsPrismaRepository } from "../../core/establishment/infra/db/prisma/establishment-analytics-prisma.repository";
 import { EstablishmentPrismaRepository } from "../../core/establishment/infra/db/prisma/establishment-prisma.repository";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { EVENTS_PROVIDERS } from "../events-module/events.providers";
 import { MUSICIANS_PROVIDERS } from "../musicians-module/musicians.providers";
@@ -62,10 +65,13 @@ export const USE_CASES = {
   },
   UPDATE_ESTABLISHMENT_USE_CASE: {
     provide: UpdateEstablishmentUseCase,
-    useFactory: (repo: IEstablishmentRepository) => {
-      return new UpdateEstablishmentUseCase(repo);
+    useFactory: (
+      repo: IEstablishmentRepository,
+      domainEventMediator: DomainEventMediator,
+    ) => {
+      return new UpdateEstablishmentUseCase(repo, domainEventMediator);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide],
+    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, DomainEventMediator],
   },
   DELETE_ESTABLISHMENT_USE_CASE: {
     provide: DeleteEstablishmentUseCase,
@@ -154,6 +160,13 @@ export const USE_CASES = {
       REPOSITORIES.ESTABLISHMENT_ANALYTICS_REPOSITORY.provide,
     ],
   },
+  VERIFY_ESTABLISHMENT_USE_CASE: {
+    provide: VerifyEstablishmentUseCase,
+    useFactory: (repo: IEstablishmentRepository) => {
+      return new VerifyEstablishmentUseCase(repo);
+    },
+    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide],
+  },
 };
 
 export const HANDLERS = {
@@ -174,9 +187,20 @@ export const JOBS = {
   },
 };
 
+export const EVENTS = {
+  DOMAIN_EVENT_MEDIATOR: {
+    provide: DomainEventMediator,
+    useFactory: (eventEmitter: EventEmitter2) => {
+      return new DomainEventMediator(eventEmitter);
+    },
+    inject: [EventEmitter2],
+  },
+};
+
 export const ESTABLISHMENTS_PROVIDERS = {
   REPOSITORIES,
   USE_CASES,
+  EVENTS,
   HANDLERS,
   JOBS,
 };

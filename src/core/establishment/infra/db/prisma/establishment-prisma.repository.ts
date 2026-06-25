@@ -191,6 +191,15 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
     return model ? EstablishmentModelMapper.toEntity(model) : null;
   }
 
+  async findByEmail(email: string): Promise<Establishment | null> {
+    const model = await this.prisma.establishment.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      include: { profile: true },
+    });
+
+    return model ? EstablishmentModelMapper.toEntity(model) : null;
+  }
+
   async findByIds(ids: EstablishmentId[]): Promise<Establishment[]> {
     const models = await this.prisma.establishment.findMany({
       where: {

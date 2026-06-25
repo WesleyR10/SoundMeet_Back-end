@@ -10,6 +10,7 @@ import { ESTABLISHMENTS_PROVIDERS } from "./establishments.providers";
   controllers: [EstablishmentsController],
   providers: [
     ...Object.values(ESTABLISHMENTS_PROVIDERS.REPOSITORIES),
+    ...Object.values(ESTABLISHMENTS_PROVIDERS.EVENTS),
     ...Object.values(ESTABLISHMENTS_PROVIDERS.USE_CASES),
     ...Object.values(ESTABLISHMENTS_PROVIDERS.HANDLERS),
     ...Object.values(ESTABLISHMENTS_PROVIDERS.JOBS),

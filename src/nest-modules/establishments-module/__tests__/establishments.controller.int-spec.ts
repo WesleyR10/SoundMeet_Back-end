@@ -1,5 +1,8 @@
 import { IEventRepository } from "@core/events/domain";
-import { EventInMemoryRepository } from "@core/events/infra/db/in-memory";
+import {
+  EventInMemoryRepository,
+  EventMusicianInMemoryRepository,
+} from "@core/events/infra/db/in-memory";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { EstablishmentOutputMapper } from "../../../core/establishment/application/use-cases/common/establishment-output";
@@ -28,8 +31,11 @@ import { DeleteEventUseCase } from "../../../core/events/application/use-cases/d
 import { FinishEventUseCase } from "../../../core/events/application/use-cases/finish-event/finish-event.use-case";
 import { GetEventUseCase } from "../../../core/events/application/use-cases/get-event/get-event.use-case";
 import { ListEventsUseCase } from "../../../core/events/application/use-cases/list-events/list-events.use-case";
+import { ListEventAttendeesUseCase } from "../../../core/events/application/use-cases/list-event-attendees/list-event-attendees.use-case";
+import { ListEventMusiciansUseCase } from "../../../core/events/application/use-cases/list-event-musicians/list-event-musicians.use-case";
 import { RemoveEventAttendeeUseCase } from "../../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
+import { UpdateEventMusicianStatusUseCase } from "../../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import { UpdateEventUseCase } from "../../../core/events/application/use-cases/update-event/update-event.use-case";
 import { EntityValidationError } from "../../../core/shared/domain/validators/validation.error";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
@@ -47,6 +53,7 @@ describe("EstablishmentsController Integration Tests", () => {
   beforeEach(async () => {
     const repositoryInstance = new EstablishmentInMemoryRepository();
     const eventRepositoryInstance = new EventInMemoryRepository();
+    const eventMusicianRepositoryInstance = new EventMusicianInMemoryRepository();
 
     const moduleBuilder = Test.createTestingModule({
       controllers: [EstablishmentsController],
@@ -162,15 +169,23 @@ describe("EstablishmentsController Integration Tests", () => {
         },
         {
           provide: AddEventPerformerUseCase,
-          useFactory: (repo: IEventRepository) =>
-            new AddEventPerformerUseCase(repo),
-          inject: ["EventRepository"],
+          useValue: { execute: jest.fn() },
         },
         {
           provide: RemoveEventPerformerUseCase,
-          useFactory: (repo: IEventRepository) =>
-            new RemoveEventPerformerUseCase(repo),
-          inject: ["EventRepository"],
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: ListEventAttendeesUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: ListEventMusiciansUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: UpdateEventMusicianStatusUseCase,
+          useValue: { execute: jest.fn() },
         },
         {
           provide: GetHiringDashboardUseCase,

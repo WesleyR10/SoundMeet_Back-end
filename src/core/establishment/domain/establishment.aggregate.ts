@@ -13,6 +13,7 @@ import { EstablishmentValidatorFactory } from "./establishment.validator";
 import { EstablishmentFakeBuilder } from "./establishment-fake.builder";
 import { EstablishmentProfile } from "./establishment-profile.aggregate";
 import { EstablishmentCreatedEvent } from "./events/establishment-created.event";
+import { EstablishmentEmailChangedEvent } from "./events/establishment-email-changed.event";
 import { EstablishmentRatedEvent } from "./events/establishment-rated.event";
 import { EstablishmentVerifiedEvent } from "./events/establishment-verified.event";
 
@@ -212,6 +213,15 @@ export class Establishment extends AggregateRoot {
       this.notification.setError(emailOrError.error.message, "email");
     this.validate(["email"]);
     this.updated_at = new Date();
+    if (!this.notification.hasErrors()) {
+      this.applyEvent(
+        new EstablishmentEmailChangedEvent({
+          establishment_id: this.establishment_id,
+          new_email: email,
+          name: this.name,
+        }),
+      );
+    }
   }
 
   changePhone(phone: string | null): void {

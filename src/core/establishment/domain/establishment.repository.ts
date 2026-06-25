@@ -90,4 +90,5 @@ export interface IEstablishmentRepository extends ISearchableRepository<
   EstablishmentSearchResult
 > {
   deleteProfile(establishment_id: EstablishmentId): Promise<void>;
+  findByEmail(email: string): Promise<Establishment | null>;
 }

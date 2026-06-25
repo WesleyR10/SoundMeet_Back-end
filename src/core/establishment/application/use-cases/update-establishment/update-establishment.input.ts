@@ -9,6 +9,11 @@ import {
   validateSync,
 } from "class-validator";
 
+import {
+  ESTABLISHMENT_TYPES,
+  EstablishmentType,
+} from "../create-establishment/create-establishment.input";
+
 export type UpdateEstablishmentInputConstructorProps = {
   id: string;
   name?: string;
@@ -18,9 +23,8 @@ export type UpdateEstablishmentInputConstructorProps = {
   email?: string;
   phone?: string;
   website?: string;
-  establishment_type?: "bar" | "restaurant" | "club";
+  establishment_type?: EstablishmentType;
   is_active?: boolean;
-  is_verified?: boolean;
 };
 
 export class UpdateEstablishmentInput {
@@ -64,17 +68,13 @@ export class UpdateEstablishmentInput {
 
   @IsString()
   @IsOptional()
-  @IsIn(["bar", "restaurant", "club"])
+  @IsIn(ESTABLISHMENT_TYPES)
   @MaxLength(50)
-  establishment_type?: "bar" | "restaurant" | "club";
+  establishment_type?: EstablishmentType;
 
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  is_verified?: boolean;
 
   constructor(props: UpdateEstablishmentInputConstructorProps) {
     if (!props) return;
@@ -88,7 +88,6 @@ export class UpdateEstablishmentInput {
     this.website = props.website;
     this.establishment_type = props.establishment_type;
     this.is_active = props.is_active;
-    this.is_verified = props.is_verified;
   }
 }
 

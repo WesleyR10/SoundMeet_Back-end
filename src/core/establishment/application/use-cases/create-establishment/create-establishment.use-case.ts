@@ -17,6 +17,13 @@ export class CreateEstablishmentUseCase implements IUseCase<
   async execute(
     input: CreateEstablishmentInput,
   ): Promise<CreateEstablishmentOutput> {
+    const existing = await this.establishmentRepo.findByEmail(input.email);
+    if (existing) {
+      throw new EntityValidationError([
+        { email: ["Email already in use by another establishment"] },
+      ]);
+    }
+
     const entity = Establishment.create({
       name: input.name,
       description: input.description,
