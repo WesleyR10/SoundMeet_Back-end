@@ -11,6 +11,7 @@ export type UpdateRequestInputConstructorProps = {
   song_title?: string;
   artist?: string;
   message?: string;
+  requesting_audience_id?: string;
 };
 
 export class UpdateRequestInput {
@@ -18,6 +19,10 @@ export class UpdateRequestInput {
   @IsNotEmpty()
   @IsUUID()
   id: string;
+
+  @IsUUID()
+  @IsOptional()
+  requesting_audience_id?: string;
 
   @IsOptional()
   @IsString()
@@ -39,6 +44,8 @@ export class UpdateRequestInput {
     props.song_title !== undefined && (this.song_title = props.song_title);
     props.artist !== undefined && (this.artist = props.artist);
     props.message !== undefined && (this.message = props.message);
+    props.requesting_audience_id !== undefined &&
+      (this.requesting_audience_id = props.requesting_audience_id);
   }
 }
 

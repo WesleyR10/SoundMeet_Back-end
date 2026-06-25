@@ -5,6 +5,7 @@ import {
   MusicianId,
 } from "../../../../musician/domain";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { InvalidOperationError } from "../../../../shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -29,6 +30,15 @@ export class UpdateRequestUseCase implements IUseCase<
     const entity = await this.requestRepo.findById(new RequestId(input.id));
     if (!entity) {
       throw new NotFoundError(input.id, Request);
+    }
+
+    if (
+      input.requesting_audience_id !== undefined &&
+      entity.audience_id.id !== input.requesting_audience_id
+    ) {
+      throw new InvalidOperationError(
+        "You do not have permission to update this request",
+      );
     }
 
     await this.validateEventAndMusician(

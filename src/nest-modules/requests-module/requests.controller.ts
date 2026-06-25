@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Inject,
@@ -39,7 +40,14 @@ import { UpdateRequestInput } from "../../core/request/application/use-cases/upd
 import { UpdateRequestUseCase } from "../../core/request/application/use-cases/update-request/update-request.use-case";
 import { VoteRequestInput } from "../../core/request/application/use-cases/vote-request/vote-request.input";
 import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
-import { AuthGuard, Roles, RolesGuard } from "../auth-module";
+import {
+  AuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
+  CurrentUserContextGuard,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
 import { CreateRequestDto } from "./dto/create-request.dto";
 import { GetMusicianRequestsDto } from "./dto/get-musician-requests.dto";
 import { GetRequestSuggestionsDto } from "./dto/get-request-suggestions.dto";
@@ -57,7 +65,7 @@ import {
 
 @ApiTags("Requests")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("requests")
 export class RequestsController {
   @Inject(CreateRequestUseCase)
@@ -97,8 +105,14 @@ export class RequestsController {
     description: "Cria um pedido musical com regras anti-spam e gamificação.",
   })
   @ApiResponse({ status: 201, type: RequestPresenter })
-  async create(@Body() dto: CreateRequestDto) {
-    const output = await this.createUseCase.execute(dto);
+  async create(
+    @Body() dto: CreateRequestDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    const output = await this.createUseCase.execute({
+      ...dto,
+      audience_id: currentUser?.userId ?? "",
+    });
     return RequestsController.serialize(output);
   }
 
@@ -149,7 +163,17 @@ export class RequestsController {
     @Param("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     musician_id: string,
     @Query() query: GetMusicianRequestsDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
+    if (
+      currentUser?.roles.includes("musician") &&
+      !currentUser.roles.includes("admin") &&
+      currentUser.userId !== musician_id
+    ) {
+      throw new ForbiddenException(
+        "Você não tem permissão para ver pedidos de outro músico.",
+      );
+    }
     const input = new GetMusicianRequestsInput({
       musician_id,
       status: query.status,
@@ -173,10 +197,11 @@ export class RequestsController {
   async respond(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: RespondToRequestDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const input = new RespondToRequestInput({
       request_id: id,
-      musician_id: dto.musician_id,
+      musician_id: currentUser?.userId ?? "",
       action: dto.action,
       rejection_reason: dto.rejection_reason,
     });
@@ -195,10 +220,14 @@ export class RequestsController {
   async markAsPlayed(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: MarkRequestPlayedDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const input = new MarkRequestPlayedInput({
       request_id: id,
       played_at: dto.played_at,
+      musician_id: currentUser?.roles.includes("admin")
+        ? undefined
+        : currentUser?.userId,
     });
     const output = await this.markRequestPlayedUseCase.execute(input);
     return RequestsController.serialize(output);
@@ -216,10 +245,11 @@ export class RequestsController {
   async vote(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: VoteRequestDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const input = new VoteRequestInput({
       request_id: id,
-      audience_id: dto.audience_id,
+      audience_id: currentUser?.userId ?? "",
       vote_type: dto.vote_type,
     });
     const output = await this.voteRequestUseCase.execute(input);
@@ -253,12 +283,14 @@ export class RequestsController {
   async update(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: UpdateRequestDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const input = new UpdateRequestInput({
       id,
       song_title: dto.song_title,
       artist: dto.artist,
       message: dto.message,
+      requesting_audience_id: currentUser?.userId,
     });
     const output = await this.updateUseCase.execute(input);
     return RequestsController.serialize(output);
@@ -275,8 +307,12 @@ export class RequestsController {
   @ApiResponse({ status: 204 })
   async remove(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const input: DeleteRequestInput = { id };
+    const input = new DeleteRequestInput({
+      id,
+      requesting_audience_id: currentUser?.userId,
+    });
     await this.deleteUseCase.execute(input);
   }
 

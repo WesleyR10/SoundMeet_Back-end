@@ -1,4 +1,5 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { InvalidOperationError } from "../../../../shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Request } from "../../../domain/request.aggregate";
 import { RequestId } from "../../../domain/request.aggregate";
@@ -19,6 +20,15 @@ export class DeleteRequestUseCase implements IUseCase<
 
     if (!entity) {
       throw new NotFoundError(input.id, Request);
+    }
+
+    if (
+      input.requesting_audience_id !== undefined &&
+      entity.audience_id.id !== input.requesting_audience_id
+    ) {
+      throw new InvalidOperationError(
+        "You do not have permission to delete this request",
+      );
     }
 
     await this.requestRepo.delete(requestId);

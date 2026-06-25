@@ -20,12 +20,15 @@ import { MarkRequestPlayedUseCase } from "../../../core/request/application/use-
 import { RespondToRequestAction } from "../../../core/request/application/use-cases/respond-to-request/respond-to-request.input";
 import { RespondToRequestUseCase } from "../../../core/request/application/use-cases/respond-to-request/respond-to-request.use-case";
 import { UpdateRequestUseCase } from "../../../core/request/application/use-cases/update-request/update-request.use-case";
+import { VoteRequestUseCase } from "../../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import {
   Request,
   RequestId,
 } from "../../../core/request/domain/request.aggregate";
 import { IRequestRepository } from "../../../core/request/domain/request.repository";
+import { IRequestVoteRepository } from "../../../core/request/domain/request-vote.repository";
 import { RequestInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-in-memory.repository";
+import { RequestVoteInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-vote-in-memory.repository";
 import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
@@ -86,6 +89,7 @@ describe("RequestsController Integration Tests", () => {
 
   beforeEach(async () => {
     const repositoryInstance = new RequestInMemoryRepository();
+    const requestVoteRepositoryInstance = new RequestVoteInMemoryRepository();
     eventRepository = new EventInMemoryRepository();
     musicianRepository = new MusicianInMemoryRepository();
     audienceRepository = new AudienceInMemoryRepository();
@@ -96,6 +100,10 @@ describe("RequestsController Integration Tests", () => {
         {
           provide: "RequestRepository",
           useValue: repositoryInstance,
+        },
+        {
+          provide: "RequestVoteRepository",
+          useValue: requestVoteRepositoryInstance,
         },
         {
           provide: "EventRepository",
@@ -201,6 +209,14 @@ describe("RequestsController Integration Tests", () => {
             "EventRepository",
             "MusicianRepository",
           ],
+        },
+        {
+          provide: VoteRequestUseCase,
+          useFactory: (
+            repo: IRequestRepository,
+            voteRepo: IRequestVoteRepository,
+          ) => new VoteRequestUseCase(repo, voteRepo),
+          inject: ["RequestRepository", "RequestVoteRepository"],
         },
       ],
     });
@@ -354,10 +370,17 @@ describe("RequestsController Integration Tests", () => {
       song_title: "Song Title",
     } as any);
 
-    const responded = await controller.respond(created.id, {
-      musician_id: musicianId,
-      action: RespondToRequestAction.ACCEPT,
-    } as any);
+    const responded = await controller.respond(
+      created.id,
+      { action: RespondToRequestAction.ACCEPT } as any,
+      {
+        userId: musicianId,
+        roles: ["musician"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
+    );
 
     const entity = await repository.findById(new RequestId(created.id));
 

@@ -1,7 +1,8 @@
-import { IsNotEmpty, IsUUID, validateSync } from "class-validator";
+import { IsNotEmpty, IsOptional, IsUUID, validateSync } from "class-validator";
 
 export type DeleteRequestInputConstructorProps = {
   id: string;
+  requesting_audience_id?: string;
 };
 
 export class DeleteRequestInput {
@@ -9,10 +10,16 @@ export class DeleteRequestInput {
   @IsNotEmpty()
   id: string;
 
+  @IsUUID()
+  @IsOptional()
+  requesting_audience_id?: string;
+
   constructor(props: DeleteRequestInputConstructorProps) {
     if (!props) return;
 
     this.id = props.id;
+    props.requesting_audience_id !== undefined &&
+      (this.requesting_audience_id = props.requesting_audience_id);
   }
 }
 

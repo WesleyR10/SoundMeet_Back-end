@@ -1,3 +1,5 @@
+import { ForbiddenException } from "@nestjs/common";
+
 import { Event, EventId, IEventRepository } from "../../../../events/domain";
 import {
   IMusicianRepository,
@@ -36,6 +38,12 @@ export class MarkRequestPlayedUseCase implements IUseCase<
 
     if (!entity) {
       throw new NotFoundError(input.request_id, Request);
+    }
+
+    if (input.musician_id && entity.musician_id.id !== input.musician_id) {
+      throw new ForbiddenException(
+        "Você não tem permissão para marcar este pedido como tocado.",
+      );
     }
 
     await this.validateEventAndMusician(

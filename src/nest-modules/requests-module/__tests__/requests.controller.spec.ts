@@ -309,21 +309,29 @@ describe("RequestsController Unit Tests", () => {
 
       const serializeSpy = jest.spyOn(RequestsController, "serialize");
 
+      const currentMusicianId = "44444444-4444-4444-4444-444444444444";
       const input: RespondToRequestDto = {
-        musician_id: "44444444-4444-4444-4444-444444444444",
         action: RespondToRequestAction.ACCEPT,
       } as any;
+      const currentUser = {
+        userId: currentMusicianId,
+        roles: ["musician"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      };
 
-      const presenter = await controller.respond(id, input);
+      const presenter = await controller.respond(id, input, currentUser);
 
       expect(mockRespondUseCase.execute).toHaveBeenCalledTimes(1);
       const executedInput = mockRespondUseCase.execute.mock
         .calls[0][0] as RespondToRequestDto & {
         request_id: string;
+        musician_id: string;
       };
 
       expect(executedInput.request_id).toBe(id);
-      expect(executedInput.musician_id).toBe(input.musician_id);
+      expect(executedInput.musician_id).toBe(currentMusicianId);
       expect(executedInput.action).toBe(input.action);
 
       expect(serializeSpy).toHaveBeenCalledWith(output);
@@ -340,7 +348,6 @@ describe("RequestsController Unit Tests", () => {
 
       const id = "11111111-1111-1111-1111-111111111111";
       const input: RespondToRequestDto = {
-        musician_id: "44444444-4444-4444-4444-444444444444",
         action: RespondToRequestAction.REJECT,
         rejection_reason: "Reason",
       } as any;
