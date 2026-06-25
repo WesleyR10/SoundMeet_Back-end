@@ -1,5 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Musician } from "../../../domain/musician.aggregate";
@@ -15,7 +16,10 @@ export class UpdateMusicianUseCase implements IUseCase<
   UpdateMusicianInput,
   UpdateMusicianOutput
 > {
-  constructor(private readonly musicianRepo: IMusicianRepository) {}
+  constructor(
+    private readonly musicianRepo: IMusicianRepository,
+    private readonly domainEventMediator?: DomainEventMediator,
+  ) {}
 
   async execute(input: UpdateMusicianInput): Promise<UpdateMusicianOutput> {
     const musicianId = new MusicianId(input.id);
@@ -23,6 +27,16 @@ export class UpdateMusicianUseCase implements IUseCase<
 
     if (!entity) {
       throw new NotFoundError(input.id, Musician);
+    }
+
+    if (input.email !== undefined && input.email !== entity.email.value) {
+      const existing = await this.musicianRepo.findByEmail(input.email);
+      if (existing && existing.musician_id.id !== entity.musician_id.id) {
+        throw new EntityValidationError([
+          { email: ["Email already in use by another musician"] },
+        ]);
+      }
+      entity.changeEmail(input.email);
     }
 
     input.name !== undefined && entity.changeName(input.name);
@@ -65,18 +79,12 @@ export class UpdateMusicianUseCase implements IUseCase<
       entity.deactivate();
     }
 
-    if (input.is_verified === true) {
-      entity.verify();
-    }
-    if (input.is_verified === false) {
-      entity.unverify();
-    }
-
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
     }
 
     await this.musicianRepo.update(entity);
+    await this.domainEventMediator?.publish(entity);
 
     return MusicianOutputMapper.toOutput(entity);
   }

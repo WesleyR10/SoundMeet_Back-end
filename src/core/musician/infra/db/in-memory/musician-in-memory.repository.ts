@@ -12,6 +12,14 @@ export class MusicianInMemoryRepository
   extends InMemorySearchableRepository<Musician, MusicianId, MusicianFilter>
   implements IMusicianRepository
 {
+  async findByEmail(email: string): Promise<Musician | null> {
+    return (
+      this.items.find(
+        (m) => m.email.value.toLowerCase() === email.toLowerCase(),
+      ) ?? null
+    );
+  }
+
   async search(props: MusicianSearchParams): Promise<MusicianSearchResult> {
     const result = await super.search(props);
     return new MusicianSearchResult({

@@ -26,7 +26,6 @@ export type UpdateMusicianInputConstructorProps = {
   experience_years?: number;
   priceRange?: PriceRangeProps | null;
   is_active?: boolean;
-  is_verified?: boolean;
 };
 
 export class UpdateMusicianInput {
@@ -59,10 +58,12 @@ export class UpdateMusicianInput {
   phone?: string;
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   genres?: string[];
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   instruments?: string[];
 
@@ -79,10 +80,6 @@ export class UpdateMusicianInput {
   @IsOptional()
   is_active?: boolean;
 
-  @IsBoolean()
-  @IsOptional()
-  is_verified?: boolean;
-
   constructor(props: UpdateMusicianInputConstructorProps) {
     if (!props) return;
     this.id = props.id;
@@ -97,7 +94,6 @@ export class UpdateMusicianInput {
     this.experience_years = props.experience_years;
     this.priceRange = props.priceRange;
     this.is_active = props.is_active;
-    this.is_verified = props.is_verified;
   }
 }
 

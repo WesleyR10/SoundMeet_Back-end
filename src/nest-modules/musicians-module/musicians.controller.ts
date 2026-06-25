@@ -27,6 +27,7 @@ import { GetMusicianUseCase } from "../../core/musician/application/use-cases/ge
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
+import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import {
   AuthGuard,
   CurrentUserContextGuard,
@@ -66,6 +67,9 @@ export class MusiciansController {
 
   @Inject(ListMusiciansUseCase)
   private listUseCase: ListMusiciansUseCase;
+
+  @Inject(VerifyMusicianUseCase)
+  private verifyUseCase: VerifyMusicianUseCase;
 
   @Post()
   @Roles("musician", "admin")
@@ -141,6 +145,21 @@ export class MusiciansController {
     @Body() dto: UpdateMusicianProfileDto,
   ) {
     const output = await this.updateProfileUseCase.execute({ ...dto, id });
+    return MusiciansController.serialize(output);
+  }
+
+  @Post(":id/verify")
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Verificar músico",
+    description: "Marca o músico como verificado (apenas admin).",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async verify(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const output = await this.verifyUseCase.execute({ id });
     return MusiciansController.serialize(output);
   }
 

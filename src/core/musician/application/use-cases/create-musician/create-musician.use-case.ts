@@ -19,6 +19,13 @@ export class CreateMusicianUseCase implements IUseCase<
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: CreateMusicianInput): Promise<MusicianOutput> {
+    const existing = await this.musicianRepo.findByEmail(input.email);
+    if (existing) {
+      throw new EntityValidationError([
+        { email: ["Email already in use by another musician"] },
+      ]);
+    }
+
     const musicianId = new MusicianId();
     let profile: MusicianProfile | null = null;
 

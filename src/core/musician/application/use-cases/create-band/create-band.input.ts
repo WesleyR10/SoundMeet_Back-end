@@ -43,6 +43,7 @@ export type CreateBandInputConstructorProps = {
   members?: BandMemberProps[];
   priceRange?: CreateBandPriceRangeInput | null;
   is_active?: boolean;
+  creator_musician_id?: string;
 };
 
 export class CreateBandInput {
@@ -75,6 +76,10 @@ export class CreateBandInput {
   @IsOptional()
   is_active?: boolean;
 
+  @IsString()
+  @IsOptional()
+  creator_musician_id?: string;
+
   constructor(props: CreateBandInputConstructorProps) {
     if (!props) return;
     this.name = props.name;
@@ -84,5 +89,6 @@ export class CreateBandInput {
     this.members = props.members;
     this.priceRange = props.priceRange;
     this.is_active = props.is_active;
+    this.creator_musician_id = props.creator_musician_id;
   }
 }

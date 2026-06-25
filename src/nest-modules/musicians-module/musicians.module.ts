@@ -10,6 +10,7 @@ import { MUSICIANS_PROVIDERS } from "./musicians.providers";
   controllers: [MusiciansController, BandsController],
   providers: [
     ...Object.values(MUSICIANS_PROVIDERS.REPOSITORIES),
+    ...Object.values(MUSICIANS_PROVIDERS.EVENTS),
     ...Object.values(MUSICIANS_PROVIDERS.USE_CASES),
   ],
   exports: [

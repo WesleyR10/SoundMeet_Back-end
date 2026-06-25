@@ -9,6 +9,7 @@ import {
 import { Location } from "../../shared/domain/value-objects/location.vo";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { MusicianCreatedEvent } from "./events/musician-created.event";
+import { MusicianEmailChangedEvent } from "./events/musician-email-changed.event";
 import { MusicianVerifiedEvent } from "./events/musician-verified.event";
 import { MusicianValidatorFactory } from "./musician.validator";
 import { MusicianFakeBuilder } from "./musician-fake.builder";
@@ -153,6 +154,24 @@ export class Musician extends AggregateRoot {
 
   changeAvatar(avatar: string | null): void {
     this.avatar = avatar;
+  }
+
+  changeEmail(email: string): void {
+    const emailOrError = Email.create(email);
+    this.email = emailOrError.ok;
+    emailOrError.isFail() &&
+      this.notification.setError(emailOrError.error.message, "email");
+    this.validate(["email"]);
+    this.updated_at = new Date();
+    if (!this.notification.hasErrors()) {
+      this.applyEvent(
+        new MusicianEmailChangedEvent({
+          musician_id: this.musician_id,
+          new_email: email,
+          name: this.name,
+        }),
+      );
+    }
   }
 
   changePhone(phone: string | null): void {

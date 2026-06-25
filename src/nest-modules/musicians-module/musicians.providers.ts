@@ -1,4 +1,5 @@
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
@@ -13,6 +14,8 @@ import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
 import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
 import { PrismaService } from "../database-module/prisma/prisma.service";
@@ -52,10 +55,13 @@ export const USE_CASES = {
   },
   UPDATE_MUSICIAN_USE_CASE: {
     provide: UpdateMusicianUseCase,
-    useFactory: (musicianRepo: IMusicianRepository) => {
-      return new UpdateMusicianUseCase(musicianRepo);
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      domainEventMediator: DomainEventMediator,
+    ) => {
+      return new UpdateMusicianUseCase(musicianRepo, domainEventMediator);
     },
-    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, DomainEventMediator],
   },
   UPDATE_MUSICIAN_PROFILE_USE_CASE: {
     provide: UpdateMusicianProfileUseCase,
@@ -140,9 +146,27 @@ export const USE_CASES = {
     },
     inject: [REPOSITORIES.BAND_REPOSITORY.provide],
   },
+  VERIFY_MUSICIAN_USE_CASE: {
+    provide: VerifyMusicianUseCase,
+    useFactory: (musicianRepo: IMusicianRepository) => {
+      return new VerifyMusicianUseCase(musicianRepo);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+};
+
+export const EVENTS = {
+  DOMAIN_EVENT_MEDIATOR: {
+    provide: DomainEventMediator,
+    useFactory: (eventEmitter: EventEmitter2) => {
+      return new DomainEventMediator(eventEmitter);
+    },
+    inject: [EventEmitter2],
+  },
 };
 
 export const MUSICIANS_PROVIDERS = {
   REPOSITORIES,
   USE_CASES,
+  EVENTS,
 };

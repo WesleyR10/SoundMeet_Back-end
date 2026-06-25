@@ -31,7 +31,16 @@ import { ListBandsUseCase } from "../../core/musician/application/use-cases/list
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { UpdateBandInput } from "../../core/musician/application/use-cases/update-band/update-band.input";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
-import { AuthGuard, Public, Roles, RolesGuard } from "../auth-module";
+import {
+  AuthGuard,
+  AuthenticatedUser,
+  BandOwnershipGuard,
+  CurrentUser,
+  CurrentUserContextGuard,
+  Public,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
 import { BandCollectionPresenter, BandPresenter } from "./band.presenter";
 import { AddBandMemberDto } from "./dto/add-band-member.dto";
 import { CreateBandDto } from "./dto/create-band.dto";
@@ -41,7 +50,7 @@ import { UpdateBandDto } from "./dto/update-band.dto";
 
 @ApiTags("Bands")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("bands")
 export class BandsController {
   @Inject(CreateBandUseCase)
@@ -69,12 +78,19 @@ export class BandsController {
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Criar banda",
-    description: "Cria uma banda com gêneros e membros opcionais.",
+    description:
+      "Cria uma banda. O músico autenticado é automaticamente adicionado como líder.",
   })
   @ApiResponse({ status: 201, type: BandPresenter })
-  async create(@Body() dto: CreateBandDto) {
+  async create(
+    @Body() dto: CreateBandDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
     const output = await this.createBandUseCase.execute(
-      new CreateBandInput(dto),
+      new CreateBandInput({
+        ...dto,
+        creator_musician_id: currentUser?.userId,
+      }),
     );
     return BandsController.serialize(output);
   }
@@ -108,6 +124,7 @@ export class BandsController {
 
   @Patch(":id")
   @Roles("musician", "admin")
+  @UseGuards(BandOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar banda",
     description: "Atualiza dados da banda.",
@@ -135,6 +152,7 @@ export class BandsController {
   @HttpCode(204)
   @Delete(":id")
   @Roles("musician", "admin")
+  @UseGuards(BandOwnershipGuard)
   @ApiOperation({
     summary: "Excluir banda",
     description: "Exclui uma banda pelo ID.",
@@ -149,6 +167,7 @@ export class BandsController {
 
   @Post(":id/members")
   @Roles("musician", "admin")
+  @UseGuards(BandOwnershipGuard)
   @ApiOperation({
     summary: "Adicionar membro na banda",
     description: "Adiciona um músico como membro de uma banda.",
@@ -173,6 +192,7 @@ export class BandsController {
   @HttpCode(204)
   @Delete(":id/members/:musicianId")
   @Roles("musician", "admin")
+  @UseGuards(BandOwnershipGuard)
   @ApiOperation({
     summary: "Remover membro da banda",
     description: "Remove um músico de uma banda.",

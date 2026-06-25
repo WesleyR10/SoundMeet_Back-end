@@ -96,4 +96,6 @@ export interface IMusicianRepository extends ISearchableRepository<
   MusicianFilter,
   MusicianSearchParams,
   MusicianSearchResult
-> {}
+> {
+  findByEmail(email: string): Promise<Musician | null>;
+}

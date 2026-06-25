@@ -88,10 +88,12 @@ export class CreateMusicianInput {
   phone?: string;
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   genres?: string[];
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   instruments?: string[];
 
