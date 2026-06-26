@@ -1,5 +1,9 @@
 import { PlanLimitExceededError } from "../errors/plan-limit-exceeded.error";
-import { EstablishmentPlanTier, MusicianPlanTier } from "../plan-tier.enum";
+import {
+  BillingCycle,
+  EstablishmentPlanTier,
+  MusicianPlanTier,
+} from "../plan-tier.enum";
 import { PlanCheckService } from "../plan-check.service";
 import {
   Subscription,
@@ -298,6 +302,179 @@ describe("PlanCheckService", () => {
       await expect(
         service.assertMusicianCanGenerateBanner(MUSICIAN_ID, 14),
       ).resolves.not.toThrow();
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // Billing cycle — 4D.8a
+  // ----------------------------------------------------------------
+  describe("getMusicianBillingCycle", () => {
+    it("sem subscription → MONTHLY (padrão)", async () => {
+      const service = new PlanCheckService(makeRepo());
+      expect(await service.getMusicianBillingCycle(MUSICIAN_ID)).toBe(
+        BillingCycle.MONTHLY,
+      );
+    });
+
+    it("subscription MONTHLY ativa → MONTHLY", async () => {
+      const repo = makeRepo();
+      await repo.insert(
+        new Subscription({
+          musician_id: MUSICIAN_ID,
+          plan_tier: MusicianPlanTier.ESSENTIAL,
+          persona: "musician",
+          status: SubscriptionStatus.ACTIVE,
+          billing_cycle: BillingCycle.MONTHLY,
+        }),
+      );
+      const service = new PlanCheckService(repo);
+      expect(await service.getMusicianBillingCycle(MUSICIAN_ID)).toBe(
+        BillingCycle.MONTHLY,
+      );
+    });
+
+    it("subscription ANNUAL ativa → ANNUAL", async () => {
+      const repo = makeRepo();
+      await repo.insert(
+        new Subscription({
+          musician_id: MUSICIAN_ID,
+          plan_tier: MusicianPlanTier.PRO,
+          persona: "musician",
+          status: SubscriptionStatus.ACTIVE,
+          billing_cycle: BillingCycle.ANNUAL,
+        }),
+      );
+      const service = new PlanCheckService(repo);
+      expect(await service.getMusicianBillingCycle(MUSICIAN_ID)).toBe(
+        BillingCycle.ANNUAL,
+      );
+    });
+
+    it("subscription cancelada → MONTHLY (fallback FREE)", async () => {
+      const repo = makeRepo();
+      const sub = new Subscription({
+        musician_id: MUSICIAN_ID,
+        plan_tier: MusicianPlanTier.PRO,
+        persona: "musician",
+        status: SubscriptionStatus.ACTIVE,
+        billing_cycle: BillingCycle.ANNUAL,
+      });
+      sub.cancel();
+      await repo.insert(sub);
+      const service = new PlanCheckService(repo);
+      expect(await service.getMusicianBillingCycle(MUSICIAN_ID)).toBe(
+        BillingCycle.MONTHLY,
+      );
+    });
+  });
+
+  describe("getEstablishmentBillingCycle", () => {
+    it("sem subscription → MONTHLY", async () => {
+      const service = new PlanCheckService(makeRepo());
+      expect(
+        await service.getEstablishmentBillingCycle(ESTABLISHMENT_ID),
+      ).toBe(BillingCycle.MONTHLY);
+    });
+
+    it("subscription ANNUAL ativa → ANNUAL", async () => {
+      const repo = makeRepo();
+      await repo.insert(
+        new Subscription({
+          establishment_id: ESTABLISHMENT_ID,
+          plan_tier: EstablishmentPlanTier.PRO,
+          persona: "establishment",
+          status: SubscriptionStatus.ACTIVE,
+          billing_cycle: BillingCycle.ANNUAL,
+        }),
+      );
+      const service = new PlanCheckService(repo);
+      expect(
+        await service.getEstablishmentBillingCycle(ESTABLISHMENT_ID),
+      ).toBe(BillingCycle.ANNUAL);
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // Pricing — 4D.8b
+  // ----------------------------------------------------------------
+  describe("getMusicianPlanPricing", () => {
+    it("FREE → preços zerados", async () => {
+      const service = new PlanCheckService(makeRepo());
+      const pricing = await service.getMusicianPlanPricing(MUSICIAN_ID);
+      expect(pricing.monthly_price_brl).toBe(0);
+      expect(pricing.annual_price_brl).toBe(0);
+      expect(pricing.annual_savings_brl).toBe(0);
+      expect(pricing.annual_discount_percent).toBe(0);
+    });
+
+    it("ESSENTIAL → R$34,90/mês · R$300/ano · economia R$118,80 · 28% off", async () => {
+      const repo = makeRepo();
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
+      const service = new PlanCheckService(repo);
+      const pricing = await service.getMusicianPlanPricing(MUSICIAN_ID);
+      expect(pricing.monthly_price_brl).toBe(34.9);
+      expect(pricing.annual_price_brl).toBe(300);
+      expect(pricing.annual_savings_brl).toBe(118.8);
+      expect(pricing.annual_discount_percent).toBe(28);
+    });
+
+    it("PRO → R$74,90/mês · R$670/ano · economia R$228,80 · 25% off", async () => {
+      const repo = makeRepo();
+      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.PRO));
+      const service = new PlanCheckService(repo);
+      const pricing = await service.getMusicianPlanPricing(MUSICIAN_ID);
+      expect(pricing.monthly_price_brl).toBe(74.9);
+      expect(pricing.annual_price_brl).toBe(670);
+      expect(pricing.annual_savings_brl).toBe(228.8);
+      expect(pricing.annual_discount_percent).toBe(25);
+    });
+
+    it("subscription cancelada → volta para pricing FREE", async () => {
+      const repo = makeRepo();
+      const sub = makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.PRO);
+      sub.cancel();
+      await repo.insert(sub);
+      const service = new PlanCheckService(repo);
+      const pricing = await service.getMusicianPlanPricing(MUSICIAN_ID);
+      expect(pricing.monthly_price_brl).toBe(0);
+    });
+  });
+
+  describe("getEstablishmentPlanPricing", () => {
+    it("FREE → preços zerados", async () => {
+      const service = new PlanCheckService(makeRepo());
+      const pricing =
+        await service.getEstablishmentPlanPricing(ESTABLISHMENT_ID);
+      expect(pricing.monthly_price_brl).toBe(0);
+      expect(pricing.annual_price_brl).toBe(0);
+    });
+
+    it("GROWTH → R$34,90/mês · R$300/ano · 28% off", async () => {
+      const repo = makeRepo();
+      await repo.insert(
+        makeEstablishmentSub(ESTABLISHMENT_ID, EstablishmentPlanTier.GROWTH),
+      );
+      const service = new PlanCheckService(repo);
+      const pricing =
+        await service.getEstablishmentPlanPricing(ESTABLISHMENT_ID);
+      expect(pricing.monthly_price_brl).toBe(34.9);
+      expect(pricing.annual_price_brl).toBe(300);
+      expect(pricing.annual_discount_percent).toBe(28);
+    });
+
+    it("PRO → R$74,90/mês · R$670/ano · 25% off", async () => {
+      const repo = makeRepo();
+      await repo.insert(
+        makeEstablishmentSub(ESTABLISHMENT_ID, EstablishmentPlanTier.PRO),
+      );
+      const service = new PlanCheckService(repo);
+      const pricing =
+        await service.getEstablishmentPlanPricing(ESTABLISHMENT_ID);
+      expect(pricing.monthly_price_brl).toBe(74.9);
+      expect(pricing.annual_price_brl).toBe(670);
+      expect(pricing.annual_discount_percent).toBe(25);
     });
   });
 });

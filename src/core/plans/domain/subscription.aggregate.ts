@@ -1,7 +1,7 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
 import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
-import { SubscriptionPersona } from "./plan-tier.enum";
+import { BillingCycle, SubscriptionPersona } from "./plan-tier.enum";
 import { SubscriptionValidatorFactory } from "./subscription.validator";
 
 export class SubscriptionId extends Uuid {}
@@ -19,6 +19,7 @@ export type SubscriptionProps = {
   establishment_id?: string | null;
   plan_tier: string;
   persona: SubscriptionPersona;
+  billing_cycle?: BillingCycle;
   status?: SubscriptionStatus;
   started_at?: Date;
   expires_at?: Date | null;
@@ -32,6 +33,7 @@ export type CreateSubscriptionCommand = {
   establishment_id?: string;
   plan_tier: string;
   persona: SubscriptionPersona;
+  billing_cycle?: BillingCycle;
   trial_ends_at?: Date;
 };
 
@@ -41,6 +43,7 @@ export class Subscription extends AggregateRoot {
   establishment_id: string | null;
   plan_tier: string;
   persona: SubscriptionPersona;
+  billing_cycle: BillingCycle;
   status: SubscriptionStatus;
   started_at: Date;
   expires_at: Date | null;
@@ -55,6 +58,7 @@ export class Subscription extends AggregateRoot {
     this.establishment_id = props.establishment_id ?? null;
     this.plan_tier = props.plan_tier;
     this.persona = props.persona;
+    this.billing_cycle = props.billing_cycle ?? BillingCycle.MONTHLY;
     this.status = props.status ?? SubscriptionStatus.ACTIVE;
     this.started_at = props.started_at ?? new Date();
     this.expires_at = props.expires_at ?? null;
@@ -64,11 +68,20 @@ export class Subscription extends AggregateRoot {
   }
 
   static create(command: CreateSubscriptionCommand): Subscription {
+    const billing_cycle = command.billing_cycle ?? BillingCycle.MONTHLY;
+    const started_at = new Date();
+    const expires_at = command.trial_ends_at
+      ? null
+      : Subscription.computeExpiryDate(billing_cycle, started_at);
+
     const sub = new Subscription({
       musician_id: command.musician_id,
       establishment_id: command.establishment_id,
       plan_tier: command.plan_tier,
       persona: command.persona,
+      billing_cycle,
+      started_at,
+      expires_at,
       trial_ends_at: command.trial_ends_at,
       status: command.trial_ends_at
         ? SubscriptionStatus.TRIAL
@@ -81,10 +94,21 @@ export class Subscription extends AggregateRoot {
     return sub;
   }
 
+  private static computeExpiryDate(cycle: BillingCycle, from: Date): Date {
+    const d = new Date(from);
+    if (cycle === BillingCycle.ANNUAL) {
+      d.setFullYear(d.getFullYear() + 1);
+    } else {
+      d.setMonth(d.getMonth() + 1);
+    }
+    return d;
+  }
+
   validate(): void {
     SubscriptionValidatorFactory.create().validate(this.notification, this, [
       "plan_tier",
       "persona",
+      "billing_cycle",
     ]);
   }
 
@@ -98,15 +122,19 @@ export class Subscription extends AggregateRoot {
   }
 
   isActive(): boolean {
-    if (this.status === SubscriptionStatus.ACTIVE) return true;
     if (
-      this.status === SubscriptionStatus.TRIAL &&
-      this.trial_ends_at &&
-      this.trial_ends_at > new Date()
+      this.status === SubscriptionStatus.CANCELLED ||
+      this.status === SubscriptionStatus.EXPIRED
     ) {
-      return true;
+      return false;
     }
-    return false;
+    if (this.status === SubscriptionStatus.TRIAL) {
+      return !!(this.trial_ends_at && this.trial_ends_at > new Date());
+    }
+    if (this.expires_at && this.expires_at <= new Date()) {
+      return false;
+    }
+    return true;
   }
 
   get entity_id(): SubscriptionId {
@@ -120,6 +148,7 @@ export class Subscription extends AggregateRoot {
       establishment_id: this.establishment_id,
       plan_tier: this.plan_tier,
       persona: this.persona,
+      billing_cycle: this.billing_cycle,
       status: this.status,
       started_at: this.started_at,
       expires_at: this.expires_at,
@@ -136,6 +165,7 @@ export class Subscription extends AggregateRoot {
           musician_id: new Uuid().id,
           plan_tier: "free",
           persona: "musician",
+          billing_cycle: BillingCycle.MONTHLY,
         }),
     };
   }

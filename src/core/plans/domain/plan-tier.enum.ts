@@ -10,4 +10,9 @@ export enum EstablishmentPlanTier {
   PRO = "pro",
 }
 
+export enum BillingCycle {
+  MONTHLY = "monthly",
+  ANNUAL = "annual",
+}
+
 export type SubscriptionPersona = "musician" | "establishment";

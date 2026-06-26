@@ -1,11 +1,15 @@
 import { PlanLimitExceededError } from "./errors/plan-limit-exceeded.error";
 import {
   ESTABLISHMENT_PLAN_FEATURES,
+  ESTABLISHMENT_PLAN_PRICING,
   EstablishmentPlanFeatures,
   MUSICIAN_PLAN_FEATURES,
+  MUSICIAN_PLAN_PRICING,
   MusicianPlanFeatures,
+  PlanPricing,
 } from "./plan-features.config";
 import {
+  BillingCycle,
   EstablishmentPlanTier,
   MusicianPlanTier,
 } from "./plan-tier.enum";
@@ -126,6 +130,48 @@ export class PlanCheckService {
         `Limite de ${features.banner_generation_per_month} banners/mês atingido. Faça upgrade para gerar mais.`,
       );
     }
+  }
+
+  /** Retorna o ciclo de cobrança da assinatura ativa do músico. */
+  async getMusicianBillingCycle(musician_id: string): Promise<BillingCycle> {
+    const sub =
+      await this.subscriptionRepository.findActiveMusicianSubscription(
+        musician_id,
+      );
+    if (!sub || !sub.isActive()) return BillingCycle.MONTHLY;
+    return sub.billing_cycle;
+  }
+
+  /** Retorna o ciclo de cobrança da assinatura ativa do estabelecimento. */
+  async getEstablishmentBillingCycle(
+    establishment_id: string,
+  ): Promise<BillingCycle> {
+    const sub =
+      await this.subscriptionRepository.findActiveEstablishmentSubscription(
+        establishment_id,
+      );
+    if (!sub || !sub.isActive()) return BillingCycle.MONTHLY;
+    return sub.billing_cycle;
+  }
+
+  /** Retorna o pricing de exibição/checkout para o tier atual do músico. */
+  async getMusicianPlanPricing(musician_id: string): Promise<PlanPricing> {
+    const tier = await this.getMusicianPlanTier(musician_id);
+    return (
+      MUSICIAN_PLAN_PRICING[tier] ??
+      MUSICIAN_PLAN_PRICING[MusicianPlanTier.FREE]
+    );
+  }
+
+  /** Retorna o pricing de exibição/checkout para o tier atual do estabelecimento. */
+  async getEstablishmentPlanPricing(
+    establishment_id: string,
+  ): Promise<PlanPricing> {
+    const tier = await this.getEstablishmentPlanTier(establishment_id);
+    return (
+      ESTABLISHMENT_PLAN_PRICING[tier] ??
+      ESTABLISHMENT_PLAN_PRICING[EstablishmentPlanTier.FREE]
+    );
   }
 
   /** Verifica se o estabelecimento pode gerar mais banners este mês. */

@@ -1,5 +1,14 @@
 import { EstablishmentPlanTier, MusicianPlanTier } from "./plan-tier.enum";
 
+export interface PlanPricing {
+  monthly_price_brl: number;
+  annual_price_brl: number;
+  /** Economia ao escolher anual vs 12×mensal */
+  annual_savings_brl: number;
+  /** Percentual de desconto anual arredondado */
+  annual_discount_percent: number;
+}
+
 // =============================================================
 // CONFIGURAÇÃO CENTRAL DE PLANOS — ALTERE AQUI PARA MODIFICAR
 // Preços de lançamento (jun/2026): revisão prevista ao atingir
@@ -129,5 +138,55 @@ export const ESTABLISHMENT_PLAN_FEATURES: Record<
     promotional_campaigns: true,
     api_access: true,
     multi_establishment: true,
+  },
+};
+
+// ------------------------------------------------------------
+// Preços — lançamento jun/2026
+// Revisão prevista ao atingir 1.000 assinantes pagantes.
+// Clientes existentes grandfathered nos valores atuais.
+// ------------------------------------------------------------
+export const MUSICIAN_PLAN_PRICING: Record<MusicianPlanTier, PlanPricing> = {
+  [MusicianPlanTier.FREE]: {
+    monthly_price_brl: 0,
+    annual_price_brl: 0,
+    annual_savings_brl: 0,
+    annual_discount_percent: 0,
+  },
+  [MusicianPlanTier.ESSENTIAL]: {
+    monthly_price_brl: 34.9,
+    annual_price_brl: 300,
+    annual_savings_brl: 118.8,
+    annual_discount_percent: 28,
+  },
+  [MusicianPlanTier.PRO]: {
+    monthly_price_brl: 74.9,
+    annual_price_brl: 670,
+    annual_savings_brl: 228.8,
+    annual_discount_percent: 25,
+  },
+};
+
+export const ESTABLISHMENT_PLAN_PRICING: Record<
+  EstablishmentPlanTier,
+  PlanPricing
+> = {
+  [EstablishmentPlanTier.FREE]: {
+    monthly_price_brl: 0,
+    annual_price_brl: 0,
+    annual_savings_brl: 0,
+    annual_discount_percent: 0,
+  },
+  [EstablishmentPlanTier.GROWTH]: {
+    monthly_price_brl: 34.9,
+    annual_price_brl: 300,
+    annual_savings_brl: 118.8,
+    annual_discount_percent: 28,
+  },
+  [EstablishmentPlanTier.PRO]: {
+    monthly_price_brl: 74.9,
+    annual_price_brl: 670,
+    annual_savings_brl: 228.8,
+    annual_discount_percent: 25,
   },
 };

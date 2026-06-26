@@ -5,6 +5,7 @@ import { Notification } from "../../shared/domain/validators/notification";
 import { Subscription } from "./subscription.aggregate";
 
 const VALID_PERSONAS = ["musician", "establishment"];
+const VALID_BILLING_CYCLES = ["monthly", "annual"] as const;
 
 export class SubscriptionRules {
   @IsNotEmpty({ groups: ["plan_tier"] })
@@ -15,9 +16,14 @@ export class SubscriptionRules {
   @IsNotEmpty({ groups: ["persona"] })
   persona: string;
 
+  @IsIn(VALID_BILLING_CYCLES, { groups: ["billing_cycle"] })
+  @IsNotEmpty({ groups: ["billing_cycle"] })
+  billing_cycle: string;
+
   constructor(entity: Subscription) {
     this.plan_tier = entity.plan_tier;
     this.persona = entity.persona;
+    this.billing_cycle = entity.billing_cycle;
   }
 }
 
@@ -30,7 +36,7 @@ export class SubscriptionValidator extends ClassValidatorFields {
     return super.validate(
       notification,
       new SubscriptionRules(entity),
-      fields ?? ["plan_tier", "persona"],
+      fields ?? ["plan_tier", "persona", "billing_cycle"],
     );
   }
 }

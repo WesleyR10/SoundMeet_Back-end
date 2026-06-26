@@ -6,7 +6,7 @@ import {
   SubscriptionId,
   SubscriptionStatus,
 } from "../../../domain/subscription.aggregate";
-import { SubscriptionPersona } from "../../../domain/plan-tier.enum";
+import { BillingCycle, SubscriptionPersona } from "../../../domain/plan-tier.enum";
 
 export type SubscriptionModel = {
   id: string;
@@ -14,6 +14,7 @@ export type SubscriptionModel = {
   establishment_id: string | null;
   plan_tier: string;
   persona: string;
+  billing_cycle: string;
   status: PrismaSubscriptionStatus;
   started_at: Date;
   expires_at: Date | null;
@@ -32,6 +33,11 @@ export class SubscriptionModelMapper {
       trial: SubscriptionStatus.TRIAL,
     };
 
+    const billingCycleMap: Record<string, BillingCycle> = {
+      monthly: BillingCycle.MONTHLY,
+      annual: BillingCycle.ANNUAL,
+    };
+
     const status = statusMap[model.status];
     if (!status) {
       throw new LoadEntityError([
@@ -45,6 +51,7 @@ export class SubscriptionModelMapper {
       establishment_id: model.establishment_id,
       plan_tier: model.plan_tier,
       persona: model.persona as SubscriptionPersona,
+      billing_cycle: billingCycleMap[model.billing_cycle] ?? BillingCycle.MONTHLY,
       status,
       started_at: model.started_at,
       expires_at: model.expires_at,
@@ -61,6 +68,7 @@ export class SubscriptionModelMapper {
       establishment_id: entity.establishment_id,
       plan_tier: entity.plan_tier,
       persona: entity.persona,
+      billing_cycle: entity.billing_cycle,
       status: entity.status as PrismaSubscriptionStatus,
       started_at: entity.started_at,
       expires_at: entity.expires_at,
