@@ -72,6 +72,13 @@ enum MusicRequestStatus {
   played
 }
 
+enum SubscriptionStatus {
+  active
+  cancelled
+  expired
+  trial
+}
+
 // =================== =====================
 // DOMÍNIO MUSICIAN
 // ========================================
@@ -120,6 +127,7 @@ model Musician {
   synced_lyrics_bulk_jobs  SyncedLyricsBulkJob[]
   wallet                   MusicianWallet?
   transactions             Transaction[]
+  subscriptions            Subscription[]
 
   @@map("musicians")
 }
@@ -277,12 +285,13 @@ model Establishment {
   updated_at             DateTime  @updatedAt
 
   // Relacionamentos
-  profile   EstablishmentProfile?
-  events    Event[]
-  bookings  Booking[]
-  inquiries Inquiry[]
-  analytics EstablishmentAnalytics[]
-  rankings  Ranking[]
+  profile       EstablishmentProfile?
+  events        Event[]
+  bookings      Booking[]
+  inquiries     Inquiry[]
+  analytics     EstablishmentAnalytics[]
+  rankings      Ranking[]
+  subscriptions Subscription[]
 
   @@map("establishments")
 }
@@ -964,6 +973,32 @@ model SyncedLyricsBulkJob {
 
   @@index([musicianId, status, created_at])
   @@map("synced_lyrics_bulk_jobs")
+}
+
+// ========================================
+// DOMÍNIO PLANS
+// ========================================
+
+model Subscription {
+  id               String             @id @default(uuid())
+  musician_id      String?
+  establishment_id String?
+  plan_tier        String
+  persona          String // "musician" | "establishment"
+  status           SubscriptionStatus @default(active)
+  started_at       DateTime           @default(now())
+  expires_at       DateTime?
+  trial_ends_at    DateTime?
+  cancelled_at     DateTime?
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+
+  musician      Musician?      @relation(fields: [musician_id], references: [id], onDelete: Cascade)
+  establishment Establishment? @relation(fields: [establishment_id], references: [id], onDelete: Cascade)
+
+  @@index([musician_id, status])
+  @@index([establishment_id, status])
+  @@map("subscriptions")
 }
 
 // ========================================
