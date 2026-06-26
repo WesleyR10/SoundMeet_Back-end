@@ -82,6 +82,8 @@ export class PlanCheckService {
       | "auto_split_management"
       | "api_access"
       | "white_label"
+      | "repertoire_sharing"
+      | "repertoire_nominal_invite"
     >,
   ): Promise<void> {
     const features = await this.getMusicianFeatures(musician_id);
@@ -172,6 +174,38 @@ export class PlanCheckService {
       ESTABLISHMENT_PLAN_PRICING[tier] ??
       ESTABLISHMENT_PLAN_PRICING[EstablishmentPlanTier.FREE]
     );
+  }
+
+  /** Verifica se o músico pode criar mais repertórios com base no plano. */
+  async assertMusicianCanCreateRepertoire(
+    musician_id: string,
+    current_count: number,
+  ): Promise<void> {
+    const features = await this.getMusicianFeatures(musician_id);
+    if (
+      features.max_repertoires !== null &&
+      current_count >= features.max_repertoires
+    ) {
+      throw new PlanLimitExceededError(
+        `Limite de ${features.max_repertoires} repertório(s) atingido. Faça upgrade para criar mais.`,
+      );
+    }
+  }
+
+  /** Verifica se o músico pode adicionar mais músicas ao repertório com base no plano. */
+  async assertMusicianCanAddSongToRepertoire(
+    musician_id: string,
+    current_songs_count: number,
+  ): Promise<void> {
+    const features = await this.getMusicianFeatures(musician_id);
+    if (
+      features.max_songs_per_repertoire !== null &&
+      current_songs_count >= features.max_songs_per_repertoire
+    ) {
+      throw new PlanLimitExceededError(
+        `Limite de ${features.max_songs_per_repertoire} músicas por repertório atingido. Faça upgrade para adicionar mais.`,
+      );
+    }
   }
 
   /** Verifica se o estabelecimento pode gerar mais banners este mês. */

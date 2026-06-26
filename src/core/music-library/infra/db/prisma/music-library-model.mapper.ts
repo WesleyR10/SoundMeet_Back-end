@@ -51,6 +51,7 @@ export class MusicLibraryModelMapper {
       lrc_coverage_ms: entity.lrc_coverage_ms ?? null,
       lrc_has_word_timestamps: entity.lrc_has_word_timestamps,
       lrc_last_synced_at: entity.lrc_last_synced_at ?? null,
+      duration_seconds: entity.duration_seconds ?? null,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
@@ -93,6 +94,7 @@ export class MusicLibraryModelMapper {
       lrc_coverage_ms: model.lrc_coverage_ms ?? null,
       lrc_has_word_timestamps: model.lrc_has_word_timestamps,
       lrc_last_synced_at: model.lrc_last_synced_at ?? null,
+      duration_seconds: model.duration_seconds ?? null,
       created_at: model.created_at,
       updated_at: model.updated_at,
     });

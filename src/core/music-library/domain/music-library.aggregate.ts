@@ -67,6 +67,8 @@ export type MusicLibraryConstructorProps = {
   lrc_coverage_ms?: number | null;
   lrc_has_word_timestamps?: boolean;
   lrc_last_synced_at?: Date | null;
+  /** Duração real da música em segundos; populado pelo pipeline ai-cifra/ai-audio (Bloco 6). */
+  duration_seconds?: number | null;
   created_at?: Date;
   updated_at?: Date;
 };
@@ -124,6 +126,7 @@ export class MusicLibrary extends AggregateRoot {
   lrc_coverage_ms: number | null;
   lrc_has_word_timestamps: boolean;
   lrc_last_synced_at: Date | null;
+  duration_seconds: number | null;
   created_at: Date;
   updated_at: Date;
 
@@ -160,6 +163,7 @@ export class MusicLibrary extends AggregateRoot {
     this.lrc_coverage_ms = props.lrc_coverage_ms ?? null;
     this.lrc_has_word_timestamps = props.lrc_has_word_timestamps ?? false;
     this.lrc_last_synced_at = props.lrc_last_synced_at ?? null;
+    this.duration_seconds = props.duration_seconds ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
@@ -399,6 +403,7 @@ export class MusicLibrary extends AggregateRoot {
       lrc_coverage_ms: this.lrc_coverage_ms,
       lrc_has_word_timestamps: this.lrc_has_word_timestamps,
       lrc_last_synced_at: this.lrc_last_synced_at,
+      duration_seconds: this.duration_seconds,
       created_at: this.created_at,
       updated_at: this.updated_at,
       display_name: this.displayName,

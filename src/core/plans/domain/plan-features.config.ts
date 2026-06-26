@@ -36,6 +36,10 @@ export interface MusicianPlanFeatures {
   auto_split_management: boolean;
   api_access: boolean;
   white_label: boolean;
+  /** link de compartilhamento de repertório (read-only temporário); false = FREE */
+  repertoire_sharing: boolean;
+  /** convite nominal de músico para acessar repertório; true = PRO only */
+  repertoire_nominal_invite: boolean;
 }
 
 export interface EstablishmentPlanFeatures {
@@ -72,6 +76,8 @@ export const MUSICIAN_PLAN_FEATURES: Record<
     auto_split_management: false,
     api_access: false,
     white_label: false,
+    repertoire_sharing: false,
+    repertoire_nominal_invite: false,
   },
   [MusicianPlanTier.ESSENTIAL]: {
     tip_fee_percentage: 7,
@@ -87,6 +93,8 @@ export const MUSICIAN_PLAN_FEATURES: Record<
     auto_split_management: false,
     api_access: false,
     white_label: false,
+    repertoire_sharing: true,
+    repertoire_nominal_invite: false,
   },
   [MusicianPlanTier.PRO]: {
     tip_fee_percentage: 5,
@@ -102,6 +110,8 @@ export const MUSICIAN_PLAN_FEATURES: Record<
     auto_split_management: true,
     api_access: false,
     white_label: false,
+    repertoire_sharing: true,
+    repertoire_nominal_invite: true,
   },
 };
 

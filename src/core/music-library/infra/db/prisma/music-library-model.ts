@@ -34,6 +34,7 @@ export type MusicLibraryModel = {
   lrc_coverage_ms: number | null;
   lrc_has_word_timestamps: boolean;
   lrc_last_synced_at: Date | null;
+  duration_seconds: number | null;
   created_at: Date;
   updated_at: Date;
 };
