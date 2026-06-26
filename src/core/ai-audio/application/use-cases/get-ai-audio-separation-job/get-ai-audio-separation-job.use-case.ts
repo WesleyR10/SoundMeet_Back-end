@@ -1,3 +1,5 @@
+import { ForbiddenException } from "@nestjs/common";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { AiAudioSeparationJob } from "../../../domain/ai-audio-separation-job.aggregate";
@@ -28,6 +30,15 @@ export class GetAiAudioSeparationJobUseCase implements IUseCase<
     if (!job) {
       throw new NotFoundError(input.id, AiAudioSeparationJob);
     }
+
+    if (input.requesting_musician_id && !input.is_admin) {
+      if (job.musician_id.id !== input.requesting_musician_id) {
+        throw new ForbiddenException(
+          "Você não tem permissão para consultar este job de separação.",
+        );
+      }
+    }
+
     return AiAudioSeparationJobOutputMapper.toOutput(job, (k) =>
       this.storage.getPublicUrl(k),
     );

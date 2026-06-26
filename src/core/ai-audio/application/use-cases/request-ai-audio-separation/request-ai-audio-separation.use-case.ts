@@ -1,3 +1,5 @@
+import { ForbiddenException } from "@nestjs/common";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -40,6 +42,14 @@ export class RequestAiAudioSeparationUseCase implements IUseCase<
     );
     if (!upload) {
       throw new NotFoundError(input.ai_audio_upload_id, AiAudioUpload);
+    }
+
+    if (input.requesting_musician_id && !input.is_admin) {
+      if (upload.musician_id.id !== input.requesting_musician_id) {
+        throw new ForbiddenException(
+          "Você não tem permissão para solicitar separação neste upload.",
+        );
+      }
     }
 
     if (upload.status === "rejected") {

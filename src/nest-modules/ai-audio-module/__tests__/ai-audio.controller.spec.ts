@@ -48,20 +48,29 @@ describe("AiAudioController Unit Tests", () => {
       jest.fn().mockResolvedValue(separationJobOutput()),
     );
 
+    const currentUser = {
+      userId: "33333333-3333-4333-8333-333333333333",
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+
     const presenter = await controller.requestSeparation(
       "22222222-2222-4222-8222-222222222222",
       {
-        musician_id: "33333333-3333-4333-8333-333333333333",
         model_id: "demucs",
         output_format: "wav",
       },
+      currentUser,
     );
 
     expect(execute).toHaveBeenCalledWith({
-      musician_id: "33333333-3333-4333-8333-333333333333",
       model_id: "demucs",
       output_format: "wav",
       ai_audio_upload_id: "22222222-2222-4222-8222-222222222222",
+      requesting_musician_id: currentUser.userId,
+      is_admin: false,
     });
     expect(presenter).toBeInstanceOf(AiAudioSeparationJobPresenter);
   });
@@ -75,12 +84,23 @@ describe("AiAudioController Unit Tests", () => {
         .mockResolvedValue(separationJobOutput({ status: "processing" })),
     );
 
+    const currentUser = {
+      userId: "33333333-3333-4333-8333-333333333333",
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+
     const presenter = await controller.getSeparation(
       "11111111-1111-4111-8111-111111111111",
+      currentUser,
     );
 
     expect(execute).toHaveBeenCalledWith({
       id: "11111111-1111-4111-8111-111111111111",
+      requesting_musician_id: currentUser.userId,
+      is_admin: false,
     });
     expect(presenter.status).toBe("processing");
   });

@@ -10,6 +10,8 @@ export type RequestAiAudioSeparationInput = {
   ai_audio_upload_id: string;
   model_id?: string;
   output_format?: "wav" | "flac" | "mp3";
+  requesting_musician_id?: string;
+  is_admin?: boolean;
 };
 
 export class RequestAiAudioSeparationInputValidator {
