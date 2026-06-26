@@ -4,6 +4,14 @@ import {
   TransactionInMemoryRepository,
 } from "@core/payment";
 
+import { MusicianPlanTier } from "../../../../../plans/domain/plan-tier.enum";
+import {
+  Subscription,
+  SubscriptionStatus,
+} from "../../../../../plans/domain/subscription.aggregate";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
+import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { WithdrawToPixUseCase } from "../withdraw-to-pix.use-case";
 
 class MusicianWalletRepoStub implements IMusicianWalletRepository {
@@ -62,10 +70,91 @@ describe("WithdrawToPixUseCase", () => {
 
     const output = await useCase.execute({
       musician_id: "123e4567-e89b-12d3-a456-426614174001",
-      amount: 50,
+      amount: 110,
       pix_key: { key: "12345678909", type: "cpf" },
     });
-    expect(output.wallet_balance).toBe(150);
+    expect(output.wallet_balance).toBe(90);
     expect(output.transaction_id).toBeDefined();
+  });
+});
+
+// ----------------------------------------------------------------
+// Gate 4C.2 — min_withdrawal_amount_brl por plano
+// ----------------------------------------------------------------
+describe("WithdrawToPixUseCase — gate 4C.2 (withdrawal config por plano)", () => {
+  const MUSICIAN_ID = "123e4567-e89b-12d3-a456-426614174099";
+
+  function makeWallet(balance = 200) {
+    const wallet = MusicianWallet.create({ musician_id: MUSICIAN_ID });
+    wallet.receiveFunds(balance);
+    return wallet;
+  }
+
+  async function setup(tier?: MusicianPlanTier, walletBalance = 200) {
+    const txRepo = new TransactionInMemoryRepository();
+    const walletRepo = new MusicianWalletRepoStub();
+    const subRepo = new SubscriptionInMemoryRepository();
+
+    const wallet = makeWallet(walletBalance);
+    await walletRepo.insert(wallet);
+
+    if (tier) {
+      await subRepo.insert(
+        new Subscription({
+          musician_id: MUSICIAN_ID,
+          plan_tier: tier,
+          persona: "musician",
+          status: SubscriptionStatus.ACTIVE,
+        }),
+      );
+    }
+
+    const planCheckService = new PlanCheckService(subRepo);
+    const useCase = new WithdrawToPixUseCase(walletRepo, txRepo, undefined, planCheckService);
+    return { useCase };
+  }
+
+  const pix_key = { key: "12345678909", type: "cpf" } as const;
+
+  it("FREE: mínimo R$110 — R$100 lança EntityValidationError", async () => {
+    const { useCase } = await setup();
+    await expect(
+      useCase.execute({ musician_id: MUSICIAN_ID, amount: 100, pix_key }),
+    ).rejects.toThrow(EntityValidationError);
+  });
+
+  it("FREE: mínimo R$110 — R$109 lança EntityValidationError", async () => {
+    const { useCase } = await setup(undefined, 500);
+    await expect(
+      useCase.execute({ musician_id: MUSICIAN_ID, amount: 109, pix_key }),
+    ).rejects.toThrow(EntityValidationError);
+  });
+
+  it("ESSENTIAL: mínimo R$70 — R$60 lança EntityValidationError", async () => {
+    const { useCase } = await setup(MusicianPlanTier.ESSENTIAL, 200);
+    await expect(
+      useCase.execute({ musician_id: MUSICIAN_ID, amount: 60, pix_key }),
+    ).rejects.toThrow(EntityValidationError);
+  });
+
+  it("ESSENTIAL: mínimo R$70 — R$70 valida mínimo corretamente", async () => {
+    const { useCase } = await setup(MusicianPlanTier.ESSENTIAL, 200);
+    await expect(
+      useCase.execute({ musician_id: MUSICIAN_ID, amount: 70, pix_key }),
+    ).resolves.not.toThrow();
+  });
+
+  it("PRO: mínimo R$50 — R$40 lança EntityValidationError", async () => {
+    const { useCase } = await setup(MusicianPlanTier.PRO, 200);
+    await expect(
+      useCase.execute({ musician_id: MUSICIAN_ID, amount: 40, pix_key }),
+    ).rejects.toThrow(EntityValidationError);
+  });
+
+  it("PRO: mínimo R$50 — R$50 valida mínimo corretamente", async () => {
+    const { useCase } = await setup(MusicianPlanTier.PRO, 200);
+    await expect(
+      useCase.execute({ musician_id: MUSICIAN_ID, amount: 50, pix_key }),
+    ).resolves.not.toThrow();
   });
 });

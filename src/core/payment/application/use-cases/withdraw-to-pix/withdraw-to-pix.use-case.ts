@@ -5,6 +5,7 @@ import {
 } from "@core/payment/domain/repositories";
 import { TransactionType } from "@core/payment/domain/transaction-enums";
 import { IPixWithdrawGateway } from "@core/payment/infra/gateways/pix-withdraw-gateway.interface";
+import { PlanCheckService } from "@core/plans/domain/plan-check.service";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 import { NotFoundError } from "@core/shared/domain/errors";
 import { EntityValidationError } from "@core/shared/domain/validators/validation.error";
@@ -19,6 +20,8 @@ export type WithdrawToPixOutput = {
   transaction_id: string;
   wallet_balance: number;
   status: string;
+  min_withdrawal_amount_brl: number;
+  withdrawal_days: number;
 };
 
 export class WithdrawToPixUseCase implements IUseCase<
@@ -29,9 +32,24 @@ export class WithdrawToPixUseCase implements IUseCase<
     private readonly walletRepo: IMusicianWalletRepository,
     private readonly txRepo: ITransactionRepository,
     private readonly pixWithdrawGateway?: IPixWithdrawGateway,
+    private readonly planCheckService?: PlanCheckService,
   ) {}
 
   async execute(input: WithdrawToPixInput): Promise<WithdrawToPixOutput> {
+    const withdrawalConfig = this.planCheckService
+      ? await this.planCheckService.getMusicianWithdrawalConfig(input.musician_id)
+      : { min_amount_brl: 110, days: 5 };
+
+    if (input.amount < withdrawalConfig.min_amount_brl) {
+      throw new EntityValidationError([
+        {
+          amount: [
+            `Valor mínimo de saque para seu plano é R$${withdrawalConfig.min_amount_brl.toFixed(2)}`,
+          ],
+        },
+      ]);
+    }
+
     const wallet = await this.walletRepo.findByMusicianId(input.musician_id);
     if (!wallet) {
       throw new NotFoundError(input.musician_id, MusicianWallet);
@@ -74,6 +92,8 @@ export class WithdrawToPixUseCase implements IUseCase<
       transaction_id: tx.transaction_id.id,
       wallet_balance: wallet.balance.amount,
       status: tx.status,
+      min_withdrawal_amount_brl: withdrawalConfig.min_amount_brl,
+      withdrawal_days: withdrawalConfig.days,
     };
   }
 }
