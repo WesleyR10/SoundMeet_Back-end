@@ -292,6 +292,7 @@ model Establishment {
   analytics     EstablishmentAnalytics[]
   rankings      Ranking[]
   subscriptions Subscription[]
+  campaigns     Campaign[]
 
   @@map("establishments")
 }
@@ -306,11 +307,12 @@ model EstablishmentProfile {
   location_lng    Float?
   amenities       String[] @default([]) // ["sound_system", "stage", "parking"]
   preferredGenres String[] @default([])
-  operatingHours  Json?
-  priceRange      Json?
-  socialLinks     Json?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  operatingHours      Json?
+  priceRange          Json?
+  socialLinks         Json?
+  menu_pdfs           Json?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 
@@ -985,6 +987,7 @@ model Subscription {
   establishment_id String?
   plan_tier        String
   persona          String // "musician" | "establishment"
+  billing_cycle    String             @default("monthly") // "monthly" | "annual"
   status           SubscriptionStatus @default(active)
   started_at       DateTime           @default(now())
   expires_at       DateTime?
@@ -1041,4 +1044,23 @@ model EstablishmentAnalytics {
 
   @@unique([establishmentId, date])
   @@map("establishment_analytics")
+}
+
+model Campaign {
+  id               String   @id @default(uuid())
+  establishment_id String
+  title            String   @db.VarChar(255)
+  description      String?  @db.Text
+  start_date       DateTime
+  end_date         DateTime
+  target_genres    String[]
+  status           String   @default("draft")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  establishment Establishment @relation(fields: [establishment_id], references: [id], onDelete: Cascade)
+
+  @@index([establishment_id])
+  @@index([status])
+  @@map("campaigns")
 }
