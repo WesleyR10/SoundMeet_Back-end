@@ -1,11 +1,15 @@
 import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
+import { AwardBadgeUseCase } from "../../core/gamification/application/use-cases/award-badge/award-badge.use-case";
 import { CalculatePointsUseCase } from "../../core/gamification/application/use-cases/calculate-points/calculate-points.use-case";
+import { CreateBadgeUseCase } from "../../core/gamification/application/use-cases/create-badge/create-badge.use-case";
+import { DeleteBadgeUseCase } from "../../core/gamification/application/use-cases/delete-badge/delete-badge.use-case";
 import { GetBadgeUseCase } from "../../core/gamification/application/use-cases/get-badge/get-badge.use-case";
 import { GetLeaderboardUseCase } from "../../core/gamification/application/use-cases/get-leaderboard/get-leaderboard.use-case";
 import { GetUserBadgesUseCase } from "../../core/gamification/application/use-cases/get-user-badges/get-user-badges.use-case";
 import { GetUserPointsUseCase } from "../../core/gamification/application/use-cases/get-user-points/get-user-points.use-case";
 import { ListBadgesUseCase } from "../../core/gamification/application/use-cases/list-badges/list-badges.use-case";
 import { ListRankingsUseCase } from "../../core/gamification/application/use-cases/list-rankings/list-rankings.use-case";
+import { UpdateBadgeUseCase } from "../../core/gamification/application/use-cases/update-badge/update-badge.use-case";
 import { IBadgeRepository } from "../../core/gamification/domain/badge.repository";
 import { IRankingRepository } from "../../core/gamification/domain/ranking.repository";
 import { IUserBadgeRepository } from "../../core/gamification/domain/user-badge.repository";
@@ -144,6 +148,34 @@ export const USE_CASES = {
       return new ListRankingsUseCase(rankingRepo);
     },
     inject: [REPOSITORIES.RANKING_REPOSITORY.provide],
+  },
+  CREATE_BADGE_USE_CASE: {
+    provide: CreateBadgeUseCase,
+    useFactory: (badgeRepo: IBadgeRepository) => {
+      return new CreateBadgeUseCase(badgeRepo);
+    },
+    inject: [REPOSITORIES.BADGE_REPOSITORY.provide],
+  },
+  UPDATE_BADGE_USE_CASE: {
+    provide: UpdateBadgeUseCase,
+    useFactory: (badgeRepo: IBadgeRepository) => {
+      return new UpdateBadgeUseCase(badgeRepo);
+    },
+    inject: [REPOSITORIES.BADGE_REPOSITORY.provide],
+  },
+  DELETE_BADGE_USE_CASE: {
+    provide: DeleteBadgeUseCase,
+    useFactory: (badgeRepo: IBadgeRepository) => {
+      return new DeleteBadgeUseCase(badgeRepo);
+    },
+    inject: [REPOSITORIES.BADGE_REPOSITORY.provide],
+  },
+  AWARD_BADGE_USE_CASE: {
+    provide: AwardBadgeUseCase,
+    useFactory: (userBadgeRepo: IUserBadgeRepository) => {
+      return new AwardBadgeUseCase(userBadgeRepo);
+    },
+    inject: [REPOSITORIES.USER_BADGE_REPOSITORY.provide],
   },
 };
 

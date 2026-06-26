@@ -110,8 +110,16 @@ describe("GamificationController Unit Tests", () => {
       jest.fn().mockResolvedValue(null),
     );
 
+    const adminUser = {
+      userId: "22222222-2222-4222-8222-222222222222",
+      roles: ["admin"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: true,
+    };
+
     await expect(
-      controller.getUserPoints("22222222-2222-4222-8222-222222222222"),
+      controller.getUserPoints("22222222-2222-4222-8222-222222222222", adminUser),
     ).resolves.toBeNull();
   });
 
