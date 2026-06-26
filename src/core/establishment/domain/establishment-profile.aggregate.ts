@@ -5,6 +5,15 @@ import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { EstablishmentProfileValidatorFactory } from "./establishment-profile.validator";
 import { EstablishmentProfileFakeBuilder } from "./establishment-profile-fake.builder";
 
+export const MENU_PDF_MAX_COUNT = 2;
+
+export type MenuPdfEntry = {
+  id: string;
+  url: string;
+  key: string;
+  uploaded_at: Date;
+};
+
 export type EstablishmentProfileOperatingHoursInput = Record<string, unknown>;
 
 export type EstablishmentProfileConstructorProps = {
@@ -12,7 +21,7 @@ export type EstablishmentProfileConstructorProps = {
   establishment_id: Uuid;
   capacity?: number | null;
   location: Address;
-  amenities?: string[]; // Comodidades do estabelecimento (ex: Wi-Fi, bar, etc.)
+  amenities?: string[];
   preferredGenres?: string[];
   operatingHours?:
     | OperatingHours
@@ -20,6 +29,7 @@ export type EstablishmentProfileConstructorProps = {
     | null;
   priceRange?: PriceRange | null;
   socialLinks?: SocialLinks | null;
+  menu_pdfs?: MenuPdfEntry[];
   created_at?: Date;
   updated_at?: Date;
 };
@@ -37,6 +47,7 @@ export type EstablishmentProfileCreateCommand = {
     | null;
   priceRange?: PriceRange | null;
   socialLinks?: SocialLinks | null;
+  menu_pdfs?: MenuPdfEntry[];
 };
 
 export class EstablishmentProfileId extends Uuid {}
@@ -51,6 +62,7 @@ export class EstablishmentProfile extends AggregateRoot {
   operatingHours: OperatingHours | null;
   priceRange: PriceRange | null;
   socialLinks: SocialLinks | null;
+  menu_pdfs: MenuPdfEntry[];
   created_at: Date;
   updated_at: Date;
 
@@ -68,6 +80,7 @@ export class EstablishmentProfile extends AggregateRoot {
     }
     this.priceRange = props.priceRange ?? null;
     this.socialLinks = props.socialLinks ?? null;
+    this.menu_pdfs = props.menu_pdfs ?? [];
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
@@ -152,6 +165,27 @@ export class EstablishmentProfile extends AggregateRoot {
     this.updated_at = new Date();
   }
 
+  addMenuPdf(entry: { url: string; key: string }): MenuPdfEntry {
+    const newEntry: MenuPdfEntry = {
+      id: new Uuid().id,
+      url: entry.url,
+      key: entry.key,
+      uploaded_at: new Date(),
+    };
+    this.menu_pdfs = [...this.menu_pdfs, newEntry];
+    this.updated_at = new Date();
+    return newEntry;
+  }
+
+  removeMenuPdf(pdf_id: string): MenuPdfEntry | undefined {
+    const entry = this.menu_pdfs.find((e) => e.id === pdf_id);
+    if (entry) {
+      this.menu_pdfs = this.menu_pdfs.filter((e) => e.id !== pdf_id);
+      this.updated_at = new Date();
+    }
+    return entry;
+  }
+
   toJSON() {
     return {
       profile_id: this.profile_id.id,
@@ -163,6 +197,12 @@ export class EstablishmentProfile extends AggregateRoot {
       operatingHours: this.operatingHours?.toJSON() ?? null,
       priceRange: this.priceRange?.toJSON() || null,
       socialLinks: this.socialLinks?.toJSON() ?? null,
+      menu_pdfs: this.menu_pdfs.map((e) => ({
+        id: e.id,
+        url: e.url,
+        key: e.key,
+        uploaded_at: e.uploaded_at,
+      })),
       created_at: this.created_at,
       updated_at: this.updated_at,
     };

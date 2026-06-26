@@ -40,6 +40,7 @@ export type CreateEstablishmentInputConstructorProps = {
   website?: string;
   establishment_type: EstablishmentType;
   is_active?: boolean;
+  existing_establishment_ids?: string[];
 };
 
 export class CreateEstablishmentInput {
@@ -87,6 +88,8 @@ export class CreateEstablishmentInput {
   @IsOptional()
   is_active?: boolean;
 
+  existing_establishment_ids: string[];
+
   constructor(props: CreateEstablishmentInputConstructorProps) {
     if (!props) return;
     this.name = props.name;
@@ -98,6 +101,7 @@ export class CreateEstablishmentInput {
     this.website = props.website;
     this.establishment_type = props.establishment_type;
     this.is_active = props.is_active ?? true;
+    this.existing_establishment_ids = props.existing_establishment_ids ?? [];
   }
 }
 

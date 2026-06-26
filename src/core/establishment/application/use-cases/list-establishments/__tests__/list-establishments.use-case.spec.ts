@@ -66,6 +66,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           is_bar: establishment.isBar,
           is_restaurant: establishment.isRestaurant,
           is_club: establishment.isClub,
+          is_open_now: false,
         },
       ],
       total: 1,
@@ -115,6 +116,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           is_bar: establishments[1].isBar,
           is_restaurant: establishments[1].isRestaurant,
           is_club: establishments[1].isClub,
+          is_open_now: false,
         },
         {
           id: establishments[0].establishment_id.id,
@@ -144,6 +146,7 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           is_bar: establishments[0].isBar,
           is_restaurant: establishments[0].isRestaurant,
           is_club: establishments[0].isClub,
+          is_open_now: false,
         },
       ],
       total: 2,

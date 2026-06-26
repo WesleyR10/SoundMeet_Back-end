@@ -3,6 +3,7 @@ import {
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { IDateTimeService } from "../../../../shared/domain/date-time.service";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import {
   EstablishmentFilter,
@@ -18,7 +19,10 @@ export class ListEstablishmentsUseCase implements IUseCase<
   ListEstablishmentsInput,
   ListEstablishmentsOutput
 > {
-  constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
+  constructor(
+    private readonly establishmentRepo: IEstablishmentRepository,
+    private readonly dateTimeService?: IDateTimeService,
+  ) {}
 
   async execute(
     input: ListEstablishmentsInput,
@@ -32,7 +36,7 @@ export class ListEstablishmentsUseCase implements IUseCase<
   private toOutput(searchResult: any): ListEstablishmentsOutput {
     const { items: _items } = searchResult;
     const items = _items.map((i) => {
-      return EstablishmentOutputMapper.toOutput(i);
+      return EstablishmentOutputMapper.toOutput(i, this.dateTimeService);
     });
     return PaginationOutputMapper.toOutput(items, searchResult);
   }

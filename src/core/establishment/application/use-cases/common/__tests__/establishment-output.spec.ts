@@ -39,6 +39,7 @@ describe("EstablishmentOutputMapper Unit Tests", () => {
       is_bar: entity.isBar,
       is_restaurant: entity.isRestaurant,
       is_club: entity.isClub,
+      is_open_now: false,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
       qr_code: expect.any(String),

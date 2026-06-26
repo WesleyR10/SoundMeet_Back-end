@@ -1,3 +1,4 @@
+import { IDateTimeService } from "../../../../shared/domain/date-time.service";
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import { PriceModel } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Establishment } from "../../../domain/establishment.aggregate";
@@ -19,6 +20,7 @@ export type EstablishmentProfileOutput = {
     notes: string | null;
   } | null;
   social_links: Record<string, unknown> | null;
+  menu_pdfs: Array<{ id: string; url: string; uploaded_at: Date }>;
   created_at: Date;
   updated_at: Date;
 };
@@ -40,6 +42,7 @@ export type EstablishmentOutput = {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  is_open_now: boolean;
   profile: EstablishmentProfileOutput | null;
   created_at: Date;
   updated_at: Date;
@@ -73,12 +76,21 @@ export class EstablishmentOutputMapper {
           }
         : null,
       social_links: profile.socialLinks?.toJSON() ?? null,
+      menu_pdfs: profile.menu_pdfs.map((e) => ({
+        id: e.id,
+        url: e.url,
+        uploaded_at: e.uploaded_at,
+      })),
       created_at: profile.created_at,
       updated_at: profile.updated_at,
     };
   }
 
-  static toOutput(entity: Establishment): EstablishmentOutput {
+  static toOutput(
+    entity: Establishment,
+    dateTimeService?: IDateTimeService,
+  ): EstablishmentOutput {
+    const now = new Date();
     return {
       id: entity.establishment_id.id,
       name: entity.name,
@@ -98,6 +110,8 @@ export class EstablishmentOutputMapper {
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
+      is_open_now:
+        entity.profile?.operatingHours?.isOpenAt(now, dateTimeService) ?? false,
       profile: entity.profile ? this.toProfileOutput(entity.profile) : null,
       created_at: entity.created_at,
       updated_at: entity.updated_at,

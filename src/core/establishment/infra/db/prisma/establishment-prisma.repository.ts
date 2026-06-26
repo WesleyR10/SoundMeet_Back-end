@@ -52,6 +52,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           ),
           priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+          menu_pdfs: this.toPrismaOptionalJson(profileModel.menu_pdfs),
         }
       : null;
     try {
@@ -108,6 +109,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           ),
           priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+          menu_pdfs: this.toPrismaOptionalJson(profileModel.menu_pdfs),
         }
       : null;
     const profileUpdateData = profileModel
@@ -121,6 +123,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           ),
           priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
+          menu_pdfs: this.toPrismaOptionalJson(profileModel.menu_pdfs),
         }
       : null;
 

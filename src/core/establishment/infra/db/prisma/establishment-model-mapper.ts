@@ -20,6 +20,20 @@ import {
   EstablishmentProfileModel,
   JsonValue,
 } from "./establishment-model";
+import { MenuPdfEntry } from "../../../domain/establishment-profile.aggregate";
+
+function parseMenuPdfs(raw: unknown): MenuPdfEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+    .map((e) => ({
+      id: String(e["id"] ?? ""),
+      url: String(e["url"] ?? ""),
+      key: String(e["key"] ?? ""),
+      uploaded_at: new Date(String(e["uploaded_at"] ?? "")),
+    }))
+    .filter((e) => e.id && e.url && e.key);
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -80,6 +94,14 @@ export class EstablishmentModelMapper {
       socialLinks: (profile.socialLinks
         ? ({ links: profile.socialLinks.links } as any)
         : null) as unknown as JsonValue | null,
+      menu_pdfs: profile.menu_pdfs.length > 0
+        ? (profile.menu_pdfs.map((e) => ({
+            id: e.id,
+            url: e.url,
+            key: e.key,
+            uploaded_at: e.uploaded_at.toISOString(),
+          })) as unknown as JsonValue)
+        : null,
       created_at: profile.created_at,
       updated_at: profile.updated_at,
     };
@@ -136,6 +158,7 @@ export class EstablishmentModelMapper {
           operatingHours,
           priceRange,
           socialLinks,
+          menu_pdfs: parseMenuPdfs(model.profile.menu_pdfs),
           created_at: model.profile.created_at,
           updated_at: model.profile.updated_at,
         });

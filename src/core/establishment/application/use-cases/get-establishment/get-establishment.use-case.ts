@@ -1,4 +1,5 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { IDateTimeService } from "../../../../shared/domain/date-time.service";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import {
   Establishment,
@@ -14,7 +15,10 @@ export class GetEstablishmentUseCase implements IUseCase<
   GetEstablishmentInput,
   GetEstablishmentOutput
 > {
-  constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
+  constructor(
+    private readonly establishmentRepo: IEstablishmentRepository,
+    private readonly dateTimeService?: IDateTimeService,
+  ) {}
 
   async execute(input: GetEstablishmentInput): Promise<GetEstablishmentOutput> {
     const establishmentId = new EstablishmentId(input.id);
@@ -24,7 +28,7 @@ export class GetEstablishmentUseCase implements IUseCase<
       throw new NotFoundError(input.id, Establishment);
     }
 
-    return EstablishmentOutputMapper.toOutput(entity);
+    return EstablishmentOutputMapper.toOutput(entity, this.dateTimeService);
   }
 }
 

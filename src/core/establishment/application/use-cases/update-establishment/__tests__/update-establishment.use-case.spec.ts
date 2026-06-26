@@ -124,6 +124,7 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
         is_highly_rated: false,
         is_popular: false,
         is_restaurant: establishment.establishment_type === "restaurant",
+        is_open_now: false,
       });
     });
   });

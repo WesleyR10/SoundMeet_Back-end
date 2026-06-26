@@ -16,6 +16,7 @@ export type EstablishmentProfileModel = {
   operatingHours: JsonValue | null;
   priceRange: JsonValue | null;
   socialLinks: JsonValue | null;
+  menu_pdfs: JsonValue | null;
   created_at: Date;
   updated_at: Date;
 };

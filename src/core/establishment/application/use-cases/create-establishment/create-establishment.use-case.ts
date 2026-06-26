@@ -1,3 +1,4 @@
+import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Establishment } from "../../../domain/establishment.aggregate";
@@ -8,15 +9,35 @@ import {
 } from "../common/establishment-output";
 import { CreateEstablishmentInput } from "./create-establishment.input";
 
+const MAX_ESTABLISHMENTS_PER_ACCOUNT = 3;
+
 export class CreateEstablishmentUseCase implements IUseCase<
   CreateEstablishmentInput,
   CreateEstablishmentOutput
 > {
-  constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
+  constructor(
+    private readonly establishmentRepo: IEstablishmentRepository,
+    private readonly planCheckService?: PlanCheckService,
+  ) {}
 
   async execute(
     input: CreateEstablishmentInput,
   ): Promise<CreateEstablishmentOutput> {
+    const existingIds = input.existing_establishment_ids ?? [];
+
+    if (existingIds.length >= MAX_ESTABLISHMENTS_PER_ACCOUNT) {
+      throw new EntityValidationError([
+        { base: ["Limite de 3 estabelecimentos por conta atingido"] },
+      ]);
+    }
+
+    if (existingIds.length >= 1 && this.planCheckService) {
+      await this.planCheckService.assertEstablishmentFeature(
+        existingIds[0],
+        "multi_establishment",
+      );
+    }
+
     const existing = await this.establishmentRepo.findByEmail(input.email);
     if (existing) {
       throw new EntityValidationError([

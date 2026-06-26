@@ -10,3 +10,5 @@ export * from "./list-establishments";
 export * from "./recalculate-establishment-analytics";
 export * from "./update-establishment";
 export * from "./update-establishment-profile";
+export * from "./upload-establishment-menu-pdf";
+export * from "./delete-establishment-menu-pdf";
