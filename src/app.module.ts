@@ -27,6 +27,7 @@ import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.mo
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
 import { MailModule } from "./nest-modules/mail-module/mail.module";
 import { CampaignModule } from "./nest-modules/campaign-module/campaign.module";
+import { RepertoireModule } from "./nest-modules/repertoire-module/repertoire.module";
 
 const normalizeTransport = (value: string | undefined, fallback: string) =>
   (value ?? fallback).trim().toLowerCase();
@@ -67,6 +68,7 @@ const shouldRegisterRabbitmqHandlers =
     MusicLibraryModule,
     PaymentModule,
     CampaignModule,
+    RepertoireModule,
     AiAudioModule,
     AiCifraModule,
     SyncedLyricsModule,
