@@ -77,13 +77,24 @@ describe("SyncedLyrics Controllers Unit Tests", () => {
         }),
       );
 
-      const presenter = await controller.search({
-        musician_id: "22222222-2222-4222-8222-222222222222",
-        has_lrc: "true",
-        include_raw: "false",
-        page: 1,
-        per_page: 10,
-      });
+      const currentUser = {
+        userId: "22222222-2222-4222-8222-222222222222",
+        roles: ["musician"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      };
+
+      const presenter = await controller.search(
+        {
+          musician_id: "22222222-2222-4222-8222-222222222222",
+          has_lrc: "true",
+          include_raw: "false",
+          page: 1,
+          per_page: 10,
+        },
+        currentUser,
+      );
 
       expect(execute).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -103,9 +114,18 @@ describe("SyncedLyrics Controllers Unit Tests", () => {
         jest.fn().mockResolvedValue(syncedLyricsOutput()),
       );
 
+      const currentUser = {
+        userId: "22222222-2222-4222-8222-222222222222",
+        roles: ["musician"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      };
+
       const presenter = await controller.upsert(
         "11111111-1111-4111-8111-111111111111",
         "22222222-2222-4222-8222-222222222222",
+        currentUser,
         {
           raw: "[00:01.00]hello",
           provider: "lrclib",

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Inject,
   Param,
@@ -33,6 +34,9 @@ import { SkipThrottle } from "@nestjs/throttler";
 
 import {
   AuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
+  CurrentUserContextGuard,
   InternalToken,
   InternalTokenGuard,
   Roles,
@@ -84,10 +88,12 @@ export class SyncedLyricsController {
   private materializeRenderableChordSheetsUseCase: MaterializeRenderableChordSheetsUseCase;
 
   @Get("synced-lyrics")
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Pesquisar letras sincronizadas (LRC) da MusicLibrary",
     description:
-      "Lista itens da MusicLibrary com campos de LRC (com paginação e filtros).",
+      "Lista itens da MusicLibrary com campos de LRC (com paginação e filtros). Músico só pode acessar a própria biblioteca.",
   })
   @ApiQuery({ name: "musician_id", required: true, type: String })
   @ApiQuery({ name: "query", required: false, type: String })
@@ -104,7 +110,16 @@ export class SyncedLyricsController {
   @ApiQuery({ name: "sort_dir", required: false, enum: ["asc", "desc"] })
   @ApiQuery({ name: "include_raw", required: false, enum: ["true", "false"] })
   @ApiResponse({ status: 200, type: SyncedLyricsCollectionPresenter })
-  async search(@Query() dto: SearchSyncedLyricsDto) {
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  async search(
+    @Query() dto: SearchSyncedLyricsDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    if (!currentUser.isAdmin && currentUser.userId !== dto.musician_id) {
+      throw new ForbiddenException(
+        "Você só pode consultar letras da sua própria biblioteca.",
+      );
+    }
     const output = await this.searchUseCase.execute({
       musician_id: dto.musician_id,
       page: dto.page,
@@ -126,21 +141,30 @@ export class SyncedLyricsController {
   }
 
   @Get(":id/synced-lyrics")
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Buscar letra sincronizada (LRC) da MusicLibrary",
     description:
-      "Retorna o artefato normalizado de LRC associado a um item da MusicLibrary.",
+      "Retorna o artefato normalizado de LRC associado a um item da MusicLibrary. Músico só pode acessar a própria biblioteca.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiQuery({ name: "musician_id", required: true, type: String })
   @ApiQuery({ name: "include_raw", required: false, type: Boolean })
   @ApiResponse({ status: 200, type: SyncedLyricsPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     musician_id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
     @Query("include_raw") include_raw?: string,
   ) {
+    if (!currentUser.isAdmin && currentUser.userId !== musician_id) {
+      throw new ForbiddenException(
+        "Você só pode consultar letras da sua própria biblioteca.",
+      );
+    }
     const output = await this.getUseCase.execute({
       musician_id,
       music_library_id: id,
@@ -150,19 +174,28 @@ export class SyncedLyricsController {
   }
 
   @Get(":id/chord-sheet")
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Buscar Chord Sheet da MusicLibrary",
     description:
-      "Retorna um artefato unificado (letra normalizada + timeline de acordes + âncoras de alinhamento).",
+      "Retorna um artefato unificado (letra normalizada + timeline de acordes + âncoras de alinhamento). Músico só pode acessar a própria biblioteca.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiQuery({ name: "musician_id", required: true, type: String })
   @ApiResponse({ status: 200, type: ChordSheetPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async chordSheet(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     musician_id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ) {
+    if (!currentUser.isAdmin && currentUser.userId !== musician_id) {
+      throw new ForbiddenException(
+        "Você só pode acessar a cifra da sua própria biblioteca.",
+      );
+    }
     const output = await this.getChordSheetUseCase.execute({
       musician_id,
       music_library_id: id,
@@ -171,20 +204,29 @@ export class SyncedLyricsController {
   }
 
   @Get(":id/chord-sheet/preview")
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Visualizar folha de cifra pronta (HTML)",
     description:
-      "Retorna um HTML renderizado a partir do renderable_chord_sheet para visualização no navegador.",
+      "Retorna um HTML renderizado a partir do renderable_chord_sheet para visualização no navegador. Músico só pode visualizar a própria biblioteca.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiQuery({ name: "musician_id", required: true, type: String })
   @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async chordSheetPreview(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     musician_id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
     @Res() res: Response,
   ) {
+    if (!currentUser.isAdmin && currentUser.userId !== musician_id) {
+      throw new ForbiddenException(
+        "Você só pode visualizar cifras da sua própria biblioteca.",
+      );
+    }
     const output = await this.getRenderableChordSheetUseCase.execute({
       musician_id,
       music_library_id: id,
@@ -249,22 +291,29 @@ export class SyncedLyricsController {
   }
 
   @Post(":id/synced-lyrics")
-  @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Upsert de LRC na MusicLibrary",
     description:
-      "Atualiza os campos de LRC (raw + normalized + qualidade) em um item existente da MusicLibrary.",
+      "Atualiza os campos de LRC (raw + normalized + qualidade) em um item existente da MusicLibrary. Músico só pode editar a própria biblioteca.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiQuery({ name: "musician_id", required: true, type: String })
   @ApiResponse({ status: 200, type: SyncedLyricsPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async upsert(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     musician_id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
     @Body() dto: UpsertSyncedLyricsDto,
   ) {
+    if (!currentUser.isAdmin && currentUser.userId !== musician_id) {
+      throw new ForbiddenException(
+        "Você só pode editar letras da sua própria biblioteca.",
+      );
+    }
     const output = await this.upsertUseCase.execute({
       musician_id,
       music_library_id: id,
@@ -277,19 +326,28 @@ export class SyncedLyricsController {
   }
 
   @Get(":id/synced-lyrics/download")
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Download do LRC da MusicLibrary",
-    description: "Retorna o arquivo .lrc (text/plain) para download.",
+    description: "Retorna o arquivo .lrc (text/plain) para download. Músico só pode baixar letras da sua própria biblioteca.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiQuery({ name: "musician_id", required: true, type: String })
   @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async download(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     musician_id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (!currentUser.isAdmin && currentUser.userId !== musician_id) {
+      throw new ForbiddenException(
+        "Você só pode baixar letras da sua própria biblioteca.",
+      );
+    }
     const output = await this.downloadUseCase.execute({
       musician_id,
       music_library_id: id,
