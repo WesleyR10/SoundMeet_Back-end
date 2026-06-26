@@ -128,6 +128,7 @@ model Musician {
   wallet                   MusicianWallet?
   transactions             Transaction[]
   subscriptions            Subscription[]
+  repertoires              Repertoire[]
 
   @@map("musicians")
 }
@@ -247,9 +248,12 @@ model MusicLibrary {
   created_at                     DateTime  @default(now())
   updated_at                     DateTime  @updatedAt
 
+  duration_seconds               Int?
+
   musician         Musician        @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   requests         MusicRequest[]
   ai_cifra_uploads AiCifraUpload[]
+  repertoire_songs RepertoireSong[]
 
   @@index([artist, title])
   @@index([lrc_hash])
@@ -1063,4 +1067,56 @@ model Campaign {
   @@index([establishment_id])
   @@index([status])
   @@map("campaigns")
+}
+
+// ========================================
+// DOMÍNIO REPERTOIRE — SETLIST DO MÚSICO
+// ========================================
+
+model Repertoire {
+  id                     String   @id @default(uuid())
+  musician_id            String
+  name                   String   @db.VarChar(255)
+  share_token            String?  @unique
+  share_token_expires_at DateTime?
+  is_shared              Boolean  @default(false)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  musician  Musician            @relation(fields: [musician_id], references: [id], onDelete: Cascade)
+  songs     RepertoireSong[]
+  invitees  RepertoireInvitee[]
+
+  @@index([musician_id])
+  @@map("repertoires")
+}
+
+model RepertoireSong {
+  id                        String   @id @default(uuid())
+  repertoire_id             String
+  music_library_id          String
+  position                  Int
+  custom_notes              String?  @db.Text
+  duration_override_seconds Int?
+  added_at                  DateTime @default(now())
+
+  repertoire    Repertoire   @relation(fields: [repertoire_id], references: [id], onDelete: Cascade)
+  music_library MusicLibrary @relation(fields: [music_library_id], references: [id])
+
+  @@unique([repertoire_id, music_library_id])
+  @@index([repertoire_id, position])
+  @@map("repertoire_songs")
+}
+
+model RepertoireInvitee {
+  id            String   @id @default(uuid())
+  repertoire_id String
+  musician_id   String
+  invited_at    DateTime @default(now())
+
+  repertoire Repertoire @relation(fields: [repertoire_id], references: [id], onDelete: Cascade)
+
+  @@unique([repertoire_id, musician_id])
+  @@index([musician_id])
+  @@map("repertoire_invitees")
 }
