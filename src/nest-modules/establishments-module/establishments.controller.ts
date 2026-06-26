@@ -10,15 +10,24 @@ import {
   Patch,
   Post,
   Query,
+  UnprocessableEntityException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { createReadStream, promises as fs } from "fs";
+import { diskStorage } from "multer";
+import { tmpdir } from "os";
+import { randomUUID } from "crypto";
 
 import {
   EstablishmentOutput,
@@ -34,15 +43,19 @@ import { ListEstablishmentAnalyticsUseCase } from "../../core/establishment/appl
 import { ListEstablishmentsUseCase } from "../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { UploadEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
+import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
   AuthGuard,
+  CurrentUser,
   CurrentUserContextGuard,
   EstablishmentOwnershipGuard,
   Public,
   Roles,
   RolesGuard,
 } from "../auth-module";
+import { AuthenticatedUser } from "../auth-module";
 import { CreateEstablishmentDto } from "./dto/create-establishment.dto";
 import { CreateEstablishmentProfileDto } from "./dto/create-establishment-profile.dto";
 import { GetHiringDashboardDto } from "./dto/get-hiring-dashboard.dto";
@@ -96,6 +109,12 @@ export class EstablishmentsController {
   @Inject(VerifyEstablishmentUseCase)
   private verifyUseCase: VerifyEstablishmentUseCase;
 
+  @Inject(UploadEstablishmentMenuPdfUseCase)
+  private uploadMenuPdfUseCase: UploadEstablishmentMenuPdfUseCase;
+
+  @Inject(DeleteEstablishmentMenuPdfUseCase)
+  private deleteMenuPdfUseCase: DeleteEstablishmentMenuPdfUseCase;
+
   @Post()
   @Roles("establishment", "admin")
   @ApiOperation({
@@ -103,8 +122,14 @@ export class EstablishmentsController {
     description: "Cria um estabelecimento e gera QR Code permanente.",
   })
   @ApiResponse({ status: 201, type: EstablishmentPresenter })
-  async create(@Body() dto: CreateEstablishmentDto) {
-    const output = await this.createUseCase.execute(dto);
+  async create(
+    @Body() dto: CreateEstablishmentDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    const output = await this.createUseCase.execute({
+      ...dto,
+      existing_establishment_ids: currentUser?.establishmentIds ?? [],
+    });
     return EstablishmentsController.serialize(output);
   }
 
@@ -295,6 +320,95 @@ export class EstablishmentsController {
     });
 
     return new EstablishmentAnalyticsCollectionPresenter(output);
+  }
+
+  @Post(":id/menu-pdf")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
+  @ApiOperation({
+    summary: "Upload do cardápio PDF",
+    description:
+      "Faz upload do cardápio em PDF para o storage (Cloudflare R2/MinIO/S3). Limite: 5 MB. MIME obrigatório: application/pdf.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiConsumes("multipart/form-data")
+  @ApiResponse({ status: 201, type: EstablishmentProfilePresenter })
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, tmpdir()),
+        filename: (_req, file, cb) => {
+          const safeName = (file.originalname || "menu.pdf").replace(
+            /[^a-zA-Z0-9._-]/g,
+            "_",
+          );
+          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
+        },
+      }),
+      limits: { fileSize: Number(process.env.ESTABLISHMENT_MENU_PDF_MAX_SIZE ?? 5 * 1024 * 1024) },
+      fileFilter: (_req, file, cb) => {
+        if (file.mimetype !== "application/pdf") {
+          return cb(new Error("Only PDF files are allowed"), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadMenuPdf(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new UnprocessableEntityException("file is required");
+    }
+
+    try {
+      const { fileTypeFromBuffer } = await import("file-type");
+      const fd = await fs.open(file.path, "r");
+      const buf = Buffer.alloc(4100);
+      await fd.read(buf, 0, 4100, 0);
+      await fd.close();
+      const detected = await fileTypeFromBuffer(buf);
+      if (!detected || detected.mime !== "application/pdf") {
+        throw new UnprocessableEntityException(
+          "Invalid file: only PDF format is accepted",
+        );
+      }
+
+      const output = await this.uploadMenuPdfUseCase.execute({
+        establishment_id: id,
+        data: createReadStream(file.path),
+        content_type: "application/pdf",
+        file_size: file.size,
+      });
+
+      return EstablishmentsController.serializeProfile(output);
+    } finally {
+      await fs.unlink(file.path).catch(() => undefined);
+    }
+  }
+
+  @HttpCode(204)
+  @Delete(":id/menu-pdf/:pdf_id")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
+  @ApiOperation({
+    summary: "Remover cardápio PDF",
+    description:
+      "Remove um PDF do cardápio pelo seu ID. O estabelecimento pode ter até 2 cardápios simultâneos; use o pdf_id retornado no campo menu_pdfs do perfil.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiParam({ name: "pdf_id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
+  async removeMenuPdf(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Param("pdf_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    pdfId: string,
+  ) {
+    await this.deleteMenuPdfUseCase.execute({
+      establishment_id: id,
+      pdf_id: pdfId,
+    });
   }
 
   static serialize(output: EstablishmentOutput) {

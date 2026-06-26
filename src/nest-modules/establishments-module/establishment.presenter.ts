@@ -21,6 +21,7 @@ export class EstablishmentPresenter {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  is_open_now: boolean;
   profile: EstablishmentProfilePresenter | null;
   qr_code: string | null;
   is_highly_rated: boolean;
@@ -50,6 +51,7 @@ export class EstablishmentPresenter {
     this.total_ratings = output.total_ratings;
     this.is_active = output.is_active;
     this.is_verified = output.is_verified;
+    this.is_open_now = output.is_open_now;
     this.profile = output.profile
       ? new EstablishmentProfilePresenter(output.profile)
       : null;
@@ -74,6 +76,10 @@ export class EstablishmentProfilePresenter {
   operating_hours: Record<string, unknown> | null;
   price_range: EstablishmentProfileOutput["price_range"];
   social_links: Record<string, unknown> | null;
+  @Transform(({ value }: { value: Array<{ id: string; url: string; uploaded_at: Date }> }) =>
+    value.map((e) => ({ id: e.id, url: e.url, uploaded_at: e.uploaded_at.toISOString() })),
+  )
+  menu_pdfs: Array<{ id: string; url: string; uploaded_at: Date }>;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   created_at: Date;
   @Transform(({ value }: { value: Date }) => value.toISOString())
@@ -89,6 +95,7 @@ export class EstablishmentProfilePresenter {
     this.operating_hours = output.operating_hours;
     this.price_range = output.price_range;
     this.social_links = output.social_links;
+    this.menu_pdfs = output.menu_pdfs;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
   }
