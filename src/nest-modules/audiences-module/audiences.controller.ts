@@ -138,12 +138,14 @@ export class AudiencesController {
 
   @Get(":id")
   @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Buscar usuário do público por ID",
     description: "Retorna os detalhes do perfil do público.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: AudiencePresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {

@@ -110,8 +110,11 @@ export class AudienceInMemoryRepository
 
   // Métodos específicos do domínio Audience
   async findByEmail(email: string): Promise<Audience | null> {
-    const item = this.items.find((item) => item.emailValue === email);
-    return item || null;
+    return (
+      this.items.find(
+        (item) => item.emailValue.toLowerCase() === email.toLowerCase(),
+      ) ?? null
+    );
   }
 
   async findActiveAudiences(): Promise<Audience[]> {
