@@ -21,6 +21,8 @@ Estado detalhado por regra de negócio: [business-rules.md](business-rules.md).
 | **payment-module**                                                                                                                  | ✅ HTTP completo + testes de integração      |
 | **auth-module**                                                                                                                     | ✅ JWT/JWKS validado, guards aplicados — falta enforcement ownership (Bloco 4B) |
 | **music-library-module**                                                                                                            | ✅ controller, providers, service, DTOs e testes criados |
+| **plans-module**                                                                                                                    | ✅ `PlanCheckService`, `PlansModule`, `SubscriptionPrismaRepository`, `plan-features.config.ts` |
+| **campaign-module**                                                                                                                 | ✅ domínio + repositórios + `CreateCampaignUseCase` + controller + Prisma schema |
 
 ---
 
@@ -107,16 +109,16 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 > **Decisões de design:** pedidos ilimitados em todos os planos (removido gate de request); busca e chat com músicos ilimitados para estabelecimentos.  
 > **Taxa de gorjeta:** 9% FREE / 7% ESSENTIAL / 5% PRO (1% gateway incluso). Saque mínimo: R$110 / R$70 / R$50. Prazo: 5 / 3 / 1 dia útil.
 
-- [ ] **4C.1** Analytics em tempo real — `assertMusicianFeature(musician_id, "realtime_analytics")` nos endpoints de analytics do músico (free tier → dados agregados; ESSENTIAL/PRO → stream em tempo real)
-- [ ] **4C.2** Saque (withdrawal) — usar `getMusicianWithdrawalConfig(musician_id)` em `WithdrawToPixUseCase` para aplicar `min_withdrawal_amount_brl` e `withdrawal_days` por plano
+- [x] **4C.1** Analytics em tempo real — `GetMusicianAnalyticsUseCase` com `assertMusicianFeature(musician_id, "realtime_analytics")` + endpoint `GET /musicians/:id/analytics`; FREE → `realtime_available: false`; ESSENTIAL/PRO → dados em tempo real
+- [x] **4C.2** Saque (withdrawal) — `getMusicianWithdrawalConfig(musician_id)` em `WithdrawToPixUseCase`; mínimos por plano: FREE R$110/5d · ESSENTIAL R$70/3d · PRO R$50/1d
 - [x] **4C.3** ~~Busca de músicos por estabelecimento (gate removido — busca ilimitada em todos os planos por decisão de produto jun/2026)~~
-- [ ] **4C.4** QR Code personalizado — `assertMusicianFeature(musician_id, "custom_qr_code")` no use-case de geração de QR customizado (free/ESSENTIAL → QR padrão; PRO → customizável)
+- [x] **4C.4** QR Code personalizado — `CustomizeQRCodeUseCase` com `assertMusicianFeature(musician_id, "custom_qr_code")`; `QRCustomization` VO (cores, logo, label); endpoint `POST /musicians/:id/qr-code/customize` (PRO only)
 - [x] **4C.5** ~~Acesso à biblioteca musical — `music_library_access: true` em todos os planos por decisão de produto (cifra é core feature)~~
-- [ ] **4C.6** Gestão de split de banda — `assertMusicianFeature(musician_id, "auto_split_management")` ao ativar splits automáticos (PRO → até 8 membros)
-- [ ] **4C.7** Multi-estabelecimento — `assertEstablishmentFeature(establishment_id, "multi_establishment")` ao registrar segundo estabelecimento (PRO → até 3 unidades)
-- [ ] **4C.8** Testes de domínio por gate: para cada item acima — (a) FREE bloqueado com `PlanLimitExceededError`, (b) plano pago permitido, (c) subscription cancelada = volta ao FREE
-- [ ] **4C.10** Campanhas promocionais — `assertEstablishmentFeature(establishment_id, "promotional_campaigns")` no use-case de criação/envio de campanha (FREE → bloqueado; GROWTH/PRO → permitido)
+- [x] **4C.6** Gestão de split de banda — `assertMusicianFeature(leader_id, "auto_split_management")` em `AddBandMemberUseCase` ao detectar `role === "leader"` (PRO → até 8 membros)
+- [x] **4C.7** Multi-estabelecimento — `assertEstablishmentFeature(establishment_id, "multi_establishment")` em `CreateEstablishmentUseCase` quando `existing_establishment_ids` presentes; hard-limit 3 unidades; PRO only
+- [x] **4C.8** Testes de domínio por gate: `CustomizeQRCode`, `GetMusicianAnalytics`, `AddBandMember`, `WithdrawToPix`, `CreateEstablishment`, `CreateCampaign` — (a) FREE bloqueado com `PlanLimitExceededError`, (b) plano pago permitido, (c) subscription cancelada = volta ao FREE
 - [x] **4C.9** Debate e fechamento de valores/tiers — concluído jun/2026 (ver decisões no cabeçalho deste bloco)
+- [x] **4C.10** Campanhas promocionais — domínio `src/core/campaign/` completo (aggregate, repository, in-memory, Prisma, `CreateCampaignUseCase`); `assertEstablishmentFeature(establishment_id, "promotional_campaigns")` (FREE bloqueado · GROWTH/PRO permitido); `CampaignModule` + controller + Prisma schema (`campaigns` table)
 
 
 ---
@@ -150,9 +152,9 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 - [ ] **4D.7** **Progress bar de saque no dashboard** — UX obrigatório para todos os planos (frontend):
   - [ ] **4D.7a** Barra de progresso "Você está a R$X de poder sacar" na home do músico
   - [ ] **4D.7b** Prazo estimado baseado no ritmo atual de gorjetas
-- [ ] **4D.8** **Plano Anual** — billing cycle anual no `Subscription`:
-  - [ ] **4D.8a** Campo `billing_cycle: "monthly" | "annual"` no aggregate `Subscription`
-  - [ ] **4D.8b** Migration Prisma + preços anuais no `plan-features.config.ts` (ESSENTIAL R$300 / PRO R$670)
+- [x] **4D.8** **Plano Anual** — billing cycle anual no `Subscription`:
+  - [x] **4D.8a** `BillingCycle` enum (`"monthly" | "annual"`) + campo no aggregate; `create()` auto-computa `expires_at`; `isActive()` respeita `expires_at`; `toJSON()` inclui campo; validator rejeita valores inválidos
+  - [x] **4D.8b** `prisma/schema.prisma` + `billing_cycle String @default("monthly")`; `PlanPricing` interface + `MUSICIAN_PLAN_PRICING` + `ESTABLISHMENT_PLAN_PRICING` em `plan-features.config.ts`; mapper atualizado; 4 novos métodos em `PlanCheckService` (`getBillingCycle`, `getPlanPricing`); 33 novos testes
 
 ---
 
@@ -202,17 +204,17 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - [ ] **7.6c** Frontend: modo filtro de ruído + gate `assertMusicianFeature(id, "tuner_noise_filter")` (ESSENCIAL + PRO)
   - [ ] **7.6d** Mobile: plugin de áudio nativo para latência mínima
   - Posicionamento: "já no app, sem trocar de contexto" — não compete com GuitarTuna; entry point do ritual pré-show
-- [ ] **7.7** **Cardápio PDF do Estabelecimento** — confirmação de descoberta no perfil (todos os planos):
-  - [ ] **7.7a** Prisma: adicionar `menu_pdf_url String?` e `menu_pdf_updated_at DateTime?` em `EstablishmentProfile`
-  - [ ] **7.7b** Aggregate: campos + `changeMenuPdf(url, updatedAt)` + `clearMenuPdf()` em `EstablishmentProfile`
-  - [ ] **7.7c** Endpoint `POST /establishments/:id/menu-pdf` — multipart → `fileFilter` MIME (1ª camada) + `file-type@16` nos bytes reais do arquivo salvo (2ª camada, ~4100 bytes, sem parse pesado) → S3 → salva URL; limite 5MB; padrão igual `ai-cifra-uploads.controller.ts`. **Nota:** instalar `file-type@16` (última versão CJS — v17+ é ESM-only e incompatível com NestJS/CommonJS sem dynamic import)
-  - [ ] **7.7d** Endpoint `DELETE /establishments/:id/menu-pdf` — remove do S3 + limpa campos no perfil
-  - [ ] **7.7e** Atualizar presenter (`menu_pdf_url`, `menu_pdf_updated_at`) e DTO de update do profile
-  - Viewer inline no perfil público (PDF.js web / WebView mobile) — usuário não sai da plataforma
-  - Aviso "Atualizado há X dias" no frontend quando `menu_pdf_updated_at` > 30 dias
-- [ ] **7.8** **Badge "Aberto agora"** — `OperatingHours` já está 100% implementado (domínio + Prisma + presenter); falta apenas UX:
-  - [ ] **7.8a** Campo calculado `is_open_now: boolean` no `EstablishmentPresenter` via `profile.operatingHours?.isOpenAt(new Date())`
-  - [ ] **7.8b** Injetar `IDateTimeService` no `ListEstablishmentsUseCase` para cálculo com timezone correto
+- [x] **7.7** **Cardápio PDF do Estabelecimento** — confirmação de descoberta no perfil (todos os planos):
+  - [x] **7.7a** Prisma: `menu_pdf_url String?` e `menu_pdf_updated_at DateTime?` em `EstablishmentProfile`
+  - [x] **7.7b** Aggregate: `changeMenuPdf(url, updatedAt)` + `clearMenuPdf()` em `EstablishmentProfile`
+  - [x] **7.7c** `POST /api/v1/establishments/:id/menu-pdf` — Multer diskStorage → fileFilter MIME (camada 1) + `file-type` v20 dynamic import nos bytes reais (camada 2) → Cloudflare R2 → salva URL; limite 5MB; ownership guard; armazenado em `establishments/{name-slug}/{id}/menu-pdf/menu-{ts}.pdf`
+  - [x] **7.7d** `DELETE /api/v1/establishments/:id/menu-pdf` — remove do R2 + limpa campos no perfil
+  - [x] **7.7e** Presenter atualizado (`menu_pdf_url`, `menu_pdf_updated_at`); `IEstablishmentStorage` port + `S3EstablishmentStorage` + providers
+  - Viewer inline no perfil público (PDF.js web / WebView mobile) — frontend pendente
+  - Aviso "Atualizado há X dias" quando `menu_pdf_updated_at` > 30 dias — frontend pendente
+- [~] **7.8** **Badge "Aberto agora"** — backend completo; falta apenas frontend:
+  - [x] **7.8a** Campo calculado `is_open_now: boolean` no `EstablishmentOutputMapper.toOutput()` via `OperatingHours.isOpenAt(now, dateTimeService)` — presente em todos os outputs de establishment
+  - [x] **7.8b** `IDateTimeService` / `LuxonDateTimeService` injetado em `EstablishmentsModule`; passado para `ListEstablishmentsUseCase` e `GetEstablishmentUseCase`; cálculo com timezone correto (UTC)
   - [ ] **7.8c** Frontend: badge "Aberto agora" na listagem e no perfil do estabelecimento
   - [ ] **7.8d** Frontend: formulário de edição de horários no dashboard do estabelecimento (preencher campo que já existe)
 - [ ] **7.11** **Missão de gamificação: compartilhamento social com Instagram** — público grava/envia clipe do evento no SoundMeet e compartilha no Instagram marcando músico e estabelecimento:
@@ -298,6 +300,8 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 | Gamificação (domínio)      | ✅                                                   |
 | Folha de cifra / IA        | ~ Bloco 6                                            |
 | Auth Keycloak              | ✅ JWT validado, guards aplicados, ownership completo (4B.1–4B.6), rate limit global |
+| Feature Gating (planos)    | ✅ Bloco 4C completo (4C.1–4C.10): analytics, saque, QR, split, multi-estabelecimento, campanhas |
+| Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — aguarda frontend (7.8c/7.8d) |
 | Dashboard estabelecimento  | ~ parcial                                            |
 | Chat integrado             | backlog Bloco 7                                      |
 

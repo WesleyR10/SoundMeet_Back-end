@@ -197,12 +197,12 @@ const config: Config = {
   // Whether to use watchman for file crawling
   // watchman: true,
 
-  moduleFileExtensions: ['js', 'json', 'ts'],
+  moduleFileExtensions: ['js', 'json', 'ts', 'tsx'],
   rootDir: 'src',
   roots: ['<rootDir>'],
   testRegex: '.*\\..*spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': '@swc/jest',
+    '^.+\\.(t|j)sx?$': '@swc/jest',
   },
   moduleNameMapper: {
     '^@core/(.*)$': '<rootDir>/core/$1',

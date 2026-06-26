@@ -80,7 +80,6 @@
     "luxon": "^3.5.0",
     "mongoose": "^7.0.0",
     "multer": "^1.4.5-lts.1",
-    "nest-keycloak-connect": "^1.9.0",
     "qrcode": "^1.5.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
