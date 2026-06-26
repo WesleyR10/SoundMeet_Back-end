@@ -186,6 +186,77 @@ Baixo. Padrão já existe em `ExpirePendingBookingsJob`:
 
 ---
 
+---
+
+## Feature 8 — Cardápio PDF do Estabelecimento
+
+### Descrição
+Estabelecimento faz upload de um PDF do cardápio → armazenado no S3 → exibido inline no perfil do estabelecimento para o público que está descobrindo onde ir.
+
+### Decisão
+✅ Incluir — debate encerrado jun/2026. Abordagem: **PDF upload → S3**, não cardápio nativo em banco nem link externo.
+
+### Por que PDF e não `menu_url` (link externo)?
+Redirect externo (iFood, site próprio) perde o usuário da plataforma. O cardápio é um elemento de **confirmação de descoberta** — o público já está decidindo se vai ao evento, o cardápio sela a decisão dentro do SoundMeet. Sair do app para ver o cardápio quebra esse fluxo.
+
+### Por que PDF e não cardápio nativo (itens em banco)?
+O objetivo é confirmação de descoberta, não busca por prato. Cardápio nativo exige: tabela `MenuItem`, use-cases de CRUD, migração Prisma, UX de edição. Custo alto para um valor que o PDF cobre com 1 campo.
+
+### Implementação técnica
+```
+EstablishmentProfile:
+  menu_pdf_url: string | null       ← URL do S3 após upload
+  menu_pdf_updated_at: Date | null  ← exibir "Atualizado há X dias" ao público
+```
+- Upload: `POST /establishments/:id/menu-pdf` → multipart → S3 → salvar URL
+- Leitura: campo já incluído no `GET /establishments/:id` via presenter
+- Viewer: PDF.js inline (web) / WebView (mobile nativo)
+- Limite: 5MB por arquivo
+
+### Riscos e mitigações
+| Risco | Mitigação |
+|-------|-----------|
+| PDF desatualizado | Exibir `menu_pdf_updated_at` com aviso visual após 30 dias; notificação automática ao estabelecimento |
+| UX mobile (pinch-to-zoom) | Orientar PDFs otimizados para mobile; limite de tamanho |
+| Não indexável por prato | Fora do escopo — objetivo é descoberta, não busca por item |
+
+### Gating por plano
+Cardápio PDF em todos os planos — é informação de perfil básica, equivalente a `amenities`. Sem gate.
+
+### Posicionamento competitivo único
+> **SoundMeet é a única plataforma que une música ao vivo + experiência gastronômica.**
+> Nenhum concorrente direto (BandHelper, OnSong, Cifra Club) tem cardápio. iFood/Rappi não têm música ao vivo.
+> Para bares e restaurantes, a decisão de ir é composta por: **artista + cardápio + preço + localização** — SoundMeet cobre tudo isso em um único lugar.
+
+Este é um ponto de genuinidade de marca a ser explorado em comunicação e posicionamento comercial do SoundMeet.
+
+### Roadmap
+Bloco 7.7 (backlog — implementar após features bloqueadoras).
+
+---
+
+## Feature 9 — Horário de Funcionamento (já implementado)
+
+### Status
+**Domínio 100% pronto.** Não é uma feature a implementar — é garantir que o UX exponha o que já existe.
+
+### O que existe
+- `OperatingHours` VO completo: timezone, horários semanais, dias especiais, férias, fechamentos pontuais, turnos overnight
+- `EstablishmentProfile.operatingHours` + `changeOperatingHours()` + `toJSON()`
+- Mapeado no Prisma mapper (read/write)
+- Exposto no presenter (`operating_hours` em `EstablishmentProfilePresenter`)
+- `isOpenAt(dateUtc)` já calcula se o estabelecimento está aberto agora
+
+### O que falta (apenas UX/frontend)
+- Frontend: formulário de edição de horários no dashboard do estabelecimento
+- Listagem pública: badge "Aberto agora" calculado via `isOpenAt()` na response
+- Notificação/lembrete para o estabelecimento preencher o campo (está `null` por padrão)
+
+### Gating
+Todos os planos — informação de perfil fundamental.
+
+---
+
 ## Resumo de Prioridades Sugeridas
 
 | # | Feature | Valor | Esforço | Prioridade |
@@ -195,4 +266,7 @@ Baixo. Padrão já existe em `ExpirePendingBookingsJob`:
 | 3 | Rating endpoints (músico + establishment) | Alto | Médio | **P1** |
 | 1 | `POST /requests/batch-respond` | Alto | Médio | **P1** |
 | 4 | `GET /audiences/leaderboard` (filtro user_type) | Médio | Baixo | **P2** |
+| 7 | Afinador cromático (básico + filtro de ruído) | Médio | Médio | **Backlog / 7.6** |
+| 9 | Horário de funcionamento (badge "Aberto agora") | Alto | Baixo | **Quick win — domínio pronto** |
+| 8 | Cardápio PDF (S3 upload, viewer inline) | Médio | Baixo | **Backlog / 7.7** |
 | 5 | Band tip split por percentual | Baixo | Alto | **Backlog** |

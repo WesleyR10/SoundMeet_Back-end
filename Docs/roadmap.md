@@ -100,6 +100,62 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 
 ---
 
+### Bloco 4C — Feature Gating (planos premium) 🔒
+
+> **Infraestrutura:** `PlanCheckService`, `PlansModule`, `SubscriptionPrismaRepository`, `plan-features.config.ts`.  
+> **Planos fechados (jun/2026):** 3 tiers — FREE / ESSENTIAL (R$34,90/mês) / PRO (R$74,90/mês) para músicos e FREE / GROWTH (R$34,90/mês) / PRO (R$74,90/mês) para estabelecimentos. Preços de lançamento; grandfathered nos planos atuais.  
+> **Decisões de design:** pedidos ilimitados em todos os planos (removido gate de request); busca e chat com músicos ilimitados para estabelecimentos.  
+> **Taxa de gorjeta:** 9% FREE / 7% ESSENTIAL / 5% PRO (1% gateway incluso). Saque mínimo: R$110 / R$70 / R$50. Prazo: 5 / 3 / 1 dia útil.
+
+- [ ] **4C.1** Analytics em tempo real — `assertMusicianFeature(musician_id, "realtime_analytics")` nos endpoints de analytics do músico (free tier → dados agregados; ESSENTIAL/PRO → stream em tempo real)
+- [ ] **4C.2** Saque (withdrawal) — usar `getMusicianWithdrawalConfig(musician_id)` em `WithdrawToPixUseCase` para aplicar `min_withdrawal_amount_brl` e `withdrawal_days` por plano
+- [x] **4C.3** ~~Busca de músicos por estabelecimento (gate removido — busca ilimitada em todos os planos por decisão de produto jun/2026)~~
+- [ ] **4C.4** QR Code personalizado — `assertMusicianFeature(musician_id, "custom_qr_code")` no use-case de geração de QR customizado (free/ESSENTIAL → QR padrão; PRO → customizável)
+- [x] **4C.5** ~~Acesso à biblioteca musical — `music_library_access: true` em todos os planos por decisão de produto (cifra é core feature)~~
+- [ ] **4C.6** Gestão de split de banda — `assertMusicianFeature(musician_id, "auto_split_management")` ao ativar splits automáticos (PRO → até 8 membros)
+- [ ] **4C.7** Multi-estabelecimento — `assertEstablishmentFeature(establishment_id, "multi_establishment")` ao registrar segundo estabelecimento (PRO → até 3 unidades)
+- [ ] **4C.8** Testes de domínio por gate: para cada item acima — (a) FREE bloqueado com `PlanLimitExceededError`, (b) plano pago permitido, (c) subscription cancelada = volta ao FREE
+- [ ] **4C.10** Campanhas promocionais — `assertEstablishmentFeature(establishment_id, "promotional_campaigns")` no use-case de criação/envio de campanha (FREE → bloqueado; GROWTH/PRO → permitido)
+- [x] **4C.9** Debate e fechamento de valores/tiers — concluído jun/2026 (ver decisões no cabeçalho deste bloco)
+
+
+---
+
+### Bloco 4D — Novas funcionalidades premium (implementação)
+
+> Features que diferenciam os planos no produto, decididas no debate de planos (jun/2026).
+
+- [ ] **4D.1** **Repertório/Setlist** — domínio `src/core/repertoire/`:
+  - [ ] **4D.1a** Aggregate `Repertoire` + `RepertoireSong` (id, musician_id, name, songs ordenadas, position, custom_notes)
+  - [ ] **4D.1b** Use-cases: criar, editar ordem, estimar tempo de show (média 3,5 min/música)
+  - [ ] **4D.1c** Use-case: compartilhar — link read-only temporário (ESSENTIAL) e convite nominal (PRO)
+  - [ ] **4D.1d** Gate: `max_repertoires` e `max_songs_per_repertoire` via `getMusicianFeatures()` (FREE 1×20 / ESSENTIAL 3×80 / PRO ∞)
+  - [ ] **4D.1e** NestJS module + controller + presenter + DTOs
+- [ ] **4D.2** **Play Mode no Repertório** — tela ao vivo durante show (frontend):
+  - [ ] **4D.2a** Tela fullscreen: cifra + letra da música atual; botões próxima/anterior com 1 clique
+  - [ ] **4D.2b** Badge "customizada" em músicas editadas pelo músico
+  - [ ] **4D.2c** Auto-scroll configurável
+- [ ] **4D.3** **Tempo estimado de show** — campo calculado no Repertoire:
+  - [ ] **4D.3a** Campo `duration_override_seconds?: number` por `RepertoireSong` (padrão 3,5 min se ausente)
+  - [ ] **4D.3b** Output calculado no presenter: `estimated_show_duration_minutes`
+- [ ] **4D.4** **Compartilhamento de Repertório** — já especificado em 4D.1c; itens de infra:
+  - [ ] **4D.4a** ESSENTIAL: gerar token temporário read-only; expirar após 7 dias
+  - [ ] **4D.4b** PRO: endpoint de convite nominal a músico cadastrado (permissão de edição)
+- [ ] **4D.5** **Banner Generation (templates)** — `src/nest-modules/banner-module/`:
+  - [ ] **4D.5a** 5–10 templates SVG/HTML (logo, foto músico/estabelecimento, nome, data, QR do evento)
+  - [ ] **4D.5b** Gate: `assertMusicianCanGenerateBanner` / `assertEstablishmentCanGenerateBanner` (FREE ❌ / ESSENTIAL 3/mês / PRO 15/mês)
+  - [ ] **4D.5c** Geração server-side PNG via `sharp` ou `canvas`; retorno como link para download
+- [ ] **4D.6** **Banner Generation (AI) — roadmap futuro** (pré-requisito: 4D.5):
+  - [ ] **4D.6a** Geração via API (DALL-E ou Stability AI) para plano PRO
+- [ ] **4D.7** **Progress bar de saque no dashboard** — UX obrigatório para todos os planos (frontend):
+  - [ ] **4D.7a** Barra de progresso "Você está a R$X de poder sacar" na home do músico
+  - [ ] **4D.7b** Prazo estimado baseado no ritmo atual de gorjetas
+- [ ] **4D.8** **Plano Anual** — billing cycle anual no `Subscription`:
+  - [ ] **4D.8a** Campo `billing_cycle: "monthly" | "annual"` no aggregate `Subscription`
+  - [ ] **4D.8b** Migration Prisma + preços anuais no `plan-features.config.ts` (ESSENTIAL R$300 / PRO R$670)
+
+---
+
 ### Bloco 5 — Real-time e messaging
 
 - [ ] **5.1** WebSockets (Socket.io) — pedidos aceitos/recusados em tempo real
@@ -124,21 +180,110 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 - [ ] **7.3** Validação compartilhamento social → pontos
 - [ ] **7.4** Analytics MongoDB (logs, auditoria)
 - [ ] **7.5** Planos premium / marketplace — ver [monetization.md](monetization.md)
+- [ ] **7.9** **Vídeo de apresentação no perfil do músico (portfólio estático)** — Fase 1 do feed geo:
+  - [ ] **7.9a** Campo `presentation_video_url String?` e `presentation_video_uploaded_at DateTime?` em `MusicianProfile` (Prisma)
+  - [ ] **7.9b** Aggregate: `changePresentationVideo(url, uploadedAt)` + `clearPresentationVideo()` em `MusicianProfile`
+  - [ ] **7.9c** Endpoint `POST /musicians/:id/presentation-video` — multipart, limite 60s / 100MB → transcode HLS via FFmpeg → S3 → salva URL; padrão igual `ai-cifra-uploads.controller.ts`
+  - [ ] **7.9d** Endpoint `DELETE /musicians/:id/presentation-video` — remove do S3 + limpa campos
+  - [ ] **7.9e** Atualizar presenter com `presentation_video_url` e `presentation_video_duration_seconds`
+  - [ ] **7.9f** Gate: `assertMusicianFeature(id, "presentation_video")` — FREE ❌ / ESSENTIAL ✅ (1 vídeo) / PRO ✅ (até 3 vídeos por instrumento)
+  - Objetivo: portfólio do músico visível no perfil antes da contratação; sem criar feed dinâmico ainda
+- [ ] **7.10** **Feed de descoberta geolocalizado (vídeos curtos)** — Fase 2 (aguarda volume crítico de músicos com vídeo):
+  - **Pré-requisito:** 7.9 completo + base de músicos com vídeos suficiente para o feed ter conteúdo
+  - **Diferencial vs TikTok/Reels:** exibe APENAS artistas e estabelecimentos dentro do raio geográfico do usuário — o que nenhuma rede social faz nativamente
+  - [ ] **7.10a** Endpoint `GET /feed/musicians` com param `lat, lng, radius_km` — retorna músicos com `presentation_video_url` ordenados por proximidade + engajamento
+  - [ ] **7.10b** Algoritmo: boosting por avaliação, frequência de eventos, gorjetas recentes
+  - [ ] **7.10c** Paginação cursor-based (Redis cache por região)
+  - [ ] **7.10d** Evento de domínio `FeedVideoViewed` → analytics MongoDB
+  - Decisão: NÃO criar player de vídeo interno na Fase 2 — usar HLS stream direto do CloudFront
+- [ ] **7.6** **Afinador cromático** — utilitário de ritual pré-show (todos os planos; filtro de ruído: ESSENCIAL + PRO):
+  - [ ] **7.6a** Adicionar `tuner_noise_filter: boolean` em `MusicianPlanFeatures` e `plan-features.config.ts`
+  - [ ] **7.6b** Frontend: afinador básico via WebAudio API + algoritmo YIN/autocorrelação (todos os planos)
+  - [ ] **7.6c** Frontend: modo filtro de ruído + gate `assertMusicianFeature(id, "tuner_noise_filter")` (ESSENCIAL + PRO)
+  - [ ] **7.6d** Mobile: plugin de áudio nativo para latência mínima
+  - Posicionamento: "já no app, sem trocar de contexto" — não compete com GuitarTuna; entry point do ritual pré-show
+- [ ] **7.7** **Cardápio PDF do Estabelecimento** — confirmação de descoberta no perfil (todos os planos):
+  - [ ] **7.7a** Prisma: adicionar `menu_pdf_url String?` e `menu_pdf_updated_at DateTime?` em `EstablishmentProfile`
+  - [ ] **7.7b** Aggregate: campos + `changeMenuPdf(url, updatedAt)` + `clearMenuPdf()` em `EstablishmentProfile`
+  - [ ] **7.7c** Endpoint `POST /establishments/:id/menu-pdf` — multipart → `fileFilter` MIME (1ª camada) + `file-type@16` nos bytes reais do arquivo salvo (2ª camada, ~4100 bytes, sem parse pesado) → S3 → salva URL; limite 5MB; padrão igual `ai-cifra-uploads.controller.ts`. **Nota:** instalar `file-type@16` (última versão CJS — v17+ é ESM-only e incompatível com NestJS/CommonJS sem dynamic import)
+  - [ ] **7.7d** Endpoint `DELETE /establishments/:id/menu-pdf` — remove do S3 + limpa campos no perfil
+  - [ ] **7.7e** Atualizar presenter (`menu_pdf_url`, `menu_pdf_updated_at`) e DTO de update do profile
+  - Viewer inline no perfil público (PDF.js web / WebView mobile) — usuário não sai da plataforma
+  - Aviso "Atualizado há X dias" no frontend quando `menu_pdf_updated_at` > 30 dias
+- [ ] **7.8** **Badge "Aberto agora"** — `OperatingHours` já está 100% implementado (domínio + Prisma + presenter); falta apenas UX:
+  - [ ] **7.8a** Campo calculado `is_open_now: boolean` no `EstablishmentPresenter` via `profile.operatingHours?.isOpenAt(new Date())`
+  - [ ] **7.8b** Injetar `IDateTimeService` no `ListEstablishmentsUseCase` para cálculo com timezone correto
+  - [ ] **7.8c** Frontend: badge "Aberto agora" na listagem e no perfil do estabelecimento
+  - [ ] **7.8d** Frontend: formulário de edição de horários no dashboard do estabelecimento (preencher campo que já existe)
+- [ ] **7.11** **Missão de gamificação: compartilhamento social com Instagram** — público grava/envia clipe do evento no SoundMeet e compartilha no Instagram marcando músico e estabelecimento:
+  - **Mecânica decidida (jun/2026):** sem integração direta com API do Meta (restrição de aprovação); fluxo é "grave/suba no SoundMeet → app gera card compartilhável com @handles do músico e do estabelecimento → usuário abre Instagram Stories/Feed manualmente e posta"
+  - **Verificação:** usuário envia print/link do post como prova → moderação automática (hash de imagem) ou manual → XP creditado
+  - [ ] **7.11a** Aggregate `SocialShareMission` — campos: `mission_id`, `audience_id`, `event_id`, `musician_id`, `establishment_id`, `proof_url`, `status (pending | verified | rejected)`, `xp_reward`, `created_at`
+  - [ ] **7.11b** Use-case `SubmitSocialShareProof` — valida que evento está ativo ou ocorreu nas últimas 24h; cria missão com status `pending`
+  - [ ] **7.11c** Use-case `VerifySocialShareMission` — admin/automação verifica prova → status `verified` → publica evento de domínio `MissionCompleted` → handler gamificação credita XP
+  - [ ] **7.11d** Badge desbloqueável: 🎬 **"Divulgador"** (1ª missão concluída) / 📣 **"Amplificador"** (5+ missões) / 🌟 **"Embaixador"** (20+ missões com músicos distintos)
+  - [ ] **7.11e** Endpoint `POST /missions/social-share` (submit prova) + `PATCH /missions/social-share/:id/verify` (admin)
+  - [ ] **7.11f** Card compartilhável gerado server-side (PNG via `sharp`): foto do músico + logo SoundMeet + texto "@musico @ estabelecimento #SoundMeet" — mesmo pipeline do banner (4D.5)
+  - **Debate pendente:** opt-in explícito do músico e do estabelecimento para serem marcados em conteúdo de terceiros (privacy by design)
+
+---
+
+### Bloco 8 — Cifra Pessoal e Comunidade de Cifras 🎸
+
+> Músico pode criar uma versão pessoal da cifra gerada pela IA (fork), editar livremente (transpor, adicionar notas, corrigir acordes) e opcionalmente compartilhar com a comunidade — que só pode visualizar. A original da IA permanece imutável.
+
+#### Regras de negócio
+- A cifra original (`AiCifraAnalysisJob.chord_data`) é **imutável** — nunca modificada pelo usuário
+- Cada músico pode ter **no máximo 1 fork por `music_library_id`**
+- Fork é **privado por padrão** (`is_shared = false`)
+- Fork compartilhado é **read-only** para todos os outros músicos
+- O músico pode **descompartilhar** a qualquer momento (volta a privado)
+- `schema_version` detecta incompatibilidade quando o modelo de IA é atualizado
+- Admin pode deletar qualquer fork (moderação)
+
+#### Domínio — `src/core/personal-chord-sheet/`
+- [ ] **8.1** Aggregate `PersonalChordSheet` com campos: `personal_chord_sheet_id`, `music_library_id`, `musician_id`, `chord_data` (JSON — mesmo schema do `AiCifraAnalysisJob`), `schema_version`, `notes`, `is_shared`, `shared_at`, `created_at`, `updated_at`
+- [ ] **8.2** `IPersonalChordSheetRepository` (interface + in-memory + Prisma)
+- [ ] **8.3** Use-cases:
+  - [ ] **8.3a** `CreatePersonalChordSheet` — valida unicidade `(musician_id, music_library_id)`; copia `chord_data` + `schema_version` do job AI mais recente
+  - [ ] **8.3b** `UpdatePersonalChordSheet` — ownership check; valida schema compatível
+  - [ ] **8.3c** `DeletePersonalChordSheet` — ownership check (admin bypass)
+  - [ ] **8.3d** `GetPersonalChordSheet` — retorna próprio fork ou fork público de outro músico
+  - [ ] **8.3e** `ListPersonalChordSheets` — lista do músico; filtra por `is_shared=true` para comunidade
+  - [ ] **8.3f** `SharePersonalChordSheet` — seta `is_shared = true`, `shared_at = now()`
+  - [ ] **8.3g** `UnsharePersonalChordSheet` — reverte para privado
+- [ ] **8.4** `PersonalChordSheet.fake()` builder + testes de domínio
+
+#### Prisma schema
+- [ ] **8.5** Adicionar tabela `PersonalChordSheet` com índice único `(musician_id, music_library_id)` e índice em `is_shared` para listagem de comunidade
+
+#### NestJS — `src/nest-modules/personal-chord-sheet-module/`
+- [ ] **8.6** Module, providers, controller, presenter, DTOs
+- [ ] **8.7** Endpoints protegidos:
+  - [ ] **8.7a** `POST /music-library/:id/chord-sheet-forks` — cria fork (`@Roles("musician")`)
+  - [ ] **8.7b** `GET /music-library/:id/chord-sheet-forks/mine` — meu fork (`@Roles("musician")`)
+  - [ ] **8.7c** `PATCH /chord-sheet-forks/:id` — edita meu fork (`@Roles("musician")` + ownership)
+  - [ ] **8.7d** `DELETE /chord-sheet-forks/:id` — deleta (`@Roles("musician", "admin")` + ownership)
+  - [ ] **8.7e** `POST /chord-sheet-forks/:id/share` + `DELETE /chord-sheet-forks/:id/share` — compartilhar / descompartilhar (`@Roles("musician")` + ownership)
+  - [ ] **8.7f** `GET /community/chord-sheet-forks` + `GET /community/chord-sheet-forks/:id` — browse público (`@Public()`)
+- [ ] **8.8** Testes de integração: create, update, share/unshare, acesso cruzado bloqueado, admin delete
+
+**Referência:** [AI-musician/chord-sheet.md](AI-musician/chord-sheet.md) · core `ai-cifra` (schema de `chord_data`)
 
 ---
 
 ## Observações técnicas (não esquecer)
 
-| Observação                               | Onde impacta                                         | Bloco |
-| ---------------------------------------- | ---------------------------------------------------- | ----- |
-| `payment-module` bloqueia fluxo produção | Gorjetas, wallet, withdraw                           | 1     |
-| QR vulnerável — qualquer string passa    | `ScanQRUseCase`                                      | 2     |
-| Scan sem transação → inconsistência      | audience + userInteraction                           | 2.5   |
-| ~~`ai-audio-module` órfão~~              | ✅ resolvido — registrado em `app.module.ts`          | 3.1   |
-| Bulk/ai-cifra sem auth consistente       | synced-lyrics, ai-cifra controllers                  | 4     |
-| Multi-roles sem ownership completo       | guards/use cases por tenant, estabelecimento e banda | 4B    |
-| Saque PIX (Asaas real)                   | `AsaasGatewayAdapter` + webhook TRANSFER_DONE        | 1.6/1.7 |
-| Gorjeta PIX ainda mock                   | `PixGatewayMock` — aguardando chaves Iugu            | 1.6   |
+| Observação                                      | Onde impacta                                         | Bloco   |
+| ----------------------------------------------- | ---------------------------------------------------- | ------- |
+| ~~`payment-module` bloqueia fluxo produção~~    | ✅ HTTP completo; gorjeta PIX ainda mock (Iugu)      | 1       |
+| ~~QR vulnerável — qualquer string passa~~       | ✅ resolvido — parser `soundmeet://`, UUID, match    | 2       |
+| ~~Scan sem transação → inconsistência~~         | ✅ resolvido — UoW atômico (`update` + `insert`)     | 2.5     |
+| ~~`ai-audio-module` órfão~~                     | ✅ resolvido — registrado em `app.module.ts`          | 3.1     |
+| ~~Bulk/ai-cifra sem auth consistente~~          | ✅ resolvido — `InternalTokenGuard` + `@SkipThrottle` | 4       |
+| ~~Multi-roles sem ownership completo~~          | ✅ resolvido — guards aplicados, testes cobertos     | 4B      |
+| Saque PIX (Asaas real)                          | ~ `AsaasGatewayAdapter` ativo; webhook TRANSFER_DONE ok | 1.6/1.7 |
+| Gorjeta PIX ainda mock                          | `PixGatewayMock` — aguardando chaves Iugu            | 1.6     |
 
 ---
 

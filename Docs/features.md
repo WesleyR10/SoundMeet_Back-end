@@ -31,6 +31,27 @@ Plataforma que conecta músicos, público e estabelecimentos em eventos ao vivo 
 
 ---
 
+## Posicionamento Único de Mercado
+
+> **Para uso em comunicação de marca, pitch comercial e posicionamento estratégico.**
+
+SoundMeet ocupa um espaço genuinamente vazio no mercado. Nenhum concorrente direto cobre a interseção entre música ao vivo e experiência gastronômica:
+
+| Plataforma | Música ao vivo | Cardápio / Estabelecimento | Gorjetas | Pedidos |
+|------------|---------------|--------------------------|----------|---------|
+| BandHelper | ✅ (gestão do músico) | ❌ | ❌ | ❌ |
+| OnSong | ✅ (cifras ao vivo) | ❌ | ❌ | ❌ |
+| Cifra Club | ✅ (cifras) | ❌ | ❌ | ❌ |
+| iFood / Rappi | ❌ | ✅ | ❌ | ❌ |
+| **SoundMeet** | ✅ | ✅ | ✅ | ✅ |
+
+Para bares e restaurantes, a decisão do público de ir a um evento é composta por quatro fatores:
+**artista → cardápio → preço → localização**
+
+SoundMeet é a única plataforma que cobre todos os quatro em um único lugar, no momento da descoberta — antes da decisão de sair de casa.
+
+---
+
 ## Fluxo principal
 
 1. **Músico/Banda** — cria perfil → gera QR permanente vinculado ao perfil
@@ -65,6 +86,10 @@ Plataforma que conecta músicos, público e estabelecimentos em eventos ao vivo 
   │ ├── **Funcionamento**: Categorização automática baseada nas músicas mais pedidas
   │ └── **Benefício**: Direcionar melhor o repertório e eventos futuros
   └── Monetização: gorjetas por música, momento, frequência (análise por estilo musical)
+- **Utilitários de Ritual Pré-show**:
+  ├── **Afinador Cromático** (todos os planos): detecção de pitch via microfone, sem precisar trocar de app antes de subir ao palco
+  └── **Filtro de Ruído no Afinador** (ESSENCIAL + PRO): pitch detection mais preciso em ambientes ruidosos (bares, palcos)
+
 - **Monetização Especializada** [(Ver Detalhes)](monetization.md#monetização-especializada):
   ├── **Músico Solo**: Gorjetas individuais, metas pessoais
   └── **Banda**: Divisão automática por membro, percentuais customizáveis
@@ -72,6 +97,10 @@ Plataforma que conecta músicos, público e estabelecimentos em eventos ao vivo 
 ### Para Estabelecimentos
 
 <a id="estabelecimentos"></a>
+
+- **Perfil Completo de Descoberta**:
+  ├── **Horário de funcionamento**: horários semanais, dias especiais, feriados, turnos overnight — badge "Aberto agora" calculado automaticamente *(domínio já implementado — `OperatingHours` VO)*
+  └── **Cardápio PDF**: upload direto de PDF do cardápio → exibido inline no perfil (usuário não sai da plataforma); aviso de atualização quando > 30 dias
 
 - **Dashboard de Contratação**:
   ├── Busca inteligente por músicos/bandas locais
@@ -271,6 +300,20 @@ Plataforma que conecta músicos, público e estabelecimentos em eventos ao vivo 
   ├── **Funcionamento**: Combinação de múltiplas métricas
   └── **Benefício**: Destaque como membro premium da comunidade
 
+**Missões e Desafios**:
+
+- 🎬 **Missão de Compartilhamento Social** — público grava/sobe clipe do evento no SoundMeet e posta no Instagram marcando músico e estabelecimento:
+  ├── **Mecânica**: upload no SoundMeet → app gera card compartilhável com @handles → usuário posta manualmente no Instagram → envia print como prova
+  ├── **Verificação**: prova moderada (automática por hash de imagem ou revisão manual)
+  ├── **Recompensa**: XP + badge desbloqueável
+  ├── **Condição**: evento ativo ou ocorrido nas últimas 24h
+  ├── **Privacidade**: opt-in explícito do músico e do estabelecimento para serem marcados
+  └── **Benefício para todos**: músico e estabelecimento ganham publicidade orgânica no Instagram sem custo
+- 🏅 **Badges de Missão Social**:
+  ├── 🎬 **Divulgador**: primeira missão de compartilhamento concluída
+  ├── 📣 **Amplificador**: 5+ missões concluídas
+  └── 🌟 **Embaixador**: 20+ missões com músicos distintos (reconhece quem promove a cena local)
+
 **Recompensas Exclusivas** [(Ver Detalhes)](monetization.md#gamificação-avançada):
 
 - 💎 **Acesso Antecipado**: Primeiro a ver novos recursos
@@ -375,11 +418,17 @@ Plataforma que conecta músicos, público e estabelecimentos em eventos ao vivo 
   ├── **Estilo**: rock, sertanejo, MPB, jazz, eletrônica
   └── **Especialidades**: subgêneros e nichos musicais
 - 💰 **Faixa de Preço**: Cachês públicos ou faixas de valor (transparência)
-- 📱 **Feed de Proximidade**: Reels de artistas próximos geograficamente
+- 📹 **Vídeo de Apresentação no Perfil** *(Fase 1 — portfólio estático)*:
+  ├── **O quê**: 1 vídeo de até 60s no perfil do músico (ESSENTIAL/PRO)
+  ├── **Objetivo**: portfólio visível antes da contratação — sem criar feed dinâmico ainda
+  └── **Formato**: HLS via CloudFront; upload multipart → transcode server-side
+- 📱 **Feed de Descoberta Geolocalizado** *(Fase 2 — aguarda volume crítico)*:
+  ├── **Diferencial vs TikTok/Reels**: exibe APENAS artistas dentro do raio geográfico do usuário — o que nenhuma rede social faz nativamente
+  ├── **Pré-requisito**: base suficiente de músicos com vídeos de apresentação cadastrados
   ├── **Demonstração**: 30-60 segundos mostrando técnica
   ├── **Engajamento**: likes e comentários nos reels
-  └── **Descoberta**: algoritmo de recomendação baseado em visualizações
-- 🔄 **Integração Social**: Posta no app → posta no Instagram marcando artista
+  └── **Descoberta**: algoritmo por proximidade + avaliação + gorjetas recentes
+- 🔄 **Integração Social**: Posta no app → card compartilhável gerado → abre Instagram marcando artista e estabelecimento
 - 🎯 **Busca por Ritmo**: Filtro por gênero + localização + horário apresentação
 - 👥 **Formação de Bandas**: Busca por instrumentos complementares
   ├── **Busca por instrumentos complementares**: encontrar músicos que tocam instrumentos que combinam com o seu
