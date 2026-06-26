@@ -2,12 +2,16 @@ import { Test, TestingModule } from "@nestjs/testing";
 
 import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-profile-output";
 import { CreateMusicianUseCase } from "../../../core/musician/application/use-cases/create-musician/create-musician.use-case";
+import { CustomizeQRCodeUseCase } from "../../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeleteMusicianUseCase } from "../../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
+import { GetMusicianAnalyticsUseCase } from "../../../core/musician/application/use-cases/get-musician-analytics/get-musician-analytics.use-case";
 import { GetMusicianUseCase } from "../../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { VerifyMusicianUseCase } from "../../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
+import { PlanCheckService } from "../../../core/plans/domain/plan-check.service";
+import { SubscriptionInMemoryRepository } from "../../../core/plans/infra/db/in-memory/subscription-in-memory.repository";
 import {
   Musician,
   MusicianId,
@@ -81,6 +85,22 @@ describe("MusiciansController Integration Tests", () => {
           useFactory: (repo: IMusicianRepository) =>
             new VerifyMusicianUseCase(repo),
           inject: ["MusicianRepository"],
+        },
+        {
+          provide: "PlanCheckService",
+          useValue: new PlanCheckService(new SubscriptionInMemoryRepository()),
+        },
+        {
+          provide: GetMusicianAnalyticsUseCase,
+          useFactory: (repo: IMusicianRepository, planCheck: PlanCheckService) =>
+            new GetMusicianAnalyticsUseCase(repo, planCheck),
+          inject: ["MusicianRepository", "PlanCheckService"],
+        },
+        {
+          provide: CustomizeQRCodeUseCase,
+          useFactory: (repo: IMusicianRepository, planCheck: PlanCheckService) =>
+            new CustomizeQRCodeUseCase(repo, planCheck),
+          inject: ["MusicianRepository", "PlanCheckService"],
         },
       ],
     });

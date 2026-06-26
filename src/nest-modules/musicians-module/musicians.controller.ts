@@ -24,6 +24,8 @@ import { MusicianOutput } from "../../core/musician/application/use-cases/common
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
+import { GetMusicianAnalyticsUseCase } from "../../core/musician/application/use-cases/get-musician-analytics/get-musician-analytics.use-case";
+import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
@@ -37,6 +39,7 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { CreateMusicianDto } from "./dto/create-musician.dto";
+import { CustomizeQRCodeDto } from "./dto/customize-qr-code.dto";
 import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
 import { UpdateMusicianProfileDto } from "./dto/update-musician-profile.dto";
@@ -70,6 +73,12 @@ export class MusiciansController {
 
   @Inject(VerifyMusicianUseCase)
   private verifyUseCase: VerifyMusicianUseCase;
+
+  @Inject(GetMusicianAnalyticsUseCase)
+  private getMusicianAnalyticsUseCase: GetMusicianAnalyticsUseCase;
+
+  @Inject(CustomizeQRCodeUseCase)
+  private customizeQRCodeUseCase: CustomizeQRCodeUseCase;
 
   @Post()
   @Roles("musician", "admin")
@@ -177,6 +186,43 @@ export class MusiciansController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {
     await this.deleteUseCase.execute({ id });
+  }
+
+  @Post(":id/qr-code/customize")
+  @Roles("musician")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Personalizar QR Code (PRO)",
+    description:
+      "Aplica personalização visual ao QR Code permanente do músico. Requer plano PRO.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async customizeQRCode(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: CustomizeQRCodeDto,
+  ) {
+    const output = await this.customizeQRCodeUseCase.execute({
+      musician_id: id,
+      customization: dto,
+    });
+    return MusiciansController.serialize(output);
+  }
+
+  @Get(":id/analytics")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Analytics do músico",
+    description:
+      "Retorna dados analíticos do músico. ESSENTIAL/PRO: realtime_available=true (stream WebSocket disponível). FREE: apenas dados agregados.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200 })
+  async getAnalytics(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    return this.getMusicianAnalyticsUseCase.execute({ musician_id: id });
   }
 
   static serialize(output: MusicianOutput) {

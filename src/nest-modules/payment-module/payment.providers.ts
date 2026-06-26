@@ -129,13 +129,15 @@ export const USE_CASES = {
       walletRepo: IMusicianWalletRepository,
       txRepo: ITransactionRepository,
       pixWithdrawGateway: IPixWithdrawGateway,
+      planCheckService: PlanCheckService,
     ) => {
-      return new WithdrawToPixUseCase(walletRepo, txRepo, pixWithdrawGateway);
+      return new WithdrawToPixUseCase(walletRepo, txRepo, pixWithdrawGateway, planCheckService);
     },
     inject: [
       REPOSITORIES.MUSICIAN_WALLET_REPOSITORY.provide,
       REPOSITORIES.TRANSACTION_REPOSITORY.provide,
       INFRA_PROVIDERS.ASAAS_PIX_WITHDRAW_GATEWAY.provide,
+      PlanCheckService,
     ],
   },
 };

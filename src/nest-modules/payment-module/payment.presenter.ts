@@ -63,10 +63,14 @@ export class WithdrawToPixPresenter {
   transaction_id: string;
   wallet_balance: number;
   status: string;
+  min_withdrawal_amount_brl: number;
+  withdrawal_days: number;
 
   constructor(output: WithdrawToPixOutput) {
     this.transaction_id = output.transaction_id;
     this.wallet_balance = output.wallet_balance;
     this.status = output.status;
+    this.min_withdrawal_amount_brl = output.min_withdrawal_amount_brl;
+    this.withdrawal_days = output.withdrawal_days;
   }
 }

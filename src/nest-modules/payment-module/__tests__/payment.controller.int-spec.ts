@@ -239,18 +239,18 @@ describe("PaymentController Integration Tests", () => {
       await walletRepo.insert(wallet);
 
       const result = await controller.withdrawToPix(MUSICIAN_ID, {
-        amount: 80,
+        amount: 110,
         pix_key: { key: "musician@pix.com", type: "email" },
       } as any);
 
       expect(result).toBeInstanceOf(WithdrawToPixPresenter);
-      expect(result.wallet_balance).toBe(120);
+      expect(result.wallet_balance).toBe(90);
       expect(result.status).toBe("completed");
       expect(typeof result.transaction_id).toBe("string");
 
       const updatedWallet = await walletRepo.findByMusicianId(MUSICIAN_ID);
-      expect(updatedWallet!.balance.amount).toBe(120);
-      expect(updatedWallet!.total_withdrawn.amount).toBe(80);
+      expect(updatedWallet!.balance.amount).toBe(90);
+      expect(updatedWallet!.total_withdrawn.amount).toBe(110);
 
       const transactions = await txRepo.findAll();
       expect(transactions).toHaveLength(1);

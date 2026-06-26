@@ -1,4 +1,6 @@
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
+import { GetMusicianAnalyticsUseCase } from "../../core/musician/application/use-cases/get-musician-analytics/get-musician-analytics.use-case";
 import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
@@ -14,6 +16,7 @@ import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { PlanCheckService } from "../../core/plans/domain/plan-check.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
@@ -131,12 +134,14 @@ export const USE_CASES = {
     useFactory: (
       bandRepo: IBandRepository,
       musicianRepo: IMusicianRepository,
+      planCheckService: PlanCheckService,
     ) => {
-      return new AddBandMemberUseCase(bandRepo, musicianRepo);
+      return new AddBandMemberUseCase(bandRepo, musicianRepo, planCheckService);
     },
     inject: [
       REPOSITORIES.BAND_REPOSITORY.provide,
       REPOSITORIES.MUSICIAN_REPOSITORY.provide,
+      PlanCheckService,
     ],
   },
   REMOVE_BAND_MEMBER_USE_CASE: {
@@ -152,6 +157,26 @@ export const USE_CASES = {
       return new VerifyMusicianUseCase(musicianRepo);
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+  GET_MUSICIAN_ANALYTICS_USE_CASE: {
+    provide: GetMusicianAnalyticsUseCase,
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new GetMusicianAnalyticsUseCase(musicianRepo, planCheckService);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, PlanCheckService],
+  },
+  CUSTOMIZE_QR_CODE_USE_CASE: {
+    provide: CustomizeQRCodeUseCase,
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new CustomizeQRCodeUseCase(musicianRepo, planCheckService);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, PlanCheckService],
   },
 };
 
