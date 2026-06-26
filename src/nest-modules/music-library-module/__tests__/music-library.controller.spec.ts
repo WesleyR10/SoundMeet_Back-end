@@ -54,6 +54,14 @@ function makeOutput(
   };
 }
 
+const MUSICIAN_USER = {
+  userId: "550e8400-e29b-41d4-a716-446655440002",
+  roles: ["musician"],
+  establishmentIds: [],
+  bandIds: [],
+  isAdmin: false,
+};
+
 describe("MusicLibraryController", () => {
   let controller: MusicLibraryController;
 
@@ -66,16 +74,17 @@ describe("MusicLibraryController", () => {
     const useCase = { execute: jest.fn().mockResolvedValue(output) };
     (controller as any).createUseCase = useCase;
     const dto: CreateMusicLibraryDto = {
-      musician_id: output.musician_id,
       title: output.title,
       artist: output.artist,
       source: output.source,
       source_id: output.source_id,
     } as CreateMusicLibraryDto;
 
-    const presenter = await controller.create(dto);
+    const presenter = await controller.create(dto, MUSICIAN_USER);
 
-    expect(useCase.execute).toHaveBeenCalledWith(dto);
+    expect(useCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ musician_id: MUSICIAN_USER.userId }),
+    );
     expect(presenter).toStrictEqual(new MusicLibraryPresenter(output));
   });
 
@@ -90,20 +99,19 @@ describe("MusicLibraryController", () => {
     const useCase = { execute: jest.fn().mockResolvedValue(output) };
     (controller as any).listUseCase = useCase;
     const query: SearchMusicLibraryDto = {
-      musician_id: "550e8400-e29b-41d4-a716-446655440002",
       source: "youtube",
       page: 1,
       per_page: 10,
     };
 
-    const presenter = await controller.findAll(query);
+    const presenter = await controller.findAll(query, MUSICIAN_USER);
 
     expect(useCase.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         page: 1,
         per_page: 10,
         filter: expect.objectContaining({
-          musician_id: query.musician_id,
+          musician_id: MUSICIAN_USER.userId,
           source: query.source,
         }),
       }),
@@ -130,11 +138,13 @@ describe("MusicLibraryController", () => {
     (controller as any).updateUseCase = useCase;
     const dto: UpdateMusicLibraryDto = { title: "Updated" };
 
-    const presenter = await controller.update(output.id, dto);
+    const presenter = await controller.update(output.id, dto, MUSICIAN_USER);
 
     expect(useCase.execute).toHaveBeenCalledWith({
       id: output.id,
       title: "Updated",
+      requesting_musician_id: MUSICIAN_USER.userId,
+      is_admin: false,
     });
     expect(presenter).toStrictEqual(new MusicLibraryPresenter(output));
   });
@@ -144,10 +154,12 @@ describe("MusicLibraryController", () => {
     (controller as any).deleteUseCase = useCase;
 
     await expect(
-      controller.remove("550e8400-e29b-41d4-a716-446655440001"),
+      controller.remove("550e8400-e29b-41d4-a716-446655440001", MUSICIAN_USER),
     ).resolves.toBeUndefined();
     expect(useCase.execute).toHaveBeenCalledWith({
       id: "550e8400-e29b-41d4-a716-446655440001",
+      requesting_musician_id: MUSICIAN_USER.userId,
+      is_admin: false,
     });
   });
 });

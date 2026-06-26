@@ -3,7 +3,10 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { CreateMusicLibraryInput } from "../../../core/music-library/application/use-cases/create-music-library/create-music-library.input";
 
 export class CreateMusicLibraryDto extends CreateMusicLibraryInput {
-  @ApiProperty({ format: "uuid" })
+  @ApiPropertyOptional({
+    format: "uuid",
+    description: "Ignorado para músicos — preenchido automaticamente do JWT. Admin pode especificar outro musician_id.",
+  })
   declare musician_id: string;
 
   @ApiProperty()

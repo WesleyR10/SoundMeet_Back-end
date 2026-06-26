@@ -19,6 +19,8 @@ import {
 
 export type UpdateMusicLibraryInputConstructorProps = {
   id: string;
+  requesting_musician_id?: string;
+  is_admin?: boolean;
   title?: string;
   artist?: string;
   genre?: string | null;
@@ -40,6 +42,12 @@ export class UpdateMusicLibraryInput {
   @IsString()
   @IsNotEmpty()
   id: string;
+
+  @IsString()
+  @IsOptional()
+  requesting_musician_id?: string;
+
+  is_admin?: boolean;
 
   @IsString()
   @IsOptional()
@@ -103,6 +111,8 @@ export class UpdateMusicLibraryInput {
   constructor(props: UpdateMusicLibraryInputConstructorProps) {
     if (!props) return;
     this.id = props.id;
+    this.requesting_musician_id = props.requesting_musician_id;
+    this.is_admin = props.is_admin;
     this.title = props.title;
     this.artist = props.artist;
     this.genre = props.genre;

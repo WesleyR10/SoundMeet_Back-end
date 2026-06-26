@@ -1,3 +1,5 @@
+import { ForbiddenException } from "@nestjs/common";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import {
@@ -21,6 +23,17 @@ export class DeleteMusicLibraryUseCase implements IUseCase<
 
     if (!entity) {
       throw new NotFoundError(input.id, MusicLibrary);
+    }
+
+    if (!input.is_admin) {
+      if (
+        !input.requesting_musician_id ||
+        entity.musician_id.id !== input.requesting_musician_id
+      ) {
+        throw new ForbiddenException(
+          "Você não tem permissão para remover este item da biblioteca.",
+        );
+      }
     }
 
     await this.musicLibraryRepo.delete(musicLibraryId);
