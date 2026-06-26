@@ -4,9 +4,11 @@ import { IAudienceRepository } from "../../core/audience/domain";
 import { IEventRepository } from "../../core/events/domain";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
+import { CreateRequestFeedbackUseCase } from "../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
 import { DeleteRequestUseCase } from "../../core/request/application/use-cases/delete-request/delete-request.use-case";
 import { GetMusicianRequestsUseCase } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestUseCase } from "../../core/request/application/use-cases/get-request/get-request.use-case";
+import { GetRequestFeedbackUseCase } from "../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { GetRequestSuggestionsUseCase } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsUseCase } from "../../core/request/application/use-cases/list-requests/list-requests.use-case";
 import { MarkRequestPlayedUseCase } from "../../core/request/application/use-cases/mark-request-played/mark-request-played.use-case";
@@ -15,6 +17,8 @@ import { UpdateRequestUseCase } from "../../core/request/application/use-cases/u
 import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import { IRequestRepository } from "../../core/request/domain/request.repository";
 import { IRequestVoteRepository } from "../../core/request/domain/request-vote.repository";
+import { IRequestFeedbackRepository } from "../../core/request/domain/request-feedback.repository";
+import { RequestFeedbackPrismaRepository } from "../../core/request/infra/db/prisma/request-feedback-prisma.repository";
 import { RequestPrismaRepository } from "../../core/request/infra/db/prisma/request-prisma.repository";
 import { RequestVotePrismaRepository } from "../../core/request/infra/db/prisma/request-vote-prisma.repository";
 import { IClock } from "../../core/shared/application/clock.interface";
@@ -42,6 +46,17 @@ export const REPOSITORIES = {
     provide: RequestVotePrismaRepository,
     useFactory: (prismaService: PrismaService) => {
       return new RequestVotePrismaRepository(prismaService);
+    },
+    inject: [PrismaService],
+  },
+  REQUEST_FEEDBACK_REPOSITORY: {
+    provide: "RequestFeedbackRepository",
+    useExisting: RequestFeedbackPrismaRepository,
+  },
+  REQUEST_FEEDBACK_PRISMA_REPOSITORY: {
+    provide: RequestFeedbackPrismaRepository,
+    useFactory: (prismaService: PrismaService) => {
+      return new RequestFeedbackPrismaRepository(prismaService);
     },
     inject: [PrismaService],
   },
@@ -209,6 +224,26 @@ export const USE_CASES = {
       REPOSITORIES.REQUEST_REPOSITORY.provide,
       REPOSITORIES.REQUEST_VOTE_REPOSITORY.provide,
     ],
+  },
+  CREATE_REQUEST_FEEDBACK_USE_CASE: {
+    provide: CreateRequestFeedbackUseCase,
+    useFactory: (
+      feedbackRepo: IRequestFeedbackRepository,
+      requestRepo: IRequestRepository,
+    ) => {
+      return new CreateRequestFeedbackUseCase(feedbackRepo, requestRepo);
+    },
+    inject: [
+      REPOSITORIES.REQUEST_FEEDBACK_REPOSITORY.provide,
+      REPOSITORIES.REQUEST_REPOSITORY.provide,
+    ],
+  },
+  GET_REQUEST_FEEDBACK_USE_CASE: {
+    provide: GetRequestFeedbackUseCase,
+    useFactory: (feedbackRepo: IRequestFeedbackRepository) => {
+      return new GetRequestFeedbackUseCase(feedbackRepo);
+    },
+    inject: [REPOSITORIES.REQUEST_FEEDBACK_REPOSITORY.provide],
   },
 };
 

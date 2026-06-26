@@ -24,11 +24,11 @@ describe("RequestEventsHandlers", () => {
       execute: jest.fn().mockResolvedValue(undefined),
     };
     eventProcessing = {
-      processOnce: jest.fn((_key, work) => work()),
+      processOnce: jest.fn((_key, work) => work()) as any,
     };
     handlers = new RequestEventsHandlers(
-      addPointsUseCase as AddPointsUseCase,
-      eventProcessing as RequestEventProcessingService,
+      addPointsUseCase as unknown as AddPointsUseCase,
+      eventProcessing as unknown as RequestEventProcessingService,
     );
   });
 

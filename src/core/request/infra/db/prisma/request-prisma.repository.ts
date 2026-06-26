@@ -437,6 +437,22 @@ export class RequestPrismaRepository implements IRequestRepository {
     });
   }
 
+  async countRequestsByMusicianInPeriod(
+    musician_id: string,
+    start_date: Date,
+    end_date: Date,
+  ): Promise<number> {
+    return await this.prisma.musicRequest.count({
+      where: {
+        musicianId: musician_id,
+        created_at: {
+          gte: start_date,
+          lt: end_date,
+        },
+      },
+    });
+  }
+
   async countPendingRequestsByMusician(musician_id: string): Promise<number> {
     return await this.prisma.musicRequest.count({
       where: {

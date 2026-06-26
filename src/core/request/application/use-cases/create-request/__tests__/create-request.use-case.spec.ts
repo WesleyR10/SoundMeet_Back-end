@@ -4,7 +4,6 @@ import { Event, EventId } from "@core/events/domain";
 import { EventInMemoryRepository } from "@core/events/infra/db/in-memory";
 import { Musician, MusicianId } from "@core/musician/domain";
 import { MusicianInMemoryRepository } from "@core/musician/infra/db/in-memory/musician-in-memory.repository";
-
 import { FakeClock } from "../../../../../shared/application/clock.interface";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";

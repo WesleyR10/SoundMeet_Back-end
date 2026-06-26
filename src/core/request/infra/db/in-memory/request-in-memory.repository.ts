@@ -224,6 +224,19 @@ export class RequestInMemoryRepository
     ).length;
   }
 
+  async countRequestsByMusicianInPeriod(
+    musician_id: string,
+    start_date: Date,
+    end_date: Date,
+  ): Promise<number> {
+    return this.items.filter(
+      (item) =>
+        item.musician_id.id === musician_id &&
+        item.created_at >= start_date &&
+        item.created_at < end_date,
+    ).length;
+  }
+
   async countPendingRequestsByMusician(musician_id: string): Promise<number> {
     return this.items.filter(
       (item) => item.isPending && item.musician_id.id === musician_id,

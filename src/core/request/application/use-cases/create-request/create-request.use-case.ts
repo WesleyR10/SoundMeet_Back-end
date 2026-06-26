@@ -9,7 +9,6 @@ import {
   Musician,
   MusicianId,
 } from "@core/musician/domain";
-
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";

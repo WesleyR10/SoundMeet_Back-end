@@ -11,9 +11,11 @@ import {
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
 import { RequestOutputMapper } from "../../../core/request/application/use-cases/common/request-output";
 import { CreateRequestUseCase } from "../../../core/request/application/use-cases/create-request/create-request.use-case";
+import { CreateRequestFeedbackUseCase } from "../../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
 import { DeleteRequestUseCase } from "../../../core/request/application/use-cases/delete-request/delete-request.use-case";
 import { GetMusicianRequestsUseCase } from "../../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestUseCase } from "../../../core/request/application/use-cases/get-request/get-request.use-case";
+import { GetRequestFeedbackUseCase } from "../../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { GetRequestSuggestionsUseCase } from "../../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsUseCase } from "../../../core/request/application/use-cases/list-requests/list-requests.use-case";
 import { MarkRequestPlayedUseCase } from "../../../core/request/application/use-cases/mark-request-played/mark-request-played.use-case";
@@ -27,6 +29,7 @@ import {
 } from "../../../core/request/domain/request.aggregate";
 import { IRequestRepository } from "../../../core/request/domain/request.repository";
 import { IRequestVoteRepository } from "../../../core/request/domain/request-vote.repository";
+import { RequestFeedbackInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-feedback-in-memory.repository";
 import { RequestInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-in-memory.repository";
 import { RequestVoteInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-vote-in-memory.repository";
 import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
@@ -90,6 +93,8 @@ describe("RequestsController Integration Tests", () => {
   beforeEach(async () => {
     const repositoryInstance = new RequestInMemoryRepository();
     const requestVoteRepositoryInstance = new RequestVoteInMemoryRepository();
+    const requestFeedbackRepositoryInstance =
+      new RequestFeedbackInMemoryRepository();
     eventRepository = new EventInMemoryRepository();
     musicianRepository = new MusicianInMemoryRepository();
     audienceRepository = new AudienceInMemoryRepository();
@@ -218,6 +223,19 @@ describe("RequestsController Integration Tests", () => {
           ) => new VoteRequestUseCase(repo, voteRepo),
           inject: ["RequestRepository", "RequestVoteRepository"],
         },
+        {
+          provide: CreateRequestFeedbackUseCase,
+          useValue: new CreateRequestFeedbackUseCase(
+            requestFeedbackRepositoryInstance,
+            repositoryInstance,
+          ),
+        },
+        {
+          provide: GetRequestFeedbackUseCase,
+          useValue: new GetRequestFeedbackUseCase(
+            requestFeedbackRepositoryInstance,
+          ),
+        },
       ],
     });
 
@@ -250,14 +268,16 @@ describe("RequestsController Integration Tests", () => {
     await setupEventWithMusicians(eventId, [musicianId]);
     await setupAudienceInEvent(eventId, audienceId);
 
-    const presenter = await controller.create({
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "Song Title",
-      artist: "Artist",
-      message: "Message",
-    } as any);
+    const presenter = await controller.create(
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song Title",
+        artist: "Artist",
+        message: "Message",
+      } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
     const entity = await repository.findById(new RequestId(presenter.id));
 
@@ -288,12 +308,14 @@ describe("RequestsController Integration Tests", () => {
     await setupEventWithMusicians(eventId, [musicianId]);
     await setupAudienceInEvent(eventId, audienceId);
 
-    const presenter = await controller.create({
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "Song Title",
-    } as any);
+    const presenter = await controller.create(
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song Title",
+      } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
     const fetched = await controller.findOne(presenter.id);
 
@@ -308,12 +330,14 @@ describe("RequestsController Integration Tests", () => {
       const musicianId = new Uuid().id;
       await setupEventWithMusicians(eventId, [musicianId]);
       await setupAudienceInEvent(eventId, audienceId);
-      await controller.create({
-        event_id: eventId,
-        audience_id: audienceId,
-        musician_id: musicianId,
-        song_title: `Song ${i}`,
-      } as any);
+      await controller.create(
+        {
+          event_id: eventId,
+          musician_id: musicianId,
+          song_title: `Song ${i}`,
+        } as any,
+        { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      );
     }
 
     const presenter = await controller.findAll({
@@ -333,13 +357,15 @@ describe("RequestsController Integration Tests", () => {
     await setupEventWithMusicians(eventId, [musicianId]);
     await setupAudienceInEvent(eventId, audienceId);
 
-    const created = await controller.create({
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "Original Song",
-      artist: "Original Artist",
-    } as any);
+    const created = await controller.create(
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Original Song",
+        artist: "Original Artist",
+      } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
     const updated = await controller.update(created.id, {
       song_title: "Updated Song",
@@ -363,12 +389,14 @@ describe("RequestsController Integration Tests", () => {
     await setupEventWithMusicians(eventId, [musicianId]);
     await setupAudienceInEvent(eventId, audienceId);
 
-    const created = await controller.create({
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "Song Title",
-    } as any);
+    const created = await controller.create(
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song Title",
+      } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
     const responded = await controller.respond(
       created.id,
@@ -400,19 +428,23 @@ describe("RequestsController Integration Tests", () => {
     await setupAudienceInEvent(firstEventId, firstAudienceId);
     await setupAudienceInEvent(secondEventId, secondAudienceId);
 
-    await controller.create({
-      event_id: firstEventId,
-      audience_id: firstAudienceId,
-      musician_id: musicianId,
-      song_title: "Song 1",
-    } as any);
+    await controller.create(
+      {
+        event_id: firstEventId,
+        musician_id: musicianId,
+        song_title: "Song 1",
+      } as any,
+      { userId: firstAudienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
-    await controller.create({
-      event_id: secondEventId,
-      audience_id: secondAudienceId,
-      musician_id: musicianId,
-      song_title: "Song 2",
-    } as any);
+    await controller.create(
+      {
+        event_id: secondEventId,
+        musician_id: musicianId,
+        song_title: "Song 2",
+      } as any,
+      { userId: secondAudienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
     const presenter = await controller.getMusicianRequests(musicianId, {
       status: undefined,
@@ -434,12 +466,14 @@ describe("RequestsController Integration Tests", () => {
     await setupEventWithMusicians(eventId, [musicianId]);
     await setupAudienceInEvent(eventId, audienceId);
 
-    const created = await controller.create({
-      event_id: eventId,
-      audience_id: audienceId,
-      musician_id: musicianId,
-      song_title: "Song Title",
-    } as any);
+    const created = await controller.create(
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song Title",
+      } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
 
     const response = await controller.remove(created.id);
 

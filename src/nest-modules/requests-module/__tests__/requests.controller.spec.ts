@@ -84,16 +84,25 @@ describe("RequestsController Unit Tests", () => {
 
       const input: CreateRequestDto = {
         event_id: "22222222-2222-2222-2222-222222222222",
-        audience_id: "33333333-3333-3333-3333-333333333333",
         musician_id: "44444444-4444-4444-4444-444444444444",
         song_title: "Song Title",
         artist: "Artist Name",
         message: "Message",
       } as any;
+      const currentUser = {
+        userId: "33333333-3333-3333-3333-333333333333",
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      };
 
-      const presenter = await controller.create(input);
+      const presenter = await controller.create(input, currentUser);
 
-      expect(mockCreateUseCase.execute).toHaveBeenCalledWith(input as any);
+      expect(mockCreateUseCase.execute).toHaveBeenCalledWith({
+        ...input,
+        audience_id: currentUser.userId,
+      });
       expect(serializeSpy).toHaveBeenCalledWith(output);
       expect(presenter).toBeInstanceOf(RequestPresenter);
       expect(presenter).toStrictEqual(new RequestPresenter(output));
@@ -429,16 +438,22 @@ describe("RequestsController Unit Tests", () => {
 
       const serializeSpy = jest.spyOn(RequestsController, "serialize");
       const input: VoteRequestDto = {
-        audience_id: "33333333-3333-3333-3333-333333333333",
         vote_type: "up" as any,
       };
+      const currentUser = {
+        userId: "33333333-3333-3333-3333-333333333333",
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      };
 
-      const presenter = await controller.vote(id, input);
+      const presenter = await controller.vote(id, input, currentUser);
 
       expect(mockVoteUseCase.execute).toHaveBeenCalledWith(
         expect.objectContaining({
           request_id: id,
-          audience_id: input.audience_id,
+          audience_id: currentUser.userId,
           vote_type: input.vote_type,
         }),
       );
@@ -456,7 +471,6 @@ describe("RequestsController Unit Tests", () => {
 
       await expect(
         controller.vote("11111111-1111-1111-1111-111111111111", {
-          audience_id: "33333333-3333-3333-3333-333333333333",
           vote_type: "down" as any,
         }),
       ).rejects.toThrow(error);

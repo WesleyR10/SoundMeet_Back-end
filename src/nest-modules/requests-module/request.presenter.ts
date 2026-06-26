@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 
+import { RequestFeedbackOutput } from "../../core/request/application/use-cases/common/request-feedback-output";
 import { RequestOutput } from "../../core/request/application/use-cases/common/request-output";
 import { GetMusicianRequestsOutput } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestSuggestionsOutput } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
@@ -136,5 +137,30 @@ export class RequestSuggestionsPresenter {
     this.musician_id = output.musician_id;
     this.genres = output.genres;
     this.suggestions = output.suggestions;
+  }
+}
+
+export class RequestFeedbackPresenter {
+  id: string;
+  request_id: string;
+  rating: number;
+  comment: string | null;
+  @Transform(({ value }: { value: Date }) => value.toISOString())
+  created_at: Date;
+  has_comment: boolean;
+  is_positive: boolean;
+  is_neutral: boolean;
+  is_negative: boolean;
+
+  constructor(output: RequestFeedbackOutput) {
+    this.id = output.id;
+    this.request_id = output.request_id;
+    this.rating = output.rating;
+    this.comment = output.comment;
+    this.created_at = output.created_at;
+    this.has_comment = output.has_comment;
+    this.is_positive = output.is_positive;
+    this.is_neutral = output.is_neutral;
+    this.is_negative = output.is_negative;
   }
 }

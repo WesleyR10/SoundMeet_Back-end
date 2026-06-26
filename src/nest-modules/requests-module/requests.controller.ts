@@ -23,6 +23,8 @@ import {
 
 import { RequestOutput } from "../../core/request/application/use-cases/common/request-output";
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
+import { CreateRequestFeedbackUseCase } from "../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
+import { GetRequestFeedbackUseCase } from "../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { DeleteRequestInput } from "../../core/request/application/use-cases/delete-request/delete-request.input";
 import { DeleteRequestUseCase } from "../../core/request/application/use-cases/delete-request/delete-request.use-case";
 import { GetMusicianRequestsInput } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.input";
@@ -49,6 +51,7 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { CreateRequestDto } from "./dto/create-request.dto";
+import { CreateRequestFeedbackDto } from "./dto/create-request-feedback.dto";
 import { GetMusicianRequestsDto } from "./dto/get-musician-requests.dto";
 import { GetRequestSuggestionsDto } from "./dto/get-request-suggestions.dto";
 import { MarkRequestPlayedDto } from "./dto/mark-request-played.dto";
@@ -59,6 +62,7 @@ import { VoteRequestDto } from "./dto/vote-request.dto";
 import {
   MusicianRequestsPresenter,
   RequestCollectionPresenter,
+  RequestFeedbackPresenter,
   RequestPresenter,
   RequestSuggestionsPresenter,
 } from "./request.presenter";
@@ -97,6 +101,12 @@ export class RequestsController {
 
   @Inject(VoteRequestUseCase)
   private voteRequestUseCase: VoteRequestUseCase;
+
+  @Inject(CreateRequestFeedbackUseCase)
+  private createFeedbackUseCase: CreateRequestFeedbackUseCase;
+
+  @Inject(GetRequestFeedbackUseCase)
+  private getFeedbackUseCase: GetRequestFeedbackUseCase;
 
   @Post()
   @Roles("audience", "musician", "admin")
@@ -314,6 +324,43 @@ export class RequestsController {
       requesting_audience_id: currentUser?.userId,
     });
     await this.deleteUseCase.execute(input);
+  }
+
+  @Post(":id/feedback")
+  @Roles("musician", "admin")
+  @ApiOperation({
+    summary: "Avaliar pedido musical",
+    description: "Músico avalia o pedido após tocá-lo (rating 1-5, comentário opcional).",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 201, type: RequestFeedbackPresenter })
+  @ApiResponse({ status: 404, description: "Pedido não encontrado" })
+  async createFeedback(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: CreateRequestFeedbackDto,
+  ) {
+    const output = await this.createFeedbackUseCase.execute({
+      request_id: id,
+      rating: dto.rating,
+      comment: dto.comment,
+    });
+    return new RequestFeedbackPresenter(output);
+  }
+
+  @Get(":id/feedback")
+  @Roles("musician", "establishment", "audience", "admin")
+  @ApiOperation({
+    summary: "Obter avaliação de um pedido",
+    description: "Retorna a avaliação do pedido musical.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestFeedbackPresenter })
+  @ApiResponse({ status: 404, description: "Avaliação não encontrada" })
+  async getFeedback(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const output = await this.getFeedbackUseCase.execute({ request_id: id });
+    return new RequestFeedbackPresenter(output);
   }
 
   static serialize(output: RequestOutput) {

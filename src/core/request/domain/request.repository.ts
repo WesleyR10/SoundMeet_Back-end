@@ -76,6 +76,11 @@ export interface IRequestRepository extends ISearchableRepository<
     start_date: Date,
     end_date: Date,
   ): Promise<number>;
+  countRequestsByMusicianInPeriod(
+    musician_id: string,
+    start_date: Date,
+    end_date: Date,
+  ): Promise<number>;
   countRequestsByAudienceInPeriodForEvent(
     audience_id: string,
     event_id: string,
