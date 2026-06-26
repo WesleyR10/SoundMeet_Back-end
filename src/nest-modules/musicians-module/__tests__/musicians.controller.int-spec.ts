@@ -7,6 +7,7 @@ import { GetMusicianUseCase } from "../../../core/musician/application/use-cases
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { UpdateMusicianUseCase } from "../../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
+import { VerifyMusicianUseCase } from "../../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import {
   Musician,
   MusicianId,
@@ -73,6 +74,12 @@ describe("MusiciansController Integration Tests", () => {
           provide: DeleteMusicianUseCase,
           useFactory: (repo: IMusicianRepository) =>
             new DeleteMusicianUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
+          provide: VerifyMusicianUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new VerifyMusicianUseCase(repo),
           inject: ["MusicianRepository"],
         },
       ],

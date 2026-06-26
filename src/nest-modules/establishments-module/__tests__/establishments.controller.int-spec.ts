@@ -16,6 +16,7 @@ import { ListEstablishmentAnalyticsUseCase } from "../../../core/establishment/a
 import { ListEstablishmentsUseCase } from "../../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { VerifyEstablishmentUseCase } from "../../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
   Establishment,
   EstablishmentId,
@@ -198,6 +199,12 @@ describe("EstablishmentsController Integration Tests", () => {
           useValue: {
             execute: jest.fn(),
           },
+        },
+        {
+          provide: VerifyEstablishmentUseCase,
+          useFactory: (repo: IEstablishmentRepository) =>
+            new VerifyEstablishmentUseCase(repo),
+          inject: ["EstablishmentRepository"],
         },
       ],
     });

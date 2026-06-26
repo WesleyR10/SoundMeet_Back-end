@@ -94,13 +94,24 @@ describe("Scheduling Controllers Unit Tests", () => {
         jest.fn().mockResolvedValue(bookingOutput({ status: "confirmed" })),
       );
 
+      const currentUser = {
+        userId: "22222222-2222-4222-8222-222222222222",
+        roles: ["establishment"],
+        establishmentIds: ["22222222-2222-4222-8222-222222222222"],
+        bandIds: [],
+        isAdmin: false,
+      };
+
       const presenter = await controller.confirm(
         "11111111-1111-4111-8111-111111111111",
+        currentUser,
       );
 
-      expect(execute).toHaveBeenCalledWith({
-        booking_id: "11111111-1111-4111-8111-111111111111",
-      });
+      expect(execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          booking_id: "11111111-1111-4111-8111-111111111111",
+        }),
+      );
       expect(presenter.status).toBe("confirmed");
     });
   });
@@ -119,14 +130,25 @@ describe("Scheduling Controllers Unit Tests", () => {
         jest.fn().mockResolvedValue(inquiryOutput({ status: "accepted" })),
       );
 
+      const currentUser = {
+        userId: "33333333-3333-4333-8333-333333333333",
+        roles: ["musician"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      };
+
       const presenter = await controller.accept(
         "44444444-4444-4444-8444-444444444444",
-        {},
+        {} as any,
+        currentUser,
       );
 
-      expect(execute).toHaveBeenCalledWith({
-        inquiry_id: "44444444-4444-4444-8444-444444444444",
-      });
+      expect(execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inquiry_id: "44444444-4444-4444-8444-444444444444",
+        }),
+      );
       expect(presenter).toBeInstanceOf(InquiryPresenter);
       expect(presenter.status).toBe("accepted");
     });
@@ -146,7 +168,7 @@ describe("Scheduling Controllers Unit Tests", () => {
           fee: 500,
           notes: "Contrato fechado",
           buffer_minutes: 30,
-        },
+        } as any,
       );
 
       expect(execute).toHaveBeenCalledWith(

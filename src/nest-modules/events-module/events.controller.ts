@@ -421,10 +421,12 @@ export class EventsController {
 
   @Get(":event_id/attendees")
   @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Listar attendees do evento",
     description: "Lista todos os participantes registrados no evento.",
   })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiParam({ name: "event_id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: EventAttendeeCollectionPresenter })
