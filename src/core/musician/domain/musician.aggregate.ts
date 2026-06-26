@@ -3,6 +3,7 @@ import {
   Email,
   Phone,
   QRCode,
+  QRCustomization,
   Rating,
   Uuid,
 } from "../../shared/domain";
@@ -234,6 +235,18 @@ export class Musician extends AggregateRoot {
     this.qr_code = new QRCode({
       code: qrData,
       url: `https://soundmeet.app/musician/${this.musician_id.id}`,
+    });
+  }
+
+  customizeQRCode(customization: QRCustomization): void {
+    if (!this.qr_code) {
+      this.generateQRCode();
+    }
+    this.qr_code = new QRCode({
+      code: this.qr_code!.code,
+      url: this.qr_code!.url,
+      expiresAt: this.qr_code!.expiresAt,
+      customization,
     });
   }
 

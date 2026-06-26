@@ -1,5 +1,13 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
+import { PlanLimitExceededError } from "../../../../../plans/domain/errors/plan-limit-exceeded.error";
+import { MusicianPlanTier } from "../../../../../plans/domain/plan-tier.enum";
+import {
+  Subscription,
+  SubscriptionStatus,
+} from "../../../../../plans/domain/subscription.aggregate";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
+import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
 import { Band } from "../../../../domain/band.aggregate";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { BandInMemoryRepository } from "../../../../infra/db/in-memory/band-in-memory.repository";
@@ -85,5 +93,87 @@ describe("AddBandMemberUseCase Unit Tests", () => {
     });
 
     await expect(useCase.execute(input)).rejects.toThrow(EntityValidationError);
+  });
+});
+
+// ----------------------------------------------------------------
+// Gate 4C.6 — auto_split_management
+// ----------------------------------------------------------------
+describe("AddBandMemberUseCase — gate 4C.6 (auto_split_management)", () => {
+  function makeBandWithLeader(leaderMusician: Musician) {
+    const band = Band.fake().aBand().build();
+    band.addMember(leaderMusician.musician_id, "leader", "vocals");
+    return band;
+  }
+
+  function makeSubscription(musicianId: string, tier: MusicianPlanTier, status = SubscriptionStatus.ACTIVE) {
+    return new Subscription({
+      musician_id: musicianId,
+      plan_tier: tier,
+      persona: "musician",
+      status,
+    });
+  }
+
+  async function setupWithPlan(tier?: MusicianPlanTier, cancelled = false) {
+    const bandRepo = new BandInMemoryRepository();
+    const musicianRepo = new MusicianInMemoryRepository();
+    const subRepo = new SubscriptionInMemoryRepository();
+
+    const leaderMusician = Musician.fake().aMusician().build();
+    const newMember = Musician.fake().aMusician().build();
+    const band = makeBandWithLeader(leaderMusician);
+
+    bandRepo.items = [band];
+    musicianRepo.items = [leaderMusician, newMember];
+
+    if (tier) {
+      await subRepo.insert(
+        makeSubscription(
+          leaderMusician.musician_id.id,
+          tier,
+          cancelled ? SubscriptionStatus.CANCELLED : SubscriptionStatus.ACTIVE,
+        ),
+      );
+    }
+
+    const planCheckService = new PlanCheckService(subRepo);
+    const useCase = new AddBandMemberUseCase(bandRepo, musicianRepo, planCheckService);
+
+    return { useCase, band, newMember };
+  }
+
+  it("(a) líder FREE: lança PlanLimitExceededError ao adicionar membro", async () => {
+    const { useCase, band, newMember } = await setupWithPlan();
+    const input = new AddBandMemberInput({
+      band_id: band.band_id.id,
+      musician_id: newMember.musician_id.id,
+      role: "member",
+      instrument: "guitar",
+    });
+    await expect(useCase.execute(input)).rejects.toThrow(PlanLimitExceededError);
+  });
+
+  it("(b) líder PRO: adiciona membro com sucesso", async () => {
+    const { useCase, band, newMember } = await setupWithPlan(MusicianPlanTier.PRO);
+    const input = new AddBandMemberInput({
+      band_id: band.band_id.id,
+      musician_id: newMember.musician_id.id,
+      role: "member",
+      instrument: "guitar",
+    });
+    const output = await useCase.execute(input);
+    expect(output.members.length).toBeGreaterThan(0);
+  });
+
+  it("(c) subscription cancelada comporta-se como FREE", async () => {
+    const { useCase, band, newMember } = await setupWithPlan(MusicianPlanTier.PRO, true);
+    const input = new AddBandMemberInput({
+      band_id: band.band_id.id,
+      musician_id: newMember.musician_id.id,
+      role: "member",
+      instrument: "bass",
+    });
+    await expect(useCase.execute(input)).rejects.toThrow(PlanLimitExceededError);
   });
 });

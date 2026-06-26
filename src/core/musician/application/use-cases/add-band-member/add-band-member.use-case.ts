@@ -1,3 +1,4 @@
+import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -15,6 +16,7 @@ export class AddBandMemberUseCase implements IUseCase<
   constructor(
     private readonly bandRepo: IBandRepository,
     private readonly musicianRepo: IMusicianRepository,
+    private readonly planCheckService?: PlanCheckService,
   ) {}
 
   async execute(input: AddBandMemberInput): Promise<BandOutput> {
@@ -53,6 +55,16 @@ export class AddBandMemberUseCase implements IUseCase<
           musician_id: ["Musician is not active"],
         },
       ]);
+    }
+
+    if (this.planCheckService) {
+      const leader = band.members.find((m) => m.role === "leader");
+      if (leader) {
+        await this.planCheckService.assertMusicianFeature(
+          leader.musician_id.id,
+          "auto_split_management",
+        );
+      }
     }
 
     band.addMember(musicianId, input.role.trim(), input.instrument.trim());

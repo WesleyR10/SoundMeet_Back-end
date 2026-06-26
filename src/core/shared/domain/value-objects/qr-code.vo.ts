@@ -1,24 +1,35 @@
 import { InvalidArgumentError } from "../errors/invalid-argument.error";
 import { ValueObject } from "../value-object";
 
+export type QRCustomization = {
+  foreground_color?: string;
+  background_color?: string;
+  logo_url?: string;
+  label?: string;
+};
+
 export class QRCode extends ValueObject {
   readonly code: string;
   readonly url: string;
   readonly expiresAt?: Date;
+  readonly customization?: QRCustomization;
 
   constructor({
     code,
     url,
     expiresAt,
+    customization,
   }: {
     code: string;
     url: string;
     expiresAt?: Date;
+    customization?: QRCustomization;
   }) {
     super();
     this.code = code;
     this.url = url;
     this.expiresAt = expiresAt;
+    this.customization = customization;
     this.validate();
   }
 
@@ -72,6 +83,7 @@ export class QRCode extends ValueObject {
       expiresAt: this.expiresAt,
       isExpired: this.isExpired,
       isValid: this.isValid,
+      customization: this.customization ?? null,
     };
   }
 }
