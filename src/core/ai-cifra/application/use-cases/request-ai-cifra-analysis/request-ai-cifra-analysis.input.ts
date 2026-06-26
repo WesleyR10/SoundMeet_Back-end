@@ -3,6 +3,8 @@ import { IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
 export type RequestAiCifraAnalysisInput = {
   ai_cifra_upload_id: string;
   model_id?: string;
+  requesting_musician_id?: string;
+  is_admin?: boolean;
 };
 
 export class RequestAiCifraAnalysisInputValidator {

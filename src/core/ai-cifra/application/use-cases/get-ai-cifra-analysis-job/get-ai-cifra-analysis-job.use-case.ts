@@ -1,3 +1,5 @@
+import { ForbiddenException } from "@nestjs/common";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import {
@@ -24,6 +26,15 @@ export class GetAiCifraAnalysisJobUseCase implements IUseCase<
     if (!job) {
       throw new NotFoundError(input.id, AiCifraAnalysisJob);
     }
+
+    if (input.requesting_musician_id && !input.is_admin) {
+      if (job.musician_id.id !== input.requesting_musician_id) {
+        throw new ForbiddenException(
+          "Você não tem permissão para consultar este job de análise.",
+        );
+      }
+    }
+
     return AiCifraAnalysisJobOutputMapper.toOutput(job);
   }
 }

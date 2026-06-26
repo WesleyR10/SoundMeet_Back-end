@@ -25,6 +25,9 @@ import { SkipThrottle } from "@nestjs/throttler";
 
 import {
   AuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
+  CurrentUserContextGuard,
   InternalToken,
   InternalTokenGuard,
   Roles,
@@ -56,39 +59,49 @@ export class AiCifraController {
   private failJobUseCase: FailAiCifraAnalysisJobUseCase;
 
   @Post("uploads/:id/analyses")
-  @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Solicitar análise de cifra",
     description:
-      "Cria um job de análise (BPM/tempo, acordes, tom, segmentação) e inicia o processamento assíncrono.",
+      "Cria um job de análise (BPM/tempo, acordes, tom, segmentação) e inicia o processamento assíncrono. Músico só pode solicitar análise nos próprios uploads.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: AiCifraAnalysisJobPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async requestAnalysis(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: RequestAiCifraAnalysisDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ) {
     const output = await this.requestAnalysisUseCase.execute({
       ...dto,
       ai_cifra_upload_id: id,
+      requesting_musician_id: currentUser.userId,
+      is_admin: currentUser.isAdmin,
     });
     return new AiCifraAnalysisJobPresenter(output);
   }
 
   @Get("analyses/:id")
-  @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Consultar status da análise de cifra",
-    description: "Retorna o job com status e resultado (quando concluído).",
+    description: "Retorna o job com status e resultado (quando concluído). Músico só pode consultar os próprios jobs.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: AiCifraAnalysisJobPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async getAnalysis(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    const output = await this.getJobUseCase.execute({ id });
+    const output = await this.getJobUseCase.execute({
+      id,
+      requesting_musician_id: currentUser.userId,
+      is_admin: currentUser.isAdmin,
+    });
     return new AiCifraAnalysisJobPresenter(output);
   }
 
