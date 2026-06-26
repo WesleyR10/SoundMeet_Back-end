@@ -1,6 +1,10 @@
 import { PaymentMethod, TipInMemoryRepository, TipStatus } from "@core/payment";
 import { TipId } from "@core/payment/domain/tip.aggregate";
 import { PixKeyType } from "@core/payment/domain/value-objects/pix-key.vo";
+import {
+  PlanCheckService,
+  SubscriptionInMemoryRepository,
+} from "@core/plans";
 
 import { SendTipUseCase } from "../send-tip.use-case";
 
@@ -10,7 +14,10 @@ describe("SendTipUseCase Unit Tests", () => {
 
   beforeEach(() => {
     repository = new TipInMemoryRepository();
-    useCase = new SendTipUseCase(repository);
+    const planCheckService = new PlanCheckService(
+      new SubscriptionInMemoryRepository(),
+    );
+    useCase = new SendTipUseCase(repository, planCheckService);
   });
 
   it("should create a tip with PIX payment method", async () => {

@@ -22,6 +22,8 @@ import { SendTipUseCase } from "../../core/payment/application/use-cases/send-ti
 import { WithdrawToPixUseCase } from "../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import {
   AuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
   CurrentUserContextGuard,
   MusicianOwnershipGuard,
   Roles,
@@ -58,11 +60,17 @@ export class PaymentController {
   @Roles("audience", "admin")
   @ApiOperation({
     summary: "Criar gorjeta",
-    description: "Cria uma gorjeta pendente e gera dados PIX quando aplicável.",
+    description: "Cria uma gorjeta pendente e gera dados PIX quando aplicável. O audience_id é preenchido automaticamente do JWT.",
   })
   @ApiResponse({ status: 201, type: SendTipPresenter })
-  async sendTip(@Body() dto: SendTipDto) {
-    const output = await this.sendTipUseCase.execute(dto);
+  async sendTip(
+    @Body() dto: SendTipDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const output = await this.sendTipUseCase.execute({
+      ...dto,
+      audience_id: currentUser.userId,
+    });
     return new SendTipPresenter(output);
   }
 
@@ -94,12 +102,14 @@ export class PaymentController {
 
   @Get("musicians/:id/wallet")
   @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Consultar carteira do músico",
-    description: "Retorna saldo e dados de carteira financeira do músico.",
+    description: "Retorna saldo e dados de carteira financeira do músico. Músico só pode consultar a própria carteira.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: MusicianWalletPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async getMusicianWallet(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {

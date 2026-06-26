@@ -4,6 +4,7 @@ import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { ConfirmTipPaymentUseCase } from "../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
 import { GetMusicianWalletUseCase } from "../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../core/payment/application/use-cases/send-tip/send-tip.use-case";
+import { PlanCheckService } from "../../core/plans";
 import { WithdrawToPixUseCase } from "../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import {
   IMusicianWalletRepository,
@@ -79,11 +80,16 @@ export const INFRA_PROVIDERS = {
 export const USE_CASES = {
   SEND_TIP_USE_CASE: {
     provide: SendTipUseCase,
-    useFactory: (tipRepo: ITipRepository, pixGateway: IPixGateway) => {
-      return new SendTipUseCase(tipRepo, pixGateway);
+    useFactory: (
+      tipRepo: ITipRepository,
+      planCheckService: PlanCheckService,
+      pixGateway: IPixGateway,
+    ) => {
+      return new SendTipUseCase(tipRepo, planCheckService, pixGateway);
     },
     inject: [
       REPOSITORIES.TIP_REPOSITORY.provide,
+      PlanCheckService,
       INFRA_PROVIDERS.PIX_GATEWAY.provide,
     ],
   },

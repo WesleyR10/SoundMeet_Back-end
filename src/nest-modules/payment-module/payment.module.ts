@@ -5,13 +5,14 @@ import { AsaasWebhookController } from "./asaas-webhook.controller";
 import { DatabaseModule } from "../database-module/database.module";
 import { GamificationModule } from "../gamification-module/gamification.module";
 import { MusiciansModule } from "../musicians-module/musicians.module";
+import { PlansModule } from "../plans-module/plans.module";
 import { PaymentController } from "./payment.controller";
 import { PAYMENT_PROVIDERS } from "./payment.providers";
 import { PaymentEventProcessingService } from "./payment-event-processing.service";
 import { PaymentEventsHandlers } from "./payment-events.handlers";
 
 @Module({
-  imports: [DatabaseModule, MusiciansModule, GamificationModule],
+  imports: [DatabaseModule, MusiciansModule, GamificationModule, PlansModule],
   controllers: [PaymentController, AsaasWebhookController],
   providers: [
     ...Object.values(PAYMENT_PROVIDERS.REPOSITORIES),

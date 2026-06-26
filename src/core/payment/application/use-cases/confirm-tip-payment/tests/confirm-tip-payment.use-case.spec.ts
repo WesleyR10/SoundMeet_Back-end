@@ -15,7 +15,7 @@ import { IUnitOfWork } from "@core/shared/domain/repository/unit-of-work.interfa
 
 import { ConfirmTipPaymentUseCase } from "../confirm-tip-payment.use-case";
 
-const uowMock: IUnitOfWork = { do: async (fn) => fn() } as IUnitOfWork;
+const uowMock: IUnitOfWork = { do: async (fn) => fn(undefined as any) } as IUnitOfWork;
 const domainEventMediatorMock = {
   publish: jest.fn(),
   publishIntegrationEvents: jest.fn(),

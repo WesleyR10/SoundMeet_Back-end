@@ -4,6 +4,10 @@ import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memor
 import { ConfirmTipPaymentUseCase } from "../../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
 import { GetMusicianWalletUseCase } from "../../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../../core/payment/application/use-cases/send-tip/send-tip.use-case";
+import {
+  PlanCheckService,
+  SubscriptionInMemoryRepository,
+} from "../../../core/plans";
 import { WithdrawToPixUseCase } from "../../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import { MusicianWallet } from "../../../core/payment/domain/musician-wallet.aggregate";
 import { Tip } from "../../../core/payment/domain/tip.aggregate";
@@ -36,6 +40,14 @@ describe("PaymentController Integration Tests", () => {
   const MUSICIAN_ID = "11111111-1111-4111-8111-111111111111";
   const AUDIENCE_ID = "22222222-2222-4222-8222-222222222222";
 
+  const AUDIENCE_USER = {
+    userId: AUDIENCE_ID,
+    roles: ["audience"],
+    establishmentIds: [],
+    bandIds: [],
+    isAdmin: false,
+  };
+
   beforeEach(async () => {
     tipRepo = new TipInMemoryRepository();
     txRepo = new TransactionInMemoryRepository();
@@ -50,7 +62,11 @@ describe("PaymentController Integration Tests", () => {
       providers: [
         {
           provide: SendTipUseCase,
-          useValue: new SendTipUseCase(tipRepo, pixGateway),
+          useValue: new SendTipUseCase(
+            tipRepo,
+            new PlanCheckService(new SubscriptionInMemoryRepository()),
+            pixGateway,
+          ),
         },
         {
           provide: ConfirmTipPaymentUseCase,
@@ -59,6 +75,8 @@ describe("PaymentController Integration Tests", () => {
             txRepo,
             walletRepo,
             bandRepo,
+            { do: async (fn: (uow: any) => any) => fn(null) } as any,
+            { publish: jest.fn(), publishIntegrationEvents: jest.fn() } as any,
           ),
         },
         {
@@ -87,13 +105,12 @@ describe("PaymentController Integration Tests", () => {
   describe("sendTip", () => {
     it("should create a pending PIX tip and return qr_code", async () => {
       const dto = {
-        audience_id: AUDIENCE_ID,
         musician_id: MUSICIAN_ID,
         amount: 20,
         payment_method: PaymentMethod.PIX,
       };
 
-      const result = await controller.sendTip(dto as any);
+      const result = await controller.sendTip(dto as any, AUDIENCE_USER);
 
       expect(result).toBeInstanceOf(SendTipPresenter);
       expect(result.status).toBe(TipStatus.PENDING);
@@ -109,13 +126,12 @@ describe("PaymentController Integration Tests", () => {
 
     it("should create a pending tip without qr_code for non-PIX payment", async () => {
       const dto = {
-        audience_id: AUDIENCE_ID,
         musician_id: MUSICIAN_ID,
         amount: 15,
         payment_method: PaymentMethod.WALLET,
       };
 
-      const result = await controller.sendTip(dto as any);
+      const result = await controller.sendTip(dto as any, AUDIENCE_USER);
 
       expect(result.status).toBe(TipStatus.PENDING);
       expect(result.qr_code).toBeUndefined();
@@ -124,18 +140,16 @@ describe("PaymentController Integration Tests", () => {
 
     it("should create multiple tips independently", async () => {
       await controller.sendTip({
-        audience_id: AUDIENCE_ID,
         musician_id: MUSICIAN_ID,
         amount: 10,
         payment_method: PaymentMethod.PIX,
-      } as any);
+      } as any, AUDIENCE_USER);
 
       await controller.sendTip({
-        audience_id: AUDIENCE_ID,
         musician_id: MUSICIAN_ID,
         amount: 25,
         payment_method: PaymentMethod.PIX,
-      } as any);
+      } as any, AUDIENCE_USER);
 
       const tips = await tipRepo.findAll();
       expect(tips).toHaveLength(2);

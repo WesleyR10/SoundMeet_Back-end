@@ -25,10 +25,6 @@ export class PixKeyDto {
 }
 
 export class SendTipDto {
-  @ApiProperty({ format: "uuid" })
-  @IsUUID()
-  audience_id: string;
-
   @ApiPropertyOptional({ format: "uuid" })
   @IsOptional()
   @IsUUID()

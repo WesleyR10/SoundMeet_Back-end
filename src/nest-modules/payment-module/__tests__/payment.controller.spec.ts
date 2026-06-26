@@ -18,21 +18,31 @@ describe("PaymentController", () => {
     const output = {
       id: "11111111-1111-4111-8111-111111111111",
       status: "pending",
+      platform_fee_percentage: 8,
       qr_code: "qr",
       copy_paste_code: "copy",
     };
     const useCase = { execute: jest.fn().mockResolvedValue(output) };
     (controller as any).sendTipUseCase = useCase;
     const dto = {
-      audience_id: "22222222-2222-4222-8222-222222222222",
       musician_id: "33333333-3333-4333-8333-333333333333",
       amount: 10,
       payment_method: PaymentMethod.PIX,
     };
+    const currentUser = {
+      userId: "22222222-2222-4222-8222-222222222222",
+      roles: ["audience"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
 
-    const presenter = await controller.sendTip(dto);
+    const presenter = await controller.sendTip(dto, currentUser);
 
-    expect(useCase.execute).toHaveBeenCalledWith(dto);
+    expect(useCase.execute).toHaveBeenCalledWith({
+      ...dto,
+      audience_id: currentUser.userId,
+    });
     expect(presenter).toStrictEqual(new SendTipPresenter(output));
   });
 

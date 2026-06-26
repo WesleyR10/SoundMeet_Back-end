@@ -1,4 +1,5 @@
 import { IPixGateway, ITipRepository, PaymentMethod, Tip } from "@core/payment";
+import { PlanCheckService } from "@core/plans";
 import { IUseCase } from "@core/shared/application/use-case.interface";
 
 export type SendTipInput = {
@@ -17,6 +18,8 @@ export type SendTipInput = {
 export type SendTipOutput = {
   id: string;
   status: string;
+  /** Percentual de taxa retido pela plataforma (ex.: 8 = 8%). Baseado no plano do músico. */
+  platform_fee_percentage: number;
   qr_code?: string;
   copy_paste_code?: string;
 };
@@ -24,10 +27,17 @@ export type SendTipOutput = {
 export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
   constructor(
     private tipRepository: ITipRepository,
+    private readonly planCheckService: PlanCheckService,
     private readonly pixGateway?: IPixGateway,
   ) {}
 
   async execute(input: SendTipInput): Promise<SendTipOutput> {
+    const platform_fee_percentage = input.musician_id
+      ? await this.planCheckService.getMusicianTipFeePercentage(
+          input.musician_id,
+        )
+      : 8; // taxa padrão quando músico não identificado
+
     const tip = Tip.create({
       audience_id: input.audience_id,
       musician_id: input.musician_id,
@@ -65,6 +75,7 @@ export class SendTipUseCase implements IUseCase<SendTipInput, SendTipOutput> {
     return {
       id: tip.tip_id.id,
       status: tip.status,
+      platform_fee_percentage,
       qr_code,
       copy_paste_code,
     };
