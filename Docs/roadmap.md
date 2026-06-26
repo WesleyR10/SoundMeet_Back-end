@@ -127,22 +127,22 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 
 > Features que diferenciam os planos no produto, decididas no debate de planos (jun/2026).
 
-- [ ] **4D.1** **Repertório/Setlist** — domínio `src/core/repertoire/`:
-  - [ ] **4D.1a** Aggregate `Repertoire` + `RepertoireSong` (id, musician_id, name, songs ordenadas, position, custom_notes)
-  - [ ] **4D.1b** Use-cases: criar, editar ordem, estimar tempo de show (média 3,5 min/música)
-  - [ ] **4D.1c** Use-case: compartilhar — link read-only temporário (ESSENTIAL) e convite nominal (PRO)
-  - [ ] **4D.1d** Gate: `max_repertoires` e `max_songs_per_repertoire` via `getMusicianFeatures()` (FREE 1×20 / ESSENTIAL 3×80 / PRO ∞)
-  - [ ] **4D.1e** NestJS module + controller + presenter + DTOs
+- [x] **4D.1** **Repertório/Setlist** — domínio `src/core/repertoire/`:
+  - [x] **4D.1a** Aggregate `Repertoire` + `RepertoireSong` (id, musician_id, name, songs ordenadas, position, custom_notes, duration_override_seconds)
+  - [x] **4D.1b** Use-cases: criar, listar, buscar, editar nome, excluir, adicionar/remover/reordenar músicas; duração estimada via `duration_seconds` real (null se pipeline ainda não populou)
+  - [x] **4D.1c** Use-case: compartilhar — link read-only temporário UUID 7 dias (ESSENTIAL) e convite nominal (PRO)
+  - [x] **4D.1d** Gate: `max_repertoires` e `max_songs_per_repertoire` via `PlanCheckService` (FREE 1×20 / ESSENTIAL 3×80 / PRO ∞)
+  - [x] **4D.1e** NestJS module + controller (14 endpoints) + presenter + DTOs; registrado em app.module.ts
 - [ ] **4D.2** **Play Mode no Repertório** — tela ao vivo durante show (frontend):
   - [ ] **4D.2a** Tela fullscreen: cifra + letra da música atual; botões próxima/anterior com 1 clique
   - [ ] **4D.2b** Badge "customizada" em músicas editadas pelo músico
   - [ ] **4D.2c** Auto-scroll configurável
-- [ ] **4D.3** **Tempo estimado de show** — campo calculado no Repertoire:
-  - [ ] **4D.3a** Campo `duration_override_seconds?: number` por `RepertoireSong` (padrão 3,5 min se ausente)
-  - [ ] **4D.3b** Output calculado no presenter: `estimated_show_duration_minutes`
-- [ ] **4D.4** **Compartilhamento de Repertório** — já especificado em 4D.1c; itens de infra:
-  - [ ] **4D.4a** ESSENTIAL: gerar token temporário read-only; expirar após 7 dias
-  - [ ] **4D.4b** PRO: endpoint de convite nominal a músico cadastrado (permissão de edição)
+- [x] **4D.3** **Tempo estimado de show** — absorvido em 4D.1:
+  - [x] **4D.3a** `duration_override_seconds` por `RepertoireSong`; `duration_seconds` em `MusicLibrary` populado pelo pipeline ai-cifra/ai-audio (Bloco 6)
+  - [x] **4D.3b** `estimated_show_duration_minutes` no output — null se alguma música não tiver duração real
+- [x] **4D.4** **Compartilhamento de Repertório** — absorvido em 4D.1:
+  - [x] **4D.4a** ESSENTIAL: token UUID armazenado no DB com expiração 7 dias
+  - [x] **4D.4b** PRO: endpoint de convite nominal; tabela `RepertoireInvitee`; gate `repertoire_nominal_invite`
 - [ ] **4D.5** **Banner Generation (templates)** — `src/nest-modules/banner-module/`:
   - [ ] **4D.5a** 5–10 templates SVG/HTML (logo, foto músico/estabelecimento, nome, data, QR do evento)
   - [ ] **4D.5b** Gate: `assertMusicianCanGenerateBanner` / `assertEstablishmentCanGenerateBanner` (FREE ❌ / ESSENTIAL 3/mês / PRO 15/mês)
