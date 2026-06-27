@@ -27,7 +27,9 @@ import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.mo
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
 import { MailModule } from "./nest-modules/mail-module/mail.module";
 import { CampaignModule } from "./nest-modules/campaign-module/campaign.module";
+import { NotificationsModule } from "./nest-modules/notifications-module/notifications.module";
 import { RepertoireModule } from "./nest-modules/repertoire-module/repertoire.module";
+import { ChatModule } from "./nest-modules/chat-module/chat.module";
 
 const normalizeTransport = (value: string | undefined, fallback: string) =>
   (value ?? fallback).trim().toLowerCase();
@@ -38,6 +40,8 @@ const shouldRegisterRabbitmqHandlers =
   normalizeTransport(process.env.AI_CIFRA_PROCESSING_TRANSPORT, "http") ===
     "rabbitmq" ||
   normalizeTransport(process.env.SYNCED_LYRICS_BULK_TRANSPORT, "inline") ===
+    "rabbitmq" ||
+  normalizeTransport(process.env.GAMIFICATION_PROCESSING_TRANSPORT, "inline") ===
     "rabbitmq";
 
 @Module({
@@ -72,6 +76,8 @@ const shouldRegisterRabbitmqHandlers =
     AiAudioModule,
     AiCifraModule,
     SyncedLyricsModule,
+    NotificationsModule,
+    ChatModule,
 
     // Event System
     // messaging-module

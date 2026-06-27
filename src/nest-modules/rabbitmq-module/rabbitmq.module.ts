@@ -91,6 +91,9 @@ export class RabbitmqModule implements OnApplicationBootstrap {
               synced_lyrics_bulk: {
                 prefetchCount: 5,
               },
+              gamification_events: {
+                prefetchCount: 10,
+              },
             },
           }),
           inject: [ConfigService],
