@@ -1,6 +1,7 @@
 import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
 import { AwardBadgeUseCase } from "../../core/gamification/application/use-cases/award-badge/award-badge.use-case";
 import { CalculatePointsUseCase } from "../../core/gamification/application/use-cases/calculate-points/calculate-points.use-case";
+import { CalculateRankingUseCase } from "../../core/gamification/application/use-cases/calculate-ranking/calculate-ranking.use-case";
 import { CreateBadgeUseCase } from "../../core/gamification/application/use-cases/create-badge/create-badge.use-case";
 import { DeleteBadgeUseCase } from "../../core/gamification/application/use-cases/delete-badge/delete-badge.use-case";
 import { GetBadgeUseCase } from "../../core/gamification/application/use-cases/get-badge/get-badge.use-case";
@@ -104,6 +105,19 @@ export const USE_CASES = {
     },
     inject: [
       REPOSITORIES.USER_POINTS_REPOSITORY.provide,
+      REPOSITORIES.USER_SCORE_REPOSITORY.provide,
+    ],
+  },
+  CALCULATE_RANKING_USE_CASE: {
+    provide: CalculateRankingUseCase,
+    useFactory: (
+      rankingRepo: IRankingRepository,
+      userScoreRepo: IUserScoreRepository,
+    ) => {
+      return new CalculateRankingUseCase(rankingRepo, userScoreRepo);
+    },
+    inject: [
+      REPOSITORIES.RANKING_REPOSITORY.provide,
       REPOSITORIES.USER_SCORE_REPOSITORY.provide,
     ],
   },
