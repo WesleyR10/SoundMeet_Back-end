@@ -3,194 +3,134 @@
 ## 1. Provedores
 
 ### Transacional (ativo) — Resend
-Usado para todos os emails gerados por ações do produto: verificação de conta, gorjeta
-PIX recebida, booking confirmado, etc.
+
+Usado para todos os emails gerados por ações do produto: verificação de conta, troca de email, booking confirmado/cancelado, boas-vindas, etc.
 
 | Atributo | Valor |
 |---|---|
 | SDK | `resend` v6+ |
-| Templates | `@react-email/components` |
+| Templates | `@react-email/components` (TSX) |
 | Free tier | 3.000 emails/mês |
 | SMTP relay | `smtp.resend.com:465` (SSL) — usado pelo Keycloak |
-| Docs | https://resend.com/docs |
 
-**Configuração mínima (`.env`):**
-```env
-RESEND_API_KEY=re_xxxxxxxxxxxx      # mesma chave usada como senha SMTP pelo Keycloak
-MAIL_FROM=noreply@soundmeet.com.br  # domínio verificado no Resend
-MAIL_BASE_URL=https://api.soundmeet.com.br
-```
-
-> **Resend SMTP relay:** o usuário SMTP é sempre `resend` e a senha é o próprio `RESEND_API_KEY`.
-> No realm JSON, `${env.RESEND_API_KEY}` é substituído automaticamente pelo Keycloak no `--import-realm`.
-
-**Verificação de domínio no Resend:**
-1. Acesse resend.com → Domains → Add Domain
-2. Adicione `soundmeet.com.br`
-3. Configure os registros DNS (SPF, DKIM, DMARC) no seu provedor
+Três variáveis de ambiente são obrigatórias: a chave de API do Resend, o endereço remetente (`noreply@soundmeet.com.br`) e a URL base da API para montar os links nos templates. O domínio deve ser verificado no painel do Resend com registros DNS SPF, DKIM e DMARC antes do uso em produção.
 
 ---
 
 ### Marketing (futuro) — Brevo
-Para newsletters, promoções e automações de marketing quando o free tier do Resend
-(3.000/mês) não for mais suficiente.
+
+Reservado para newsletters, promoções e automações de marketing quando o volume superar o free tier do Resend.
 
 | Atributo | Valor |
 |---|---|
-| Free tier | 300 emails/dia (9.000/mês) |
-| Diferenciais | Automações de marketing, LGPD-friendly (servidores EU), A/B test |
-| Estratégia | Usar em conjunto com Resend: Resend para transacional, Brevo para campanhas |
-| Docs | https://developers.brevo.com |
+| Free tier | 300 emails/dia (≈ 9.000/mês) |
+| Diferenciais | Automações, LGPD-friendly (servidores EU), A/B test |
+| Estratégia | Paralelo ao Resend: Resend para transacional, Brevo para campanhas |
 
-**Quando migrar para Brevo (marketing):**
-- Volume de cadastros superar 3.000 novos usuários/mês (welcome emails)
-- Início de campanhas de reengajamento ou newsletters
+**Gatilho de migração:** volume de novos usuários superar 3.000/mês (welcome emails) ou início de campanhas de reengajamento.
 
 ---
 
 ## 2. Integração com Keycloak
 
-O Keycloak envia o email de **verificação inicial** (na criação de conta) via SMTP
-do Resend. Isso dispensa código NestJS para essa etapa.
-
-**Configuração no realm (`infra/keycloak/realm-soundmeet.json`):**
-```json
-{
-  "verifyEmail": true,
-  "smtpServer": {
-    "host": "smtp.resend.com",
-    "port": "465",
-    "ssl": "true",
-    "user": "resend",
-    "password": "${env.RESEND_API_KEY}",
-    "from": "${env.MAIL_FROM}",
-    "fromDisplayName": "SoundMeet"
-  },
-  "requiredActions": [
-    { "alias": "VERIFY_EMAIL", "defaultAction": true, "enabled": true }
-  ]
-}
-```
+O Keycloak envia o email de **verificação inicial** na criação de conta via SMTP do Resend, usando a mesma chave de API como senha SMTP. Isso dispensa código NestJS para essa etapa específica — o Keycloak substitui variáveis de ambiente no realm JSON durante o `--import-realm`.
 
 **Fluxo de criação de conta:**
-```
-Backend → Keycloak Admin API (criar usuário)
-Keycloak → envia email de verificação via SMTP Resend
-Usuário → clica no link do Keycloak
-Keycloak → marca email_verified=true no JWT
-Backend → próximo login terá claim email_verified: true
-```
 
-**Troca de email (Keycloak Admin API):**
-```
-PUT /admin/realms/soundmeet/users/{id}   → atualiza email no Keycloak
-POST /admin/realms/soundmeet/users/{id}/execute-actions-email
-  body: ["VERIFY_EMAIL"]                  → Keycloak envia email para o novo endereço
-```
+1. Backend cria o usuário via Keycloak Admin API
+2. Keycloak dispara email de verificação pelo SMTP do Resend
+3. Usuário clica no link do Keycloak
+4. Keycloak marca `email_verified = true` no token
+5. Próximo login do usuário já carrega a claim `email_verified: true`
+
+**Troca de email via Keycloak Admin API:**
+
+Para atualizar o email no Keycloak, o backend usa dois endpoints sequenciais: primeiro atualiza o campo `email` do usuário via `PUT` e depois dispara o fluxo `VERIFY_EMAIL` via `execute-actions-email`, fazendo o Keycloak enviar um link de verificação para o novo endereço.
+
+> **Decisão de arquitetura:** o Keycloak e o backend têm fluxos paralelos de verificação. O fluxo do backend persiste o estado no banco da aplicação (`email_verified_at`), enquanto o Keycloak mantém seu próprio controle. Para evitar duplicidade de emails, ativar apenas um dos dois fluxos ou suprimir o email do Keycloak para o passo inicial.
 
 ---
 
-## 3. Campos Prisma adicionados
+## 3. Campos de suporte no banco
 
-Adicionados nos models `Musician`, `Establishment` e `Audience` para suportar o
-fluxo de troca de email com confirmação:
+Adicionados nos models `Musician`, `Establishment` e `Audience` para suportar o fluxo de troca de email com confirmação:
 
-```prisma
-email_verified_at      DateTime?   // quando o email foi verificado
-email_pending          String?     // novo email aguardando confirmação
-email_token            String?     // token UUID gerado para confirmação
-email_token_expires_at DateTime?   // TTL de 24h a partir da solicitação
-```
+| Campo | Tipo | Finalidade |
+|---|---|---|
+| `email_verified_at` | `DateTime?` | Quando o email foi verificado |
+| `email_pending` | `String?` | Novo email aguardando confirmação |
+| `email_token` | `String?` | Token UUID gerado para confirmação |
+| `email_token_expires_at` | `DateTime?` | TTL de 24h a partir da solicitação |
 
-> **Esses campos são infra-only.** Não pertencem ao agregado de domínio — são
-> gerenciados exclusivamente pelo `VerifyEmailUseCase` via Prisma direto.
+Esses campos são **infra-only** — não pertencem ao agregado de domínio e são gerenciados exclusivamente pelo `VerifyEmailUseCase` via Prisma direto.
 
 ---
 
 ## 4. Fluxo: Verificação de email no cadastro
 
-```
-1. Backend cria conta via use case (Musician/Establishment/Audience)
-2. Evento de domínio *CreatedEvent emitido
-3. MailEventHandler captura o evento
-4. MailService.sendEmailVerification(email, { name, verificationUrl })
-   → verificationUrl = GET /api/v1/auth/verify-email?token=<uuid>
-5. Backend salva: email_token + email_token_expires_at (+24h)
-6. Usuário clica no link
-7. VerifyEmailUseCase valida token, atualiza email_verified_at, limpa token
-```
+1. Backend cria conta via use case (Musician / Establishment / Audience)
+2. Evento de domínio `*CreatedEvent` emitido
+3. `MailEventHandler` captura o evento
+4. `MailService.sendEmailVerification` envia link com token UUID para o email do usuário
+5. Backend persiste `email_token` + `email_token_expires_at` (+24h)
+6. Usuário clica no link (`GET /api/v1/auth/verify-email?token=<uuid>`)
+7. `VerifyEmailUseCase` valida o token, atualiza `email_verified_at` e limpa os campos de token
 
-> **Nota:** O Keycloak já envia um email de verificação próprio (via SMTP).
-> O email do backend (etapa 4) é complementar e salva o dado no banco da
-> aplicação. Para evitar duplicidade, considere ativar apenas um dos dois
-> fluxos ou suprimir o email do Keycloak para essa etapa.
+> **Nota:** o Keycloak envia um email de verificação próprio no mesmo momento. O email do backend é complementar e garante o registro no banco da aplicação. Avaliar qual suprimir quando o realm estiver em produção.
 
 ---
 
 ## 5. Fluxo: Troca de email com revalidação
 
-```
-1. PATCH /musicians/:id com { email: "novo@email.com" }
-2. UpdateMusicianUseCase:
-   a. Noop se email === email_atual
-   b. findByEmail(novo) → 422 se já existe no mesmo tipo de perfil
-   c. entity.changeEmail(novo) → emite EmailChangedEvent
-3. MailEventHandler captura EmailChangedEvent
-4. Backend salva: email_pending=novo, email_token=uuid, email_token_expires_at=+24h
-5. MailService.sendEmailChange(novo_email, { name, newEmail, confirmationUrl })
+1. `PATCH /musicians/:id` com o novo email
+2. `UpdateMusicianUseCase` verifica se o email mudou; se não mudou, é noop; se já existe para outro perfil do mesmo tipo, retorna 422
+3. `entity.changeEmail(novo)` emite `EmailChangedEvent`
+4. Backend persiste `email_pending`, `email_token` e `email_token_expires_at` (+24h)
+5. `MailService.sendEmailChange` envia link de confirmação para o **novo** endereço
 6. Usuário clica no link de confirmação
-7. VerifyEmailUseCase:
-   a. Valida token e TTL
-   b. Atualiza email = email_pending, email_verified_at = now()
-   c. Limpa email_pending, email_token, email_token_expires_at
-   d. Chama Keycloak Admin API → PUT user.email + executeActionsEmail(["VERIFY_EMAIL"])
-```
+7. `VerifyEmailUseCase` valida token e TTL, move `email_pending` → `email`, atualiza `email_verified_at`, limpa os campos de token
+8. Backend chama Keycloak Admin API para sincronizar o novo email e disparar novo `VERIFY_EMAIL`
 
 ---
 
 ## 6. Mapa de emails do produto
 
-> **Princípio:** email é para *registros* e *ações de segurança*. Eventos
-> transacionais rápidos (gorjeta, pedido musical) ficam como push notification.
+> **Princípio:** email é para *registros* e *ações de segurança*. Eventos transacionais rápidos ficam como push notification.
 
-| Trigger | Canal | Destinatário | Template | Prioridade |
+| Trigger | Canal | Destinatário | Template | Status |
 |---|---|---|---|---|
-| Cadastro de conta | Email | Músico / Estabelecimento / Público | `email-verification.tsx` | 🔴 Crítico |
-| Troca de email solicitada | Email | Novo email do usuário | `email-change.tsx` | 🔴 Crítico |
-| Booking confirmado | Email | Músico + Estabelecimento | `booking-confirmed.tsx` | 🔴 Crítico |
-| Booking cancelado | Email | Músico + Estabelecimento | `booking-cancelled.tsx` | 🔴 Crítico |
-| Saque PIX solicitado / aprovado | Email | Músico | (a criar) | 🔴 Crítico |
-| Relatório semanal de receita | Email | Músico | (a criar) | 🔴 Crítico |
-| Perfil completo / boas-vindas | Email | Todos | `welcome.tsx` | 🟡 Médio |
-| Músico verificado por admin | Email | Músico | (a criar) | 🟡 Médio |
-| Estabelecimento verificado por admin | Email | Estabelecimento | (a criar) | 🟡 Médio |
+| Cadastro de conta | Email | Músico / Estabelecimento / Público | `email-verification.tsx` | ✅ Template pronto |
+| Troca de email solicitada | Email | Novo email do usuário | `email-change.tsx` | ✅ Template pronto |
+| Booking confirmado | Email | Músico + Estabelecimento | `booking-confirmed.tsx` | ✅ Template pronto |
+| Booking cancelado | Email | Músico + Estabelecimento | `booking-cancelled.tsx` | ✅ Template pronto |
+| Boas-vindas / perfil completo | Email | Todos | `welcome.tsx` | ✅ Template pronto |
+| Saque PIX solicitado/aprovado | Email | Músico | *(a criar)* | ⏳ Pendente |
+| Relatório semanal de receita | Email | Músico | `weekly-musician-report.tsx` *(a criar)* | ⏳ Bloco 7 |
+| Músico verificado por admin | Email | Músico | *(a criar)* | ⏳ Pendente |
+| Estabelecimento verificado por admin | Email | Estabelecimento | *(a criar)* | ⏳ Pendente |
 | Gorjeta PIX recebida | Push | Músico | — | push only |
 | Pedido musical aceito/recusado | Push | Público / Músico | — | push only |
-| Newsletter / promoção | Email (Brevo) | Todos | via Brevo (futuro) | 🟢 Futuro |
+| Newsletter / promoção | Email (Brevo) | Todos | via Brevo | 🔮 Futuro |
 
 ### Por que gorjeta e pedido musical são push, não email
 
-- **Gorjeta**: um músico pode receber dezenas por show. Email individual = spam.
-  O músico recebe push imediato (satisfação na hora) + relatório semanal com
-  total ganho, breakdown por show e média por gorjeta.
-- **Pedido musical**: ação contextual in-app, o usuário já está no celular.
-  Push é suficiente; email seria ruído.
-- **Booking**: mantido como email porque serve de *comprovante* — o músico
-  precisa do registro com data, horário e cachê meses depois. Push some, email fica.
+- **Gorjeta:** um músico pode receber dezenas por show. Email individual equivale a spam. O músico recebe push imediato para satisfação na hora e um relatório semanal consolidado com total, breakdown por show e média por gorjeta.
+- **Pedido musical:** ação contextual in-app com usuário já no celular. Push é suficiente; email seria ruído.
+- **Booking:** mantido como email porque serve de *comprovante* — o músico precisa do registro com data, horário e cachê meses depois. Push some, email persiste.
 
-### Relatório semanal do músico (email)
+### Relatório semanal do músico
 
-Consolidado toda segunda-feira, cobre a semana anterior:
+Enviado toda segunda-feira cobrindo a semana anterior:
 
 | Seção | Conteúdo |
 |---|---|
 | Receita | Gorjetas + shows + saques |
-| Gorjetas | Total recebido, nº de gorjetas, média por gorjeta |
-| Shows | Eventos realizados, horas tocadas |
+| Gorjetas | Total, quantidade e média por gorjeta |
+| Shows | Eventos realizados e horas tocadas |
 | Engajamento | Pedidos musicais, QR codes escaneados, novos seguidores |
-| Destaque | Maior gorjeta da semana, música mais pedida |
+| Destaque | Maior gorjeta da semana e música mais pedida |
 
-Template: `weekly-musician-report.tsx` (a criar no Bloco 7)
+Template `weekly-musician-report.tsx` planejado para o Bloco 7.
 
 ---
 
@@ -198,46 +138,27 @@ Template: `weekly-musician-report.tsx` (a criar no Bloco 7)
 
 **Localização:** `src/nest-modules/mail-module/`
 
-```
-mail-module/
-  mail.module.ts         # @Global() — exporta MailService para toda a app
-  mail.service.ts        # sendEmailVerification, sendEmailChange, sendBooking*, etc.
-  mail-event.handler.ts  # @OnEvent handlers: *EmailChangedEvent
-  templates/
-    email-verification.tsx
-    email-change.tsx
-    booking-confirmed.tsx
-    booking-cancelled.tsx
-    welcome.tsx
-    weekly-musician-report.tsx  # (a criar — Bloco 7)
-```
+| Arquivo | Responsabilidade |
+|---|---|
+| `mail.module.ts` | Módulo `@Global()` — exporta `MailService` para toda a app sem necessidade de importar explicitamente |
+| `mail.service.ts` | Métodos de envio: `sendEmailVerification`, `sendEmailChange`, `sendBookingConfirmed`, `sendBookingCancelled`, `sendWelcome` |
+| `mail-event.handler.ts` | Listeners `@OnEvent` para `MusicianEmailChangedEvent`, `EstablishmentEmailChangedEvent`, `AudienceEmailChangedEvent` |
+| `templates/` | Componentes TSX com `@react-email/components` |
 
-> `pix-tip-received.tsx` foi criado mas não é usado por email — gorjeta é push only.
-> O método `MailService.sendPixTipReceived()` pode ser removido em refactoring futuro.
-
-**Uso em outros módulos:**
-```typescript
-// Injetado via @Global() — não precisa importar MailModule
-constructor(private readonly mailService: MailService) {}
-
-await this.mailService.sendPixTipReceived(musician.email.value, {
-  musicianName: musician.displayName,
-  senderName: senderName,
-  amount: "R$ 10,00",
-  message: tipMessage,
-  eventName: eventName,
-});
-```
+O `MailModule` é global — qualquer outro módulo NestJS pode injetar `MailService` sem declarar importação adicional.
 
 ---
 
 ## 8. Pendências de implementação
 
-- [x] `VerifyEmailService` + endpoint `GET /api/v1/auth/verify-email?token=X`
-- [x] `MailEventHandler` com listeners para `*EmailChangedEvent`
-- [x] Domain event `EmailChangedEvent` para Musician, Establishment e Audience
-- [ ] Integração Keycloak Admin API para troca de email (chamar `executeActionsEmail` no novo email)
-- [ ] `MailEventHandler` para `*CreatedEvent` → welcome email (necessita wiring de `DomainEventMediator` nos create use cases)
-- [ ] Emails de saque PIX (`WithdrawalRequestedEvent`)
-- [ ] Emails de músico/estabelecimento verificados por admin
-- [ ] Templates de email para pedido musical aceito/recusado
+| Status | Item |
+|---|---|
+| ✅ | `VerifyEmailService` + endpoint `GET /api/v1/auth/verify-email?token=X` |
+| ✅ | `MailEventHandler` com listeners para `*EmailChangedEvent` (Musician, Establishment, Audience) |
+| ✅ | Domain events `EmailChangedEvent` para os três perfis |
+| ✅ | Templates e métodos de serviço para verificação, troca, booking e boas-vindas |
+| ⏳ | Integração Keycloak Admin API para troca de email (chamar `execute-actions-email` no novo endereço) |
+| ⏳ | `MailEventHandler` para `*CreatedEvent` → envio do welcome email (requer wiring do `DomainEventMediator` nos create use-cases) |
+| ⏳ | Emails de saque PIX (`WithdrawalRequestedEvent`) |
+| ⏳ | Emails para músico e estabelecimento verificados por admin |
+| ⏳ | Template e método `weekly-musician-report.tsx` (Bloco 7) |

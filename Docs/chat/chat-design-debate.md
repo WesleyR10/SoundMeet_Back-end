@@ -34,6 +34,7 @@ Jornada principal:
 | Rate limiting por conversa | Anti-spam/assédio |
 | Mensagens de voz | Complexidade de storage + UX desnecessária inicialmente |
 | Reactions/emojis nas mensagens | Nice-to-have futuro |
+| Edição/exclusão de mensagem |
 
 ---
 
@@ -45,7 +46,6 @@ Jornada principal:
 | GIFs/stickers | Não é contexto social |
 | Chats em grupo | Negociação é 1:1; banda representa um lado só |
 | Busca em mensagens | Relevante só com volume alto |
-| Edição/exclusão de mensagem | Aumenta complexidade do modelo de dados |
 | Forwarding | Sem uso prático no contexto |
 | Criptografia E2E | Overhead de implementação; LGPD não exige E2E, exige proteção em trânsito/repouso |
 
@@ -73,13 +73,7 @@ Jornada principal:
 - Mensagem de "connection request" — estabelecimento não manda direto, manda "interesse"
 - **O que cabe pra nós:** o modelo de Inquiry JÁ faz esse papel no SoundMeet — o estabelecimento não abre chat do nada, abre uma Inquiry e o chat nasce a partir daí
 
-### 4.4 Slack (referência de DM profissional)
-- Arquiva mensagens (free: 90 dias; pago: ilimitado)
-- Threading não seria útil aqui
-- Integração com calendário/compromissos
-- **O que cabe pra nós:** possibilidade de enviar um "evento de agenda" dentro da conversa quando o Booking é confirmado
-
-### 4.5 WhatsApp Business API
+### 4.4 WhatsApp Business API
 - 24h window: após 24h sem resposta do usuário, só templates aprovados
 - Templates para abrir conversa proativamente
 - End-to-end encryption
@@ -119,26 +113,6 @@ Jornada principal:
 - **Custo:** free até 10k MAU (generoso para MVP), depois cresce com escala
 - **Complexidade de implementação:** baixa (SDK faz muito)
 
-#### 5.3 Ably Realtime
-- **O que faz:** pub/sub em tempo real, presença, channels — **não é um chat completo**, é primitivo de tempo real
-- **Fit com stack:** bom para o transporte em tempo real, mas precisaria de camada de persistência por cima
-- **Prós:** latência baixa, presença out of the box, SDKs bons
-- **Contras:** não resolve o chat completo — você ainda escreve a lógica de histórico, ownership, delivery receipt
-- **Custo:** free tier 6M mensagens/mês, depois cresce
-- **Complexidade:** média (você ainda faz a lógica de chat)
-
-#### 5.4 Firebase Realtime Database / Firestore
-- **O que faz:** banco NoSQL real-time sincronizado
-- **Fit com stack:** **fraco** — introduz GCP no stack que é AWS-centric, conflita com PostgreSQL como fonte de verdade, complica ownership/auth (Firebase Auth vs Keycloak)
-- **Prós:** fácil de começar
-- **Contras:** vendor lock-in Google, auth duplo (Keycloak + Firebase), dados no GCP quando o resto é AWS
-- **Veredicto:** descartado
-
-#### 5.5 Pusher Channels
-- **O que faz:** pub/sub em tempo real (similar ao Ably)
-- **Fit com stack:** razoável, mas mesmo problema do Ably — é só transporte
-- **Custo:** free 200k mensagens/dia
-- **Veredicto:** inferior ao Socket.io para nosso caso, que já temos no stack
 
 ---
 

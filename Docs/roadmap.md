@@ -133,10 +133,6 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - [x] **4D.1c** Use-case: compartilhar — link read-only temporário UUID 7 dias (ESSENTIAL) e convite nominal (PRO)
   - [x] **4D.1d** Gate: `max_repertoires` e `max_songs_per_repertoire` via `PlanCheckService` (FREE 1×20 / ESSENTIAL 3×80 / PRO ∞)
   - [x] **4D.1e** NestJS module + controller (14 endpoints) + presenter + DTOs; registrado em app.module.ts
-- [ ] **4D.2** **Play Mode no Repertório** — tela ao vivo durante show (frontend):
-  - [ ] **4D.2a** Tela fullscreen: cifra + letra da música atual; botões próxima/anterior com 1 clique
-  - [ ] **4D.2b** Badge "customizada" em músicas editadas pelo músico
-  - [ ] **4D.2c** Auto-scroll configurável
 - [x] **4D.3** **Tempo estimado de show** — absorvido em 4D.1:
   - [x] **4D.3a** `duration_override_seconds` por `RepertoireSong`; `duration_seconds` em `MusicLibrary` populado pelo pipeline ai-cifra/ai-audio (Bloco 6)
   - [x] **4D.3b** `estimated_show_duration_minutes` no output — null se alguma música não tiver duração real
@@ -149,9 +145,6 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - [ ] **4D.5c** Geração server-side PNG via `sharp` ou `canvas`; retorno como link para download
 - [ ] **4D.6** **Banner Generation (AI) — roadmap futuro** (pré-requisito: 4D.5):
   - [ ] **4D.6a** Geração via API (DALL-E ou Stability AI) para plano PRO
-- [ ] **4D.7** **Progress bar de saque no dashboard** — UX obrigatório para todos os planos (frontend):
-  - [ ] **4D.7a** Barra de progresso "Você está a R$X de poder sacar" na home do músico
-  - [ ] **4D.7b** Prazo estimado baseado no ritmo atual de gorjetas
 - [x] **4D.8** **Plano Anual** — billing cycle anual no `Subscription`:
   - [x] **4D.8a** `BillingCycle` enum (`"monthly" | "annual"`) + campo no aggregate; `create()` auto-computa `expires_at`; `isActive()` respeita `expires_at`; `toJSON()` inclui campo; validator rejeita valores inválidos
   - [x] **4D.8b** `prisma/schema.prisma` + `billing_cycle String @default("monthly")`; `PlanPricing` interface + `MUSICIAN_PLAN_PRICING` + `ESTABLISHMENT_PLAN_PRICING` em `plan-features.config.ts`; mapper atualizado; 4 novos métodos em `PlanCheckService` (`getBillingCycle`, `getPlanPricing`); 33 novos testes
@@ -160,8 +153,10 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 
 ### Bloco 5 — Real-time e messaging
 
-- [ ] **5.1** WebSockets (Socket.io) — pedidos aceitos/recusados em tempo real
-- [ ] **5.2** RabbitMQ: pagamento confirmado → gamificação → ranking (event-driven)
+> **⚠️ Infra obrigatória ao criar o gateway Socket.io:** configurar `@socket.io/redis-adapter` usando as vars `REDIS_HOST`/`REDIS_PORT` já existentes. Sem ele, múltiplas instâncias NestJS não trocam eventos WebSocket — silent failure em produção com load balancer. Ver memória `project-websocket-redis-note`.
+
+- [x] **5.1** WebSockets (Socket.io) — pedidos aceitos/recusados em tempo real + chat (ver Bloco 7.1) — `RedisIoAdapter` + `NotificationsGateway` (/notifications) + `ChatGateway` (/chat) + `RequestEventsHandler`; testes de integração do ChatController pendentes
+- [x] **5.2** RabbitMQ: pagamento confirmado → gamificação → ranking (event-driven) — `TipCompletedIntegrationEvent` publicado no exchange `soundmeet.events` via `PaymentEventsHandlers`; `GamificationTipCompletedConsumer` consome `soundmeet.gamification` e recalcula `TOP_FAS` + `TOP_APOIADORES`; canal `gamification_events` (prefetch 10); transport configurável via `GAMIFICATION_PROCESSING_TRANSPORT`
 - [ ] **5.3** Outbox pattern para consistência entre domínios (opcional pós-MVP)
 
 ---
@@ -177,7 +172,7 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 
 ### Bloco 7 — Produto avançado (backlog)
 
-- [ ] **7.1** Chat estabelecimento ↔ músico
+- [x] **7.1** Chat estabelecimento ↔ músico — domínio `src/core/chat/` completo (Conversation + Message aggregates, 3 repositórios, 5 use-cases); `ChatModule` + gateway `/chat` + controller REST + `ChatEventsHandler` (auto-abre conversa em `InquiryCreatedEvent`); testes de integração do controller pendentes
 - [ ] **7.2** WebSockets push / Firebase APNs
 - [ ] **7.3** Validação compartilhamento social → pontos
 - [ ] **7.4** Analytics MongoDB (logs, auditoria)
@@ -200,23 +195,19 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - Decisão: NÃO criar player de vídeo interno na Fase 2 — usar HLS stream direto do CloudFront
 - [ ] **7.6** **Afinador cromático** — utilitário de ritual pré-show (todos os planos; filtro de ruído: ESSENCIAL + PRO):
   - [ ] **7.6a** Adicionar `tuner_noise_filter: boolean` em `MusicianPlanFeatures` e `plan-features.config.ts`
-  - [ ] **7.6b** Frontend: afinador básico via WebAudio API + algoritmo YIN/autocorrelação (todos os planos)
-  - [ ] **7.6c** Frontend: modo filtro de ruído + gate `assertMusicianFeature(id, "tuner_noise_filter")` (ESSENCIAL + PRO)
-  - [ ] **7.6d** Mobile: plugin de áudio nativo para latência mínima
-  - Posicionamento: "já no app, sem trocar de contexto" — não compete com GuitarTuna; entry point do ritual pré-show
+  - Posicionamento: "já no app, sem trocar de contexto" — entry point do ritual pré-show  
+  - Frontend + mobile: ver [roadmap-frontend.md](roadmap-frontend.md) (7.6b/7.6c/7.6d)
 - [x] **7.7** **Cardápio PDF do Estabelecimento** — confirmação de descoberta no perfil (todos os planos):
   - [x] **7.7a** Prisma: `menu_pdf_url String?` e `menu_pdf_updated_at DateTime?` em `EstablishmentProfile`
   - [x] **7.7b** Aggregate: `changeMenuPdf(url, updatedAt)` + `clearMenuPdf()` em `EstablishmentProfile`
   - [x] **7.7c** `POST /api/v1/establishments/:id/menu-pdf` — Multer diskStorage → fileFilter MIME (camada 1) + `file-type` v20 dynamic import nos bytes reais (camada 2) → Cloudflare R2 → salva URL; limite 5MB; ownership guard; armazenado em `establishments/{name-slug}/{id}/menu-pdf/menu-{ts}.pdf`
   - [x] **7.7d** `DELETE /api/v1/establishments/:id/menu-pdf` — remove do R2 + limpa campos no perfil
   - [x] **7.7e** Presenter atualizado (`menu_pdf_url`, `menu_pdf_updated_at`); `IEstablishmentStorage` port + `S3EstablishmentStorage` + providers
-  - Viewer inline no perfil público (PDF.js web / WebView mobile) — frontend pendente
-  - Aviso "Atualizado há X dias" quando `menu_pdf_updated_at` > 30 dias — frontend pendente
-- [~] **7.8** **Badge "Aberto agora"** — backend completo; falta apenas frontend:
+  - Viewer inline e aviso de PDF desatualizado: ver [roadmap-frontend.md](roadmap-frontend.md) (7.7)
+- [x] **7.8** **Badge "Aberto agora"** — backend completo:
   - [x] **7.8a** Campo calculado `is_open_now: boolean` no `EstablishmentOutputMapper.toOutput()` via `OperatingHours.isOpenAt(now, dateTimeService)` — presente em todos os outputs de establishment
   - [x] **7.8b** `IDateTimeService` / `LuxonDateTimeService` injetado em `EstablishmentsModule`; passado para `ListEstablishmentsUseCase` e `GetEstablishmentUseCase`; cálculo com timezone correto (UTC)
-  - [ ] **7.8c** Frontend: badge "Aberto agora" na listagem e no perfil do estabelecimento
-  - [ ] **7.8d** Frontend: formulário de edição de horários no dashboard do estabelecimento (preencher campo que já existe)
+  - Badge e formulário de horários no dashboard: ver [roadmap-frontend.md](roadmap-frontend.md) (7.8c/7.8d)
 - [ ] **7.11** **Missão de gamificação: compartilhamento social com Instagram** — público grava/envia clipe do evento no SoundMeet e compartilha no Instagram marcando músico e estabelecimento:
   - **Mecânica decidida (jun/2026):** sem integração direta com API do Meta (restrição de aprovação); fluxo é "grave/suba no SoundMeet → app gera card compartilhável com @handles do músico e do estabelecimento → usuário abre Instagram Stories/Feed manualmente e posta"
   - **Verificação:** usuário envia print/link do post como prova → moderação automática (hash de imagem) ou manual → XP creditado
@@ -301,7 +292,7 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 | Folha de cifra / IA        | ~ Bloco 6                                            |
 | Auth Keycloak              | ✅ JWT validado, guards aplicados, ownership completo (4B.1–4B.6), rate limit global |
 | Feature Gating (planos)    | ✅ Bloco 4C completo (4C.1–4C.10): analytics, saque, QR, split, multi-estabelecimento, campanhas |
-| Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — aguarda frontend (7.8c/7.8d) |
+| Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — frontend em roadmap-frontend.md |
 | Dashboard estabelecimento  | ~ parcial                                            |
 | Chat integrado             | backlog Bloco 7                                      |
 
