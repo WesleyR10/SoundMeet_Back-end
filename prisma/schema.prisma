@@ -430,11 +430,43 @@ model Inquiry {
   musician      Musician?     @relation(fields: [musicianId], references: [id], onDelete: SetNull)
   band          Band?         @relation(fields: [bandId], references: [id], onDelete: SetNull)
   booking       Booking?      @relation("InquiryBooking", fields: [bookingId], references: [id], onDelete: SetNull)
+  conversation  Conversation?
 
   @@index([musicianId, status, created_at])
   @@index([bandId, status, created_at])
   @@index([establishmentId, status, created_at])
   @@map("inquiries")
+}
+
+model Conversation {
+  id               String    @id @default(uuid())
+  inquiry_id       String    @unique
+  establishment_id String
+  musician_id      String?
+  band_id          String?
+  messages         Message[]
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  inquiry Inquiry @relation(fields: [inquiry_id], references: [id], onDelete: Cascade)
+
+  @@map("conversations")
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  conversation_id String
+  sender_id       String
+  sender_type     String
+  content         String       @db.Text
+  status          String       @default("sent")
+  created_at      DateTime     @default(now())
+  read_at         DateTime?
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@map("messages")
 }
 
 model MusicianCalendarSettings {
