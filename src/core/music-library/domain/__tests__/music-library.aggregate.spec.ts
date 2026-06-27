@@ -329,6 +329,7 @@ describe("MusicLibrary Unit Tests without validator", () => {
       renderable_chord_sheet_version: 0,
       notes: null,
       difficulty: 2,
+      duration_seconds: null,
       is_favorite: false,
       source: null,
       source_id: null,

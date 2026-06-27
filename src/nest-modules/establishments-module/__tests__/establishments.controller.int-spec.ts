@@ -17,6 +17,8 @@ import { ListEstablishmentsUseCase } from "../../../core/establishment/applicati
 import { UpdateEstablishmentUseCase } from "../../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
 import { VerifyEstablishmentUseCase } from "../../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
+import { UploadEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
+import { DeleteEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import {
   Establishment,
   EstablishmentId,
@@ -199,6 +201,14 @@ describe("EstablishmentsController Integration Tests", () => {
           useValue: {
             execute: jest.fn(),
           },
+        },
+        {
+          provide: UploadEstablishmentMenuPdfUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: DeleteEstablishmentMenuPdfUseCase,
+          useValue: { execute: jest.fn() },
         },
         {
           provide: VerifyEstablishmentUseCase,
