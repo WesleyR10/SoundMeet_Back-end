@@ -1,9 +1,11 @@
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { ConfigService } from "@nestjs/config";
 
 import { AppModule } from "./app.module";
 import { applyGlobalConfig } from "./nest-modules/global-config";
 import { applySwaggerExamples } from "./nest-modules/shared-module/swagger/swagger-examples";
+import { RedisIoAdapter } from "./nest-modules/shared-module/websocket/redis-io.adapter";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -69,6 +71,12 @@ async function bootstrap() {
   } catch (error) {
     console.error("❌ Swagger disabled due to error:", error);
   }
+
+  const configService = app.get(ConfigService);
+  const redisUrl = configService.get<string>("REDIS_URL") ?? "redis://localhost:6379";
+  const redisIoAdapter = new RedisIoAdapter(app, redisUrl);
+  await redisIoAdapter.connect();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   const port = process.env.PORT || 3000;
   await app.listen(port, "0.0.0.0");
