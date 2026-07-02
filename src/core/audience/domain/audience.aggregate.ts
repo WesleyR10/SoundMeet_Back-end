@@ -45,6 +45,7 @@ export type AudienceConstructorProps = {
 };
 
 export type AudienceCreateCommand = {
+  audience_id?: AudienceId;
   email: string;
   name: string;
   nickname?: string | null;
@@ -293,6 +294,7 @@ export class Audience extends AggregateRoot {
     });
 
     const audience = new Audience({
+      audience_id: command.audience_id,
       email: command.email,
       name: command.name,
       nickname: command.nickname,
