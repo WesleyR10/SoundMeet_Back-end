@@ -26,9 +26,11 @@ services:
       - RABBITMQ_URL=amqp://soundmeet:soundmeet123@rabbitmq:5672
       - AUTH_JWT_VALIDATION_MODE=keycloak
       - KEYCLOAK_URL=http://localhost:8080
+      - KEYCLOAK_INTERNAL_URL=http://keycloak:8080
       - KEYCLOAK_REALM=soundmeet
       - KEYCLOAK_CLIENT_ID=soundmeet-api
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-soundmeet-api-local-secret}
+      - KEYCLOAK_MOBILE_CLIENT_ID=soundmeet-mobile
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/soundmeet/protocol/openid-connect/certs
       - KEYCLOAK_JWKS_CACHE_TTL_SECONDS=300
       - KEYCLOAK_VERIFY_AUDIENCE=false
