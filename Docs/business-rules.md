@@ -17,6 +17,14 @@ Marcações:
 
 ---
 
+## Domínio Auth (Registro e Identidade)
+
+- [x] Registro de novos usuários via `POST /api/v1/auth/register` (`src/core/auth/application/use-cases/register/register.use-case.ts`) — única porta de entrada, já que `registrationAllowed: false` no realm Keycloak.
+  **Invariante crítica — NUNCA quebrar:** o ID do aggregate criado (`musician_id` ou `audience_id`) é sempre **igual ao `sub`** do usuário no Keycloak. O sistema de ownership (`MusicianOwnershipGuard`/`AudienceOwnershipGuard`, Bloco 4B) compara `currentUser.userId` (== `sub` do JWT) diretamente contra o ID do recurso na URL — se um fluxo de criação de conta usar um ID diferente do `sub`, o ownership dessa conta quebra silenciosamente (o dono nunca consegue editar o próprio recurso). Qualquer novo fluxo de criação de `Musician`/`Audience` vinculado a uma conta Keycloak deve respeitar essa invariante.
+  Detalhes de arquitetura em [auth/keycloak.md](auth/keycloak.md).
+
+---
+
 ## Domínio Musician (Músico/Banda)
 
 **Perfil, QR Code e dados básicos**

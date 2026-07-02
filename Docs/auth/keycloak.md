@@ -52,6 +52,12 @@ Responsabilidades:
 - expor mappers de claims usados pelo backend;
 - permitir service account apenas para automacoes internas controladas.
 
+A service account deste client tem as roles `manage-users` e `view-realm` do client de sistema `realm-management` atribuidas via `infra/keycloak/service-account-role-assignments.json` (sincronizada por `scripts/keycloak-sync.mjs`, funcao `assignServiceAccountRoles`). `manage-users` permite criar/atribuir role/deletar usuarios; `view-realm` e necessaria a parte porque ler a representacao de uma realm role (`GET /admin/realms/{realm}/roles/{nome}`, passo intermediario antes de atribuir a role a um usuario) e um endpoint de leitura de *realm*, nao de *usuario* — testado e confirmado empiricamente (sem `view-realm` a chamada retorna 403 mesmo com `manage-users` presente). Sem rodar `npm run keycloak:sync:local` (ou equivalente em staging/producao) apos alterar essa configuracao, qualquer chamada a Admin API retorna 403.
+
+> **Atencao ao token cacheado:** o `KeycloakAdminGateway` cacheia o token de admin (`client_credentials`) em memoria por ate ~14 min. Se voce alterar as roles da service account com o backend ja rodando, o processo precisa ser reiniciado para obter um token novo com as roles atualizadas — o token antigo, ja emitido, nao reflete permissoes concedidas depois da sua emissao.
+
+> **Atencao:** este arquivo e deliberadamente separado do `realm-soundmeet.json`. O container do Keycloak roda com `--import-realm` e monta `realm-soundmeet.json` diretamente (parser nativo do Keycloak, que rejeita campos desconhecidos com `UnrecognizedPropertyException`). Qualquer configuracao consumida apenas pelo `keycloak-sync.mjs` (nao nativa do Keycloak) deve ficar em um arquivo separado como este, nunca dentro de `realm-soundmeet.json`.
+
 Em desenvolvimento, o secret padrao aplicado pelo script e:
 
 ```bash
@@ -176,12 +182,13 @@ AUTH_JWT_VALIDATION_MODE=keycloak
 KEYCLOAK_URL=http://localhost:8080
 KEYCLOAK_REALM=soundmeet
 KEYCLOAK_CLIENT_ID=soundmeet-api
+KEYCLOAK_INTERNAL_URL=http://keycloak:8080
 KEYCLOAK_JWKS_URI=http://localhost:8080/realms/soundmeet/protocol/openid-connect/certs
 KEYCLOAK_JWKS_CACHE_TTL_SECONDS=300
 KEYCLOAK_VERIFY_AUDIENCE=false
 ```
 
-Quando a API roda dentro do Docker, `KEYCLOAK_URL` deve continuar representando o issuer publico do token (`http://localhost:8080` no ambiente local). Ja `KEYCLOAK_JWKS_URI` pode apontar para o host interno Docker (`http://keycloak:8080/...`) para evitar acesso via host bridge.
+Quando a API roda dentro do Docker, `KEYCLOAK_URL` deve continuar representando o issuer publico do token (`http://localhost:8080` no ambiente local) — ele precisa bater exatamente com o `iss` do JWT. Ja `KEYCLOAK_JWKS_URI` e `KEYCLOAK_INTERNAL_URL` podem apontar para o host interno Docker (`http://keycloak:8080/...`) para evitar acesso via host bridge. `KEYCLOAK_INTERNAL_URL` e usado pelo `KeycloakAdminGateway` (Admin API + Direct Access Grant do fluxo de registro, ver secao abaixo) — sem ele, dentro de um container o backend tentaria acessar `KEYCLOAK_URL` (`localhost`) e cairia nele mesmo, nao no container do Keycloak.
 
 `KEYCLOAK_VERIFY_AUDIENCE=false` e tolerante para desenvolvimento, porque alguns clients publicos podem nao emitir `aud` exatamente como a API espera sem ajustes adicionais de audience mapper. Em producao, a recomendacao e ligar:
 
@@ -344,6 +351,25 @@ Isso popula `establishment_ids` e `band_ids` automaticamente no proximo token em
 > **Estado atual (jun/2026):** criacao de groups por entidade e manual via Admin Console. Automacao via `scripts/keycloak-sync.mjs` esta planejada mas nao implementada.
 
 ---
+
+## Registro de usuarios (`POST /api/v1/auth/register`)
+
+Como `registrationAllowed: false`, este endpoint e a unica porta de entrada para novos usuarios musico/publico. Implementacao: `src/core/auth/` (domain, sem aggregate proprio) + `src/nest-modules/auth-module/` (wiring).
+
+Fluxo do `RegisterUseCase`:
+
+1. Valida que o email nao existe localmente (`Musician`/`Audience`, conforme `role`) — falha rapida antes de tocar o Keycloak.
+2. Cria o usuario no Keycloak via Admin API (`KeycloakAdminGateway`, `client_credentials` grant com `soundmeet-api`) com `emailVerified: true` e `requiredActions: []`.
+3. Atribui a realm role (`musician` ou `audience`) ao novo usuario.
+4. Cria o aggregate `Musician`/`Audience` usando o **mesmo UUID** do `sub` retornado pelo Keycloak como ID primario (ver invariante em [business-rules.md](../business-rules.md)).
+5. Emite (best-effort, nao bloqueante) um token de verificacao de email via `VerifyEmailService.issueVerificationToken()` — reaproveita os campos `email_token`/`email_token_expires_at` ja existentes e `MailService.sendEmailVerification()`.
+6. Autentica o usuario via Direct Access Grant (`grant_type=password`, client publico `soundmeet-mobile`) e retorna `access_token`/`refresh_token`.
+
+Qualquer falha entre os passos 2 e 4 aciona compensacao (`deleteUser` best-effort no Keycloak) para nao deixar conta orfa. Falha no passo 6 (autenticacao) **nao** aciona compensacao, pois a conta ja foi criada com sucesso — o cliente recebe 503 e deve cair para a tela de login normal.
+
+**Por que `emailVerified: true` na criacao, e nao o fluxo nativo `VERIFY_EMAIL` do Keycloak:** o realm tem `verifyEmail: true` com `VERIFY_EMAIL` como required action padrao. Se o usuario fosse criado sem `emailVerified: true`, o Direct Access Grant do passo 6 falharia com `invalid_grant: Account is not fully set up` (Keycloak bloqueia password grant com required actions pendentes) — o que quebraria o requisito de retornar tokens imediatamente (sem redirect de browser). A verificacao de posse do email passa a ser responsabilidade da aplicacao (mecanismo `email_token` ja existente), nao do Keycloak.
+
+**Risco residual:** `POST /audiences` continua `@Public()` no NestJS, permitindo criar um `Audience` sem usuario Keycloak correspondente. Fora do escopo desta implementacao — considerar restringir a admin/interno numa iteracao futura.
 
 ## Evolucao futura
 

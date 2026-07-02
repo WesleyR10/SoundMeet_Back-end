@@ -151,6 +151,27 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 
 ---
 
+### Bloco 4E — Registro de usuários (Keycloak Admin API) ✅
+
+> Movido de `soundmeet-mobile/Docs/roadmap-mobile.md` (item 1.9, Bloco 1.5). `registrationAllowed` permanece `false` no realm — este endpoint é a única porta de entrada para novos usuários músicos/público.
+> **Invariante crítica:** `musician_id`/`audience_id` do aggregate criado é sempre igual ao `sub` do usuário no Keycloak — dependência direta do sistema de ownership (Bloco 4B). Ver [business-rules.md](business-rules.md).
+
+- [x] **4E.1** Infra Keycloak: `infra/keycloak/service-account-role-assignments.json` (arquivo separado do `realm-soundmeet.json` — este é montado nativamente pelo container via `--import-realm` e rejeita campos desconhecidos, testado e corrigido após quebrar o boot do Keycloak) + função `assignServiceAccountRoles` em `scripts/keycloak-sync.mjs` — concede `manage-users` + `view-realm` (`realm-management`) à service account de `soundmeet-api`; `KEYCLOAK_INTERNAL_URL` adicionado para o `KeycloakAdminGateway` funcionar quando a API roda dentro do Docker (mesma necessidade do `KEYCLOAK_JWKS_URI`)
+- [x] **4E.2** `KEYCLOAK_MOBILE_CLIENT_ID` (default `soundmeet-mobile`) em `config.schema.ts`/`config-module.module.ts`/`.env.example` — client público usado no Direct Access Grant pós-registro
+- [x] **4E.3** Domínio `src/core/auth/` (sem aggregate próprio): `IIdentityProviderGateway` + `KeycloakAdminGateway` (axios, cache de admin token via `client_credentials`), `IEmailVerificationIssuer`, `RegisterUseCase` (`application/use-cases/register/`)
+- [x] **4E.4** `RegisterUseCase`: valida duplicidade local antes de tocar o Keycloak → cria usuário (`emailVerified: true`, `requiredActions: []`, necessário para o Direct Access Grant não falhar) → atribui role → cria aggregate `Musician`/`Audience` com ID == `sub` do Keycloak → emite token de verificação de email (não bloqueante) → autentica via Direct Access Grant (`soundmeet-mobile`). Compensação (rollback do usuário Keycloak) em toda falha após a criação, exceto na etapa final de autenticação (conta já commitada)
+- [x] **4E.5** `Audience.create()` passou a aceitar `audience_id` explícito em `AudienceCreateCommand` (paridade com `Musician.create()`, pré-requisito para o registro)
+- [x] **4E.6** `ExternalServiceError` (novo `DomainError`) → 503 no `GlobalExceptionFilter`, para falhas do provedor de identidade
+- [x] **4E.7** `VerifyEmailService` implementa `IEmailVerificationIssuer.issueVerificationToken()` — reaproveita `email_token`/`email_token_expires_at` já existentes em `Musician`/`Audience` e `MailService.sendEmailVerification()` (template já existente, não utilizado até então)
+- [x] **4E.8** `POST /api/v1/auth/register` (`@Public()`, `@Throttle` 5/60s) — `RegisterDto extends RegisterInput`, `AuthController`, `auth.providers.ts`
+- [x] **4E.9** Testes: `register.use-case.spec.ts` (9 cenários incl. compensação e falha de compensação), `keycloak-admin.gateway.spec.ts`, `register.controller.int-spec.ts`
+
+**Risco residual (fora de escopo):** `POST /audiences` continua `@Public()` — permite criar `Audience` órfã sem Keycloak. Considerar restringir a admin/interno numa iteração futura.
+
+**Referência:** [auth/keycloak.md](auth/keycloak.md)
+
+---
+
 ### Bloco 5 — Real-time e messaging
 
 > **⚠️ Infra obrigatória ao criar o gateway Socket.io:** configurar `@socket.io/redis-adapter` usando as vars `REDIS_HOST`/`REDIS_PORT` já existentes. Sem ele, múltiplas instâncias NestJS não trocam eventos WebSocket — silent failure em produção com load balancer. Ver memória `project-websocket-redis-note`.
