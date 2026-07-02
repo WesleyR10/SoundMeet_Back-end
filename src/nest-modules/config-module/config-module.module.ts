@@ -62,6 +62,8 @@ export const CONFIG_AUTH_SCHEMA = {
   KEYCLOAK_REALM: Joi.string().default("soundmeet"),
   KEYCLOAK_CLIENT_ID: Joi.string().required(),
   KEYCLOAK_CLIENT_SECRET: Joi.string().required(),
+  KEYCLOAK_MOBILE_CLIENT_ID: Joi.string().default("soundmeet-mobile"),
+  KEYCLOAK_INTERNAL_URL: Joi.string().uri().optional(),
   KEYCLOAK_JWKS_URI: Joi.string().uri().optional(),
   KEYCLOAK_JWKS_CACHE_TTL_SECONDS: Joi.number().min(1).default(300),
   KEYCLOAK_VERIFY_AUDIENCE: Joi.boolean().default(false),
@@ -104,9 +106,7 @@ export const CONFIG_EXTERNAL_APIS_SCHEMA = {
 
 export const CONFIG_PAYMENT_SCHEMA = {
   // Asaas — cachê de show, escrow, assinaturas, saque PIX
-  ASAAS_API_URL: Joi.string()
-    .uri()
-    .default("https://sandbox.asaas.com/api/v3"),
+  ASAAS_API_URL: Joi.string().uri().default("https://sandbox.asaas.com/api/v3"),
   ASAAS_API_KEY: Joi.string().when("NODE_ENV", {
     is: "production",
     then: Joi.string().min(1).required(),

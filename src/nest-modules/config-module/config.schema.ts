@@ -37,6 +37,8 @@ export type EnvConfig = {
   KEYCLOAK_REALM: string;
   KEYCLOAK_CLIENT_ID: string;
   KEYCLOAK_CLIENT_SECRET: string;
+  KEYCLOAK_MOBILE_CLIENT_ID: string;
+  KEYCLOAK_INTERNAL_URL?: string;
   KEYCLOAK_JWKS_URI?: string;
   KEYCLOAK_JWKS_CACHE_TTL_SECONDS?: number;
   KEYCLOAK_VERIFY_AUDIENCE?: boolean;
