@@ -6,6 +6,11 @@ import { ConfigSchemaType } from "../config-module/config.schema";
 import { DatabaseModule } from "../database-module/database.module";
 import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
+import {
+  AUTH_GATEWAYS,
+  AUTH_REPOSITORIES,
+  AUTH_USE_CASES,
+} from "./auth.providers";
 import { AuthJwtVerifier } from "./auth-jwt.verifier";
 import { CurrentUserContextGuard } from "./current-user-context.guard";
 import { InternalTokenGuard } from "./internal-token.guard";
@@ -39,6 +44,9 @@ import { VerifyEmailService } from "./verify-email.service";
     EstablishmentOwnershipGuard,
     MusicianOwnershipGuard,
     VerifyEmailService,
+    ...Object.values(AUTH_REPOSITORIES),
+    ...Object.values(AUTH_GATEWAYS),
+    ...Object.values(AUTH_USE_CASES),
   ],
   exports: [
     JwtModule,

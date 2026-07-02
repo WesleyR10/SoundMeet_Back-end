@@ -3,8 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { randomUUID } from "crypto";
 
+import { IEmailVerificationIssuer } from "../../core/auth/infra/gateways/email-verification-issuer.interface";
 import { PrismaService } from "../database-module/prisma/prisma.service";
+import { MailService } from "../mail-module/mail.service";
 
 type ProfileType = "musician" | "establishment" | "audience";
 
@@ -16,8 +19,45 @@ type TokenRecord = {
 };
 
 @Injectable()
-export class VerifyEmailService {
-  constructor(private readonly prisma: PrismaService) {}
+export class VerifyEmailService implements IEmailVerificationIssuer {
+  private readonly TOKEN_TTL_HOURS = 24;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
+
+  async issueVerificationToken(
+    type: "musician" | "audience",
+    id: string,
+  ): Promise<void> {
+    const token = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + this.TOKEN_TTL_HOURS);
+
+    const data = {
+      email_token: token,
+      email_token_expires_at: expiresAt,
+    };
+
+    const profile =
+      type === "musician"
+        ? await this.prisma.musician.update({
+            where: { id },
+            data,
+            select: { name: true, email: true },
+          })
+        : await this.prisma.audience.update({
+            where: { id },
+            data,
+            select: { name: true, email: true },
+          });
+
+    await this.mailService.sendEmailVerification(profile.email, {
+      name: profile.name,
+      verificationUrl: this.mailService.buildVerificationUrl(token),
+    });
+  }
 
   async verify(token: string): Promise<{ message: string }> {
     const record = await this.findByToken(token);

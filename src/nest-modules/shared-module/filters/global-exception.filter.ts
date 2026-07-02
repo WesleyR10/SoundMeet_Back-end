@@ -8,6 +8,7 @@ import { Response } from "express";
 
 import { ConflictError } from "../../../core/shared/domain/errors/conflict.error";
 import { DomainError } from "../../../core/shared/domain/errors/domain.error";
+import { ExternalServiceError } from "../../../core/shared/domain/errors/external-service.error";
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
 import { InvalidOperationError } from "../../../core/shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../core/shared/domain/errors/not-found.error";
@@ -85,6 +86,8 @@ function getErrorText(statusCode: number): string {
       return "Payload Too Large";
     case 422:
       return "Unprocessable Entity";
+    case 503:
+      return "Service Unavailable";
     case 500:
     default:
       return "Internal Server Error";
@@ -173,6 +176,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       response.status(422).json({
         statusCode: 422,
         error: getErrorText(422),
+        message: [exception.message],
+      });
+      return;
+    }
+
+    if (exception instanceof ExternalServiceError) {
+      console.error(
+        "GlobalExceptionFilter external service error",
+        JSON.stringify({
+          message: exception.message,
+          ...toExceptionLogContext(exception),
+        }),
+      );
+      response.status(503).json({
+        statusCode: 503,
+        error: getErrorText(503),
         message: [exception.message],
       });
       return;
