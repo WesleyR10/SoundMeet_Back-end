@@ -259,7 +259,7 @@ services:
     image: adminer:latest
     container_name: soundmeet-adminer
     ports:
-      - "8081:8080"
+      - "8083:8080"
     depends_on:
       - postgres
       - mongo
