@@ -13,3 +13,5 @@ export * from "./get-shared-repertoire/get-shared-repertoire.use-case";
 export * from "./invite-musician/invite-musician.use-case";
 export * from "./revoke-invite/revoke-invite.use-case";
 export * from "./list-my-invites/list-my-invites.use-case";
+export * from "./check-repertoire-song-access/check-repertoire-song-access.use-case";
+export * from "./check-shared-song-access/check-shared-song-access.use-case";

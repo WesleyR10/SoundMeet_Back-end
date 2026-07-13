@@ -4,6 +4,8 @@ import { IRepertoireRepository } from "../../core/repertoire/domain/repertoire.r
 import { RepertoirePrismaRepository } from "../../core/repertoire/infra/db/prisma/repertoire-prisma.repository";
 import {
   AddSongUseCase,
+  CheckRepertoireSongAccessUseCase,
+  CheckSharedSongAccessUseCase,
   CreateRepertoireUseCase,
   DeleteRepertoireUseCase,
   GetRepertoireUseCase,
@@ -116,6 +118,16 @@ export const USE_CASES = {
     useFactory: (repo: IRepertoireRepository, mlRepo: IMusicLibraryRepository) =>
       new ListMyInvitesUseCase(repo, mlRepo),
     inject: [REPOSITORIES.REPERTOIRE_REPOSITORY.provide, "MusicLibraryRepository"],
+  },
+  CHECK_REPERTOIRE_SONG_ACCESS_USE_CASE: {
+    provide: CheckRepertoireSongAccessUseCase,
+    useFactory: (repo: IRepertoireRepository) => new CheckRepertoireSongAccessUseCase(repo),
+    inject: [REPOSITORIES.REPERTOIRE_REPOSITORY.provide],
+  },
+  CHECK_SHARED_SONG_ACCESS_USE_CASE: {
+    provide: CheckSharedSongAccessUseCase,
+    useFactory: (repo: IRepertoireRepository) => new CheckSharedSongAccessUseCase(repo),
+    inject: [REPOSITORIES.REPERTOIRE_REPOSITORY.provide],
   },
 };
 
