@@ -17,8 +17,10 @@ function makeIdentityGateway(): jest.Mocked<IIdentityProviderGateway> {
   return {
     createUser: jest.fn(),
     assignRealmRole: jest.fn(),
+    removeRealmRole: jest.fn(),
     deleteUser: jest.fn(),
     authenticateWithPassword: jest.fn(),
+    getUser: jest.fn(),
   };
 }
 
@@ -199,6 +201,79 @@ describe("RegisterUseCase Unit Tests", () => {
     );
     expect(identityGateway.deleteUser).not.toHaveBeenCalled();
     expect(musicianRepo.items).toHaveLength(1);
+  });
+
+  it("should register a musician with cpf and phone and persist them", async () => {
+    const output = await useCase.execute({
+      ...baseInput("musician"),
+      cpf: "52998224725",
+      phone: "11999999999",
+    });
+
+    expect(output.profile_id).toBe(KEYCLOAK_USER_ID);
+    expect(musicianRepo.items[0].cpf?.value).toBe("52998224725");
+    expect(musicianRepo.items[0].phone?.value).toBe("11999999999");
+  });
+
+  it("should register an audience without cpf/phone (not required for this role)", async () => {
+    const output = await useCase.execute(baseInput("audience"));
+
+    expect(output.profile_id).toBe(KEYCLOAK_USER_ID);
+    expect(identityGateway.createUser).toHaveBeenCalled();
+  });
+
+  it("should reject with ConflictError when cpf already exists for another musician, without calling the identity gateway", async () => {
+    await musicianRepo.insert(
+      Musician.create({
+        email: "outro@example.com",
+        name: "Já Existe",
+        cpf: "52998224725",
+        genres: [],
+        instruments: [],
+      }),
+    );
+
+    await expect(
+      useCase.execute({
+        ...baseInput("musician"),
+        cpf: "52998224725",
+        phone: "11999999999",
+      }),
+    ).rejects.toThrow(ConflictError);
+    expect(identityGateway.createUser).not.toHaveBeenCalled();
+  });
+
+  it("should reject with ConflictError when phone already exists for another musician, without calling the identity gateway", async () => {
+    await musicianRepo.insert(
+      Musician.create({
+        email: "outro@example.com",
+        name: "Já Existe",
+        phone: "11999999999",
+        genres: [],
+        instruments: [],
+      }),
+    );
+
+    await expect(
+      useCase.execute({
+        ...baseInput("musician"),
+        cpf: "52998224725",
+        phone: "11999999999",
+      }),
+    ).rejects.toThrow(ConflictError);
+    expect(identityGateway.createUser).not.toHaveBeenCalled();
+  });
+
+  it("should throw EntityValidationError and compensate when cpf format is invalid", async () => {
+    await expect(
+      useCase.execute({
+        ...baseInput("musician"),
+        cpf: "11111111111",
+        phone: "11999999999",
+      }),
+    ).rejects.toThrow(EntityValidationError);
+    expect(identityGateway.deleteUser).toHaveBeenCalledWith(KEYCLOAK_USER_ID);
+    expect(musicianRepo.items).toHaveLength(0);
   });
 
   it("should not block registration when issuing the email verification token fails", async () => {

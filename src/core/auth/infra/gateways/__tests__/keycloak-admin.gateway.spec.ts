@@ -2,11 +2,19 @@ import axios from "axios";
 
 import {
   IdentityProviderConflictError,
+  IdentityProviderInvalidCredentialsError,
   IdentityProviderUnavailableError,
 } from "../identity-provider-gateway.interface";
 import { KeycloakAdminGateway } from "../keycloak-admin.gateway";
 
-jest.mock("axios");
+jest.mock("axios", () => {
+  const actualAxios = jest.requireActual("axios");
+  return {
+    __esModule: true,
+    default: { create: jest.fn() },
+    isAxiosError: actualAxios.isAxiosError,
+  };
+});
 
 describe("KeycloakAdminGateway Unit Tests", () => {
   const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -23,8 +31,6 @@ describe("KeycloakAdminGateway Unit Tests", () => {
       delete: jest.fn(),
     };
     mockedAxios.create.mockReturnValue(mockHttp as any);
-    (mockedAxios as any).isAxiosError =
-      jest.requireActual("axios").isAxiosError;
   });
 
   function makeGateway(): KeycloakAdminGateway {
@@ -155,5 +161,51 @@ describe("KeycloakAdminGateway Unit Tests", () => {
       "/users/abc-123",
       expect.any(Object),
     );
+  });
+
+  it("removes a realm role by looking up the role representation first", async () => {
+    mockAdminTokenResponse();
+    mockHttp.get.mockResolvedValueOnce({ data: { name: "musician" } });
+    mockHttp.delete.mockResolvedValueOnce({ status: 204 });
+
+    const gateway = makeGateway();
+    await gateway.removeRealmRole("abc-123", "musician");
+
+    expect(mockHttp.get).toHaveBeenCalledWith(
+      "/roles/musician",
+      expect.any(Object),
+    );
+    expect(mockHttp.delete).toHaveBeenCalledWith(
+      "/users/abc-123/role-mappings/realm",
+      expect.objectContaining({ data: [{ name: "musician" }] }),
+    );
+  });
+
+  it("gets a user by id", async () => {
+    mockAdminTokenResponse();
+    mockHttp.get.mockResolvedValueOnce({
+      data: { email: "a@b.com", firstName: "A" },
+    });
+
+    const gateway = makeGateway();
+    const user = await gateway.getUser("abc-123");
+
+    expect(user).toEqual({ email: "a@b.com", name: "A" });
+    expect(mockHttp.get).toHaveBeenCalledWith(
+      "/users/abc-123",
+      expect.any(Object),
+    );
+  });
+
+  it("throws IdentityProviderInvalidCredentialsError when Keycloak returns invalid_grant", async () => {
+    mockHttp.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 400, data: { error: "invalid_grant" } },
+    });
+
+    const gateway = makeGateway();
+    await expect(
+      gateway.authenticateWithPassword("a@b.com", "wrong-password"),
+    ).rejects.toThrow(IdentityProviderInvalidCredentialsError);
   });
 });

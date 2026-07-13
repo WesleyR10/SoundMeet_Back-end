@@ -12,6 +12,8 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { ConflictError } from "../../../../shared/domain/errors/conflict.error";
 import { ExternalServiceError } from "../../../../shared/domain/errors/external-service.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import { CPF } from "../../../../shared/domain/value-objects/cpf.vo";
+import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
 import { IEmailVerificationIssuer } from "../../../infra/gateways/email-verification-issuer.interface";
 import {
   IdentityProviderConflictError,
@@ -33,6 +35,11 @@ export class RegisterUseCase implements IUseCase<
 
   async execute(input: RegisterInput): Promise<RegisterOutput> {
     await this.assertEmailNotTaken(input.email, input.role);
+
+    if (input.role === "musician") {
+      await this.assertCpfNotTaken(input.cpf);
+      await this.assertPhoneNotTaken(input.phone);
+    }
 
     const externalId = await this.createIdentityUser(input);
 
@@ -56,6 +63,34 @@ export class RegisterUseCase implements IUseCase<
 
     if (existing) {
       throw new ConflictError("Email já cadastrado");
+    }
+  }
+
+  private async assertCpfNotTaken(cpf?: string): Promise<void> {
+    if (!cpf) return;
+    // Formato inválido é reportado depois pela validação do agregado (422);
+    // aqui só nos importa checar duplicidade do valor normalizado.
+    let normalized: string;
+    try {
+      normalized = new CPF(cpf).value;
+    } catch {
+      return;
+    }
+    const existing = await this.musicianRepo.findByCpf(normalized);
+    if (existing) {
+      throw new ConflictError("CPF já cadastrado");
+    }
+  }
+
+  private async assertPhoneNotTaken(phone?: string): Promise<void> {
+    if (!phone) return;
+    const phoneOrError = Phone.create(phone);
+    if (phoneOrError.isFail()) return;
+    const existing = await this.musicianRepo.findByPhone(
+      phoneOrError.ok.value,
+    );
+    if (existing) {
+      throw new ConflictError("Celular já cadastrado");
     }
   }
 
@@ -103,6 +138,8 @@ export class RegisterUseCase implements IUseCase<
           musician_id: new MusicianId(externalId),
           email: input.email,
           name: input.name,
+          cpf: input.cpf ?? null,
+          phone: input.phone ?? null,
           genres: [],
           instruments: [],
           is_active: true,

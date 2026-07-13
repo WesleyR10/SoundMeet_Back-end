@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -8,12 +17,20 @@ import {
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 
+import { LoginOutput } from "../../core/auth/application/use-cases/login/login.output";
+import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterOutput } from "../../core/auth/application/use-cases/register/register.output";
 import { RegisterUseCase } from "../../core/auth/application/use-cases/register/register.use-case";
+import { SocialSignupOutput } from "../../core/auth/application/use-cases/social-signup/social-signup.output";
+import { SocialSignupUseCase } from "../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { Public } from "./auth.decorators";
 import { AuthGuard } from "./auth.guard";
 import { CurrentUserContextGuard } from "./current-user-context.guard";
+import { CurrentUser } from "./decorators/current-user.decorator";
+import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { SocialSignupDto } from "./dto/social-signup.dto";
+import { AuthenticatedUser } from "./interfaces/authenticated-user.interface";
 import { RolesGuard } from "./roles.guard";
 import { VerifyEmailService } from "./verify-email.service";
 
@@ -25,6 +42,8 @@ export class AuthController {
   constructor(
     private readonly verifyEmailService: VerifyEmailService,
     private readonly registerUseCase: RegisterUseCase,
+    private readonly loginUseCase: LoginUseCase,
+    private readonly socialSignupUseCase: SocialSignupUseCase,
   ) {}
 
   @Post("register")
@@ -44,6 +63,53 @@ export class AuthController {
   })
   async register(@Body() dto: RegisterDto): Promise<RegisterOutput> {
     return this.registerUseCase.execute(dto);
+  }
+
+  @Post("login")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({
+    summary: "Login por email e senha",
+    description:
+      "Autentica via Direct Access Grants no Keycloak e resolve o papel/perfil do usuário nos aggregates locais.",
+  })
+  @ApiResponse({ status: 200, description: "Login efetuado, tokens retornados" })
+  @ApiResponse({ status: 401, description: "Credenciais inválidas" })
+  @ApiResponse({ status: 422, description: "Dados inválidos" })
+  @ApiResponse({
+    status: 503,
+    description: "Provedor de identidade indisponível",
+  })
+  async login(@Body() dto: LoginDto): Promise<LoginOutput> {
+    return this.loginUseCase.execute(dto);
+  }
+
+  @Post("social-signup")
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({
+    summary: "Completa cadastro de usuário autenticado via provedor social",
+    description:
+      "Para usuários já autenticados no Keycloak via login social (ex.: Google) mas sem role/aggregate local ainda. Atribui o papel escolhido e cria o aggregate mínimo (músico ou público) usando o mesmo id do token (sub).",
+  })
+  @ApiResponse({ status: 201, description: "Cadastro completado" })
+  @ApiResponse({ status: 409, description: "Usuário já cadastrado" })
+  @ApiResponse({ status: 422, description: "Dados inválidos" })
+  @ApiResponse({
+    status: 503,
+    description: "Provedor de identidade indisponível",
+  })
+  async socialSignup(
+    @Body() dto: SocialSignupDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<SocialSignupOutput> {
+    return this.socialSignupUseCase.execute({
+      user_id: user.userId,
+      existing_roles: user.roles,
+      role: dto.role,
+      cpf: dto.cpf,
+      phone: dto.phone,
+    });
   }
 
   @Get("verify-email")

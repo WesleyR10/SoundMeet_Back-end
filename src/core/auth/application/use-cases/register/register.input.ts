@@ -6,6 +6,7 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from "class-validator";
 
 export type RegisterRole = "musician" | "audience";
@@ -30,4 +31,16 @@ export class RegisterInput {
 
   @IsIn(["musician", "audience"])
   role: RegisterRole;
+
+  // Obrigatórios só para role=musician (anti multi-conta); audience é público
+  // casual escaneando QR — fricção extra aqui mataria conversão sem ganho real.
+  @ValidateIf((o: RegisterInput) => o.role === "musician")
+  @IsNotEmpty({ message: "CPF é obrigatório para músicos" })
+  @IsString()
+  cpf?: string;
+
+  @ValidateIf((o: RegisterInput) => o.role === "musician")
+  @IsNotEmpty({ message: "Celular é obrigatório para músicos" })
+  @IsString()
+  phone?: string;
 }

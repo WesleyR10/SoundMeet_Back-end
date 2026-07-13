@@ -5,8 +5,10 @@ import {
   CreateIdentityUserResult,
   IdentityAuthenticationResult,
   IdentityProviderConflictError,
+  IdentityProviderInvalidCredentialsError,
   IdentityProviderUnavailableError,
   IdentityRealmRole,
+  IdentityUser,
   IIdentityProviderGateway,
 } from "./identity-provider-gateway.interface";
 
@@ -91,16 +93,57 @@ export class KeycloakAdminGateway implements IIdentityProviderGateway {
   ): Promise<void> {
     try {
       const token = await this.getAdminToken();
-      const roleResponse = await this.adminHttp.get(
-        `/roles/${encodeURIComponent(role)}`,
-        { headers: this.authHeader(token) },
-      );
+      const roleRepresentation = await this.getRoleRepresentation(role, token);
 
       await this.adminHttp.post(
         `/users/${userId}/role-mappings/realm`,
-        [roleResponse.data],
+        [roleRepresentation],
         { headers: this.authHeader(token) },
       );
+    } catch (error) {
+      throw this.toUnavailableError(error);
+    }
+  }
+
+  async removeRealmRole(
+    userId: string,
+    role: IdentityRealmRole,
+  ): Promise<void> {
+    try {
+      const token = await this.getAdminToken();
+      const roleRepresentation = await this.getRoleRepresentation(role, token);
+
+      await this.adminHttp.delete(`/users/${userId}/role-mappings/realm`, {
+        headers: this.authHeader(token),
+        data: [roleRepresentation],
+      });
+    } catch (error) {
+      throw this.toUnavailableError(error);
+    }
+  }
+
+  private async getRoleRepresentation(
+    role: IdentityRealmRole,
+    token: string,
+  ): Promise<unknown> {
+    const response = await this.adminHttp.get(
+      `/roles/${encodeURIComponent(role)}`,
+      { headers: this.authHeader(token) },
+    );
+    return response.data;
+  }
+
+  async getUser(userId: string): Promise<IdentityUser> {
+    try {
+      const token = await this.getAdminToken();
+      const { data } = await this.adminHttp.get(`/users/${userId}`, {
+        headers: this.authHeader(token),
+      });
+
+      return {
+        email: data.email,
+        name: data.firstName ?? data.username ?? data.email,
+      };
     } catch (error) {
       throw this.toUnavailableError(error);
     }
@@ -140,6 +183,13 @@ export class KeycloakAdminGateway implements IIdentityProviderGateway {
         token_type: data.token_type,
       };
     } catch (error) {
+      if (
+        isAxiosError(error) &&
+        error.response?.status === 400 &&
+        (error.response?.data as any)?.error === "invalid_grant"
+      ) {
+        throw new IdentityProviderInvalidCredentialsError();
+      }
       throw this.toUnavailableError(error);
     }
   }

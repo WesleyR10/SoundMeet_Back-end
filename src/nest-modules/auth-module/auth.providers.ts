@@ -1,7 +1,9 @@
 import { ConfigService } from "@nestjs/config";
 
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
+import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../core/auth/application/use-cases/register/register.use-case";
+import { SocialSignupUseCase } from "../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { KeycloakAdminGateway } from "../../core/auth/infra/gateways/keycloak-admin.gateway";
 import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
 import { EnvConfig } from "../config-module/config.schema";
@@ -67,6 +69,32 @@ export const AUTH_USE_CASES = {
       AudiencePrismaRepository,
       IDENTITY_PROVIDER_GATEWAY,
       VerifyEmailService,
+    ],
+  },
+  LOGIN_USE_CASE: {
+    provide: LoginUseCase,
+    useFactory: (
+      musicianRepo: MusicianPrismaRepository,
+      audienceRepo: AudiencePrismaRepository,
+      identityGateway: KeycloakAdminGateway,
+    ) => new LoginUseCase(musicianRepo, audienceRepo, identityGateway),
+    inject: [
+      MusicianPrismaRepository,
+      AudiencePrismaRepository,
+      IDENTITY_PROVIDER_GATEWAY,
+    ],
+  },
+  SOCIAL_SIGNUP_USE_CASE: {
+    provide: SocialSignupUseCase,
+    useFactory: (
+      musicianRepo: MusicianPrismaRepository,
+      audienceRepo: AudiencePrismaRepository,
+      identityGateway: KeycloakAdminGateway,
+    ) => new SocialSignupUseCase(musicianRepo, audienceRepo, identityGateway),
+    inject: [
+      MusicianPrismaRepository,
+      AudiencePrismaRepository,
+      IDENTITY_PROVIDER_GATEWAY,
     ],
   },
 };
