@@ -371,6 +371,34 @@ Qualquer falha entre os passos 2 e 4 aciona compensacao (`deleteUser` best-effor
 
 **Risco residual:** `POST /audiences` continua `@Public()` no NestJS, permitindo criar um `Audience` sem usuario Keycloak correspondente. Fora do escopo desta implementacao — considerar restringir a admin/interno numa iteracao futura.
 
+## Login por email/senha (`POST /api/v1/auth/login`)
+
+Espelha o `RegisterUseCase`, mas sem criar nada — so autentica e resolve o papel/perfil ja existente. Implementacao: `src/core/auth/application/use-cases/login/`.
+
+Fluxo do `LoginUseCase`:
+
+1. Autentica via Direct Access Grant (`grant_type=password`, client `soundmeet-mobile`) usando `KeycloakAdminGateway.authenticateWithPassword()`.
+2. Credencial invalida (Keycloak responde `400 invalid_grant`) vira `IdentityProviderInvalidCredentialsError` no gateway e `UnauthorizedError` (401) no use case.
+3. Com o token emitido, resolve `role`/`profile_id` consultando `MusicianRepository.findByEmail()`/`AudienceRepository.findByEmail()` — **nunca** decodificando o JWT no backend, pois o token so carrega o que o realm ja sabe no momento da emissao.
+4. Anomalia (Keycloak autenticou mas nao existe `Musician`/`Audience` local com esse email) tambem retorna 401 generico ao cliente, com log server-side — esse estado nao deveria ocorrer no fluxo de senha (so é possivel via o caminho de login social sem completar o cadastro).
+
+Sem validacao de complexidade de senha aqui (essa politica e de criacao de conta, nao de autenticacao).
+
+## Login social e cadastro pendente (`POST /api/v1/auth/social-signup`)
+
+Cobre o caso em que um usuario se autentica no Keycloak via provedor externo (ex.: Google, broker do realm) e recebe um JWT valido, mas **ainda nao tem role nem aggregate no SoundMeet** — o broker cria o usuario no Keycloak automaticamente, porem sem nenhuma role de realm atribuida. Implementacao: `src/core/auth/application/use-cases/social-signup/`.
+
+Diferencas-chave em relacao ao `/auth/register`:
+
+- **Nao e `@Public()`** — exige Bearer token valido (o usuario ja passou pelo login social). `userId` e as `roles` atuais vem de `@CurrentUser()` (claim do token via `CurrentUserContextGuard`), nunca do body.
+- O client so envia `{ role, cpf?, phone? }` — nome e email vem de `IIdentityProviderGateway.getUser(userId)` (Admin API), pois o Keycloak ja os importou do provedor social.
+- Se o token ja tiver `musician` ou `audience` em `roles`, o endpoint responde 409 (`ConflictError`, "ja cadastrado") confiando no claim do token — mesma fonte de verdade que o `RolesGuard` ja usa em todo o resto da API.
+- Sem emissao de verificacao de email: o provedor social ja verificou a posse do email (`trustEmail: true` no identity provider do realm).
+- **Compensacao diferente do registro por senha:** se a criacao do aggregate falhar depois do `assignRealmRole` ter tido sucesso, o rollback chama `removeRealmRole` (nunca `deleteUser`) — essa conta Keycloak nao foi criada por nos, existe por um login social real do usuario, entao so desfazemos a role que atribuimos.
+- Invariante `musician_id == sub` / `audience_id == sub` continua valendo aqui, ver [business-rules.md](../business-rules.md).
+
+O mobile trata o caso "login social sem role" numa store transiente (nunca grava em `auth.store` com roles vazias) ate o usuario escolher o papel e este endpoint responder com sucesso.
+
 ## Evolucao futura
 
 Quando o produto evoluir para B2B/enterprise, reavaliar:

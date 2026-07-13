@@ -67,6 +67,25 @@ O repertório é a **setlist digital ao vivo**. Disponível para todos os planos
 
 ---
 
+## ⚠️ Enforcement de gates: ação vs. leitura (ler antes de mexer em qualquer gate de plano)
+
+**Todo gate de plano neste projeto (`PlanCheckService.assertMusicianFeature`/`assertMusicianCanCreateRepertoire`/`assertMusicianCanAddSongToRepertoire`/etc.) é checado só NO MOMENTO DA AÇÃO que o gate protege — nunca revalidado depois, em leituras subsequentes.**
+
+Exemplo concreto (é o caso real que motivou documentar isto, jul/2026 — descoberto durante o Bloco 7 mobile):
+1. Músico está no plano PRO, ativa compartilhamento público do repertório (`repertoire_sharing`) e convida um colaborador nominal (`repertoire_nominal_invite`). Os dois gates são checados **nesse instante**, no `ShareRepertoireUseCase`/`InviteMusicianUseCase`.
+2. Semanas depois, o músico faz downgrade pra FREE (ou o pagamento falha e a assinatura expira).
+3. **O link público continua ativo e o convidado continua com acesso total** — nada os desativa automaticamente. `Repertoire.is_shared`/`share_token`/`invitees` são estado persistido no aggregate, não recalculados contra o plano atual a cada leitura. `GetSharedRepertoireUseCase.isShareTokenValid()` só olha expiração (7 dias) e a flag `is_shared`, nunca o plano do dono. `CheckRepertoireSongAccessUseCase`/`CheckSharedSongAccessUseCase` (Play Mode do convidado / cifra do link público) idem — só checam dono-ou-convidado / token-válido, nunca plano.
+
+**Isso é intencional e consistente em todo o projeto** — nenhum outro gate (banner generation, QR customizado, split de banda) revalida no momento da leitura, todos seguem o mesmo modelo "grant-at-action". Não é uma falha do Repertoire especificamente, é a arquitetura de enforcement do `PlanCheckService` como um todo.
+
+**Se algum dia isso precisar mudar** (ex.: negócio decidir que downgrade deve revogar acesso já concedido), as opções são:
+- Um job periódico que varre repertórios com `is_shared=true`/`invitees` não-vazio e revalida o plano do dono, desativando o que não for mais elegível.
+- Checar o plano do dono também nas rotas de LEITURA (`GetSharedRepertoireUseCase`, `CheckRepertoireSongAccessUseCase`, `CheckSharedSongAccessUseCase`) — mais caro (uma consulta a mais por leitura) e muda a semântica de "leitura pura" desses use-cases.
+
+Nenhuma das duas está implementada — por ora, é status quo conhecido, não bug.
+
+---
+
 ## Diferencial vs. concorrentes
 
 | App | Free | Pago | Observação |
@@ -106,6 +125,6 @@ src/core/plans/domain/plan-features.config.ts → MUSICIAN_PLAN_FEATURES
 | Progress bar de saque (UX) | Pendente | 4D.7 |
 | Billing anual | Pendente | 4D.8 |
 | Enforcement analytics (4C.1) | Pendente | 4C.1 |
-| Enforcement QR custom (4C.4) | Pendente | 4C.4 |
+| ~~Enforcement QR custom (4C.4)~~ | Concluído jul/2026 — persistência, output e gate (402) corrigidos | 4C.4 |
 | Enforcement split banda (4C.6) | Pendente | 4C.6 |
 | Enforcement saque config (4C.2) | Pendente | 4C.2 |

@@ -110,7 +110,7 @@ O arquivo de composição é [docker-compose.yml](file:///home/wesleyr10/Program
 - `rabbitmq`: `5672:5672` e management `15672:15672`
 - `keycloak`: `8080:8080`
 - `minio`: `9000:9000` e console `9001:9001`
-- `adminer`: `8081:8080`
+- `adminer`: `8083:8080`
 
 ### Healthchecks
 

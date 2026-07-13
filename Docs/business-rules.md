@@ -22,6 +22,8 @@ Marcações:
 - [x] Registro de novos usuários via `POST /api/v1/auth/register` (`src/core/auth/application/use-cases/register/register.use-case.ts`) — única porta de entrada, já que `registrationAllowed: false` no realm Keycloak.
   **Invariante crítica — NUNCA quebrar:** o ID do aggregate criado (`musician_id` ou `audience_id`) é sempre **igual ao `sub`** do usuário no Keycloak. O sistema de ownership (`MusicianOwnershipGuard`/`AudienceOwnershipGuard`, Bloco 4B) compara `currentUser.userId` (== `sub` do JWT) diretamente contra o ID do recurso na URL — se um fluxo de criação de conta usar um ID diferente do `sub`, o ownership dessa conta quebra silenciosamente (o dono nunca consegue editar o próprio recurso). Qualquer novo fluxo de criação de `Musician`/`Audience` vinculado a uma conta Keycloak deve respeitar essa invariante.
   Detalhes de arquitetura em [auth/keycloak.md](auth/keycloak.md).
+- [x] Login por email/senha via `POST /api/v1/auth/login` (`src/core/auth/application/use-cases/login/login.use-case.ts`) — resolve `role`/`profile_id` consultando os repositórios locais por email, nunca decodificando o JWT no backend.
+- [x] Login social + cadastro pendente via `POST /api/v1/auth/social-signup` (`src/core/auth/application/use-cases/social-signup/social-signup.use-case.ts`) — cobre usuário autenticado via provedor externo (Google) no Keycloak mas ainda sem role/aggregate local. **A invariante `musician_id`/`audience_id` == `sub` também vale neste caminho** — o aggregate é criado usando o `userId` do token (`@CurrentUser()`), nunca um ID novo. Compensação em caso de falha remove só a role atribuída (`removeRealmRole`), nunca deleta o usuário Keycloak (a conta não foi criada por nós).
 
 ---
 

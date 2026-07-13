@@ -62,7 +62,9 @@ A camada NestJS (controllers/DTOs/DI) vive em `src/nest-modules/[domain]-module/
 
 **Mapper Prisma:** `toModel(entity)` e `toEntity(model)`; em erro de carga, lança `LoadEntityError`. Status de domínio (string/VO) é casteado para o enum Prisma correspondente.
 
-**VOs compartilhados disponíveis:** `Uuid`, `Email`, `Phone`, `QRCode`, `Rating`, `Address`, `CNPJ`, `Money`, `PriceRange`, `OperatingHours`, `SocialLinks`.
+**VOs compartilhados disponíveis:** `Uuid`, `Email`, `Phone`, `QRCode`, `Rating`, `Address`, `CNPJ`, `CPF`, `Money`, `PriceRange`, `OperatingHours`, `SocialLinks`.
+
+**Envelope HTTP:** o `WrapperDataInterceptor` global (`src/nest-modules/shared-module/interceptors/wrapper-data/`) embrulha toda resposta em `{ data: ... }`; o wrap é pulado quando o body é falsy ou já contém a chave `meta` (listas paginadas do CollectionPresenter já saem como `{ data, meta }`). **Todo cliente HTTP (mobile/web) deve ler `data.data`** — nunca o body cru.
 
 ## Banco de dados (Prisma)
 
