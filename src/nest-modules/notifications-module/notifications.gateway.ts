@@ -9,7 +9,12 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 
 import { AuthJwtVerifier } from "../auth-module/auth-jwt.verifier";
-import { RequestStatusChangedPayload } from "./dto/notification.payloads";
+import {
+  ChatMessageNewPayload,
+  NewRequestPayload,
+  RequestStatusChangedPayload,
+  TipReceivedPayload,
+} from "./dto/notification.payloads";
 
 @Injectable()
 @WebSocketGateway({
@@ -59,5 +64,21 @@ export class NotificationsGateway
     this.server
       .to(`user:${audienceId}`)
       .emit("request.status_changed", payload);
+  }
+
+  notifyNewRequest(musicianId: string, payload: NewRequestPayload): void {
+    this.server.to(`user:${musicianId}`).emit("request.new", payload);
+  }
+
+  notifyTipReceived(musicianId: string, payload: TipReceivedPayload): void {
+    this.server.to(`user:${musicianId}`).emit("tip.received", payload);
+  }
+
+  // Reaproveita a mesma room `user:${musicianId}` já usada por
+  // request.new/tip.received — é o que permite ao mobile atualizar a lista
+  // de conversas (badge/preview) sem abrir uma segunda conexão persistente
+  // pro namespace /chat, que é screen-scoped (ver ChatGateway).
+  notifyChatMessage(musicianId: string, payload: ChatMessageNewPayload): void {
+    this.server.to(`user:${musicianId}`).emit("chat.message.new", payload);
   }
 }
