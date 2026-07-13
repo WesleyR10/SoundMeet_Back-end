@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import { IsNumber, IsOptional, Max, Min, validateSync } from "class-validator";
 
 export type GetLeaderboardInputConstructorProps = {
@@ -6,12 +7,14 @@ export type GetLeaderboardInputConstructorProps = {
 };
 
 export class GetLeaderboardInput {
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)
   @IsOptional()
   limit?: number = 10;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @IsOptional()
