@@ -1,0 +1,82 @@
+@host = http://localhost:3000
+@audioSeparationHost = http://localhost:8000
+@modelId1 = htdemucs_4stems
+@modelId2 = htdemucs_6stems
+@modelId3 = mdx23c
+@modelId4 = bs_roformer
+@modelId5 = bs_roformer_4stems
+@musicianEmail = ai-musician-{{$guid}}@example.com
+
+### create musician
+# @name createMusician
+POST {{host}}/api/v1/musicians
+Content-Type: application/json
+
+{
+  "email": "{{musicianEmail}}",
+  "name": "AI Musician Test",
+  "genres": ["rock", "pop"],
+  "instruments": ["guitar", "voice"],
+  "experience_years": 5,
+  "priceRange": {
+    "model": "per_event",
+    "min": 500,
+    "max": 1500,
+    "currency": "BRL",
+    "notes": "Cache para shows padrão"
+  }
+}
+
+### variables from createMusician response - bd4d92ba-cd4b-4513-b7ea-ac09d71923c1
+@musicianId = {{createMusician.response.body.$.data.id}}
+
+### worker models
+GET {{audioSeparationHost}}/v1/models
+
+### worker models status
+GET {{audioSeparationHost}}/v1/models/status
+
+### upload audio (backend -> storage)
+# @name uploadAudio
+POST {{host}}/api/v1/musicians/{{musicianId}}/ai-audio/uploads
+Content-Type: multipart/form-data; boundary=----soundmeet
+
+------soundmeet
+Content-Disposition: form-data; name="file"; filename="audio.wav"
+Content-Type: audio/wav
+
+< /tmp/soundmeet-e2e-sine.wav
+------soundmeet--
+
+### variables from uploadAudio response
+@aiAudioUploadId = {{uploadAudio.response.body.$.data.id}}
+@objectKey = {{uploadAudio.response.body.$.data.object_key}}
+
+### request separation (backend -> worker)
+# @name requestSeparation
+POST {{host}}/api/v1/ai-audio/uploads/{{aiAudioUploadId}}/separations
+Content-Type: application/json
+
+{
+  "model_id": "{{modelId3}}",
+  "output_format": "wav"
+}
+
+### variables from requestSeparation response
+@jobId = {{requestSeparation.response.body.$.data.id}}
+
+### get separation status
+GET {{host}}/api/v1/ai-audio/separations/{{jobId}}
+
+### direct call: worker /v1/separate (debug)
+POST {{audioSeparationHost}}/v1/separate
+Content-Type: application/json
+
+{
+  "job_id": "{{jobId}}",
+  "model_id": "{{modelId3}}",
+  "input_object_key": "{{objectKey}}",
+  "output_prefix": "ai-audio/{{musicianId}}/{{aiAudioUploadId}}/debug/{{jobId}}/{{modelId3}}",
+  "output_format": "wav",
+  "use_tta": false
+}
