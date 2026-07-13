@@ -40,6 +40,8 @@ export interface MusicianPlanFeatures {
   repertoire_sharing: boolean;
   /** convite nominal de músico para acessar repertório; true = PRO only */
   repertoire_nominal_invite: boolean;
+  /** filtro de ruído do afinador cromático; true = ESSENCIAL + PRO */
+  tuner_noise_filter: boolean;
 }
 
 export interface EstablishmentPlanFeatures {
@@ -78,6 +80,7 @@ export const MUSICIAN_PLAN_FEATURES: Record<
     white_label: false,
     repertoire_sharing: false,
     repertoire_nominal_invite: false,
+    tuner_noise_filter: false,
   },
   [MusicianPlanTier.ESSENTIAL]: {
     tip_fee_percentage: 7,
@@ -95,6 +98,7 @@ export const MUSICIAN_PLAN_FEATURES: Record<
     white_label: false,
     repertoire_sharing: true,
     repertoire_nominal_invite: false,
+    tuner_noise_filter: true,
   },
   [MusicianPlanTier.PRO]: {
     tip_fee_percentage: 5,
@@ -112,6 +116,7 @@ export const MUSICIAN_PLAN_FEATURES: Record<
     white_label: false,
     repertoire_sharing: true,
     repertoire_nominal_invite: true,
+    tuner_noise_filter: true,
   },
 };
 

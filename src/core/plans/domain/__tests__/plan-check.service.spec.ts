@@ -211,6 +211,31 @@ describe("PlanCheckService", () => {
         service.assertMusicianFeature(MUSICIAN_ID, "auto_split_management"),
       ).resolves.not.toThrow();
     });
+
+    it("FREE → filtro de ruído do afinador bloqueado", async () => {
+      const service = new PlanCheckService(makeRepo());
+      await expect(
+        service.assertMusicianFeature(MUSICIAN_ID, "tuner_noise_filter"),
+      ).rejects.toThrow(PlanLimitExceededError);
+    });
+
+    it("ESSENTIAL → filtro de ruído do afinador liberado", async () => {
+      const repo = makeRepo();
+      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      const service = new PlanCheckService(repo);
+      await expect(
+        service.assertMusicianFeature(MUSICIAN_ID, "tuner_noise_filter"),
+      ).resolves.not.toThrow();
+    });
+
+    it("PRO → filtro de ruído do afinador liberado", async () => {
+      const repo = makeRepo();
+      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.PRO));
+      const service = new PlanCheckService(repo);
+      await expect(
+        service.assertMusicianFeature(MUSICIAN_ID, "tuner_noise_filter"),
+      ).resolves.not.toThrow();
+    });
   });
 
   // ----------------------------------------------------------------

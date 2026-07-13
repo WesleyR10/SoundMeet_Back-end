@@ -5,6 +5,7 @@ import request from "supertest";
 import { DomainError } from "../../../core/shared/domain/errors/domain.error";
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
 import { InvalidUuidError } from "../../../core/shared/domain/value-objects/uuid.vo";
+import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import { GlobalExceptionFilter } from "./global-exception.filter";
 
 @Controller("stub-global-exception-filter")
@@ -17,6 +18,11 @@ class StubController {
   @Get("invalid-uuid")
   invalidUuid() {
     throw new InvalidUuidError();
+  }
+
+  @Get("plan-limit")
+  planLimit() {
+    throw new PlanLimitExceededError("Recurso disponível apenas no plano PRO");
   }
 
   @Get("unexpected")
@@ -56,6 +62,17 @@ describe("GlobalExceptionFilter Unit Tests", () => {
         statusCode: 422,
         error: "Unprocessable Entity",
         message: ["ID must be a valida UUID"],
+      });
+  });
+
+  it("should map PlanLimitExceededError to 402", () => {
+    return request(app.getHttpServer())
+      .get("/stub-global-exception-filter/plan-limit")
+      .expect(402)
+      .expect({
+        statusCode: 402,
+        error: "Payment Required",
+        message: ["Recurso disponível apenas no plano PRO"],
       });
   });
 

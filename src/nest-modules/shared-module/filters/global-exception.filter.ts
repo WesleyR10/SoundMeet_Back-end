@@ -12,6 +12,8 @@ import { ExternalServiceError } from "../../../core/shared/domain/errors/externa
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
 import { InvalidOperationError } from "../../../core/shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../core/shared/domain/errors/not-found.error";
+import { UnauthorizedError } from "../../../core/shared/domain/errors/unauthorized.error";
+import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import {
   BaseValidationError,
   EntityValidationError,
@@ -76,6 +78,8 @@ function getErrorText(statusCode: number): string {
       return "Bad Request";
     case 401:
       return "Unauthorized";
+    case 402:
+      return "Payment Required";
     case 403:
       return "Forbidden";
     case 404:
@@ -149,6 +153,24 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       response.status(404).json({
         statusCode: 404,
         error: getErrorText(404),
+        message: [exception.message],
+      });
+      return;
+    }
+
+    if (exception instanceof UnauthorizedError) {
+      response.status(401).json({
+        statusCode: 401,
+        error: getErrorText(401),
+        message: [exception.message],
+      });
+      return;
+    }
+
+    if (exception instanceof PlanLimitExceededError) {
+      response.status(402).json({
+        statusCode: 402,
+        error: getErrorText(402),
         message: [exception.message],
       });
       return;

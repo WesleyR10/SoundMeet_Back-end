@@ -1,6 +1,7 @@
-export class PlanLimitExceededError extends Error {
+import { DomainError } from "../../../shared/domain/errors/domain.error";
+
+export class PlanLimitExceededError extends DomainError {
   constructor(message: string) {
     super(message);
-    this.name = "PlanLimitExceededError";
   }
 }

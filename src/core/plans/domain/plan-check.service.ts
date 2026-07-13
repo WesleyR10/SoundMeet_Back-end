@@ -71,7 +71,22 @@ export class PlanCheckService {
     };
   }
 
-  /** Verifica se uma feature booleana está disponível no plano do músico. */
+  /**
+   * Verifica se uma feature booleana está disponível no plano do músico.
+   *
+   * ⚠️ Enforcement é só NO MOMENTO DA AÇÃO (ex.: ShareRepertoireUseCase,
+   * InviteMusicianUseCase chamam isto uma vez, ao compartilhar/convidar) —
+   * nunca revalidado depois, em leituras subsequentes. Se o músico fizer
+   * downgrade de PRO pra FREE depois de compartilhar um repertório ou
+   * convidar alguém, o acesso já concedido (link público ativo, convidado
+   * na lista) continua valendo indefinidamente até alguém desativar/revogar
+   * manualmente — não existe um job ou checagem em GET que re-audita
+   * gates antigos. Isto é intencional e consistente em todo o projeto (todo
+   * gate de plano segue esse padrão, não é peculiaridade do Repertoire),
+   * mas é fácil esquecer ao debugar "por que esse usuário FREE ainda tem
+   * acesso a X". Ver Docs/plans/musician-plans.md, seção "Enforcement de
+   * gates: ação vs. leitura".
+   */
   async assertMusicianFeature(
     musician_id: string,
     feature: keyof Pick<
@@ -84,6 +99,7 @@ export class PlanCheckService {
       | "white_label"
       | "repertoire_sharing"
       | "repertoire_nominal_invite"
+      | "tuner_noise_filter"
     >,
   ): Promise<void> {
     const features = await this.getMusicianFeatures(musician_id);
