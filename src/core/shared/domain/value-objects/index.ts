@@ -22,6 +22,9 @@ export * from "./address.vo";
 // CNPJ Value Object
 export * from "./cnpj.vo";
 
+// CPF Value Object
+export * from "./cpf.vo";
+
 // Level Value Object
 export * from "./level.vo";
 
