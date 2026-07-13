@@ -1,4 +1,5 @@
 import { IMusicianWalletRepository, MusicianWallet } from "@core/payment";
+import { PlanCheckService } from "@core/plans/domain/plan-check.service";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -13,13 +14,19 @@ export type UpdateMusicianPixKeyInput = {
   pix_key_type: string;
 };
 
-export type UpdateMusicianPixKeyOutput = MusicianWalletOutput;
+export type UpdateMusicianPixKeyOutput = MusicianWalletOutput & {
+  min_withdrawal_amount_brl: number;
+  withdrawal_days: number;
+};
 
 export class UpdateMusicianPixKeyUseCase implements IUseCase<
   UpdateMusicianPixKeyInput,
   UpdateMusicianPixKeyOutput
 > {
-  constructor(private readonly walletRepository: IMusicianWalletRepository) {}
+  constructor(
+    private readonly walletRepository: IMusicianWalletRepository,
+    private readonly planCheckService?: PlanCheckService,
+  ) {}
 
   async execute(
     input: UpdateMusicianPixKeyInput,
@@ -41,6 +48,14 @@ export class UpdateMusicianPixKeyUseCase implements IUseCase<
     }
     await this.walletRepository.update(wallet);
 
-    return MusicianWalletOutputMapper.toOutput(wallet);
+    const withdrawalConfig = this.planCheckService
+      ? await this.planCheckService.getMusicianWithdrawalConfig(input.musician_id)
+      : { min_amount_brl: 110, days: 5 };
+
+    return {
+      ...MusicianWalletOutputMapper.toOutput(wallet),
+      min_withdrawal_amount_brl: withdrawalConfig.min_amount_brl,
+      withdrawal_days: withdrawalConfig.days,
+    };
   }
 }

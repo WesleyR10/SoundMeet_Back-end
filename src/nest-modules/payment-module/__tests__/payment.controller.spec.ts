@@ -89,6 +89,8 @@ describe("PaymentController", () => {
       pix_key: "pix@example.com",
       bank_account: null,
       is_active: true,
+      min_withdrawal_amount_brl: 110,
+      withdrawal_days: 5,
       created_at: now,
       updated_at: now,
     };

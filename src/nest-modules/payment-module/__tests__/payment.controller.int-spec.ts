@@ -2,12 +2,14 @@ import { Test, TestingModule } from "@nestjs/testing";
 
 import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memory/band-in-memory.repository";
 import { ConfirmTipPaymentUseCase } from "../../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
+import { GetMusicianTipsUseCase } from "../../../core/payment/application/use-cases/get-musician-tips/get-musician-tips.use-case";
 import { GetMusicianWalletUseCase } from "../../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../../core/payment/application/use-cases/send-tip/send-tip.use-case";
 import {
   PlanCheckService,
   SubscriptionInMemoryRepository,
 } from "../../../core/plans";
+import { UpdateMusicianPixKeyUseCase } from "../../../core/payment/application/use-cases/update-musician-pix-key/update-musician-pix-key.use-case";
 import { WithdrawToPixUseCase } from "../../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import { MusicianWallet } from "../../../core/payment/domain/musician-wallet.aggregate";
 import { Tip } from "../../../core/payment/domain/tip.aggregate";
@@ -26,6 +28,7 @@ import {
   ConfirmTipPaymentPresenter,
   MusicianWalletPresenter,
   SendTipPresenter,
+  TipsListPresenter,
   WithdrawToPixPresenter,
 } from "../payment.presenter";
 
@@ -86,6 +89,14 @@ describe("PaymentController Integration Tests", () => {
         {
           provide: WithdrawToPixUseCase,
           useValue: new WithdrawToPixUseCase(walletRepo, txRepo),
+        },
+        {
+          provide: UpdateMusicianPixKeyUseCase,
+          useValue: new UpdateMusicianPixKeyUseCase(walletRepo),
+        },
+        {
+          provide: GetMusicianTipsUseCase,
+          useValue: new GetMusicianTipsUseCase(tipRepo),
         },
       ],
     })
@@ -228,6 +239,112 @@ describe("PaymentController Integration Tests", () => {
 
       await expect(
         controller.getMusicianWallet(unknownMusicianId),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("getMusicianTips", () => {
+    it("should list tips for the musician, paginated", async () => {
+      await tipRepo.insert(
+        Tip.create({
+          audience_id: AUDIENCE_ID,
+          musician_id: MUSICIAN_ID,
+          amount: 10,
+          payment_method: PaymentMethod.PIX,
+        }),
+      );
+      await tipRepo.insert(
+        Tip.create({
+          audience_id: AUDIENCE_ID,
+          musician_id: MUSICIAN_ID,
+          amount: 20,
+          payment_method: PaymentMethod.PIX,
+        }),
+      );
+      await tipRepo.insert(
+        Tip.create({
+          audience_id: AUDIENCE_ID,
+          musician_id: "33333333-3333-4333-8333-333333333333",
+          amount: 99,
+          payment_method: PaymentMethod.PIX,
+        }),
+      );
+
+      const result = await controller.getMusicianTips(MUSICIAN_ID, {
+        page: 1,
+        per_page: 15,
+      } as any);
+
+      expect(result).toBeInstanceOf(TipsListPresenter);
+      expect(result.total).toBe(2);
+      expect(result.items).toHaveLength(2);
+      expect(result.items.every((tip) => tip.status === TipStatus.PENDING)).toBe(
+        true,
+      );
+    });
+
+    it("should filter tips by status", async () => {
+      const tip = Tip.create({
+        audience_id: AUDIENCE_ID,
+        musician_id: MUSICIAN_ID,
+        amount: 15,
+        payment_method: PaymentMethod.PIX,
+      });
+      tip.complete("tx-123");
+      await tipRepo.insert(tip);
+      await tipRepo.insert(
+        Tip.create({
+          audience_id: AUDIENCE_ID,
+          musician_id: MUSICIAN_ID,
+          amount: 5,
+          payment_method: PaymentMethod.PIX,
+        }),
+      );
+
+      const result = await controller.getMusicianTips(MUSICIAN_ID, {
+        page: 1,
+        per_page: 15,
+        status: TipStatus.COMPLETED,
+      } as any);
+
+      expect(result.total).toBe(1);
+      expect(result.items[0].status).toBe(TipStatus.COMPLETED);
+    });
+  });
+
+  describe("updatePixKey", () => {
+    it("should create the wallet lazily and set the pix key when none exists", async () => {
+      const result = await controller.updatePixKey(MUSICIAN_ID, {
+        pix_key: "52998224725",
+        pix_key_type: "cpf",
+      } as any);
+
+      expect(result).toBeInstanceOf(MusicianWalletPresenter);
+      expect(result.musician_id).toBe(MUSICIAN_ID);
+      expect(result.pix_key).toBe("52998224725");
+
+      const wallet = await walletRepo.findByMusicianId(MUSICIAN_ID);
+      expect(wallet?.pix_key?.key).toBe("52998224725");
+    });
+
+    it("should update the pix key of an existing wallet", async () => {
+      const wallet = MusicianWallet.create({ musician_id: MUSICIAN_ID });
+      await walletRepo.insert(wallet);
+
+      const result = await controller.updatePixKey(MUSICIAN_ID, {
+        pix_key: "musico@pix.com",
+        pix_key_type: "email",
+      } as any);
+
+      expect(result.pix_key).toBe("musico@pix.com");
+    });
+
+    it("should reject an invalid pix key for the given type", async () => {
+      await expect(
+        controller.updatePixKey(MUSICIAN_ID, {
+          pix_key: "not-a-cpf",
+          pix_key_type: "cpf",
+        } as any),
       ).rejects.toThrow();
     });
   });

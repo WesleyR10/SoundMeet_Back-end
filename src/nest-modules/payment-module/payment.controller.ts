@@ -5,7 +5,9 @@ import {
   Inject,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -17,8 +19,10 @@ import {
 } from "@nestjs/swagger";
 
 import { ConfirmTipPaymentUseCase } from "../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
+import { GetMusicianTipsUseCase } from "../../core/payment/application/use-cases/get-musician-tips/get-musician-tips.use-case";
 import { GetMusicianWalletUseCase } from "../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../core/payment/application/use-cases/send-tip/send-tip.use-case";
+import { UpdateMusicianPixKeyUseCase } from "../../core/payment/application/use-cases/update-musician-pix-key/update-musician-pix-key.use-case";
 import { WithdrawToPixUseCase } from "../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import {
   AuthGuard,
@@ -30,12 +34,15 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { ConfirmTipPaymentDto } from "./dto/confirm-tip-payment.dto";
+import { ListMusicianTipsDto } from "./dto/list-musician-tips.dto";
 import { SendTipDto } from "./dto/send-tip.dto";
+import { UpdatePixKeyDto } from "./dto/update-pix-key.dto";
 import { WithdrawToPixDto } from "./dto/withdraw-to-pix.dto";
 import {
   ConfirmTipPaymentPresenter,
   MusicianWalletPresenter,
   SendTipPresenter,
+  TipsListPresenter,
   WithdrawToPixPresenter,
 } from "./payment.presenter";
 
@@ -53,8 +60,14 @@ export class PaymentController {
   @Inject(GetMusicianWalletUseCase)
   private getMusicianWalletUseCase: GetMusicianWalletUseCase;
 
+  @Inject(GetMusicianTipsUseCase)
+  private getMusicianTipsUseCase: GetMusicianTipsUseCase;
+
   @Inject(WithdrawToPixUseCase)
   private withdrawToPixUseCase: WithdrawToPixUseCase;
+
+  @Inject(UpdateMusicianPixKeyUseCase)
+  private updatePixKeyUseCase: UpdateMusicianPixKeyUseCase;
 
   @Post("tips")
   @Roles("audience", "admin")
@@ -115,6 +128,54 @@ export class PaymentController {
   ) {
     const output = await this.getMusicianWalletUseCase.execute({
       musician_id: id,
+    });
+    return new MusicianWalletPresenter(output);
+  }
+
+  @Get("musicians/:id/wallet/tips")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Listar gorjetas recebidas pelo músico",
+    description:
+      "Lista as gorjetas recebidas pelo músico com paginação e filtro opcional por status. Músico só pode consultar as próprias gorjetas.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: TipsListPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  async getMusicianTips(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Query() query: ListMusicianTipsDto,
+  ) {
+    const output = await this.getMusicianTipsUseCase.execute({
+      musician_id: id,
+      page: query.page,
+      per_page: query.per_page,
+      sort: query.sort,
+      sort_dir: query.sort_dir,
+      filter: { status: query.status },
+    });
+    return new TipsListPresenter(output);
+  }
+
+  @Patch("musicians/:id/wallet/pix-key")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Atualizar chave PIX do músico",
+    description:
+      "Define ou atualiza a chave PIX de recebimento de gorjetas do músico. Cria a carteira automaticamente se ainda não existir.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianWalletPresenter })
+  async updatePixKey(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: UpdatePixKeyDto,
+  ) {
+    const output = await this.updatePixKeyUseCase.execute({
+      musician_id: id,
+      pix_key: dto.pix_key,
+      pix_key_type: dto.pix_key_type,
     });
     return new MusicianWalletPresenter(output);
   }

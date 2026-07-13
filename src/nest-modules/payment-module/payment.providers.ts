@@ -2,9 +2,11 @@ import { ConfigService } from "@nestjs/config";
 
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { ConfirmTipPaymentUseCase } from "../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
+import { GetMusicianTipsUseCase } from "../../core/payment/application/use-cases/get-musician-tips/get-musician-tips.use-case";
 import { GetMusicianWalletUseCase } from "../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../core/payment/application/use-cases/send-tip/send-tip.use-case";
 import { PlanCheckService } from "../../core/plans";
+import { UpdateMusicianPixKeyUseCase } from "../../core/payment/application/use-cases/update-musician-pix-key/update-musician-pix-key.use-case";
 import { WithdrawToPixUseCase } from "../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import {
   IMusicianWalletRepository,
@@ -118,10 +120,30 @@ export const USE_CASES = {
   },
   GET_MUSICIAN_WALLET_USE_CASE: {
     provide: GetMusicianWalletUseCase,
-    useFactory: (walletRepo: IMusicianWalletRepository) => {
-      return new GetMusicianWalletUseCase(walletRepo);
+    useFactory: (
+      walletRepo: IMusicianWalletRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new GetMusicianWalletUseCase(walletRepo, planCheckService);
     },
-    inject: [REPOSITORIES.MUSICIAN_WALLET_REPOSITORY.provide],
+    inject: [REPOSITORIES.MUSICIAN_WALLET_REPOSITORY.provide, PlanCheckService],
+  },
+  GET_MUSICIAN_TIPS_USE_CASE: {
+    provide: GetMusicianTipsUseCase,
+    useFactory: (tipRepo: ITipRepository) => {
+      return new GetMusicianTipsUseCase(tipRepo);
+    },
+    inject: [REPOSITORIES.TIP_REPOSITORY.provide],
+  },
+  UPDATE_MUSICIAN_PIX_KEY_USE_CASE: {
+    provide: UpdateMusicianPixKeyUseCase,
+    useFactory: (
+      walletRepo: IMusicianWalletRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new UpdateMusicianPixKeyUseCase(walletRepo, planCheckService);
+    },
+    inject: [REPOSITORIES.MUSICIAN_WALLET_REPOSITORY.provide, PlanCheckService],
   },
   WITHDRAW_TO_PIX_USE_CASE: {
     provide: WithdrawToPixUseCase,

@@ -2,6 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { ConfirmTipPaymentUseCase } from "../../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
+import { GetMusicianTipsUseCase } from "../../../core/payment/application/use-cases/get-musician-tips/get-musician-tips.use-case";
 import { GetMusicianWalletUseCase } from "../../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../../core/payment/application/use-cases/send-tip/send-tip.use-case";
 import { WithdrawToPixUseCase } from "../../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
@@ -59,6 +60,9 @@ describe("Payment providers", () => {
     );
     expect(module.get(WithdrawToPixUseCase)).toBeInstanceOf(
       WithdrawToPixUseCase,
+    );
+    expect(module.get(GetMusicianTipsUseCase)).toBeInstanceOf(
+      GetMusicianTipsUseCase,
     );
 
     const confirmTipPayment = module.get<ConfirmTipPaymentUseCase>(
