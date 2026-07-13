@@ -67,4 +67,65 @@ describe("CustomizeQRCodeUseCase — gate 4C.4", () => {
       }),
     ).rejects.toThrow(PlanLimitExceededError);
   });
+
+  it("(d) customizar só o label depois de já ter cor/logo preserva ambos (merge, não substituição)", async () => {
+    const { useCase, musician } = await setup(MusicianPlanTier.PRO);
+
+    await useCase.execute({
+      musician_id: musician.musician_id.id,
+      customization: {
+        foreground_color: "#1a1a2e",
+        logo_url: "https://cdn.example.com/logo.png",
+      },
+    });
+
+    const output = await useCase.execute({
+      musician_id: musician.musician_id.id,
+      customization: { label: "Peça uma música!" },
+    });
+
+    expect(output.qr_customization).toEqual({
+      foreground_color: "#1a1a2e",
+      logo_url: "https://cdn.example.com/logo.png",
+      label: "Peça uma música!",
+    });
+  });
+
+  it("(e) customization: null remove só aquela chave, preservando as demais (reset ao padrão)", async () => {
+    const { useCase, musician } = await setup(MusicianPlanTier.PRO);
+
+    await useCase.execute({
+      musician_id: musician.musician_id.id,
+      customization: {
+        foreground_color: "#1a1a2e",
+        background_color: "#ffffff",
+        logo_url: "https://cdn.example.com/logo.png",
+        label: "Peça uma música!",
+      },
+    });
+
+    const output = await useCase.execute({
+      musician_id: musician.musician_id.id,
+      customization: { foreground_color: null, logo_url: null },
+    });
+
+    expect(output.qr_customization).toEqual({
+      background_color: "#ffffff",
+      label: "Peça uma música!",
+    });
+  });
+
+  it("(f) rejeita cores de contraste insuficiente (QR ficaria ilegível)", async () => {
+    const { useCase, musician } = await setup(MusicianPlanTier.PRO);
+
+    await expect(
+      useCase.execute({
+        musician_id: musician.musician_id.id,
+        customization: {
+          foreground_color: "#1a1a2e",
+          background_color: "#1a1a2e",
+        },
+      }),
+    ).rejects.toThrow(/contraste insuficiente/);
+  });
 });

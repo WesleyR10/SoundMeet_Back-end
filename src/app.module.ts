@@ -19,6 +19,7 @@ import { EstablishmentsModule } from "./nest-modules/establishments-module/estab
 import { EventModule } from "./nest-modules/events-module/events.module";
 import { GamificationModule } from "./nest-modules/gamification-module/gamification.module";
 import { MusicLibraryModule } from "./nest-modules/music-library-module/music-library.module";
+import { MusicianAnalyticsModule } from "./nest-modules/musician-analytics-module/musician-analytics.module";
 import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
 import { PaymentModule } from "./nest-modules/payment-module/payment.module";
 import { RabbitmqModule } from "./nest-modules/rabbitmq-module/rabbitmq.module";
@@ -71,6 +72,7 @@ const shouldRegisterRabbitmqHandlers =
     GamificationModule,
     MusicLibraryModule,
     PaymentModule,
+    MusicianAnalyticsModule,
     CampaignModule,
     RepertoireModule,
     AiAudioModule,

@@ -1,9 +1,12 @@
 import {
   AggregateRoot,
+  CPF,
   Email,
+  InvalidCPFError,
   Phone,
   QRCode,
   QRCustomization,
+  QRCustomizationPatch,
   Rating,
   Uuid,
 } from "../../shared/domain";
@@ -24,15 +27,19 @@ export type MusicianConstructorProps = {
   bio?: string | null;
   avatar?: string | null;
   phone?: string | null;
+  cpf?: string | null;
   genres: string[];
   instruments: string[];
   experience_years?: number;
   qr_code?: string | null;
+  qr_customization?: QRCustomization;
   rating?: number;
   total_ratings?: number;
   is_active?: boolean;
   is_verified?: boolean;
   profile?: MusicianProfile | null;
+  push_token?: string | null;
+  push_token_platform?: string | null;
   created_at?: Date;
   updated_at?: Date;
 };
@@ -45,6 +52,7 @@ export type MusicianCreateCommand = {
   bio?: string | null;
   avatar?: string | null;
   phone?: string | null;
+  cpf?: string | null;
   genres: string[];
   instruments: string[];
   experience_years?: number;
@@ -62,6 +70,7 @@ export class Musician extends AggregateRoot {
   bio: string | null;
   avatar: string | null;
   phone: Phone | null;
+  cpf: CPF | null;
   genres: string[];
   instruments: string[];
   experience_years: number;
@@ -71,6 +80,8 @@ export class Musician extends AggregateRoot {
   is_active: boolean;
   is_verified: boolean;
   profile: MusicianProfile | null;
+  push_token: string | null;
+  push_token_platform: string | null;
   created_at: Date;
   updated_at: Date;
 
@@ -91,6 +102,22 @@ export class Musician extends AggregateRoot {
       this.phone = phone;
       errorPhone && this.notification.setError(errorPhone.message, "phone");
     }
+    if (props.cpf) {
+      try {
+        this.cpf = new CPF(props.cpf);
+      } catch (error) {
+        const message =
+          error instanceof InvalidCPFError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Invalid cpf";
+        this.notification.addError(message, "cpf");
+        this.cpf = null;
+      }
+    } else {
+      this.cpf = null;
+    }
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years ?? 0;
@@ -98,6 +125,7 @@ export class Musician extends AggregateRoot {
       ? new QRCode({
           code: props.qr_code,
           url: `https://soundmeet.app/musician/${this.musician_id.id}`,
+          customization: props.qr_customization,
         })
       : null;
     this.rating = new Rating(props.rating ?? 0);
@@ -105,6 +133,8 @@ export class Musician extends AggregateRoot {
     this.is_active = props.is_active ?? true;
     this.is_verified = props.is_verified ?? false;
     this.profile = props.profile ?? null;
+    this.push_token = props.push_token ?? null;
+    this.push_token_platform = props.push_token_platform ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
@@ -157,6 +187,13 @@ export class Musician extends AggregateRoot {
     this.avatar = avatar;
   }
 
+  // Bookkeeping de device, não evento de negócio — não dispara domain event.
+  // Último dispositivo registrado sobrescreve o anterior (sem histórico multi-device).
+  registerPushToken(token: string, platform: string): void {
+    this.push_token = token;
+    this.push_token_platform = platform;
+  }
+
   changeEmail(email: string): void {
     const emailOrError = Email.create(email);
     this.email = emailOrError.ok;
@@ -182,6 +219,25 @@ export class Musician extends AggregateRoot {
       const [newPhone, errorPhone] = Phone.create(phone).asArray();
       this.phone = newPhone;
       errorPhone && this.notification.setError(errorPhone.message, "phone");
+    }
+  }
+
+  changeCpf(cpf: string | null): void {
+    if (!cpf) {
+      this.cpf = null;
+      return;
+    }
+    try {
+      this.cpf = new CPF(cpf);
+    } catch (error) {
+      const message =
+        error instanceof InvalidCPFError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Invalid cpf";
+      this.notification.addError(message, "cpf");
+      this.cpf = null;
     }
   }
 
@@ -238,15 +294,29 @@ export class Musician extends AggregateRoot {
     });
   }
 
-  customizeQRCode(customization: QRCustomization): void {
+  customizeQRCode(patch: QRCustomizationPatch): void {
     if (!this.qr_code) {
       this.generateQRCode();
     }
+    const current = this.qr_code!.customization ?? {};
+    const merged: QRCustomization = { ...current };
+    // Merge por chave (JSON merge patch) — customizar só a cor não pode apagar
+    // um logo/label já salvo anteriormente (valor ausente = mantém). `null`
+    // explícito remove a chave, permitindo reverter um campo ao padrão sem
+    // afetar os demais (ver QRCustomizationPatch).
+    (Object.keys(patch) as (keyof QRCustomizationPatch)[]).forEach((key) => {
+      const value = patch[key];
+      if (value === null) {
+        delete merged[key];
+      } else if (value !== undefined) {
+        merged[key] = value;
+      }
+    });
     this.qr_code = new QRCode({
       code: this.qr_code!.code,
       url: this.qr_code!.url,
       expiresAt: this.qr_code!.expiresAt,
-      customization,
+      customization: merged,
     });
   }
 
@@ -303,7 +373,8 @@ export class Musician extends AggregateRoot {
           (field) =>
             !(
               (field === "email" && this.notification.errors.has("email")) ||
-              (field === "phone" && this.notification.errors.has("phone"))
+              (field === "phone" && this.notification.errors.has("phone")) ||
+              (field === "cpf" && this.notification.errors.has("cpf"))
             ),
         )
       : fields;
@@ -323,10 +394,12 @@ export class Musician extends AggregateRoot {
       bio: this.bio,
       avatar: this.avatar,
       phone: this.phone?.value || null,
+      cpf: this.cpf?.value || null,
       genres: this.genres,
       instruments: this.instruments,
       experience_years: this.experience_years,
       qr_code: this.qr_code?.code || null,
+      qr_customization: this.qr_code?.customization ?? null,
       rating: this.rating.value,
       total_ratings: this.total_ratings,
       is_active: this.is_active,

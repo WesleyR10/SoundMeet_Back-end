@@ -98,4 +98,6 @@ export interface IMusicianRepository extends ISearchableRepository<
   MusicianSearchResult
 > {
   findByEmail(email: string): Promise<Musician | null>;
+  findByCpf(cpf: string): Promise<Musician | null>;
+  findByPhone(phone: string): Promise<Musician | null>;
 }

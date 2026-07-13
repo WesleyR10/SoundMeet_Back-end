@@ -3,6 +3,13 @@ import {
   InvalidUuidError,
   Uuid,
 } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
+import { MusicianPlanTier } from "../../../../../plans/domain/plan-tier.enum";
+import {
+  Subscription,
+  SubscriptionStatus,
+} from "../../../../../plans/domain/subscription.aggregate";
+import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { GetMusicianInput } from "../get-musician.input";
@@ -11,10 +18,14 @@ import { GetMusicianUseCase } from "../get-musician.use-case";
 describe("GetMusicianUseCase Unit Tests", () => {
   let useCase: GetMusicianUseCase;
   let repository: MusicianInMemoryRepository;
+  let subscriptionRepo: SubscriptionInMemoryRepository;
+  let planCheckService: PlanCheckService;
 
   beforeEach(() => {
     repository = new MusicianInMemoryRepository();
-    useCase = new GetMusicianUseCase(repository);
+    subscriptionRepo = new SubscriptionInMemoryRepository();
+    planCheckService = new PlanCheckService(subscriptionRepo);
+    useCase = new GetMusicianUseCase(repository, planCheckService);
   });
 
   it("should throw error when entity not found", async () => {
@@ -67,11 +78,13 @@ describe("GetMusicianUseCase Unit Tests", () => {
       is_verified: musician.is_verified,
       profile: musician.profile?.toJSON() ?? null,
       qr_code: musician.qr_code!.code,
+      qr_customization: musician.qr_code!.customization ?? null,
       created_at: musician.created_at,
       updated_at: musician.updated_at,
       display_name: musician.displayName,
       is_experienced: musician.isExperienced,
       is_highly_rated: musician.isHighlyRated,
+      plan_tier: MusicianPlanTier.FREE,
     });
   });
 
@@ -149,5 +162,50 @@ describe("GetMusicianUseCase Unit Tests", () => {
     expect(output.is_verified).toBe(true);
     expect(output.qr_code).toBeDefined();
     expect(output.created_at).toBeInstanceOf(Date);
+  });
+
+  describe("plan_tier", () => {
+    it("returns FREE when there is no active subscription", async () => {
+      const musician = Musician.fake().aMusician().build();
+      repository.items = [musician];
+
+      const output = await useCase.execute({ id: musician.musician_id.id });
+
+      expect(output.plan_tier).toBe(MusicianPlanTier.FREE);
+    });
+
+    it("returns the active subscription tier (PRO)", async () => {
+      const musician = Musician.fake().aMusician().build();
+      repository.items = [musician];
+      await subscriptionRepo.insert(
+        new Subscription({
+          musician_id: musician.musician_id.id,
+          plan_tier: MusicianPlanTier.PRO,
+          persona: "musician",
+          status: SubscriptionStatus.ACTIVE,
+        }),
+      );
+
+      const output = await useCase.execute({ id: musician.musician_id.id });
+
+      expect(output.plan_tier).toBe(MusicianPlanTier.PRO);
+    });
+
+    it("returns the active subscription tier (ESSENTIAL)", async () => {
+      const musician = Musician.fake().aMusician().build();
+      repository.items = [musician];
+      await subscriptionRepo.insert(
+        new Subscription({
+          musician_id: musician.musician_id.id,
+          plan_tier: MusicianPlanTier.ESSENTIAL,
+          persona: "musician",
+          status: SubscriptionStatus.ACTIVE,
+        }),
+      );
+
+      const output = await useCase.execute({ id: musician.musician_id.id });
+
+      expect(output.plan_tier).toBe(MusicianPlanTier.ESSENTIAL);
+    });
   });
 });

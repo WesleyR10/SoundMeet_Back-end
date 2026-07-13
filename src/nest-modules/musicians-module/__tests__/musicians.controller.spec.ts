@@ -28,6 +28,7 @@ function makeMusicianOutput(
     instruments: ["Guitar"],
     experience_years: 0,
     qr_code: "qr-code-value",
+    qr_customization: null,
     rating: 0,
     total_ratings: 0,
     is_active: true,

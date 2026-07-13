@@ -20,6 +20,14 @@ export class MusicianInMemoryRepository
     );
   }
 
+  async findByCpf(cpf: string): Promise<Musician | null> {
+    return this.items.find((m) => m.cpf?.value === cpf) ?? null;
+  }
+
+  async findByPhone(phone: string): Promise<Musician | null> {
+    return this.items.find((m) => m.phone?.value === phone) ?? null;
+  }
+
   async search(props: MusicianSearchParams): Promise<MusicianSearchResult> {
     const result = await super.search(props);
     return new MusicianSearchResult({

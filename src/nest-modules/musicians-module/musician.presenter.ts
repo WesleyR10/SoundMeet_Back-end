@@ -13,6 +13,7 @@ export class MusicianPresenter {
   avatar: string | null;
   phone: string | null;
   qr_code: string | null;
+  qr_customization: MusicianOutput["qr_customization"];
   rating: number;
   total_ratings: number;
   is_active: boolean;
@@ -24,6 +25,7 @@ export class MusicianPresenter {
   display_name: string;
   is_experienced: boolean;
   is_highly_rated: boolean;
+  plan_tier?: string;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   created_at: Date;
   @Transform(({ value }: { value: Date }) => value.toISOString())
@@ -38,6 +40,8 @@ export class MusicianPresenter {
     this.avatar = output.avatar;
     this.phone = output.phone;
     this.qr_code = output.qr_code;
+    this.qr_customization = output.qr_customization;
+    this.plan_tier = output.plan_tier;
     this.rating = output.rating;
     this.total_ratings = output.total_ratings;
     this.is_active = output.is_active;

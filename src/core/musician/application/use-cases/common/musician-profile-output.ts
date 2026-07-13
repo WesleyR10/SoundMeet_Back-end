@@ -1,5 +1,6 @@
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import { PriceModel } from "../../../../shared/domain/value-objects/price-range.vo";
+import { QRCustomization } from "../../../../shared/domain/value-objects/qr-code.vo";
 import { Musician } from "../../../domain/musician.aggregate";
 
 export type MusicianProfileOutput = {
@@ -38,6 +39,7 @@ export type MusicianOutput = {
   instruments: string[];
   experience_years: number;
   qr_code: string | null;
+  qr_customization: QRCustomization | null;
   rating: number;
   total_ratings: number;
   is_active: boolean;
@@ -48,6 +50,11 @@ export type MusicianOutput = {
   display_name: string;
   is_experienced: boolean;
   is_highly_rated: boolean;
+  // Só populado por GetMusicianUseCase (injeta PlanCheckService) — demais
+  // use-cases que reaproveitam este mapper (create/update/upload-avatar/etc.)
+  // deixam undefined; o mobile sempre revalida via GET após qualquer mutation,
+  // então nunca lê plan_tier do corpo de uma resposta de PATCH/POST.
+  plan_tier?: string;
 };
 
 export class MusicianOutputMapper {
@@ -64,6 +71,7 @@ export class MusicianOutputMapper {
       instruments: entity.instruments,
       experience_years: entity.experience_years,
       qr_code: entity.qr_code?.code ?? null,
+      qr_customization: entity.qr_code?.customization ?? null,
       rating: entity.rating.value,
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,

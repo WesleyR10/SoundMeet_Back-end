@@ -189,6 +189,28 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       : null;
   }
 
+  async findByCpf(cpf: string): Promise<Musician | null> {
+    const model = await this.prisma.musician.findFirst({
+      where: { cpf },
+      include: { profile: true },
+    });
+
+    return model
+      ? MusicianModelMapper.toEntity(model as unknown as MusicianModel)
+      : null;
+  }
+
+  async findByPhone(phone: string): Promise<Musician | null> {
+    const model = await this.prisma.musician.findFirst({
+      where: { phone },
+      include: { profile: true },
+    });
+
+    return model
+      ? MusicianModelMapper.toEntity(model as unknown as MusicianModel)
+      : null;
+  }
+
   async findByIds(ids: MusicianId[]): Promise<Musician[]> {
     const models = await this.prisma.musician.findMany({
       where: {

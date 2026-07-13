@@ -126,6 +126,7 @@ describe("CreateMusicianUseCase Unit Tests", () => {
         ...expected,
         profile: null,
         qr_code: expect.any(String),
+        qr_customization: null,
         created_at: repository.items[0].created_at,
         updated_at: repository.items[0].updated_at,
       });

@@ -12,6 +12,7 @@ export class MusicianFakeBuilder<TBuild = any> {
   private _bio: PropOrFactory<string | null> = (_index) => null;
   private _avatar: PropOrFactory<string | null> = (_index) => null;
   private _phone: PropOrFactory<string | null> = (_index) => null;
+  private _cpf: PropOrFactory<string | null> = (_index) => null;
   private _genres: PropOrFactory<string[]> = (_index) => ["Rock", "Pop"];
   private _instruments: PropOrFactory<string[]> = (_index) => [
     "Guitar",
@@ -71,6 +72,11 @@ export class MusicianFakeBuilder<TBuild = any> {
 
   withPhone(valueOrFactory: PropOrFactory<string | null>) {
     this._phone = valueOrFactory;
+    return this;
+  }
+
+  withCpf(valueOrFactory: PropOrFactory<string | null>) {
+    this._cpf = valueOrFactory;
     return this;
   }
 
@@ -172,6 +178,7 @@ export class MusicianFakeBuilder<TBuild = any> {
           bio: this.callFactory(this._bio, index),
           avatar: this.callFactory(this._avatar, index),
           phone: this.callFactory(this._phone, index),
+          cpf: this.callFactory(this._cpf, index),
           genres: this.callFactory(this._genres, index),
           instruments: this.callFactory(this._instruments, index),
           experience_years: this.callFactory(this._experience_years, index),
@@ -213,6 +220,10 @@ export class MusicianFakeBuilder<TBuild = any> {
 
   get phone() {
     return this.getValue("phone");
+  }
+
+  get cpf() {
+    return this.getValue("cpf");
   }
 
   get genres() {

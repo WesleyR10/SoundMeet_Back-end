@@ -1,7 +1,7 @@
 import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { QRCustomization } from "../../../../shared/domain/value-objects/qr-code.vo";
+import { QRCustomizationPatch } from "../../../../shared/domain/value-objects/qr-code.vo";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import { IMusicianRepository } from "../../../domain/musician.repository";
 import {
@@ -11,7 +11,7 @@ import {
 
 export type CustomizeQRCodeInput = {
   musician_id: string;
-  customization: QRCustomization;
+  customization: QRCustomizationPatch;
 };
 
 export type CustomizeQRCodeOutput = MusicianOutput;

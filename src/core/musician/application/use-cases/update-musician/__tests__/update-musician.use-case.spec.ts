@@ -1,6 +1,7 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { QRCustomization } from "../../../../../shared/domain/value-objects/qr-code.vo";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { UpdateMusicianUseCase } from "../update-musician.use-case";
@@ -64,6 +65,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       is_verified: entity.is_verified,
       profile: entity.profile?.toJSON() ?? null,
       qr_code: entity.qr_code!.code,
+      qr_customization: entity.qr_code!.customization ?? null,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
       display_name: entity.displayName,
@@ -99,6 +101,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         is_active: boolean;
         is_verified: boolean;
         qr_code: string;
+        qr_customization: QRCustomization | null;
         created_at: Date;
         display_name: string;
         is_experienced: boolean;
@@ -126,6 +129,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_active: entity.is_active,
           is_verified: entity.is_verified,
           qr_code: entity.qr_code!.code,
+          qr_customization: entity.qr_code!.customization ?? null,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -151,6 +155,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_active: entity.is_active,
           is_verified: entity.is_verified,
           qr_code: entity.qr_code!.code,
+          qr_customization: entity.qr_code!.customization ?? null,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -176,6 +181,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_active: entity.is_active,
           is_verified: entity.is_verified,
           qr_code: entity.qr_code!.code,
+          qr_customization: entity.qr_code!.customization ?? null,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -201,6 +207,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_active: entity.is_active,
           is_verified: entity.is_verified,
           qr_code: entity.qr_code!.code,
+          qr_customization: entity.qr_code!.customization ?? null,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -226,6 +233,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_active: entity.is_active,
           is_verified: entity.is_verified,
           qr_code: entity.qr_code!.code,
+          qr_customization: entity.qr_code!.customization ?? null,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -251,6 +259,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_active: false,
           is_verified: entity.is_verified,
           qr_code: entity.qr_code!.code,
+          qr_customization: entity.qr_code!.customization ?? null,
           created_at: entity.created_at,
           display_name: "New Stage Name",
           is_experienced: entity.isExperienced,
@@ -308,6 +317,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
             : freshEntity.is_verified,
         profile: freshEntity.profile?.toJSON() ?? null,
         qr_code: freshEntity.qr_code!.code,
+        qr_customization: freshEntity.qr_code!.customization ?? null,
         created_at: freshEntity.created_at,
         updated_at: freshEntity.updated_at,
         display_name:

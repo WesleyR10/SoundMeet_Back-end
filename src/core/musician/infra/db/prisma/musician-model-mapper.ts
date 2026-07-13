@@ -5,6 +5,7 @@ import {
   PriceModel,
   PriceRange,
 } from "../../../../shared/domain/value-objects/price-range.vo";
+import { QRCustomization } from "../../../../shared/domain/value-objects/qr-code.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
@@ -24,6 +25,35 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 const toSocialLinks = (value: unknown): Record<string, unknown> | null => {
   return isRecord(value) ? value : null;
+};
+
+// Só monta o objeto se ao menos um campo existir — um `{}` vazio seria
+// truthy e o QRCode VO trataria como "customizado" mesmo sem nada definido.
+const toQrCustomization = (
+  model: Pick<
+    MusicianModel,
+    | "qr_foreground_color"
+    | "qr_background_color"
+    | "qr_logo_url"
+    | "qr_label"
+  >,
+): QRCustomization | undefined => {
+  const { qr_foreground_color, qr_background_color, qr_logo_url, qr_label } =
+    model;
+  if (
+    !qr_foreground_color &&
+    !qr_background_color &&
+    !qr_logo_url &&
+    !qr_label
+  ) {
+    return undefined;
+  }
+  return {
+    foreground_color: qr_foreground_color ?? undefined,
+    background_color: qr_background_color ?? undefined,
+    logo_url: qr_logo_url ?? undefined,
+    label: qr_label ?? undefined,
+  };
 };
 
 const toDbCurrency = (currency: Currency): CurrencyDb => {
@@ -58,10 +88,17 @@ export class MusicianModelMapper {
       bio: entity.bio ?? null,
       avatar: entity.avatar ?? null,
       phone: entity.phone?.value ?? null,
+      cpf: entity.cpf?.value ?? null,
       genres: entity.genres ?? [],
       instruments: entity.instruments ?? [],
       experience_years: entity.experience_years ?? null,
       qr_code: entity.qr_code?.code ?? null,
+      qr_foreground_color: entity.qr_code?.customization?.foreground_color ?? null,
+      qr_background_color: entity.qr_code?.customization?.background_color ?? null,
+      qr_logo_url: entity.qr_code?.customization?.logo_url ?? null,
+      qr_label: entity.qr_code?.customization?.label ?? null,
+      push_token: entity.push_token ?? null,
+      push_token_platform: entity.push_token_platform ?? null,
       rating: entity.rating.value,
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
@@ -143,14 +180,18 @@ export class MusicianModelMapper {
       bio: model.bio ?? undefined,
       avatar: model.avatar ?? undefined,
       phone: model.phone ?? undefined,
+      cpf: model.cpf ?? undefined,
       genres: model.genres ?? [],
       instruments: model.instruments ?? [],
       experience_years: model.experience_years ?? undefined,
       qr_code: model.qr_code ?? undefined,
+      qr_customization: toQrCustomization(model),
       rating: model.rating,
       total_ratings: model.total_ratings,
       is_active: model.is_active,
       is_verified: model.is_verified,
+      push_token: model.push_token ?? undefined,
+      push_token_platform: model.push_token_platform ?? undefined,
       created_at: model.created_at,
       updated_at: model.updated_at,
       profile: profile,

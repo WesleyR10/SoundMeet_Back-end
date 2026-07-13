@@ -36,10 +36,17 @@ describe("MusicianModelMapper", () => {
         bio: musician.bio,
         avatar: musician.avatar,
         phone: musician.phone?.value,
+        cpf: musician.cpf?.value ?? null,
         genres: musician.genres,
         instruments: musician.instruments,
         experience_years: musician.experience_years,
         qr_code: musician.qr_code?.code,
+        qr_foreground_color: null,
+        qr_background_color: null,
+        qr_logo_url: null,
+        qr_label: null,
+        push_token: null,
+        push_token_platform: null,
         rating: musician.rating.value,
         total_ratings: musician.total_ratings,
         is_active: musician.is_active,
@@ -66,10 +73,17 @@ describe("MusicianModelMapper", () => {
         bio: null,
         avatar: null,
         phone: null,
+        cpf: null,
         genres: musician.genres, // Fake builder generates ['Rock', 'Pop']
         instruments: musician.instruments, // Fake builder generates ['Guitar', 'Piano']
         experience_years: musician.experience_years, // Fake builder generates random number
         qr_code: musician.qr_code?.code ?? null,
+        qr_foreground_color: null,
+        qr_background_color: null,
+        qr_logo_url: null,
+        qr_label: null,
+        push_token: null,
+        push_token_platform: null,
         rating: musician.rating.value,
         total_ratings: musician.total_ratings,
         is_active: musician.is_active,
@@ -126,6 +140,7 @@ describe("MusicianModelMapper", () => {
         bio: "Musician bio",
         avatar: "avatar.jpg",
         phone: "+5511999999999",
+        cpf: "52998224725",
         genres: ["Rock", "Pop"],
         instruments: ["Guitar", "Piano"],
         experience_years: 5,
@@ -148,6 +163,7 @@ describe("MusicianModelMapper", () => {
       expect(entity.bio).toBe(model.bio);
       expect(entity.avatar).toBe(model.avatar);
       expect(entity.phone?.value).toBe(model.phone);
+      expect(entity.cpf?.value).toBe(model.cpf);
       expect(entity.genres).toEqual(model.genres);
       expect(entity.instruments).toEqual(model.instruments);
       expect(entity.experience_years).toBe(model.experience_years);
@@ -157,6 +173,64 @@ describe("MusicianModelMapper", () => {
       expect(entity.is_active).toBe(model.is_active);
       expect(entity.is_verified).toBe(model.is_verified);
       expect(entity.created_at).toBe(model.created_at);
+    });
+
+    it("should round-trip QR Code customization through toModel/toEntity", () => {
+      const musician = Musician.fake()
+        .aMusician()
+        .withName("John Doe")
+        .withEmail("john@example.com")
+        .build();
+
+      musician.customizeQRCode({
+        foreground_color: "#111111",
+        background_color: "#ffffff",
+        logo_url: "https://cdn.example.com/logo.png",
+        label: "Peça uma música!",
+      });
+
+      const model: MusicianModel = {
+        ...MusicianModelMapper.toModel(musician),
+        profile: null,
+      };
+
+      const reidratado = MusicianModelMapper.toEntity(model);
+
+      expect(reidratado.qr_code?.customization).toEqual({
+        foreground_color: "#111111",
+        background_color: "#ffffff",
+        logo_url: "https://cdn.example.com/logo.png",
+        label: "Peça uma música!",
+      });
+    });
+
+    it("should not fabricate a customization object when no QR field is set", () => {
+      const musicianId = new MusicianId();
+      const model: MusicianModel = {
+        id: musicianId.id,
+        email: "jane@example.com",
+        name: "Jane Doe",
+        stage_name: null,
+        bio: null,
+        avatar: null,
+        phone: null,
+        cpf: null,
+        genres: [],
+        instruments: [],
+        experience_years: null,
+        qr_code: "soundmeet://musician/" + musicianId.id,
+        rating: 0,
+        total_ratings: 0,
+        is_active: true,
+        is_verified: false,
+        created_at: new Date(),
+        updated_at: new Date(),
+        profile: null,
+      };
+
+      const entity = MusicianModelMapper.toEntity(model);
+
+      expect(entity.qr_code?.customization).toBeUndefined();
     });
 
     it("should convert model to entity with minimal properties", () => {
@@ -172,6 +246,7 @@ describe("MusicianModelMapper", () => {
         bio: null,
         avatar: null,
         phone: null,
+        cpf: null,
         genres: [],
         instruments: [],
         experience_years: null,
@@ -194,6 +269,7 @@ describe("MusicianModelMapper", () => {
       expect(entity.bio).toBeNull();
       expect(entity.avatar).toBeNull();
       expect(entity.phone).toBeNull();
+      expect(entity.cpf).toBeNull();
       expect(entity.genres).toEqual([]);
       expect(entity.instruments).toEqual([]);
       expect(entity.experience_years).toBe(0);
@@ -216,6 +292,7 @@ describe("MusicianModelMapper", () => {
         bio: null,
         avatar: null,
         phone: null,
+        cpf: null,
         genres: null as any,
         instruments: null as any,
         experience_years: null,
@@ -252,6 +329,7 @@ describe("MusicianModelMapper", () => {
         bio: null,
         avatar: null,
         phone: "+5511999999999",
+        cpf: "52998224725",
         genres: ["Rock"],
         instruments: ["Guitar"],
         experience_years: null,

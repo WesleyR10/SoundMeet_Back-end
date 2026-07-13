@@ -45,6 +45,11 @@ export class MusicianRules {
   @IsString({ groups: ["phone"] })
   phone?: string;
 
+  @MaxLength(14, { groups: ["cpf"] })
+  @IsOptional({ groups: ["cpf"] })
+  @IsString({ groups: ["cpf"] })
+  cpf?: string;
+
   @IsArray({ groups: ["genres"] })
   @IsOptional({ groups: ["genres"] })
   genres?: string[];
@@ -74,6 +79,7 @@ export class MusicianRules {
     this.bio = entity?.bio;
     this.avatar = entity?.avatar;
     this.phone = entity?.phone?.value || entity?.phone;
+    this.cpf = entity?.cpf?.value || entity?.cpf;
     this.genres = entity?.genres;
     this.instruments = entity?.instruments;
     this.experience_years = entity?.experience_years;

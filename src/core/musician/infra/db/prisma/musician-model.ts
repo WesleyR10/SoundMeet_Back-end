@@ -13,10 +13,17 @@ export type MusicianModel = {
   bio: string | null;
   avatar: string | null;
   phone: string | null;
+  cpf: string | null;
   genres: string[];
   instruments: string[];
   experience_years: number | null;
   qr_code: string | null;
+  qr_foreground_color?: string | null;
+  qr_background_color?: string | null;
+  qr_logo_url?: string | null;
+  qr_label?: string | null;
+  push_token?: string | null;
+  push_token_platform?: string | null;
   rating: number;
   total_ratings: number;
   is_active: boolean;

@@ -90,11 +90,18 @@ model Musician {
   stage_name       String?
   bio              String?
   avatar           String?
-  phone            String?
+  phone            String?  @unique
+  cpf              String?  @unique
   genres           String[] @default([])
   instruments      String[] @default([])
   experience_years Int?
   qr_code          String?  @unique
+  qr_foreground_color String?
+  qr_background_color String?
+  qr_logo_url         String?
+  qr_label            String?
+  push_token          String?
+  push_token_platform String?
   rating           Float    @default(0)
   total_ratings    Int      @default(0)
   is_active        Boolean  @default(true)
