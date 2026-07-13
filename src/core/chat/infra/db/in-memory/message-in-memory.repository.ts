@@ -55,4 +55,34 @@ export class MessageInMemoryRepository
       )
       .forEach((m) => m.markRead());
   }
+
+  async findLastMessagesByConversationIds(
+    conversation_ids: string[],
+  ): Promise<Map<string, Message>> {
+    const result = new Map<string, Message>();
+    for (const id of conversation_ids) {
+      const last = this.items
+        .filter((m) => m.conversation_id === id)
+        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0];
+      if (last) result.set(id, last);
+    }
+    return result;
+  }
+
+  async countUnreadByConversationIds(
+    conversation_ids: string[],
+    reader_id: string,
+  ): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    for (const id of conversation_ids) {
+      const count = this.items.filter(
+        (m) =>
+          m.conversation_id === id &&
+          m.sender_id !== reader_id &&
+          m.status !== "read",
+      ).length;
+      result.set(id, count);
+    }
+    return result;
+  }
 }

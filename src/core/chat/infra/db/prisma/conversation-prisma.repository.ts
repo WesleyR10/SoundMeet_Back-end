@@ -118,6 +118,7 @@ export class ConversationPrismaRepository implements IConversationRepository {
         OR: [
           { musician_id: participant_id },
           { band_id: participant_id },
+          { establishment_id: participant_id },
         ],
       },
     });

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Inject,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -25,7 +26,10 @@ import {
   MarkAsReadUseCase,
   SendMessageUseCase,
 } from "../../core/chat/application/use-cases";
+import { ConversationListItem } from "../../core/chat/application/use-cases/list-conversations/list-conversations.use-case";
 import { SenderType } from "../../core/chat/domain/message.aggregate";
+import { Establishment, EstablishmentId } from "../../core/establishment/domain/establishment.aggregate";
+import { IEstablishmentRepository } from "../../core/establishment/domain/establishment.repository";
 import {
   AuthGuard,
   CurrentUserContextGuard,
@@ -62,6 +66,8 @@ function resolveSender(user: AuthenticatedUser): {
 @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("conversations")
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   @Inject(SendMessageUseCase)
   private sendMessageUseCase: SendMessageUseCase;
 
@@ -76,6 +82,9 @@ export class ChatController {
 
   @Inject(ChatGateway)
   private chatGateway: ChatGateway;
+
+  @Inject("EstablishmentRepository")
+  private establishmentRepo: IEstablishmentRepository;
 
   @Post(":id/messages")
   @ApiOperation({
@@ -131,9 +140,81 @@ export class ChatController {
   @ApiResponse({ status: 200 })
   async listConversations(@CurrentUser() currentUser: AuthenticatedUser) {
     const { sender_id } = resolveSender(currentUser);
-    return this.listConversationsUseCase.execute({
+    const { conversations } = await this.listConversationsUseCase.execute({
       participant_id: sender_id,
     });
+
+    return {
+      conversations: await this.enrichWithEstablishment(conversations),
+    };
+  }
+
+  // Enriquecimento cross-context (nome/avatar do estabelecimento) fica aqui,
+  // não dentro de core/chat — mesma fronteira DDD já seguida por
+  // RequestOutput/TipOutput, que nunca alcançam outro bounded context de
+  // dentro do core. Extraído em métodos próprios (em vez de inline no
+  // handler HTTP) pra poder ser unit-testado sem precisar da stack HTTP
+  // completa, e pra isolar as duas falhas reais que esse enriquecimento
+  // pode sofrer sem derrubar a listagem inteira (ver loadEstablishments).
+  private async enrichWithEstablishment(
+    conversations: ConversationListItem[],
+  ): Promise<Array<ConversationListItem & { establishment: { id: string; name: string; avatar: string | null } | null }>> {
+    const byId = await this.loadEstablishments(
+      conversations.map((c) => c.establishment_id),
+    );
+
+    return conversations.map((c) => {
+      const establishment = byId.get(c.establishment_id);
+      return {
+        ...c,
+        establishment: establishment
+          ? {
+              id: establishment.establishment_id.id,
+              name: establishment.name,
+              avatar: establishment.avatar,
+            }
+          : null,
+      };
+    });
+  }
+
+  // Duas falhas reais e independentes são possíveis aqui, nenhuma das quais
+  // deve derrubar GET /conversations (os dados de chat em si estão íntegros
+  // mesmo se o enriquecimento falhar — degrada pra establishment: null,
+  // mesma tolerância já esperada pelo mobile em ConversationListItem.tsx):
+  // (1) um establishment_id que não é UUID estritamente RFC4122 faz `new
+  // EstablishmentId(id)` lançar InvalidUuidError — já aconteceu de verdade
+  // com um fixture de teste durante esta revisão; (2) o repositório pode
+  // falhar (timeout de DB, etc). Ambas são contidas aqui, uma por
+  // establishment_id malformado (só aquele é pulado) e uma pro lookup
+  // inteiro (todos os establishments ficam null nesse request).
+  private async loadEstablishments(
+    establishmentIds: string[],
+  ): Promise<Map<string, Establishment>> {
+    const validIds: EstablishmentId[] = [];
+    for (const id of new Set(establishmentIds)) {
+      try {
+        validIds.push(new EstablishmentId(id));
+      } catch {
+        this.logger.warn(
+          `Skipping malformed establishment_id in conversation enrichment: ${id}`,
+        );
+      }
+    }
+
+    if (!validIds.length) return new Map();
+
+    try {
+      const establishments = await this.establishmentRepo.findByIds(validIds);
+      return new Map(establishments.map((e) => [e.establishment_id.id, e]));
+    } catch (error) {
+      this.logger.error(
+        `Failed to load establishments for conversation enrichment: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return new Map();
+    }
   }
 
   @HttpCode(200)

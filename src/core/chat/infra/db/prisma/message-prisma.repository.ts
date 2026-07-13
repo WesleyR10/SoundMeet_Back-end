@@ -146,6 +146,44 @@ export class MessagePrismaRepository implements IMessageRepository {
     });
   }
 
+  async findLastMessagesByConversationIds(
+    conversation_ids: string[],
+  ): Promise<Map<string, Message>> {
+    if (!conversation_ids.length) return new Map();
+
+    // distinct + orderBy: Prisma retorna a 1ª linha (segundo o orderBy) de
+    // cada valor distinto de conversation_id — dá a última mensagem por
+    // conversa numa única query, sem 1 findFirst por conversa.
+    const rows = await this.prisma.message.findMany({
+      where: { conversation_id: { in: conversation_ids } },
+      orderBy: { created_at: "desc" },
+      distinct: ["conversation_id"],
+    });
+
+    return new Map(
+      rows.map((m) => [m.conversation_id, MessageModelMapper.toEntity(m)]),
+    );
+  }
+
+  async countUnreadByConversationIds(
+    conversation_ids: string[],
+    reader_id: string,
+  ): Promise<Map<string, number>> {
+    if (!conversation_ids.length) return new Map();
+
+    const groups = await this.prisma.message.groupBy({
+      by: ["conversation_id"],
+      where: {
+        conversation_id: { in: conversation_ids },
+        NOT: { sender_id: reader_id },
+        status: { not: "read" },
+      },
+      _count: { _all: true },
+    });
+
+    return new Map(groups.map((g) => [g.conversation_id, g._count._all]));
+  }
+
   getEntity(): new (...args: any[]) => Message {
     return Message;
   }

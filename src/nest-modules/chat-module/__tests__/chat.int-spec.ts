@@ -13,6 +13,11 @@ import { IConversationRepository } from "../../../core/chat/domain/conversation.
 import { IMessageRepository } from "../../../core/chat/domain/message.repository";
 import { ConversationInMemoryRepository } from "../../../core/chat/infra/db/in-memory/conversation-in-memory.repository";
 import { MessageInMemoryRepository } from "../../../core/chat/infra/db/in-memory/message-in-memory.repository";
+import {
+  Establishment,
+  EstablishmentId,
+} from "../../../core/establishment/domain/establishment.aggregate";
+import { EstablishmentInMemoryRepository } from "../../../core/establishment/infra/db/in-memory/establishment-in-memory.repository";
 import { AuthenticatedUser } from "../../auth-module/interfaces/authenticated-user.interface";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import { ChatController } from "../chat.controller";
@@ -27,10 +32,10 @@ const MUSICIAN_USER: AuthenticatedUser = {
 };
 
 const ESTABLISHMENT_USER: AuthenticatedUser = {
-  userId: "00000000-0000-0000-0000-000000000002",
+  userId: "00000000-0000-4000-8000-000000000002",
   roles: ["establishment"],
   bandIds: [],
-  establishmentIds: ["00000000-0000-0000-0000-000000000002"],
+  establishmentIds: ["00000000-0000-4000-8000-000000000002"],
   isAdmin: false,
 };
 
@@ -46,7 +51,9 @@ describe("ChatController Integration Tests", () => {
   let controller: ChatController;
   let convRepo: ConversationInMemoryRepository;
   let msgRepo: MessageInMemoryRepository;
+  let establishmentRepo: EstablishmentInMemoryRepository;
   let testConv: Conversation;
+  let testEstablishment: Establishment;
 
   const chatGatewayMock = {
     emitNewMessage: jest.fn(),
@@ -56,6 +63,7 @@ describe("ChatController Integration Tests", () => {
   beforeEach(async () => {
     convRepo = new ConversationInMemoryRepository();
     msgRepo = new MessageInMemoryRepository();
+    establishmentRepo = new EstablishmentInMemoryRepository();
 
     const moduleBuilder = Test.createTestingModule({
       controllers: [ChatController],
@@ -68,6 +76,10 @@ describe("ChatController Integration Tests", () => {
         {
           provide: "IMessageRepository",
           useValue: msgRepo,
+        },
+        {
+          provide: "EstablishmentRepository",
+          useValue: establishmentRepo,
         },
         {
           provide: OpenConversationUseCase,
@@ -93,9 +105,11 @@ describe("ChatController Integration Tests", () => {
         },
         {
           provide: ListConversationsUseCase,
-          useFactory: (repo: IConversationRepository) =>
-            new ListConversationsUseCase(repo),
-          inject: ["IConversationRepository"],
+          useFactory: (
+            cRepo: IConversationRepository,
+            mRepo: IMessageRepository,
+          ) => new ListConversationsUseCase(cRepo, mRepo),
+          inject: ["IConversationRepository", "IMessageRepository"],
         },
         {
           provide: MarkAsReadUseCase,
@@ -114,6 +128,14 @@ describe("ChatController Integration Tests", () => {
     controller = module.get<ChatController>(ChatController);
 
     // Conversa entre estabelecimento e músico
+    testEstablishment = Establishment.fake()
+      .aEstablishment()
+      .withEstablishmentId(
+        new EstablishmentId(ESTABLISHMENT_USER.establishmentIds[0]),
+      )
+      .build();
+    await establishmentRepo.insert(testEstablishment);
+
     testConv = Conversation.fake()
       .aConversation()
       .withEstablishmentId(ESTABLISHMENT_USER.establishmentIds[0])
@@ -277,6 +299,72 @@ describe("ChatController Integration Tests", () => {
     it("should return empty list when user has no conversations", async () => {
       const result = await controller.listConversations(OUTSIDER_USER);
       expect(result.conversations).toHaveLength(0);
+    });
+
+    it("should enrich each conversation with establishment name/avatar", async () => {
+      const result = await controller.listConversations(MUSICIAN_USER);
+
+      expect(result.conversations[0].establishment).toEqual({
+        id: testEstablishment.establishment_id.id,
+        name: testEstablishment.name,
+        avatar: testEstablishment.avatar,
+      });
+    });
+
+    // Regressão: ConversationPrisma pode conter um establishment_id que
+    // passa na validação (mais permissiva) do agregado Conversation
+    // (class-validator @IsUUID("4")) mas falha na validação estrita do VO
+    // EstablishmentId (uuid package, exige nibble de versão 1-5 e variante
+    // 8/9/a/b) — já aconteceu de verdade com um fixture de teste durante
+    // esta revisão. Antes do fix, isso derrubava GET /conversations inteiro
+    // com InvalidUuidError pra QUALQUER conversa do músico, não só a
+    // malformada.
+    it("should not throw when a conversation has a malformed establishment_id — degrades that conversation's establishment to null", async () => {
+      const malformedConv = Conversation.fake()
+        .aConversation()
+        .withEstablishmentId("00000000-0000-0000-0000-000000000099")
+        .withMusicianId(MUSICIAN_USER.userId)
+        .build();
+      await convRepo.insert(malformedConv);
+
+      const result = await controller.listConversations(MUSICIAN_USER);
+
+      expect(result.conversations).toHaveLength(2);
+      const malformedResult = result.conversations.find(
+        (c) => c.conversation_id === malformedConv.conversation_id.id,
+      );
+      expect(malformedResult?.establishment).toBeNull();
+      // A conversa "boa" (testConv) não é afetada pela malformada.
+      const goodResult = result.conversations.find(
+        (c) => c.conversation_id === testConv.conversation_id.id,
+      );
+      expect(goodResult?.establishment).not.toBeNull();
+    });
+
+    it("should not throw and should return establishment: null for all conversations when the establishment repository fails", async () => {
+      jest
+        .spyOn(establishmentRepo, "findByIds")
+        .mockRejectedValueOnce(new Error("DB timeout"));
+
+      const result = await controller.listConversations(MUSICIAN_USER);
+
+      expect(result.conversations).toHaveLength(1);
+      expect(result.conversations[0].establishment).toBeNull();
+    });
+
+    it("should return last_message and unread_count for each conversation", async () => {
+      await controller.sendMessage(
+        testConv.conversation_id.id,
+        { content: "Proposta de cachê" },
+        ESTABLISHMENT_USER,
+      );
+
+      const result = await controller.listConversations(MUSICIAN_USER);
+
+      expect(result.conversations[0].last_message).toMatchObject({
+        content: "Proposta de cachê",
+      });
+      expect(result.conversations[0].unread_count).toBe(1);
     });
   });
 

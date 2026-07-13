@@ -58,10 +58,13 @@ export const USE_CASES = {
   },
   LIST_CONVERSATIONS: {
     provide: ListConversationsUseCase,
-    useFactory: (convRepo: IConversationRepository): ListConversationsUseCase => {
-      return new ListConversationsUseCase(convRepo);
+    useFactory: (
+      convRepo: IConversationRepository,
+      msgRepo: IMessageRepository,
+    ): ListConversationsUseCase => {
+      return new ListConversationsUseCase(convRepo, msgRepo);
     },
-    inject: [REPOSITORIES.CONVERSATION.provide],
+    inject: [REPOSITORIES.CONVERSATION.provide, REPOSITORIES.MESSAGE.provide],
   },
   MARK_AS_READ: {
     provide: MarkAsReadUseCase,
