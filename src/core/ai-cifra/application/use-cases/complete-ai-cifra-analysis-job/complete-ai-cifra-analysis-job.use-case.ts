@@ -1,3 +1,4 @@
+import { UpdateMusicLibraryUseCase } from "../../../../music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -20,6 +21,7 @@ export class CompleteAiCifraAnalysisJobUseCase implements IUseCase<
     private readonly uploadRepo: IAiCifraUploadRepository,
     private readonly jobRepo: IAiCifraAnalysisJobRepository,
     private readonly storage: IAiCifraStorage,
+    private readonly updateMusicLibraryUseCase?: UpdateMusicLibraryUseCase,
   ) {}
 
   async execute(input: CompleteAiCifraAnalysisJobInput): Promise<void> {
@@ -64,6 +66,24 @@ export class CompleteAiCifraAnalysisJobUseCase implements IUseCase<
 
     await this.jobRepo.update(job);
     await this.uploadRepo.update(upload);
+
+    // Ponte pipeline → catálogo: sem isso, o resultado da análise fica preso
+    // no aggregate do job e GET /music-library/:id/chord-sheet nunca vê os
+    // acordes/estrutura recém-gerados (ele lê direto de MusicLibrary.chords/
+    // structure_segments/bpm/key, não do job). Best-effort: uma falha aqui não
+    // deve reverter a conclusão do job em si (já persistido acima).
+    if (this.updateMusicLibraryUseCase && upload.music_library_id) {
+      await this.updateMusicLibraryUseCase
+        .execute({
+          id: upload.music_library_id.id,
+          is_admin: true,
+          chords: result.chords,
+          structure_segments: result.segments,
+          bpm: result.bpm,
+          key: result.key,
+        })
+        .catch(() => undefined);
+    }
 
     await this.storage
       .deleteObject({ object_key: upload.object_key })

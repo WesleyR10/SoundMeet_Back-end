@@ -26,6 +26,7 @@ import { AiCifraUploadPrismaRepository } from "../../core/ai-cifra/infra/db/pris
 import { AiCifraAnalysisHttpClient } from "../../core/ai-cifra/infra/http/ai-cifra-analysis-http.client";
 import { S3AiCifraStorage } from "../../core/ai-cifra/infra/storage/s3-ai-cifra.storage";
 import { GetMusicLibraryUseCase } from "../../core/music-library/application/use-cases/get-music-library/get-music-library.use-case";
+import { UpdateMusicLibraryUseCase } from "../../core/music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import {
@@ -360,17 +361,20 @@ export const USE_CASES = {
       uploadRepo: IAiCifraUploadRepository,
       jobRepo: IAiCifraAnalysisJobRepository,
       storage: IAiCifraStorage,
+      updateMusicLibraryUseCase: UpdateMusicLibraryUseCase,
     ) => {
       return new CompleteAiCifraAnalysisJobUseCase(
         uploadRepo,
         jobRepo,
         storage,
+        updateMusicLibraryUseCase,
       );
     },
     inject: [
       REPOSITORIES.AI_CIFRA_UPLOAD_REPOSITORY.provide,
       REPOSITORIES.AI_CIFRA_ANALYSIS_JOB_REPOSITORY.provide,
       INFRA_PROVIDERS.AI_CIFRA_STORAGE.provide,
+      UpdateMusicLibraryUseCase,
     ],
   },
   FAIL_AI_CIFRA_ANALYSIS_JOB_USE_CASE: {

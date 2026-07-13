@@ -11,6 +11,7 @@ import {
 } from "./ai-cifra.consumers";
 import { AiCifraController } from "./ai-cifra.controller";
 import { AI_CIFRA_PROVIDERS } from "./ai-cifra.providers";
+import { AiCifraSearchController } from "./ai-cifra-search.controller";
 import { AiCifraUploadsController } from "./ai-cifra-uploads.controller";
 
 @Module({
@@ -21,7 +22,7 @@ import { AiCifraUploadsController } from "./ai-cifra-uploads.controller";
       ? [RabbitmqModule.forFeature()]
       : []),
   ],
-  controllers: [AiCifraController, AiCifraUploadsController],
+  controllers: [AiCifraController, AiCifraUploadsController, AiCifraSearchController],
   providers: [
     ...Object.values(AI_CIFRA_PROVIDERS.REPOSITORIES),
     ...Object.values(AI_CIFRA_PROVIDERS.INFRA_PROVIDERS),

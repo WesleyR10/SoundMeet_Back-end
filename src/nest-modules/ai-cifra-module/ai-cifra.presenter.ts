@@ -3,6 +3,19 @@ import { Transform } from "class-transformer";
 
 import { AiCifraAnalysisJobOutput } from "../../core/ai-cifra/application/use-cases/common/ai-cifra-analysis-job-output";
 import { AiCifraUploadOutput } from "../../core/ai-cifra/application/use-cases/common/ai-cifra-upload-output";
+import { SearchAiCifraCatalogResultItem } from "../../core/ai-cifra/application/use-cases/search-ai-cifra-catalog/search-ai-cifra-catalog.use-case";
+
+export class SearchAiCifraCatalogResultPresenter {
+  title: string;
+  artist: string;
+  youtube_video_id: string;
+
+  constructor(output: SearchAiCifraCatalogResultItem) {
+    this.title = output.title;
+    this.artist = output.artist;
+    this.youtube_video_id = output.youtube_video_id;
+  }
+}
 
 export class AiCifraUploadPresenter {
   id: string;
