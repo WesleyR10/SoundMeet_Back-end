@@ -24,18 +24,26 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
   async insert(entity: Repertoire): Promise<void> {
     try {
       await this.prisma.$transaction(async (tx) => {
+        // No create aninhado a FK vem da própria relação — repassar o
+        // repertoire_id do mapper explode com "Unknown argument" (bug pego
+        // pelo seed, jul/2026: o app só exercitava o caminho do update, que
+        // usa createMany direto na tabela filha e aceita a FK explícita).
         await tx.repertoire.create({
           data: {
             ...RepertoireModelMapper.toModel(entity),
             songs: {
-              create: entity.songs.map((s) =>
-                RepertoireModelMapper.songToModel(s, entity.repertoire_id.id),
-              ),
+              create: entity.songs.map((s) => {
+                const { repertoire_id: _repertoireId, ...song } =
+                  RepertoireModelMapper.songToModel(s, entity.repertoire_id.id);
+                return song;
+              }),
             },
             invitees: {
-              create: entity.invitees.map((i) =>
-                RepertoireModelMapper.inviteeToModel(i, entity.repertoire_id.id),
-              ),
+              create: entity.invitees.map((i) => {
+                const { repertoire_id: _repertoireId, ...invitee } =
+                  RepertoireModelMapper.inviteeToModel(i, entity.repertoire_id.id);
+                return invitee;
+              }),
             },
           },
         });
