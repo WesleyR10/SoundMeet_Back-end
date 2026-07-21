@@ -1,3 +1,4 @@
+import { Location } from "../../../../shared/domain/value-objects/location.vo";
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import {
   PriceModel,
@@ -45,6 +46,12 @@ export class BandModelMapper {
         ? toDbCurrency(entity.priceRange.currency)
         : null,
       price_notes: entity.priceRange?.notes ?? null,
+      open_to_gigs: entity.open_to_gigs,
+      address: entity.address
+        ? (entity.address.toJSON() as unknown as BandModel["address"])
+        : null,
+      location_lat: entity.address?.latitude ?? null,
+      location_lng: entity.address?.longitude ?? null,
       is_active: entity.is_active,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
@@ -77,9 +84,13 @@ export class BandModelMapper {
         musician_id: new Uuid(m.musicianId),
         role: m.role,
         instrument: m.instrument,
+        status: m.status,
         joined_at: m.joinedAt,
+        responded_at: m.responded_at,
       })),
       priceRange: priceRange,
+      address: model.address ? Location.fromJSON(model.address) : null,
+      open_to_gigs: model.open_to_gigs,
       is_active: model.is_active,
       created_at: model.created_at,
       updated_at: model.updated_at,

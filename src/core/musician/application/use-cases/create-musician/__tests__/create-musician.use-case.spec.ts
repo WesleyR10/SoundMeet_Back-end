@@ -124,6 +124,7 @@ describe("CreateMusicianUseCase Unit Tests", () => {
       expect(output).toStrictEqual({
         id: repository.items[0].musician_id.id,
         ...expected,
+        open_to_gigs: null,
         profile: null,
         qr_code: expect.any(String),
         qr_customization: null,

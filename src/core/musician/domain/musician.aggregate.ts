@@ -37,6 +37,7 @@ export type MusicianConstructorProps = {
   total_ratings?: number;
   is_active?: boolean;
   is_verified?: boolean;
+  open_to_gigs?: boolean | null;
   profile?: MusicianProfile | null;
   push_token?: string | null;
   push_token_platform?: string | null;
@@ -57,6 +58,7 @@ export type MusicianCreateCommand = {
   instruments: string[];
   experience_years?: number;
   is_active?: boolean;
+  open_to_gigs?: boolean | null;
   profile?: MusicianProfile | null;
 };
 
@@ -79,6 +81,7 @@ export class Musician extends AggregateRoot {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  open_to_gigs: boolean | null;
   profile: MusicianProfile | null;
   push_token: string | null;
   push_token_platform: string | null;
@@ -132,6 +135,8 @@ export class Musician extends AggregateRoot {
     this.total_ratings = props.total_ratings ?? 0;
     this.is_active = props.is_active ?? true;
     this.is_verified = props.is_verified ?? false;
+    // Nunca default true — consentimento explícito, decisão forçada no onboarding.
+    this.open_to_gigs = props.open_to_gigs ?? null;
     this.profile = props.profile ?? null;
     this.push_token = props.push_token ?? null;
     this.push_token_platform = props.push_token_platform ?? null;
@@ -262,8 +267,8 @@ export class Musician extends AggregateRoot {
     this.experience_years = years;
   }
 
-  updatePriceRange(price: PriceRange | null): void {
-    this.ensureProfile().changePriceRange(price);
+  updatePriceRanges(priceRanges: PriceRange[]): void {
+    this.ensureProfile().changePriceRanges(priceRanges);
     this.updated_at = new Date();
   }
 
@@ -354,6 +359,11 @@ export class Musician extends AggregateRoot {
     this.is_verified = false;
   }
 
+  setOpenToGigs(value: boolean): void {
+    this.open_to_gigs = value;
+    this.updated_at = new Date();
+  }
+
   get displayName(): string {
     return this.stage_name || this.name;
   }
@@ -404,6 +414,7 @@ export class Musician extends AggregateRoot {
       total_ratings: this.total_ratings,
       is_active: this.is_active,
       is_verified: this.is_verified,
+      open_to_gigs: this.open_to_gigs,
       profile: this.profile?.toJSON() || null,
       created_at: this.created_at,
       updated_at: this.updated_at,

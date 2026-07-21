@@ -21,7 +21,7 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
 
     expect(profile.profile_id).toBeInstanceOf(MusicianProfileId);
     expect(profile.musician_id).toBe(musician_id);
-    expect(profile.priceRange).toBeNull();
+    expect(profile.priceRanges).toEqual([]);
     expect(profile.location).toBeInstanceOf(Location);
     expect(profile.socialLinks).toBeNull();
     expect(profile.experience).toBe(0);
@@ -50,12 +50,12 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
       genres: ["Rock"],
       created_at,
       updated_at,
-      priceRange,
+      priceRanges: [priceRange],
     });
 
     expect(profile.profile_id).toBe(profile_id);
     expect(profile.musician_id).toBe(musician_id);
-    expect(profile.priceRange).toBe(priceRange);
+    expect(profile.priceRanges).toEqual([priceRange]);
     expect(profile.location).toBe(location);
     expect(profile.socialLinks).toEqual({ instagram: "@test" });
     expect(profile.experience).toBe(10);
@@ -93,19 +93,39 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     );
   });
 
-  test("should change price range", () => {
+  test("should change price ranges (one per model)", () => {
     const profile = MusicianProfile.fake().aProfile().build();
-    const priceRange = new PriceRange({
+    const eventRange = new PriceRange({
       model: "per_event",
       min: 500,
       max: 1000,
       notes: "Base fee",
     });
+    const hourRange = new PriceRange({
+      model: "per_hour",
+      min: 100,
+      max: 200,
+    });
 
-    profile.changePriceRange(priceRange);
+    profile.changePriceRanges([eventRange, hourRange]);
 
-    expect(profile.priceRange).toBe(priceRange);
-    expect(profile.toJSON().priceRange).toEqual(priceRange.toJSON());
+    expect(profile.priceRanges).toEqual([eventRange, hourRange]);
+    expect(profile.toJSON().priceRanges).toEqual([
+      eventRange.toJSON(),
+      hourRange.toJSON(),
+    ]);
+    expect(profile.notification.hasErrors()).toBe(false);
+  });
+
+  test("should reject duplicated price range models", () => {
+    const profile = MusicianProfile.fake().aProfile().build();
+    const first = new PriceRange({ model: "per_hour", min: 100, max: 200 });
+    const duplicate = new PriceRange({ model: "per_hour", min: 300, max: 400 });
+
+    profile.changePriceRanges([first, duplicate]);
+
+    expect(profile.notification.hasErrors()).toBe(true);
+    expect(profile.priceRanges).toEqual([]);
   });
 
   test("should update experience", () => {

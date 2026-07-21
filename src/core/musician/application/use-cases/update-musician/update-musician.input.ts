@@ -1,4 +1,6 @@
+import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -8,10 +10,12 @@ import {
   IsString,
   Max,
   Min,
+  ValidateNested,
   validateSync,
 } from "class-validator";
 
 import { PriceRangeProps } from "../../../../shared/domain/value-objects/price-range.vo";
+import { PriceRangeInput } from "../common/price-range.input";
 
 export type UpdateMusicianInputConstructorProps = {
   id: string;
@@ -24,8 +28,9 @@ export type UpdateMusicianInputConstructorProps = {
   genres?: string[];
   instruments?: string[];
   experience_years?: number;
-  priceRange?: PriceRangeProps | null;
+  priceRanges?: PriceRangeProps[] | null;
   is_active?: boolean;
+  open_to_gigs?: boolean;
 };
 
 export class UpdateMusicianInput {
@@ -74,11 +79,19 @@ export class UpdateMusicianInput {
   experience_years?: number;
 
   @IsOptional()
-  priceRange?: PriceRangeProps | null;
+  @IsArray()
+  @ArrayMaxSize(2)
+  @ValidateNested({ each: true })
+  @Type(() => PriceRangeInput)
+  priceRanges?: PriceRangeInput[] | null;
 
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  open_to_gigs?: boolean;
 
   constructor(props: UpdateMusicianInputConstructorProps) {
     if (!props) return;
@@ -92,8 +105,9 @@ export class UpdateMusicianInput {
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years;
-    this.priceRange = props.priceRange;
+    this.priceRanges = props.priceRanges;
     this.is_active = props.is_active;
+    this.open_to_gigs = props.open_to_gigs;
   }
 }
 

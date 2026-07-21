@@ -270,6 +270,88 @@ describe("MusicianPrismaRepository", () => {
     });
   });
 
+  describe("searchByProximity — 7.13d modo turnê", () => {
+    const lat = -23.5614;
+    const lng = -46.6559;
+
+    it("builds an OR bounding box between base location and active touring location", async () => {
+      (prisma.musician.findMany as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await repository.search(
+        MusicianSearchParams.create({ filter: { lat, lng, radius_km: 5 } }),
+      );
+
+      const [candidateCall] = (prisma.musician.findMany as jest.Mock).mock.calls;
+      const profileWhere = candidateCall[0].where.profile.is;
+
+      expect(profileWhere.OR).toHaveLength(2);
+      expect(profileWhere.OR[0]).toEqual({
+        location_lat: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+        location_lng: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+      });
+      expect(profileWhere.OR[1]).toEqual({
+        touring_lat: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+        touring_lng: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+        touring_expires_at: { gt: expect.any(Date) },
+      });
+    });
+
+    it("finds a musician only via an active touring point, even when the base is far away", async () => {
+      const musicianId = "b7f8e6a0-1c2d-4e3f-9a1b-2c3d4e5f6a7b";
+      const model = MusicianModelMapper.toModel(
+        Musician.fake().aMusician().build(),
+      );
+
+      (prisma.musician.findMany as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            id: musicianId,
+            profile: {
+              location_lat: -22.9035, // Rio — longe do centro de busca
+              location_lng: -43.1771,
+              touring_lat: lat, // turnê exatamente no centro de busca
+              touring_lng: lng,
+              touring_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+          },
+        ])
+        .mockResolvedValueOnce([{ ...model, id: musicianId }]);
+
+      const result = await repository.search(
+        MusicianSearchParams.create({ filter: { lat, lng, radius_km: 5 } }),
+      );
+
+      expect(result.items).toHaveLength(1);
+      expect(result.total).toBe(1);
+    });
+
+    it("ignores an expired touring point and falls back to the base distance", async () => {
+      (prisma.musician.findMany as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            id: "b7f8e6a0-1c2d-4e3f-9a1b-2c3d4e5f6a7b",
+            profile: {
+              location_lat: -22.9035, // Rio — fora do raio de 5km
+              location_lng: -43.1771,
+              touring_lat: lat, // turnê expirado não deve contar
+              touring_lng: lng,
+              touring_expires_at: new Date(Date.now() - 1000),
+            },
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.search(
+        MusicianSearchParams.create({ filter: { lat, lng, radius_km: 5 } }),
+      );
+
+      expect(result.items).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+  });
+
   describe("buildWhereClause", () => {
     it("should return empty object when no filter", () => {
       const result = repository["buildWhereClause"](null);
@@ -304,7 +386,7 @@ describe("MusicianPrismaRepository", () => {
       });
     });
 
-    it("should build where clause with price range filters", () => {
+    it("should build where clause with price range filters scoped to a model", () => {
       const result = repository["buildWhereClause"]({
         price_model: "per_event",
         price_min: 100,
@@ -315,10 +397,33 @@ describe("MusicianPrismaRepository", () => {
       expect(result).toEqual({
         profile: {
           is: {
-            price_model: "per_event",
             price_currency: "BRL",
-            price_max: { gte: 100 },
-            price_min: { lte: 200 },
+            price_event_max: { gte: 100 },
+            price_event_min: { lte: 200 },
+          },
+        },
+      });
+    });
+
+    it("should build where clause matching any model when price_model is absent", () => {
+      const result = repository["buildWhereClause"]({
+        price_min: 100,
+        price_max: 200,
+      });
+
+      expect(result).toEqual({
+        profile: {
+          is: {
+            OR: [
+              {
+                price_hour_max: { gte: 100 },
+                price_hour_min: { lte: 200 },
+              },
+              {
+                price_event_max: { gte: 100 },
+                price_event_min: { lte: 200 },
+              },
+            ],
           },
         },
       });

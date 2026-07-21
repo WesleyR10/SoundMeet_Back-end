@@ -50,9 +50,10 @@ describe("ListMusiciansUseCase Unit Tests", () => {
 
   it("should return output sorted by created_at when input param is empty", async () => {
     const items = [
-      Musician.fake().aMusician().build(),
+      Musician.fake().aMusician().withOpenToGigs(true).build(),
       Musician.fake()
         .aMusician()
+        .withOpenToGigs(true)
         .withcreated_at(new Date(new Date().getTime() + 100))
         .build(),
     ];
@@ -70,11 +71,11 @@ describe("ListMusiciansUseCase Unit Tests", () => {
 
   it("should return output using pagination, sort and filter", async () => {
     const items = [
-      Musician.fake().aMusician().withName("test").build(),
-      Musician.fake().aMusician().withName("AAA").build(),
-      Musician.fake().aMusician().withName("AaA").build(),
-      Musician.fake().aMusician().withName("bob").build(),
-      Musician.fake().aMusician().withName("charlie").build(),
+      Musician.fake().aMusician().withName("test").withOpenToGigs(true).build(),
+      Musician.fake().aMusician().withName("AAA").withOpenToGigs(true).build(),
+      Musician.fake().aMusician().withName("AaA").withOpenToGigs(true).build(),
+      Musician.fake().aMusician().withName("bob").withOpenToGigs(true).build(),
+      Musician.fake().aMusician().withName("charlie").withOpenToGigs(true).build(),
     ];
     repository.items = items;
 
@@ -138,26 +139,25 @@ describe("ListMusiciansUseCase Unit Tests", () => {
       Musician.fake()
         .aMusician()
         .withName("m1")
+        .withOpenToGigs(true)
         .withcreated_at(new Date(created_at.getTime() + 100))
         .build(),
       Musician.fake()
         .aMusician()
         .withName("m2")
+        .withOpenToGigs(true)
         .withcreated_at(new Date(created_at.getTime() + 200))
         .build(),
       Musician.fake()
         .aMusician()
         .withName("m3")
+        .withOpenToGigs(true)
         .withcreated_at(new Date(created_at.getTime() + 300))
         .build(),
     ];
 
-    items[0].updatePriceRange(
-      new PriceRange({ model: "per_event", min: 100, max: 200 }),
-    );
-    items[1].updatePriceRange(
-      new PriceRange({ model: "per_event", min: 300, max: 400 }),
-    );
+    items[0].updatePriceRanges([new PriceRange({ model: "per_event", min: 100, max: 200 })]);
+    items[1].updatePriceRanges([new PriceRange({ model: "per_event", min: 300, max: 400 })]);
 
     repository.items = items;
 
@@ -174,5 +174,19 @@ describe("ListMusiciansUseCase Unit Tests", () => {
       per_page: 15,
       last_page: 1,
     });
+  });
+
+  it("never lets the caller override the open_to_gigs consent gate", async () => {
+    const optedIn = Musician.fake().aMusician().withOpenToGigs(true).build();
+    const optedOut = Musician.fake().aMusician().withOpenToGigs(false).build();
+    const undecided = Musician.fake().aMusician().withOpenToGigs(null).build();
+    repository.items = [optedIn, optedOut, undecided];
+
+    const output = await useCase.execute({
+      filter: { open_to_gigs: false } as any,
+    });
+
+    expect(output.items).toEqual([MusicianOutputMapper.toOutput(optedIn)]);
+    expect(output.total).toBe(1);
   });
 });

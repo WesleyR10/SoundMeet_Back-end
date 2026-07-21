@@ -13,6 +13,7 @@ import {
 
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import { BandMemberProps } from "../../../domain/band.aggregate";
+import { LocationInput } from "../update-musician-profile/update-musician-profile.input";
 
 export class CreateBandPriceRangeInput {
   @IsIn(["per_event", "per_hour"])
@@ -42,6 +43,8 @@ export type CreateBandInputConstructorProps = {
   genres: string[];
   members?: BandMemberProps[];
   priceRange?: CreateBandPriceRangeInput | null;
+  address?: LocationInput | null;
+  open_to_gigs?: boolean | null;
   is_active?: boolean;
   creator_musician_id?: string;
 };
@@ -72,6 +75,17 @@ export class CreateBandInput {
   @Type(() => CreateBandPriceRangeInput)
   priceRange?: CreateBandPriceRangeInput | null;
 
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationInput)
+  address?: LocationInput | null;
+
+  // Nunca default true — consentimento explícito do líder, decidido depois
+  // via PATCH /bands/:id/open-to-gigs se omitido aqui.
+  @IsBoolean()
+  @IsOptional()
+  open_to_gigs?: boolean | null;
+
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
@@ -88,6 +102,8 @@ export class CreateBandInput {
     this.genres = props.genres;
     this.members = props.members;
     this.priceRange = props.priceRange;
+    this.address = props.address;
+    this.open_to_gigs = props.open_to_gigs;
     this.is_active = props.is_active;
     this.creator_musician_id = props.creator_musician_id;
   }

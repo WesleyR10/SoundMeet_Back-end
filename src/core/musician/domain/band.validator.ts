@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDate,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -13,7 +14,7 @@ import {
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
-import { Band } from "./band.aggregate";
+import { Band, BandMemberStatus } from "./band.aggregate";
 
 export class BandMemberRules {
   @IsNotEmpty({ groups: ["members"] })
@@ -28,6 +29,9 @@ export class BandMemberRules {
   @IsNotEmpty({ groups: ["members"] })
   instrument: string;
 
+  @IsIn(["pending", "accepted", "declined"], { groups: ["members"] })
+  status: BandMemberStatus;
+
   @IsDate({ groups: ["members"] })
   joined_at: Date;
 
@@ -35,6 +39,7 @@ export class BandMemberRules {
     this.musician_id = data.musician_id;
     this.role = data.role;
     this.instrument = data.instrument;
+    this.status = data.status;
     this.joined_at = data.joined_at;
   }
 }
@@ -89,6 +94,7 @@ export class BandRules {
           musician_id: m.musician_id.id,
           role: m.role,
           instrument: m.instrument,
+          status: m.status,
           joined_at: m.joined_at,
         }),
     );

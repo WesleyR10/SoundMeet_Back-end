@@ -1,6 +1,10 @@
-import { CurrencyEnum, PrismaClient } from "@prisma/client";
+import { CurrencyEnum, Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import {
+  boundingBoxForRadius,
+  haversineKm,
+} from "../../../../shared/domain/geo.utils";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Band, BandId } from "../../../domain/band.aggregate";
@@ -31,19 +35,31 @@ export class BandPrismaRepository implements IBandRepository {
     return currency;
   }
 
+  private toPrismaOptionalJson(
+    value: unknown,
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+    if (value === null) {
+      return Prisma.DbNull;
+    }
+    return value as Prisma.InputJsonValue;
+  }
+
   async insert(entity: Band): Promise<void> {
     const modelProps = BandModelMapper.toModel(entity);
     try {
       await this.prisma.band.create({
         data: {
           ...modelProps,
+          address: this.toPrismaOptionalJson(modelProps.address),
           members: {
             create: entity.members.map((m) => ({
               id: m.member_id?.id ?? new Uuid().id,
               musicianId: m.musician_id.id,
               role: m.role,
               instrument: m.instrument,
+              status: m.status,
               joinedAt: m.joined_at,
+              responded_at: m.responded_at,
             })),
           },
         },
@@ -72,7 +88,10 @@ export class BandPrismaRepository implements IBandRepository {
         try {
           await tx.band.update({
             where: { id },
-            data: modelProps,
+            data: {
+              ...modelProps,
+              address: this.toPrismaOptionalJson(modelProps.address),
+            },
           });
         } catch (error: any) {
           throw mapPrismaErrorToDomainError(error, {
@@ -82,20 +101,40 @@ export class BandPrismaRepository implements IBandRepository {
           });
         }
 
+        // Upsert por membro em vez de apagar/recriar a tabela inteira a cada
+        // update — aceitar um convite (ou qualquer outro update de banda que
+        // não mexe em membros) não pode custar 1 delete + N inserts, e como
+        // bônus o `id` de um membro inalterado deixa de ser regenerado a
+        // cada save.
+        const currentMemberIds = entity.members.map((m) => m.musician_id.id);
         await tx.bandMember.deleteMany({
-          where: { bandId: id },
+          where: {
+            bandId: id,
+            musicianId: {
+              notIn: currentMemberIds.length ? currentMemberIds : [""],
+            },
+          },
         });
 
-        if (entity.members.length) {
-          await tx.bandMember.createMany({
-            data: entity.members.map((m) => ({
+        for (const m of entity.members) {
+          await tx.bandMember.upsert({
+            where: { bandId_musicianId: { bandId: id, musicianId: m.musician_id.id } },
+            create: {
               id: m.member_id?.id ?? new Uuid().id,
               bandId: id,
               musicianId: m.musician_id.id,
               role: m.role,
               instrument: m.instrument,
+              status: m.status,
               joinedAt: m.joined_at,
-            })),
+              responded_at: m.responded_at,
+            },
+            update: {
+              role: m.role,
+              instrument: m.instrument,
+              status: m.status,
+              responded_at: m.responded_at,
+            },
           });
         }
       });
@@ -182,6 +221,18 @@ export class BandPrismaRepository implements IBandRepository {
   }
 
   async search(props: BandSearchParams): Promise<BandSearchResult> {
+    const geo = props.filter;
+    if (
+      geo?.lat !== null &&
+      geo?.lat !== undefined &&
+      geo?.lng !== null &&
+      geo?.lng !== undefined &&
+      geo?.radius_km !== null &&
+      geo?.radius_km !== undefined
+    ) {
+      return this.searchByProximity(props, geo.lat, geo.lng, geo.radius_km);
+    }
+
     const offset = (props.page - 1) * props.per_page;
     const limit = props.per_page;
 
@@ -204,6 +255,68 @@ export class BandPrismaRepository implements IBandRepository {
     return new BandSearchResult({
       items: entities,
       total,
+      current_page: props.page,
+      per_page: props.per_page,
+    });
+  }
+
+  // Busca por proximidade — paridade com MusicianPrismaRepository.searchByProximity:
+  // bounding box indexável em SQL (location_lat/location_lng denormalizados
+  // direto na tabela bands, sem sub-tabela de profile) + Haversine exato em
+  // memória para o corte circular e ordenação por distância.
+  private async searchByProximity(
+    props: BandSearchParams,
+    lat: number,
+    lng: number,
+    radiusKm: number,
+  ): Promise<BandSearchResult> {
+    const where = this.buildWhereClause(props.filter);
+    const box = boundingBoxForRadius(lat, lng, radiusKm);
+    where.location_lat = { gte: box.min_lat, lte: box.max_lat };
+    where.location_lng = { gte: box.min_lng, lte: box.max_lng };
+
+    const candidates = await this.prisma.band.findMany({
+      where,
+      select: { id: true, location_lat: true, location_lng: true },
+    });
+
+    const withinRadius = candidates
+      .filter(
+        (candidate) =>
+          candidate.location_lat !== null && candidate.location_lng !== null,
+      )
+      .map((candidate) => ({
+        id: candidate.id,
+        distance: haversineKm(
+          lat,
+          lng,
+          candidate.location_lat!,
+          candidate.location_lng!,
+        ),
+      }))
+      .filter((candidate) => candidate.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    const offset = (props.page - 1) * props.per_page;
+    const pageIds = withinRadius
+      .slice(offset, offset + props.per_page)
+      .map((candidate) => candidate.id);
+
+    const models = pageIds.length
+      ? await this.prisma.band.findMany({
+          where: { id: { in: pageIds } },
+          include: { members: { orderBy: { role: "asc" } } },
+        })
+      : [];
+    const modelById = new Map(models.map((model) => [model.id, model]));
+    const items = pageIds
+      .map((id) => modelById.get(id))
+      .filter((model): model is NonNullable<typeof model> => !!model)
+      .map((model) => BandModelMapper.toEntity(model as any));
+
+    return new BandSearchResult({
+      items,
+      total: withinRadius.length,
       current_page: props.page,
       per_page: props.per_page,
     });
@@ -255,6 +368,18 @@ export class BandPrismaRepository implements IBandRepository {
 
     if (filter.is_active !== undefined) {
       where.is_active = filter.is_active;
+    }
+
+    if (filter.open_to_gigs !== undefined) {
+      where.open_to_gigs = filter.open_to_gigs;
+    }
+
+    if (filter.musician_id) {
+      // "Minhas bandas" só deve listar bandas onde o vínculo é real — um
+      // convite pending/declined não conta como "sou membro".
+      where.members = {
+        some: { musicianId: filter.musician_id, status: "accepted" },
+      };
     }
 
     return where;

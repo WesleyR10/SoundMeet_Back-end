@@ -1,6 +1,7 @@
 import { Chance } from "chance";
 
 import { InvariantViolationError } from "../../shared/domain/errors/invariant-violation.error";
+import { Location } from "../../shared/domain/value-objects/location.vo";
 import { Band, BandId, BandMemberProps } from "./band.aggregate";
 
 type PropOrFactory<T> = T | ((index: number) => T);
@@ -17,6 +18,8 @@ export class BandFakeBuilder<TBuild = any> {
     this.chance.word(),
   ];
   private _members: PropOrFactory<BandMemberProps[]> = [];
+  private _address: PropOrFactory<Location | null> = (_index) => null;
+  private _open_to_gigs: PropOrFactory<boolean | null> = (_index) => null;
   private _is_active: PropOrFactory<boolean> = (_index) => true;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
   private _updated_at: PropOrFactory<Date> | undefined = undefined;
@@ -80,6 +83,16 @@ export class BandFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withAddress(valueOrFactory: PropOrFactory<Location | null>) {
+    this._address = valueOrFactory;
+    return this;
+  }
+
+  withOpenToGigs(valueOrFactory: PropOrFactory<boolean | null>) {
+    this._open_to_gigs = valueOrFactory;
+    return this;
+  }
+
   withCreatedAt(valueOrFactory: PropOrFactory<Date>) {
     this._created_at = valueOrFactory;
     return this;
@@ -101,6 +114,8 @@ export class BandFakeBuilder<TBuild = any> {
         avatar: this.callFactory(this._avatar, index),
         genres: this.callFactory(this._genres, index),
         members: this.callFactory(this._members, index),
+        address: this.callFactory(this._address, index),
+        open_to_gigs: this.callFactory(this._open_to_gigs, index),
         is_active: this.callFactory(this._is_active, index),
         created_at: !this._created_at
           ? undefined
@@ -142,6 +157,14 @@ export class BandFakeBuilder<TBuild = any> {
 
   get is_active() {
     return this.getValue("is_active");
+  }
+
+  get address() {
+    return this.getValue("address");
+  }
+
+  get open_to_gigs() {
+    return this.getValue("open_to_gigs");
   }
 
   get created_at() {

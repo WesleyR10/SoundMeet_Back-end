@@ -1,3 +1,4 @@
+import { haversineKm } from "../../../../shared/domain/geo.utils";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Band, BandId } from "../../../domain/band.aggregate";
@@ -75,6 +76,41 @@ export class BandInMemoryRepository
 
       if (filter.is_active !== undefined) {
         matches = matches && band.is_active === filter.is_active;
+      }
+
+      if (filter.open_to_gigs !== undefined) {
+        matches = matches && band.open_to_gigs === filter.open_to_gigs;
+      }
+
+      if (filter.musician_id) {
+        // "Minhas bandas" só deve listar bandas onde o vínculo é real — um
+        // convite pending/declined não conta como "sou membro".
+        matches =
+          matches &&
+          band.acceptedMembers.some(
+            (m) => m.musician_id.id === filter.musician_id,
+          );
+      }
+
+      // Busca por raio — paridade com MusicianInMemoryRepository (7.13c).
+      if (
+        filter.lat !== null &&
+        filter.lat !== undefined &&
+        filter.lng !== null &&
+        filter.lng !== undefined &&
+        filter.radius_km !== null &&
+        filter.radius_km !== undefined
+      ) {
+        const address = band.address;
+        matches =
+          matches &&
+          !!address &&
+          address.latitude !== null &&
+          address.latitude !== undefined &&
+          address.longitude !== null &&
+          address.longitude !== undefined &&
+          haversineKm(filter.lat, filter.lng, address.latitude, address.longitude) <=
+            filter.radius_km;
       }
 
       return matches;

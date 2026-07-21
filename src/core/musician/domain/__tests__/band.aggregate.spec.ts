@@ -1,5 +1,6 @@
 import { Uuid } from "@core/shared/domain";
 
+import { Location } from "../../../shared/domain/value-objects/location.vo";
 import { Band, BandId } from "../band.aggregate";
 
 describe("Band Unit Tests", () => {
@@ -123,7 +124,187 @@ describe("Band Unit Tests", () => {
       name: band.name,
       genres: band.genres,
       is_active: band.is_active,
+      address: null,
+      open_to_gigs: null,
     });
     expect(Array.isArray(json.members)).toBe(true);
+  });
+
+  describe("invite flow", () => {
+    test("inviteMember creates a pending member", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+
+      band.inviteMember(musicianId, "member", "guitar");
+
+      expect(band.notification.hasErrors()).toBe(false);
+      expect(band.members).toHaveLength(1);
+      expect(band.members[0].status).toBe("pending");
+      expect(band.members[0].responded_at).toBeNull();
+      expect(band.acceptedMembers).toHaveLength(0);
+    });
+
+    test("inviteMember errors when musician already has a member/invite", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+
+      band.inviteMember(musicianId, "member", "guitar");
+      band.inviteMember(musicianId, "member", "bass");
+
+      expect(band.notification.hasErrors()).toBe(true);
+      expect(band.notification).notificationContainsErrorMessages([
+        {
+          musician_id: [
+            "Musician is already a member or has a pending invite for this band",
+          ],
+        },
+      ]);
+    });
+
+    test("acceptInvite transitions pending to accepted", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+      band.inviteMember(musicianId, "member", "guitar");
+
+      band.acceptInvite(musicianId);
+
+      expect(band.notification.hasErrors()).toBe(false);
+      expect(band.members[0].status).toBe("accepted");
+      expect(band.members[0].responded_at).toBeInstanceOf(Date);
+      expect(band.acceptedMembers).toHaveLength(1);
+    });
+
+    test("declineInvite transitions pending to declined", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+      band.inviteMember(musicianId, "member", "guitar");
+
+      band.declineInvite(musicianId);
+
+      expect(band.notification.hasErrors()).toBe(false);
+      expect(band.members[0].status).toBe("declined");
+      expect(band.members[0].responded_at).toBeInstanceOf(Date);
+      expect(band.acceptedMembers).toHaveLength(0);
+    });
+
+    test("acceptInvite errors when there is no invite for the musician", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+
+      band.acceptInvite(new Uuid());
+
+      expect(band.notification.hasErrors()).toBe(true);
+      expect(band.notification).notificationContainsErrorMessages([
+        { musician_id: ["No invite found for this musician"] },
+      ]);
+    });
+
+    test("acceptInvite errors when invite is not pending anymore", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+      band.inviteMember(musicianId, "member", "guitar");
+      band.acceptInvite(musicianId);
+
+      band.acceptInvite(musicianId);
+
+      expect(band.notification.hasErrors()).toBe(true);
+      expect(band.notification).notificationContainsErrorMessages([
+        { status: ["Invite is not pending"] },
+      ]);
+    });
+
+    test("declineInvite errors when invite is not pending anymore", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+      band.inviteMember(musicianId, "member", "guitar");
+      band.declineInvite(musicianId);
+
+      band.declineInvite(musicianId);
+
+      expect(band.notification.hasErrors()).toBe(true);
+      expect(band.notification).notificationContainsErrorMessages([
+        { status: ["Invite is not pending"] },
+      ]);
+    });
+
+    test("acceptedMembers filters only accepted members", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const pendingMusician = new Uuid();
+      const acceptedMusician = new Uuid();
+      const declinedMusician = new Uuid();
+
+      band.inviteMember(pendingMusician, "member", "guitar");
+      band.inviteMember(acceptedMusician, "member", "bass");
+      band.inviteMember(declinedMusician, "member", "drums");
+      band.acceptInvite(acceptedMusician);
+      band.declineInvite(declinedMusician);
+
+      expect(band.acceptedMembers).toHaveLength(1);
+      expect(band.acceptedMembers[0].musician_id.id).toBe(acceptedMusician.id);
+    });
+
+    test("inviteMember reactivates a previously declined invite instead of rejecting it forever", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+
+      band.inviteMember(musicianId, "member", "guitar");
+      band.declineInvite(musicianId);
+      expect(band.members[0].status).toBe("declined");
+
+      band.inviteMember(musicianId, "member", "bass");
+
+      expect(band.notification.hasErrors()).toBe(false);
+      expect(band.members).toHaveLength(1);
+      expect(band.members[0].status).toBe("pending");
+      expect(band.members[0].instrument).toBe("bass");
+      expect(band.members[0].responded_at).toBeNull();
+    });
+
+    test("inviteMember still rejects a musician who is already pending", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+      band.inviteMember(musicianId, "member", "guitar");
+
+      band.inviteMember(musicianId, "member", "guitar");
+
+      expect(band.notification.hasErrors()).toBe(true);
+      expect(band.members).toHaveLength(1);
+    });
+
+    test("inviteMember still rejects a musician who is already accepted", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const musicianId = new Uuid();
+      band.inviteMember(musicianId, "member", "bass");
+      band.acceptInvite(musicianId);
+
+      band.inviteMember(musicianId, "member", "bass");
+
+      expect(band.notification.hasErrors()).toBe(true);
+      expect(band.members).toHaveLength(1);
+      expect(band.members[0].status).toBe("accepted");
+    });
+  });
+
+  describe("open_to_gigs and address", () => {
+    test("setOpenToGigs updates the consent flag", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      expect(band.open_to_gigs).toBeNull();
+
+      band.setOpenToGigs(true);
+      expect(band.open_to_gigs).toBe(true);
+
+      band.setOpenToGigs(false);
+      expect(band.open_to_gigs).toBe(false);
+    });
+
+    test("changeAddress updates and clears the address", () => {
+      const band = Band.create({ name: "Band Name", genres: ["rock"] });
+      const address = new Location({ city: "São Paulo", state: "SP" });
+
+      band.changeAddress(address);
+      expect(band.address).toBe(address);
+
+      band.changeAddress(null);
+      expect(band.address).toBeNull();
+    });
   });
 });

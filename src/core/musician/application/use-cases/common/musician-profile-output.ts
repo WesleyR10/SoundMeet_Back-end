@@ -6,19 +6,29 @@ import { Musician } from "../../../domain/musician.aggregate";
 export type MusicianProfileOutput = {
   id: string;
   musician_id: string;
-  price_range: {
+  price_ranges: {
     model: PriceModel;
     min: number;
     max: number;
     currency: Currency;
     notes: string | null;
-  } | null;
+  }[];
   location: {
     city: string | null;
     state: string | null;
     latitude: number | null;
     longitude: number | null;
+    street: string | null;
+    number: string | null;
+    complement: string | null;
+    neighborhood: string | null;
+    zip_code: string | null;
   };
+  // Modo turnê (7.13d) — segundo ponto de busca, opcional e com expiração
+  // automática; is_touring já considera a expiração (null/expirado = false).
+  touring_location: MusicianProfileOutput["location"] | null;
+  touring_expires_at: Date | null;
+  is_touring: boolean;
   social_links: Record<string, unknown> | null;
   experience: number;
   instruments: string[];
@@ -44,6 +54,7 @@ export type MusicianOutput = {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  open_to_gigs: boolean | null;
   profile: MusicianProfileOutput | null;
   created_at: Date;
   updated_at: Date;
@@ -76,20 +87,22 @@ export class MusicianOutputMapper {
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
+      open_to_gigs: entity.open_to_gigs,
       profile: entity.profile
         ? {
             id: entity.profile.profile_id.id,
             musician_id: entity.profile.musician_id.id,
-            price_range: entity.profile.priceRange
-              ? {
-                  model: entity.profile.priceRange.model,
-                  min: entity.profile.priceRange.min,
-                  max: entity.profile.priceRange.max,
-                  currency: entity.profile.priceRange.currency,
-                  notes: entity.profile.priceRange.notes,
-                }
-              : null,
+            price_ranges: entity.profile.priceRanges.map((range) => ({
+              model: range.model,
+              min: range.min,
+              max: range.max,
+              currency: range.currency,
+              notes: range.notes,
+            })),
             location: entity.profile.location.toJSON(),
+            touring_location: entity.profile.touring_location?.toJSON() ?? null,
+            touring_expires_at: entity.profile.touring_expires_at,
+            is_touring: entity.profile.isTouring,
             social_links: entity.profile.socialLinks,
             experience: entity.profile.experience,
             instruments: entity.profile.instruments,

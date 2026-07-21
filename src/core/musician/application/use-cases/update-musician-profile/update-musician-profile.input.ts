@@ -1,5 +1,6 @@
 import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
   IsArray,
   IsIn,
   IsNumber,
@@ -7,32 +8,14 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
   ValidateNested,
 } from "class-validator";
 
-import { Currency } from "../../../../shared/domain/value-objects/money.vo";
+import { PriceRangeInput } from "../common/price-range.input";
 
-export class PriceRangeInput {
-  @IsIn(["per_event", "per_hour"])
-  model: "per_event" | "per_hour";
-
-  @IsNumber()
-  @Min(0)
-  min: number;
-
-  @IsNumber()
-  @Min(0)
-  max: number;
-
-  @IsOptional()
-  @IsIn(Object.values(Currency))
-  currency?: Currency;
-
-  @IsOptional()
-  @IsString()
-  notes?: string | null;
-}
+export { PriceRangeInput };
 
 export class LocationInput {
   @IsOptional()
@@ -50,16 +33,43 @@ export class LocationInput {
   @IsOptional()
   @IsNumber()
   longitude?: number;
+
+  // Endereço detalhado opcional (autofill via CEP/ViaCEP no app) — perfis
+  // antigos com só city/state continuam válidos.
+  @IsOptional()
+  @IsString()
+  street?: string | null;
+
+  @IsOptional()
+  @IsString()
+  number?: string | null;
+
+  @IsOptional()
+  @IsString()
+  complement?: string | null;
+
+  @IsOptional()
+  @IsString()
+  neighborhood?: string | null;
+
+  // Aceita "01310-100" ou "01310100"; o VO normaliza para 8 dígitos.
+  @IsOptional()
+  @Matches(/^\d{5}-?\d{3}$/, { message: "zip_code must be a valid CEP" })
+  zip_code?: string | null;
 }
 
 export class UpdateMusicianProfileInput {
   @IsUUID()
   id: string;
 
+  // Até uma faixa por modelo (per_hour e per_event) — substitui o conjunto
+  // inteiro a cada update; null limpa tudo.
   @IsOptional()
-  @ValidateNested()
+  @IsArray()
+  @ArrayMaxSize(2)
+  @ValidateNested({ each: true })
   @Type(() => PriceRangeInput)
-  priceRange?: PriceRangeInput | null;
+  priceRanges?: PriceRangeInput[] | null;
 
   @IsOptional()
   @ValidateNested()

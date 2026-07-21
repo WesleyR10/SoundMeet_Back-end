@@ -16,6 +16,17 @@ export type BandFilter = {
   price_max?: number | null;
   price_currency?: Currency | null;
   is_active?: boolean | null;
+  // Consentimento explícito do líder — ListBandsUseCase força true
+  // incondicionalmente (mesmo raciocínio de MusicianFilter.open_to_gigs).
+  open_to_gigs?: boolean | null;
+  // Busca por proximidade — paridade com MusicianFilter (7.13c): só entra
+  // com o trio completo; ordenação por distância no repositório.
+  lat?: number | null;
+  lng?: number | null;
+  radius_km?: number | null;
+  // "Minhas bandas" — bandas onde o músico é membro. Roster de banda já é
+  // público via GET /bands/:id, então esse filtro não precisa de ownership.
+  musician_id?: string | null;
 };
 
 const isPriceModel = (value: unknown): value is PriceModel => {
@@ -33,6 +44,17 @@ export class BandSearchParams extends DefaultSearchParams<BandFilter> {
 
   static create(props: SearchParamsConstructorProps<BandFilter> = {}) {
     return new BandSearchParams(props);
+  }
+
+  // Gate de consentimento — mesmo raciocínio de MusicianSearchParams.createPublic:
+  // único ponto de aplicação, sempre vence o filtro do chamador. NÃO use para
+  // "minhas bandas" (filter.musician_id) — visibilidade da própria banda para
+  // quem já é membro dela não depende do opt-in de descoberta por terceiros.
+  static createPublic(props: SearchParamsConstructorProps<BandFilter> = {}) {
+    return new BandSearchParams({
+      ...props,
+      filter: { ...(props.filter ?? {}), open_to_gigs: true },
+    });
   }
 
   get filter(): BandFilter | null {
@@ -68,6 +90,21 @@ export class BandSearchParams extends DefaultSearchParams<BandFilter> {
         typeof _value.is_active === "boolean" && {
           is_active: _value.is_active,
         }),
+      ...(_value &&
+        typeof _value.open_to_gigs === "boolean" && {
+          open_to_gigs: _value.open_to_gigs,
+        }),
+      ...(_value &&
+        Number.isFinite(Number(_value.lat)) &&
+        Number.isFinite(Number(_value.lng)) &&
+        Number(_value.radius_km) > 0 && {
+          lat: Number(_value.lat),
+          lng: Number(_value.lng),
+          radius_km: Math.min(Number(_value.radius_km), 500),
+        }),
+      ...(_value && _value.musician_id && {
+        musician_id: `${_value.musician_id}`,
+      }),
     };
 
     this._filter = Object.keys(filter).length === 0 ? null : filter;

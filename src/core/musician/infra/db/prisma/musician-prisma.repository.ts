@@ -1,6 +1,10 @@
 import { CurrencyEnum, Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import {
+  boundingBoxForRadius,
+  haversineKm,
+} from "../../../../shared/domain/geo.utils";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
@@ -60,6 +64,9 @@ export class MusicianPrismaRepository implements IMusicianRepository {
           ...(({ musicianId, ...data }) => data)(profileModel),
           price_currency: this.toPrismaCurrency(profileModel.price_currency),
           location: this.toPrismaRequiredJson(profileModel.location),
+          touring_location: this.toPrismaOptionalJson(
+            profileModel.touring_location,
+          ),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
         }
       : null;
@@ -114,6 +121,9 @@ export class MusicianPrismaRepository implements IMusicianRepository {
           ...(({ musicianId, ...data }) => data)(profileModel),
           price_currency: this.toPrismaCurrency(profileModel.price_currency),
           location: this.toPrismaRequiredJson(profileModel.location),
+          touring_location: this.toPrismaOptionalJson(
+            profileModel.touring_location,
+          ),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
         }
       : null;
@@ -122,6 +132,9 @@ export class MusicianPrismaRepository implements IMusicianRepository {
           ...(({ musicianId, id: profileId, ...data }) => data)(profileModel),
           price_currency: this.toPrismaCurrency(profileModel.price_currency),
           location: this.toPrismaRequiredJson(profileModel.location),
+          touring_location: this.toPrismaOptionalJson(
+            profileModel.touring_location,
+          ),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
         }
       : null;
@@ -264,6 +277,18 @@ export class MusicianPrismaRepository implements IMusicianRepository {
   }
 
   async search(props: MusicianSearchParams): Promise<MusicianSearchResult> {
+    const geo = props.filter;
+    if (
+      geo?.lat !== null &&
+      geo?.lat !== undefined &&
+      geo?.lng !== null &&
+      geo?.lng !== undefined &&
+      geo?.radius_km !== null &&
+      geo?.radius_km !== undefined
+    ) {
+      return this.searchByProximity(props, geo.lat, geo.lng, geo.radius_km);
+    }
+
     const offset = (props.page - 1) * props.per_page;
     const limit = props.per_page;
 
@@ -288,6 +313,108 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     return new MusicianSearchResult({
       items: entities,
       total,
+      current_page: props.page,
+      per_page: props.per_page,
+    });
+  }
+
+  // Busca por proximidade (roadmap 7.13c): bounding box indexável em SQL
+  // (colunas denormalizadas location_lat/location_lng no profile, índice
+  // composto) como pré-filtro + Haversine exato em memória para o corte
+  // circular e ordenação por distância. Duas queries (ids→página) para manter
+  // paginação/total exatos sem SQL cru — mesmo desenho do
+  // EstablishmentPrismaRepository.searchByProximity.
+  // 7.13d — modo turnê: considera OS DOIS pontos (base OU turnê ainda
+  // ativo), usando a menor distância como corte/ordenação. Nunca substitui
+  // a base, só amplia onde o músico pode ser encontrado.
+  private async searchByProximity(
+    props: MusicianSearchParams,
+    lat: number,
+    lng: number,
+    radiusKm: number,
+  ): Promise<MusicianSearchResult> {
+    const where = this.buildWhereClause(props.filter);
+    const box = boundingBoxForRadius(lat, lng, radiusKm);
+    const now = new Date();
+    where.profile = {
+      is: {
+        ...(where.profile?.is ?? {}),
+        OR: [
+          {
+            location_lat: { gte: box.min_lat, lte: box.max_lat },
+            location_lng: { gte: box.min_lng, lte: box.max_lng },
+          },
+          {
+            touring_lat: { gte: box.min_lat, lte: box.max_lat },
+            touring_lng: { gte: box.min_lng, lte: box.max_lng },
+            touring_expires_at: { gt: now },
+          },
+        ],
+      },
+    };
+
+    const candidates = await this.prisma.musician.findMany({
+      where,
+      select: {
+        id: true,
+        profile: {
+          select: {
+            location_lat: true,
+            location_lng: true,
+            touring_lat: true,
+            touring_lng: true,
+            touring_expires_at: true,
+          },
+        },
+      },
+    });
+
+    const withinRadius = candidates
+      .map((candidate) => {
+        const profile = candidate.profile!;
+        const distances: number[] = [];
+        if (profile.location_lat !== null && profile.location_lng !== null) {
+          distances.push(
+            haversineKm(lat, lng, profile.location_lat, profile.location_lng),
+          );
+        }
+        if (
+          profile.touring_lat !== null &&
+          profile.touring_lng !== null &&
+          profile.touring_expires_at !== null &&
+          profile.touring_expires_at.getTime() > now.getTime()
+        ) {
+          distances.push(
+            haversineKm(lat, lng, profile.touring_lat, profile.touring_lng),
+          );
+        }
+        return { id: candidate.id, distance: Math.min(...distances) };
+      })
+      .filter((candidate) => candidate.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    const offset = (props.page - 1) * props.per_page;
+    const pageIds = withinRadius
+      .slice(offset, offset + props.per_page)
+      .map((candidate) => candidate.id);
+
+    const models = pageIds.length
+      ? await this.prisma.musician.findMany({
+          where: { id: { in: pageIds } },
+          include: { profile: true },
+        })
+      : [];
+    const modelById = new Map(models.map((model) => [model.id, model]));
+    const items = pageIds
+      .map((id) => modelById.get(id))
+      .filter((model): model is NonNullable<typeof model> => !!model)
+      .map((model) =>
+        MusicianModelMapper.toEntity(model as unknown as MusicianModel),
+      );
+
+    return new MusicianSearchResult({
+      items,
+      total: withinRadius.length,
       current_page: props.page,
       per_page: props.per_page,
     });
@@ -334,28 +461,38 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     const profileWhere: any = {};
     const prismaCurrency = this.toPrismaCurrency(filter.price_currency ?? null);
 
-    if (filter.price_model) {
-      profileWhere.price_model = filter.price_model;
-    }
-
     if (prismaCurrency) {
       profileWhere.price_currency = prismaCurrency;
     }
 
-    if (
+    const hasPriceMin =
       filter.price_min !== null &&
       filter.price_min !== undefined &&
-      Number.isFinite(filter.price_min)
-    ) {
-      profileWhere.price_max = { gte: filter.price_min };
-    }
-
-    if (
+      Number.isFinite(filter.price_min);
+    const hasPriceMax =
       filter.price_max !== null &&
       filter.price_max !== undefined &&
-      Number.isFinite(filter.price_max)
-    ) {
-      profileWhere.price_min = { lte: filter.price_max };
+      Number.isFinite(filter.price_max);
+
+    // Faixas por modelo vivem em pares de colunas (price_hour_* /
+    // price_event_*). Com price_model no filtro, exige a faixa daquele modelo
+    // (e o overlap min/max nela); sem price_model, o overlap vale para
+    // qualquer um dos dois modelos (OR).
+    const modelOverlapClause = (model: "per_hour" | "per_event") => {
+      const prefix = model === "per_hour" ? "price_hour" : "price_event";
+      const clause: any = { [`${prefix}_min`]: { not: null } };
+      if (hasPriceMin) clause[`${prefix}_max`] = { gte: filter.price_min };
+      if (hasPriceMax) clause[`${prefix}_min`] = { lte: filter.price_max };
+      return clause;
+    };
+
+    if (filter.price_model) {
+      Object.assign(profileWhere, modelOverlapClause(filter.price_model));
+    } else if (hasPriceMin || hasPriceMax) {
+      profileWhere.OR = [
+        modelOverlapClause("per_hour"),
+        modelOverlapClause("per_event"),
+      ];
     }
 
     if (Object.keys(profileWhere).length) {
@@ -370,6 +507,10 @@ export class MusicianPrismaRepository implements IMusicianRepository {
 
     if (filter.is_verified !== undefined) {
       where.is_verified = filter.is_verified;
+    }
+
+    if (filter.open_to_gigs !== undefined) {
+      where.open_to_gigs = filter.open_to_gigs;
     }
 
     return where;

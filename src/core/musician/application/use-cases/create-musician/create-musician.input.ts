@@ -27,9 +27,10 @@ export type CreateMusicianInputConstructorProps = {
   genres?: string[];
   instruments?: string[];
   experience_years?: number;
-  priceRange?: CreateMusicianPriceRangeInput;
+  priceRanges?: CreateMusicianPriceRangeInput[];
   location?: LocationProps;
   is_active?: boolean;
+  open_to_gigs?: boolean | null;
 };
 
 export class CreateMusicianPriceRangeInput {
@@ -103,10 +104,11 @@ export class CreateMusicianInput {
   @IsOptional()
   experience_years?: number;
 
-  @ValidateNested()
+  @IsArray()
+  @ValidateNested({ each: true })
   @Type(() => CreateMusicianPriceRangeInput)
   @IsOptional()
-  priceRange?: CreateMusicianPriceRangeInput;
+  priceRanges?: CreateMusicianPriceRangeInput[];
 
   @IsOptional()
   location?: LocationProps;
@@ -114,6 +116,12 @@ export class CreateMusicianInput {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  // Nunca default true — consentimento explícito, decidido no onboarding
+  // (aqui ou depois via PATCH /musicians/:id/open-to-gigs).
+  @IsBoolean()
+  @IsOptional()
+  open_to_gigs?: boolean | null;
 
   constructor(props: CreateMusicianInputConstructorProps) {
     if (!props) return;
@@ -126,9 +134,10 @@ export class CreateMusicianInput {
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years;
-    this.priceRange = props.priceRange;
+    this.priceRanges = props.priceRanges;
     this.location = props.location;
     this.is_active = props.is_active ?? true;
+    this.open_to_gigs = props.open_to_gigs;
   }
 }
 

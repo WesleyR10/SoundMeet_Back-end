@@ -1,5 +1,6 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { Location } from "../../../../shared/domain/value-objects/location.vo";
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Band, BandId } from "../../../domain/band.aggregate";
@@ -59,6 +60,14 @@ export class UpdateBandUseCase implements IUseCase<
       } else {
         band.deactivate();
       }
+    }
+
+    if (input.address !== undefined) {
+      band.changeAddress(input.address ? new Location(input.address) : null);
+    }
+
+    if (input.open_to_gigs !== undefined) {
+      band.setOpenToGigs(input.open_to_gigs);
     }
 
     await this.bandRepo.update(band);

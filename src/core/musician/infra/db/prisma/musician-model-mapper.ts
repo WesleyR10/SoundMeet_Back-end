@@ -103,27 +103,98 @@ export class MusicianModelMapper {
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
+      open_to_gigs: entity.open_to_gigs,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
   }
 
   static toProfileModel(profile: MusicianProfile): MusicianProfileModel {
+    const hourRange = profile.priceRanges.find((r) => r.model === "per_hour");
+    const eventRange = profile.priceRanges.find(
+      (r) => r.model === "per_event",
+    );
     return {
       id: profile.profile_id.id,
       musicianId: profile.musician_id.id,
-      price_model: profile.priceRange?.model ?? null,
-      price_min: profile.priceRange?.min ?? null,
-      price_max: profile.priceRange?.max ?? null,
-      price_currency: profile.priceRange
-        ? toDbCurrency(profile.priceRange.currency)
+      // Colunas legadas zeradas — leitura/escrita agora é pelos pares por modelo
+      price_model: null,
+      price_min: null,
+      price_max: null,
+      price_currency: profile.priceRanges.length
+        ? toDbCurrency(profile.priceRanges[0].currency)
         : null,
-      price_notes: profile.priceRange?.notes ?? null,
+      price_notes: null,
+      price_hour_min: hourRange?.min ?? null,
+      price_hour_max: hourRange?.max ?? null,
+      price_hour_notes: hourRange?.notes ?? null,
+      price_event_min: eventRange?.min ?? null,
+      price_event_max: eventRange?.max ?? null,
+      price_event_notes: eventRange?.notes ?? null,
       location: profile.location.toJSON() as unknown as JsonValue,
+      location_lat: profile.location.latitude ?? null,
+      location_lng: profile.location.longitude ?? null,
+      touring_location: profile.touring_location
+        ? (profile.touring_location.toJSON() as unknown as JsonValue)
+        : null,
+      touring_lat: profile.touring_location?.latitude ?? null,
+      touring_lng: profile.touring_location?.longitude ?? null,
+      touring_expires_at: profile.touring_expires_at ?? null,
       socialLinks: (profile.socialLinks ?? null) as unknown as JsonValue | null,
       created_at: profile.created_at,
       updated_at: profile.updated_at,
     };
+  }
+
+  // Reconstrói as faixas a partir dos pares por modelo, com fallback para as
+  // colunas legadas (linhas ainda não backfilladas / bancos antigos).
+  static toPriceRanges(profile: MusicianProfileModel): PriceRange[] {
+    const currency = profile.price_currency
+      ? toDomainCurrency(profile.price_currency)
+      : undefined;
+
+    const ranges: PriceRange[] = [];
+    if (profile.price_hour_min !== null && profile.price_hour_max !== null) {
+      ranges.push(
+        new PriceRange({
+          model: "per_hour",
+          min: Number(profile.price_hour_min),
+          max: Number(profile.price_hour_max),
+          currency,
+          notes: profile.price_hour_notes,
+        }),
+      );
+    }
+    if (profile.price_event_min !== null && profile.price_event_max !== null) {
+      ranges.push(
+        new PriceRange({
+          model: "per_event",
+          min: Number(profile.price_event_min),
+          max: Number(profile.price_event_max),
+          currency,
+          notes: profile.price_event_notes,
+        }),
+      );
+    }
+
+    if (
+      ranges.length === 0 &&
+      profile.price_model &&
+      profile.price_min !== null &&
+      profile.price_max !== null
+    ) {
+      ranges.push(
+        new PriceRange({
+          model: profile.price_model as PriceModel,
+          min: Number(profile.price_min),
+          max: Number(profile.price_max),
+          currency,
+          notes: profile.price_notes,
+        }),
+      );
+    }
+
+    return ranges;
   }
 
   static toEntity(model: MusicianModel): Musician {
@@ -133,21 +204,12 @@ export class MusicianModelMapper {
         profile = new MusicianProfile({
           profile_id: new MusicianProfileId(model.profile.id),
           musician_id: new Uuid(model.profile.musicianId),
-          priceRange:
-            model.profile.price_model &&
-            model.profile.price_min !== null &&
-            model.profile.price_max !== null
-              ? new PriceRange({
-                  model: model.profile.price_model as PriceModel,
-                  min: Number(model.profile.price_min),
-                  max: Number(model.profile.price_max),
-                  currency: model.profile.price_currency
-                    ? toDomainCurrency(model.profile.price_currency)
-                    : undefined,
-                  notes: model.profile.price_notes,
-                })
-              : null,
+          priceRanges: MusicianModelMapper.toPriceRanges(model.profile),
           location: Location.fromJSON(model.profile.location),
+          touring_location: model.profile.touring_location
+            ? Location.fromJSON(model.profile.touring_location)
+            : null,
+          touring_expires_at: model.profile.touring_expires_at ?? null,
           socialLinks: toSocialLinks(model.profile.socialLinks),
           experience: model.experience_years ?? 0,
           instruments: model.instruments ?? [],
@@ -190,6 +252,7 @@ export class MusicianModelMapper {
       total_ratings: model.total_ratings,
       is_active: model.is_active,
       is_verified: model.is_verified,
+      open_to_gigs: model.open_to_gigs,
       push_token: model.push_token ?? undefined,
       push_token_platform: model.push_token_platform ?? undefined,
       created_at: model.created_at,

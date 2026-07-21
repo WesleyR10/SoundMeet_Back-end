@@ -267,6 +267,22 @@ describe("Musician Unit Tests without validator", () => {
     expect(musician.is_verified).toBe(false);
   });
 
+  test("should set open_to_gigs, never defaulting to true", () => {
+    const musician = new Musician({
+      name: "John Doe",
+      email: "john@example.com",
+      genres: ["Rock"],
+      instruments: ["Guitar"],
+    });
+    expect(musician.open_to_gigs).toBeNull();
+
+    musician.setOpenToGigs(true);
+    expect(musician.open_to_gigs).toBe(true);
+
+    musician.setOpenToGigs(false);
+    expect(musician.open_to_gigs).toBe(false);
+  });
+
   test("should get display name", () => {
     let musician = new Musician({
       name: "John Doe",
@@ -366,6 +382,7 @@ describe("Musician Unit Tests without validator", () => {
       total_ratings: 100,
       is_active: true,
       is_verified: true,
+      open_to_gigs: null,
       profile: null,
       created_at: musician.created_at,
       updated_at: musician.updated_at,

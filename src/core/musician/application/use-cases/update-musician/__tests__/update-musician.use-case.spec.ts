@@ -63,6 +63,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       total_ratings: entity.total_ratings,
       is_active: entity.is_active,
       is_verified: entity.is_verified,
+      open_to_gigs: entity.open_to_gigs,
       profile: entity.profile?.toJSON() ?? null,
       qr_code: entity.qr_code!.code,
       qr_customization: entity.qr_code!.customization ?? null,
@@ -315,6 +316,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           "is_verified" in i.input
             ? i.input.is_verified
             : freshEntity.is_verified,
+        open_to_gigs: freshEntity.open_to_gigs,
         profile: freshEntity.profile?.toJSON() ?? null,
         qr_code: freshEntity.qr_code!.code,
         qr_customization: freshEntity.qr_code!.customization ?? null,

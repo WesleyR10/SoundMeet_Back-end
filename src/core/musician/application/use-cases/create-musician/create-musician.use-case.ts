@@ -29,25 +29,25 @@ export class CreateMusicianUseCase implements IUseCase<
     const musicianId = new MusicianId();
     let profile: MusicianProfile | null = null;
 
-    let priceRange: PriceRange | null = null;
-    if (input.priceRange) {
+    let priceRanges: PriceRange[] = [];
+    if (input.priceRanges?.length) {
       try {
-        priceRange = new PriceRange(input.priceRange);
+        priceRanges = input.priceRanges.map((props) => new PriceRange(props));
       } catch (error: any) {
         const notification = new Notification();
         notification.addError(
           error?.message ?? "Invalid price range",
-          "priceRange",
+          "priceRanges",
         );
         throw new EntityValidationError(notification.toJSON());
       }
     }
 
-    if (input.location || priceRange) {
+    if (input.location || priceRanges.length) {
       profile = MusicianProfile.create({
         musician_id: musicianId,
         location: new Location(input.location ?? {}),
-        priceRange,
+        priceRanges,
         instruments: input.instruments || [],
         genres: input.genres || [],
         experience: input.experience_years ?? 0,
@@ -66,6 +66,7 @@ export class CreateMusicianUseCase implements IUseCase<
       instruments: input.instruments || [],
       experience_years: input.experience_years,
       is_active: input.is_active,
+      open_to_gigs: input.open_to_gigs,
       profile: profile,
     });
 

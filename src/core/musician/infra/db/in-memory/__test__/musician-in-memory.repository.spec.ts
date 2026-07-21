@@ -91,20 +91,14 @@ describe("MusicianInMemoryRepository", () => {
       Musician.fake().aMusician().withName("m3").build(),
     ];
 
-    items[0].updatePriceRange(
-      new PriceRange({ model: "per_event", min: 100, max: 200 }),
-    );
-    items[1].updatePriceRange(
-      new PriceRange({
+    items[0].updatePriceRanges([new PriceRange({ model: "per_event", min: 100, max: 200 })]);
+    items[1].updatePriceRanges([new PriceRange({
         model: "per_event",
         min: 300,
         max: 400,
         currency: Currency.USD,
-      }),
-    );
-    items[2].updatePriceRange(
-      new PriceRange({ model: "per_hour", min: 50, max: 80 }),
-    );
+      })]);
+    items[2].updatePriceRanges([new PriceRange({ model: "per_hour", min: 50, max: 80 })]);
 
     let itemsFiltered = await repository["applyFilter"](items, {
       price_min: 150,

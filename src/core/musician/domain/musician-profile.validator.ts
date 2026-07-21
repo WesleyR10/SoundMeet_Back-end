@@ -36,11 +36,20 @@ export class MusicianProfileRules {
   @IsObject({ groups: ["socialLinks"] })
   socialLinks: object | null;
 
-  @IsOptional({ groups: ["priceRange"] })
-  priceRange?: PriceRange | null;
+  @IsOptional({ groups: ["priceRanges"] })
+  @IsArray({ groups: ["priceRanges"] })
+  priceRanges?: PriceRange[];
 
   @IsObject({ groups: ["location"] })
   location: object;
+
+  @IsOptional({ groups: ["touring_location"] })
+  @IsObject({ groups: ["touring_location"] })
+  touring_location: object | null;
+
+  @IsOptional({ groups: ["touring_expires_at"] })
+  @IsDate({ groups: ["touring_expires_at"] })
+  touring_expires_at: Date | null;
 
   @IsDate({ groups: ["created_at"] })
   @IsOptional({ groups: ["created_at"] })
@@ -56,10 +65,14 @@ export class MusicianProfileRules {
     this.instruments = entity?.instruments;
     this.genres = entity?.genres;
     this.socialLinks = entity?.socialLinks;
-    this.priceRange = entity?.priceRange;
+    this.priceRanges = entity?.priceRanges;
     this.location = entity?.location?.toJSON
       ? entity.location.toJSON()
       : entity?.location;
+    this.touring_location = entity?.touring_location?.toJSON
+      ? entity.touring_location.toJSON()
+      : (entity?.touring_location ?? null);
+    this.touring_expires_at = entity?.touring_expires_at ?? null;
     this.created_at = entity?.created_at;
     this.updated_at = entity?.updated_at;
   }
@@ -75,8 +88,10 @@ export class MusicianProfileValidator extends ClassValidatorFields {
           "instruments",
           "genres",
           "socialLinks",
-          "priceRange",
+          "priceRanges",
           "location",
+          "touring_location",
+          "touring_expires_at",
           "created_at",
           "updated_at",
         ];

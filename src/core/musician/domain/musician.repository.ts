@@ -20,6 +20,15 @@ export type MusicianFilter = {
   price_currency?: Currency | null;
   is_active?: boolean | null;
   is_verified?: boolean | null;
+  // Consentimento explícito para aparecer em busca de estabelecimentos —
+  // ListMusiciansUseCase força true incondicionalmente (não é preferência
+  // de busca opcional, é gate de consentimento).
+  open_to_gigs?: boolean | null;
+  // Busca por proximidade (7.13c) — mesmo contrato de EstablishmentFilter:
+  // só entra com o trio completo; ordenação por distância no repositório.
+  lat?: number | null;
+  lng?: number | null;
+  radius_km?: number | null;
 };
 
 const isPriceModel = (value: unknown): value is PriceModel => {
@@ -39,6 +48,21 @@ export class MusicianSearchParams extends DefaultSearchParams<MusicianFilter> {
 
   static create(props: SearchParamsConstructorProps<MusicianFilter> = {}) {
     return new MusicianSearchParams(props);
+  }
+
+  // Gate de consentimento — único ponto de aplicação de "só músicos com
+  // open_to_gigs=true aparecem em busca pública/de estabelecimento". Use
+  // SEMPRE este método (nunca `create`) em qualquer use case que exponha
+  // músicos a estabelecimentos (radar, dashboard de contratação, indicação).
+  // O filtro do chamador entra primeiro no spread — open_to_gigs: true por
+  // último sempre vence, nenhuma query consegue contornar o gate.
+  static createPublic(
+    props: SearchParamsConstructorProps<MusicianFilter> = {},
+  ) {
+    return new MusicianSearchParams({
+      ...props,
+      filter: { ...(props.filter ?? {}), open_to_gigs: true },
+    });
   }
 
   get filter(): MusicianFilter | null {
@@ -81,6 +105,20 @@ export class MusicianSearchParams extends DefaultSearchParams<MusicianFilter> {
       ...(_value &&
         typeof _value.is_verified === "boolean" && {
           is_verified: _value.is_verified,
+        }),
+      ...(_value &&
+        typeof _value.open_to_gigs === "boolean" && {
+          open_to_gigs: _value.open_to_gigs,
+        }),
+      // Coerção explícita (query string entrega strings) — só entra com o
+      // trio completo e válido; raio máximo sanitizado em 500km.
+      ...(_value &&
+        Number.isFinite(Number(_value.lat)) &&
+        Number.isFinite(Number(_value.lng)) &&
+        Number(_value.radius_km) > 0 && {
+          lat: Number(_value.lat),
+          lng: Number(_value.lng),
+          radius_km: Math.min(Number(_value.radius_km), 500),
         }),
     };
 

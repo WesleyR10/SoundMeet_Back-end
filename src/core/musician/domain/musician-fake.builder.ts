@@ -21,6 +21,7 @@ export class MusicianFakeBuilder<TBuild = any> {
   private _experience_years: PropOrFactory<number> = (_index) =>
     this.chance.integer({ min: 0, max: 50 });
   private _is_active: PropOrFactory<boolean> = (_index) => true;
+  private _open_to_gigs: PropOrFactory<boolean | null> = (_index) => null;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
 
   private countObjs;
@@ -105,6 +106,11 @@ export class MusicianFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withOpenToGigs(valueOrFactory: PropOrFactory<boolean | null>) {
+    this._open_to_gigs = valueOrFactory;
+    return this;
+  }
+
   withcreated_at(valueOrFactory: PropOrFactory<Date>) {
     this._created_at = valueOrFactory;
     return this;
@@ -183,6 +189,7 @@ export class MusicianFakeBuilder<TBuild = any> {
           instruments: this.callFactory(this._instruments, index),
           experience_years: this.callFactory(this._experience_years, index),
           is_active: this.callFactory(this._is_active, index),
+          open_to_gigs: this.callFactory(this._open_to_gigs, index),
           ...(this._created_at && {
             created_at: this.callFactory(this._created_at, index),
           }),
@@ -240,6 +247,10 @@ export class MusicianFakeBuilder<TBuild = any> {
 
   get is_active() {
     return this.getValue("is_active");
+  }
+
+  get open_to_gigs() {
+    return this.getValue("open_to_gigs");
   }
 
   get created_at() {

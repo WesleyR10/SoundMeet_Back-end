@@ -21,7 +21,10 @@ export class ListMusiciansUseCase implements IUseCase<
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: ListMusiciansInput): Promise<ListMusiciansOutput> {
-    const params = MusicianSearchParams.create(input);
+    // Gate de consentimento (não é preferência de busca opcional) — único
+    // ponto de aplicação em MusicianSearchParams.createPublic, nenhum
+    // estabelecimento consegue contornar via query param.
+    const params = MusicianSearchParams.createPublic(input);
     const searchResult = await this.musicianRepo.search(params);
 
     return this.toOutput(searchResult);

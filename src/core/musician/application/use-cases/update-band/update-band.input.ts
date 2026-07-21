@@ -14,6 +14,7 @@ import {
 
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import { PriceRangeProps } from "../../../../shared/domain/value-objects/price-range.vo";
+import { LocationInput } from "../update-musician-profile/update-musician-profile.input";
 
 export class UpdateBandPriceRangeInput {
   @IsIn(["per_event", "per_hour"])
@@ -43,6 +44,8 @@ export type UpdateBandInputConstructorProps = {
   avatar?: string;
   genres?: string[];
   priceRange?: UpdateBandPriceRangeInput | null;
+  address?: LocationInput | null;
+  open_to_gigs?: boolean;
   is_active?: boolean;
 };
 
@@ -72,6 +75,15 @@ export class UpdateBandInput {
   @Type(() => UpdateBandPriceRangeInput)
   priceRange?: UpdateBandPriceRangeInput | null;
 
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationInput)
+  address?: LocationInput | null;
+
+  @IsBoolean()
+  @IsOptional()
+  open_to_gigs?: boolean;
+
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
@@ -84,6 +96,8 @@ export class UpdateBandInput {
     this.avatar = props.avatar;
     this.genres = props.genres;
     this.priceRange = props.priceRange;
+    this.address = props.address;
+    this.open_to_gigs = props.open_to_gigs;
     this.is_active = props.is_active;
   }
 

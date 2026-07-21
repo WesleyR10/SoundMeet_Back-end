@@ -76,6 +76,7 @@ describe("GetMusicianUseCase Unit Tests", () => {
       total_ratings: musician.total_ratings,
       is_active: musician.is_active,
       is_verified: musician.is_verified,
+      open_to_gigs: musician.open_to_gigs,
       profile: musician.profile?.toJSON() ?? null,
       qr_code: musician.qr_code!.code,
       qr_customization: musician.qr_code!.customization ?? null,

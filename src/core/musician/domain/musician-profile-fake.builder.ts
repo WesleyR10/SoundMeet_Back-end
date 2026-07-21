@@ -13,7 +13,7 @@ type PropOrFactory<T> = T | ((index: number) => T);
 export class MusicianProfileFakeBuilder<TBuild = any> {
   private _profile_id: PropOrFactory<MusicianProfileId> | undefined = undefined;
   private _musician_id: PropOrFactory<Uuid> = (_index) => new Uuid();
-  private _priceRange: PropOrFactory<PriceRange | null> = (_index) => null;
+  private _priceRanges: PropOrFactory<PriceRange[]> = (_index) => [];
   private _location: PropOrFactory<Location> = (_index) =>
     new Location({
       city: this.chance.city(),
@@ -55,8 +55,8 @@ export class MusicianProfileFakeBuilder<TBuild = any> {
     return this;
   }
 
-  withPriceRange(valueOrFactory: PropOrFactory<PriceRange | null>) {
-    this._priceRange = valueOrFactory;
+  withPriceRanges(valueOrFactory: PropOrFactory<PriceRange[]>) {
+    this._priceRanges = valueOrFactory;
     return this;
   }
 
@@ -101,7 +101,7 @@ export class MusicianProfileFakeBuilder<TBuild = any> {
             ? undefined
             : this.callFactory(this._profile_id, index),
           musician_id: this.callFactory(this._musician_id, index),
-          priceRange: this.callFactory(this._priceRange, index),
+          priceRanges: this.callFactory(this._priceRanges, index),
           location: this.callFactory(this._location, index),
           socialLinks: this.callFactory(this._socialLinks, index),
           experience: this.callFactory(this._experience, index),

@@ -31,6 +31,8 @@ describe("CreateBandUseCase Unit Tests", () => {
       genres: ["rock"],
       members: [],
       priceRange: null,
+      address: null,
+      open_to_gigs: null,
       is_active: true,
       created_at: expect.any(Date),
       updated_at: expect.any(Date),
@@ -38,7 +40,7 @@ describe("CreateBandUseCase Unit Tests", () => {
     expect(repository.items).toHaveLength(1);
   });
 
-  it("should create a band with full props", async () => {
+  it("should create a band with full props, forcing non-creator members to pending", async () => {
     const musicianId = new MusicianId();
     const joinedAt = new Date();
     const input = new CreateBandInput({
@@ -52,7 +54,9 @@ describe("CreateBandUseCase Unit Tests", () => {
           musician_id: musicianId,
           role: "member",
           instrument: "vocalist",
+          status: "accepted",
           joined_at: joinedAt,
+          responded_at: null,
         },
       ],
       priceRange: {
@@ -79,7 +83,9 @@ describe("CreateBandUseCase Unit Tests", () => {
           musician_id: musicianId.id,
           role: "member",
           instrument: "vocalist",
-          joined_at: joinedAt,
+          status: "pending",
+          joined_at: expect.any(Date),
+          responded_at: null,
         },
       ],
       priceRange: {
@@ -89,10 +95,39 @@ describe("CreateBandUseCase Unit Tests", () => {
         currency: "BRL",
         notes: "negotiable",
       },
+      address: null,
+      open_to_gigs: null,
       is_active: false,
       created_at: expect.any(Date),
       updated_at: expect.any(Date),
     });
     expect(repository.items).toHaveLength(1);
+  });
+
+  it("never trusts a client-supplied status: accepted for non-creator members (consent bypass regression)", async () => {
+    const musicianId = new MusicianId();
+    const input = new CreateBandInput({
+      name: "test band",
+      genres: ["rock"],
+      creator_musician_id: new MusicianId().id,
+      members: [
+        {
+          musician_id: musicianId,
+          role: "member",
+          instrument: "guitar",
+          status: "accepted",
+          joined_at: new Date(),
+          responded_at: new Date(),
+        } as any,
+      ],
+    });
+
+    const output = await useCase.execute(input);
+
+    const nonCreatorMember = output.members.find(
+      (m) => m.musician_id === musicianId.id,
+    );
+    expect(nonCreatorMember?.status).toBe("pending");
+    expect(nonCreatorMember?.responded_at).toBeNull();
   });
 });

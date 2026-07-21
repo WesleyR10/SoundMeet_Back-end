@@ -58,16 +58,16 @@ export class UpdateMusicianUseCase implements IUseCase<
         entity.profile.updateExperience(input.experience_years);
     }
 
-    if (input.priceRange !== undefined) {
+    if (input.priceRanges !== undefined) {
       try {
-        const priceRange = input.priceRange
-          ? new PriceRange(input.priceRange)
-          : null;
-        entity.updatePriceRange(priceRange);
+        const priceRanges = (input.priceRanges ?? []).map(
+          (props) => new PriceRange(props),
+        );
+        entity.updatePriceRanges(priceRanges);
       } catch (error: any) {
         entity.notification.addError(
           error?.message ?? "Invalid price range",
-          "priceRange",
+          "priceRanges",
         );
       }
     }
@@ -78,6 +78,9 @@ export class UpdateMusicianUseCase implements IUseCase<
     if (input.is_active === false) {
       entity.deactivate();
     }
+
+    input.open_to_gigs !== undefined &&
+      entity.setOpenToGigs(input.open_to_gigs);
 
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
