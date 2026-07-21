@@ -34,9 +34,9 @@ services:
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/soundmeet/protocol/openid-connect/certs
       - KEYCLOAK_JWKS_CACHE_TTL_SECONDS=300
       - KEYCLOAK_VERIFY_AUDIENCE=false
-      - AI_CIFRA_ANALYSIS_HTTP_BASE_URL=http://ai-cifra-worker:8000
+      - AI_CIFRA_ANALYSIS_HTTP_BASE_URL=http://ai-cifra-worker-gpu:8000
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
-      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v12
+      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v21_phase2
       - AI_CIFRA_SIMPMUSIC_YTDLP_BIN=yt-dlp
       - AI_CIFRA_MUSIFY_PIPED_BASE_URL=https://api.piped.private.coffee
       - AI_CIFRA_MUSIFY_PIPED_TIMEOUT_MS=10000
@@ -323,7 +323,7 @@ services:
       - "8002:8000"
     volumes:
       - ./ai-cifra-mir-worker/artifacts:/app/artifacts:ro
-      - model-cache:/root/.cache/huggingface
+      - /root/.cache/huggingface:/root/.cache/huggingface
     environment:
       - AI_CIFRA_STORAGE_PROVIDER=minio
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
@@ -346,7 +346,7 @@ services:
       - soundmeet-network
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
