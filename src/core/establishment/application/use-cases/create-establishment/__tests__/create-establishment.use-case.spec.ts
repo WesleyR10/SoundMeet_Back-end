@@ -28,6 +28,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       cnpj: "12.345.678/0001-90",
       phone: "+5500000000000",
       establishment_type: "bar",
+      existing_establishment_ids: [],
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -59,6 +60,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
           phone: "+5511999999999",
           establishment_type: "bar",
           cnpj: "11.222.333/0001-81",
+          existing_establishment_ids: [],
         },
         expected: {
           name: "Test Bar",
@@ -88,6 +90,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
           establishment_type: "club",
           website: "https://rockclub.com",
           is_active: false,
+          existing_establishment_ids: [],
         },
         expected: {
           name: "Rock Club",
@@ -136,6 +139,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       phone: "+5511999999999",
       establishment_type: "bar",
       cnpj: "11.111.111/0001-91",
+      existing_establishment_ids: [],
     };
 
     const output = await useCase.execute(input);
@@ -152,6 +156,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       phone: "+5511888888888",
       establishment_type: "restaurant",
       cnpj: "11.222.333/0001-81",
+      existing_establishment_ids: [],
     };
 
     const output = await useCase.execute(input);
@@ -172,6 +177,7 @@ describe("CreateEstablishmentUseCase Unit Tests", () => {
       cnpj: "",
       phone: "+5500000000000",
       establishment_type: "bar",
+      existing_establishment_ids: [],
     };
 
     await expect(() => useCase.execute(input)).rejects.toThrow(
@@ -189,6 +195,7 @@ describe("CreateEstablishmentUseCase — gate 4C.7 (multi_establishment)", () =>
   const baseInput: CreateEstablishmentInput = {
     name: "Bar do Wesley",
     email: "bar2@soundmeet.app",
+    phone: "+5511999999999",
     establishment_type: "bar",
     existing_establishment_ids: [EXISTING_ID],
   };

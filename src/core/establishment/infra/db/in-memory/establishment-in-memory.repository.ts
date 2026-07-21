@@ -1,4 +1,5 @@
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { haversineKm } from "../../../../shared/domain/geo.utils";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import {
@@ -141,6 +142,28 @@ export class EstablishmentInMemoryRepository
           !!profile &&
           profile.capacity !== null &&
           profile.capacity <= filter.capacity_max;
+      }
+
+      // Mesma semântica do Prisma (searchByProximity): corte circular exato
+      // por Haversine sobre as coordenadas do profile.
+      if (
+        filter.lat !== null &&
+        filter.lat !== undefined &&
+        filter.lng !== null &&
+        filter.lng !== undefined &&
+        filter.radius_km !== null &&
+        filter.radius_km !== undefined
+      ) {
+        const address = profile?.location ?? null;
+        matches =
+          matches &&
+          !!address &&
+          address.latitude !== null &&
+          address.latitude !== undefined &&
+          address.longitude !== null &&
+          address.longitude !== undefined &&
+          haversineKm(filter.lat, filter.lng, address.latitude, address.longitude) <=
+            filter.radius_km;
       }
 
       if (filter.is_active !== undefined) {

@@ -2,6 +2,7 @@ import { OperatingHours } from "@core/shared/domain/value-objects/operating-hour
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { IGeocodingService } from "../../../../shared/domain/geocoding.service";
 import { Notification } from "../../../../shared/domain/validators/notification";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Address } from "../../../../shared/domain/value-objects/address.vo";
@@ -20,7 +21,12 @@ export class UpdateEstablishmentProfileUseCase implements IUseCase<
   UpdateEstablishmentProfileInput,
   UpdateEstablishmentProfileOutput
 > {
-  constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
+  constructor(
+    private readonly establishmentRepo: IEstablishmentRepository,
+    // Opcional (mesmo padrão do UpdateMusicianProfileUseCase): sem o
+    // serviço, o comportamento é o anterior — salva sem coordenadas.
+    private readonly geocodingService?: IGeocodingService,
+  ) {}
 
   async execute(
     input: UpdateEstablishmentProfileInput,
@@ -39,16 +45,22 @@ export class UpdateEstablishmentProfileUseCase implements IUseCase<
       throw new EntityValidationError(notification.toJSON());
     }
 
+    // Geocodificação best-effort (7.13c) resolvida uma única vez — o mesmo
+    // endereço serve pro ensureProfile e pro changeLocation abaixo.
+    const location = input.location
+      ? await this.resolveLocation(input.location)
+      : null;
+
     const profile = establishment.profile
       ? establishment.profile
-      : establishment.ensureProfile(this.toAddress(input.location!));
+      : establishment.ensureProfile(this.toAddress(location!));
 
     if (input.capacity !== undefined) {
       profile.changeCapacity(input.capacity);
     }
 
-    if (input.location) {
-      profile.changeLocation(this.toAddress(input.location));
+    if (location) {
+      profile.changeLocation(this.toAddress(location));
     }
 
     if (input.amenities) {
@@ -136,6 +148,39 @@ export class UpdateEstablishmentProfileUseCase implements IUseCase<
     await this.establishmentRepo.update(establishment);
 
     return EstablishmentOutputMapper.toProfileOutput(profile);
+  }
+
+  private async resolveLocation(
+    location: NonNullable<UpdateEstablishmentProfileInput["location"]>,
+  ): Promise<NonNullable<UpdateEstablishmentProfileInput["location"]>> {
+    const hasCoords =
+      location.latitude !== null &&
+      location.latitude !== undefined &&
+      location.longitude !== null &&
+      location.longitude !== undefined;
+
+    if (hasCoords || !this.geocodingService) {
+      return location;
+    }
+
+    const coords = await this.geocodingService.geocode({
+      street: location.street,
+      number: location.number,
+      neighborhood: location.neighborhood,
+      city: location.city,
+      state: location.state,
+      zip_code: location.zipCode,
+    });
+
+    if (!coords) {
+      return location;
+    }
+
+    return {
+      ...location,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    };
   }
 
   private toAddress(input: {

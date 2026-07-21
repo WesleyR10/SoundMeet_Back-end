@@ -1,5 +1,9 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
+import {
+  boundingBoxForRadius,
+  haversineKm,
+} from "../../../../shared/domain/geo.utils";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
@@ -258,6 +262,18 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
   async search(
     props: EstablishmentSearchParams,
   ): Promise<EstablishmentSearchResult> {
+    const geo = props.filter;
+    if (
+      geo?.lat !== null &&
+      geo?.lat !== undefined &&
+      geo?.lng !== null &&
+      geo?.lng !== undefined &&
+      geo?.radius_km !== null &&
+      geo?.radius_km !== undefined
+    ) {
+      return this.searchByProximity(props, geo.lat, geo.lng, geo.radius_km);
+    }
+
     const offset = (props.page - 1) * props.per_page;
     const limit = props.per_page;
 
@@ -282,6 +298,73 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
     return new EstablishmentSearchResult({
       items,
       total: count,
+      current_page: props.page,
+      per_page: props.per_page,
+    });
+  }
+
+  // Busca por proximidade (roadmap 7.13): bounding box indexável em SQL
+  // (colunas location_lat/location_lng, índice composto) como pré-filtro +
+  // Haversine exato em memória para o corte circular e ordenação por
+  // distância. Duas queries (ids→página) para manter paginação/total exatos
+  // sem SQL cru; volume urbano de estabelecimentos comporta o candidato set.
+  private async searchByProximity(
+    props: EstablishmentSearchParams,
+    lat: number,
+    lng: number,
+    radiusKm: number,
+  ): Promise<EstablishmentSearchResult> {
+    const where = this.buildWhereClause(props.filter);
+    const box = boundingBoxForRadius(lat, lng, radiusKm);
+    where.profile = {
+      is: {
+        ...(where.profile?.is ?? {}),
+        location_lat: { gte: box.min_lat, lte: box.max_lat },
+        location_lng: { gte: box.min_lng, lte: box.max_lng },
+      },
+    };
+
+    const candidates = await this.prisma.establishment.findMany({
+      where,
+      select: {
+        id: true,
+        profile: { select: { location_lat: true, location_lng: true } },
+      },
+    });
+
+    const withinRadius = candidates
+      .map((candidate) => ({
+        id: candidate.id,
+        distance: haversineKm(
+          lat,
+          lng,
+          candidate.profile!.location_lat!,
+          candidate.profile!.location_lng!,
+        ),
+      }))
+      .filter((candidate) => candidate.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    const offset = (props.page - 1) * props.per_page;
+    const pageIds = withinRadius
+      .slice(offset, offset + props.per_page)
+      .map((candidate) => candidate.id);
+
+    const models = pageIds.length
+      ? await this.prisma.establishment.findMany({
+          where: { id: { in: pageIds } },
+          include: { profile: true },
+        })
+      : [];
+    const modelById = new Map(models.map((model) => [model.id, model]));
+    const items = pageIds
+      .map((id) => modelById.get(id))
+      .filter((model): model is NonNullable<typeof model> => !!model)
+      .map((model) => EstablishmentModelMapper.toEntity(model));
+
+    return new EstablishmentSearchResult({
+      items,
+      total: withinRadius.length,
       current_page: props.page,
       per_page: props.per_page,
     });

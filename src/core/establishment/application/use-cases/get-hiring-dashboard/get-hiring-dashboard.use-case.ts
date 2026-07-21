@@ -21,6 +21,14 @@ import {
   MusicianSearchParams,
 } from "@core/musician/domain";
 import {
+  BandOutput,
+  BandOutputMapper,
+} from "@core/musician/application/use-cases/common/band-output";
+import {
+  MusicianOutput,
+  MusicianOutputMapper,
+} from "@core/musician/application/use-cases/common/musician-profile-output";
+import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "@core/shared/application/pagination-output";
@@ -92,7 +100,7 @@ export class GetHiringDashboardUseCase implements IUseCase<
   private async listCompatibleMusicians(
     establishment: EstablishmentOutput,
     input: GetHiringDashboardInput,
-  ): Promise<PaginationOutput<any>> {
+  ): Promise<PaginationOutput<MusicianOutput>> {
     const filter: MusicianFilter = {
       genres:
         input.filters?.musician_filter?.genres ??
@@ -107,7 +115,10 @@ export class GetHiringDashboardUseCase implements IUseCase<
       is_verified: true,
     };
 
-    const params = MusicianSearchParams.create({
+    // Gate de consentimento via único ponto de aplicação — este dashboard é
+    // outro "radar" de contratação, não pode vazar músicos que não optaram
+    // por aparecer.
+    const params = MusicianSearchParams.createPublic({
       page: input.musicians_page,
       per_page: input.musicians_per_page,
       sort: input.musicians_sort ?? "rating",
@@ -116,50 +127,9 @@ export class GetHiringDashboardUseCase implements IUseCase<
     });
 
     const searchResult = await this.musicianRepo.search(params);
-    const items = searchResult.items.map((item) => ({
-      id: item.musician_id.id,
-      name: item.name,
-      email: item.email.value,
-      stage_name: item.stage_name,
-      bio: item.bio,
-      avatar: item.avatar,
-      phone: item.phone?.value ?? null,
-      genres: item.genres,
-      instruments: item.instruments,
-      experience_years: item.experience_years,
-      qr_code: item.qr_code?.code ?? null,
-      rating: item.rating.value,
-      total_ratings: item.total_ratings,
-      is_active: item.is_active,
-      is_verified: item.is_verified,
-      profile: item.profile
-        ? {
-            id: item.profile.profile_id.id,
-            musician_id: item.profile.musician_id.id,
-            price_range: item.profile.priceRange
-              ? {
-                  model: item.profile.priceRange.model,
-                  min: item.profile.priceRange.min,
-                  max: item.profile.priceRange.max,
-                  currency: item.profile.priceRange.currency,
-                  notes: item.profile.priceRange.notes,
-                }
-              : null,
-            location: item.profile.location.toJSON(),
-            social_links: item.profile.socialLinks,
-            experience: item.profile.experience,
-            instruments: item.profile.instruments,
-            genres: item.profile.genres,
-            created_at: item.profile.created_at,
-            updated_at: item.profile.updated_at,
-          }
-        : null,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      display_name: item.displayName,
-      is_experienced: item.isExperienced,
-      is_highly_rated: item.isHighlyRated,
-    }));
+    const items = searchResult.items.map((item) =>
+      MusicianOutputMapper.toOutput(item),
+    );
 
     return PaginationOutputMapper.toOutput(items, searchResult);
   }
@@ -167,7 +137,7 @@ export class GetHiringDashboardUseCase implements IUseCase<
   private async listCompatibleBands(
     establishment: EstablishmentOutput,
     input: GetHiringDashboardInput,
-  ): Promise<PaginationOutput<any>> {
+  ): Promise<PaginationOutput<BandOutput>> {
     const filter: BandFilter = {
       genres:
         input.filters?.band_filter?.genres ??
@@ -180,7 +150,9 @@ export class GetHiringDashboardUseCase implements IUseCase<
       is_active: true,
     };
 
-    const params = BandSearchParams.create({
+    // Gate de consentimento via único ponto de aplicação — mesmo raciocínio
+    // acima, para bandas.
+    const params = BandSearchParams.createPublic({
       page: input.bands_page,
       per_page: input.bands_per_page,
       sort: input.bands_sort ?? "created_at",
@@ -189,32 +161,16 @@ export class GetHiringDashboardUseCase implements IUseCase<
     });
 
     const searchResult = await this.bandRepo.search(params);
-    const items = searchResult.items.map((band) => ({
-      id: band.band_id.id,
-      name: band.name,
-      description: band.description,
-      avatar: band.avatar,
-      genres: band.genres,
-      members: band.members.map((member) => ({
-        member_id: member.member_id!.id,
-        musician_id: member.musician_id.id,
-        role: member.role,
-        instrument: member.instrument,
-        joined_at: member.joined_at,
-      })),
-      priceRange: band.priceRange
-        ? {
-            model: band.priceRange.model,
-            min: band.priceRange.min,
-            max: band.priceRange.max,
-            currency: band.priceRange.currency,
-            notes: band.priceRange.notes,
-          }
-        : null,
-      is_active: band.is_active,
-      created_at: band.created_at,
-      updated_at: band.updated_at,
-    }));
+    // Só a formação confirmada é "contratável" — convites pending/declined
+    // não são membros reais da banda (mesmo raciocínio de acceptedMembers
+    // já aplicado em confirm-tip-payment/confirm-booking).
+    const items = searchResult.items.map((band) => {
+      const output = BandOutputMapper.toOutput(band);
+      return {
+        ...output,
+        members: output.members.filter((m) => m.status === "accepted"),
+      };
+    });
 
     return PaginationOutputMapper.toOutput(items, searchResult);
   }
@@ -250,8 +206,8 @@ export class GetHiringDashboardUseCase implements IUseCase<
   }
 
   private buildRecommendations(
-    musicians: PaginationOutput<any>,
-    bands: PaginationOutput<any>,
+    musicians: PaginationOutput<MusicianOutput>,
+    bands: PaginationOutput<BandOutput>,
   ) {
     return {
       top_musicians: musicians.items.slice(0, 5),

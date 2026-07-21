@@ -3,6 +3,8 @@ import { ConfigService } from "@nestjs/config";
 
 import { IDateTimeService } from "@core/shared/domain/date-time.service";
 import { LuxonDateTimeService } from "@core/shared/infra/date-time/luxon-date-time.service";
+import { IGeocodingService } from "@core/shared/domain/geocoding.service";
+import { HttpGeocodingService } from "@core/shared/infra/geocoding/http-geocoding.service";
 import { PlanCheckService } from "@core/plans/domain/plan-check.service";
 import { IEventRepository } from "@core/events/domain";
 
@@ -41,12 +43,19 @@ import {
 import { RecalculateEstablishmentAnalyticsJob } from "./recalculate-establishment-analytics.job";
 
 export const DATE_TIME_SERVICE_TOKEN = "DateTimeService";
+export const GEOCODING_SERVICE_TOKEN = "GeocodingService";
 export const ESTABLISHMENT_STORAGE_TOKEN = "EstablishmentStorage";
 
 export const SERVICES = {
   DATE_TIME_SERVICE: {
     provide: DATE_TIME_SERVICE_TOKEN,
     useClass: LuxonDateTimeService,
+  },
+  // Geocodificacao best-effort (7.13c) usada pelo update de perfil — endereco
+  // cadastrado (CEP) vira coordenadas pra busca por raio.
+  GEOCODING_SERVICE: {
+    provide: GEOCODING_SERVICE_TOKEN,
+    useClass: HttpGeocodingService,
   },
 };
 
@@ -213,10 +222,13 @@ export const USE_CASES = {
   },
   UPDATE_ESTABLISHMENT_PROFILE_USE_CASE: {
     provide: UpdateEstablishmentProfileUseCase,
-    useFactory: (repo: IEstablishmentRepository) => {
-      return new UpdateEstablishmentProfileUseCase(repo);
+    useFactory: (
+      repo: IEstablishmentRepository,
+      geocodingService: IGeocodingService,
+    ) => {
+      return new UpdateEstablishmentProfileUseCase(repo, geocodingService);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide],
+    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, GEOCODING_SERVICE_TOKEN],
   },
   DELETE_ESTABLISHMENT_PROFILE_USE_CASE: {
     provide: DeleteEstablishmentProfileUseCase,

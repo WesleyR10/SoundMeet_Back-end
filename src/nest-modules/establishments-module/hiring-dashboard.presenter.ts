@@ -19,7 +19,7 @@ export class HiringDashboardMusicianPresenter {
   rating: number;
   total_ratings: number;
   is_verified: boolean;
-  price_range: MusicianProfileOutput["price_range"] | null;
+  price_ranges: MusicianProfileOutput["price_ranges"];
 
   constructor(output: MusicianOutput) {
     this.id = output.id;
@@ -31,7 +31,7 @@ export class HiringDashboardMusicianPresenter {
     this.rating = output.rating;
     this.total_ratings = output.total_ratings;
     this.is_verified = output.is_verified;
-    this.price_range = output.profile?.price_range ?? null;
+    this.price_ranges = output.profile?.price_ranges ?? [];
   }
 }
 

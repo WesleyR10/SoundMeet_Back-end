@@ -1,3 +1,6 @@
+import { Band } from "@core/musician/domain/band.aggregate";
+import { Uuid } from "@core/shared/domain/value-objects/uuid.vo";
+
 import { EstablishmentOutputMapper } from "../../common/establishment-output";
 import { GetHiringDashboardUseCase } from "../get-hiring-dashboard.use-case";
 
@@ -114,6 +117,69 @@ describe("GetHiringDashboardUseCase Unit Tests", () => {
 
     const searchCall = (musicianRepo.search as jest.Mock).mock.calls[0][0];
     expect(searchCall.filter.genres).toEqual(["rock"]);
+  });
+
+  it("forces open_to_gigs: true on both musician and band search filters (consent gate)", async () => {
+    const establishmentRepo = {
+      findById: jest.fn().mockResolvedValue({} as any),
+    } as any;
+
+    const musicianRepo = {
+      search: jest.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        current_page: 1,
+        per_page: 10,
+        last_page: 0,
+      }),
+    } as any;
+
+    const bandRepo = {
+      search: jest.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        current_page: 1,
+        per_page: 10,
+        last_page: 0,
+      }),
+    } as any;
+
+    const eventRepo = {
+      search: jest.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        current_page: 1,
+        per_page: 10,
+        last_page: 0,
+      }),
+    } as any;
+
+    const establishmentOutput = {
+      id: "3b5e3b9e-4b7f-4e74-9f5c-4a8d4e3a1111",
+      profile: { preferred_genres: ["rock"] },
+    } as any;
+
+    jest
+      .spyOn(EstablishmentOutputMapper, "toOutput")
+      .mockReturnValueOnce(establishmentOutput);
+
+    const useCase = new GetHiringDashboardUseCase(
+      establishmentRepo,
+      musicianRepo,
+      bandRepo,
+      eventRepo,
+    );
+
+    await useCase.execute({
+      establishment_id: "3b5e3b9e-4b7f-4e74-9f5c-4a8d4e3a1111",
+    } as any);
+
+    const musicianFilter = (musicianRepo.search as jest.Mock).mock.calls[0][0]
+      .filter;
+    const bandFilter = (bandRepo.search as jest.Mock).mock.calls[0][0].filter;
+
+    expect(musicianFilter.open_to_gigs).toBe(true);
+    expect(bandFilter.open_to_gigs).toBe(true);
   });
 
   it("should override preferred_genres when musician_filter.genres is provided", async () => {
@@ -381,6 +447,76 @@ describe("GetHiringDashboardUseCase Unit Tests", () => {
     );
     expect(output.recommendations.top_bands).toHaveLength(1);
     expect(output.recommendations.top_bands[0].id).toBe(bandItem.band_id.id);
+  });
+
+  it("only lists accepted band members, excluding pending/declined invites", async () => {
+    const establishmentRepo = {
+      findById: jest.fn().mockResolvedValue({} as any),
+    } as any;
+
+    const musicianRepo = {
+      search: jest.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        current_page: 1,
+        per_page: 10,
+        last_page: 0,
+      }),
+    } as any;
+
+    const acceptedMusicianId = new Uuid();
+    const pendingMusicianId = new Uuid();
+
+    const band = Band.create({ name: "Rock Band", genres: ["rock"] });
+    band.inviteMember(acceptedMusicianId, "leader", "vocals");
+    band.acceptInvite(acceptedMusicianId);
+    band.inviteMember(pendingMusicianId, "member", "guitar");
+
+    const bandRepo = {
+      search: jest.fn().mockResolvedValue({
+        items: [band],
+        total: 1,
+        current_page: 1,
+        per_page: 10,
+        last_page: 1,
+      }),
+    } as any;
+
+    const eventRepo = {
+      search: jest.fn().mockResolvedValue({
+        items: [],
+        total: 0,
+        current_page: 1,
+        per_page: 10,
+        last_page: 0,
+      }),
+    } as any;
+
+    const establishmentOutput = {
+      id: "3b5e3b9e-4b7f-4e74-9f5c-4a8d4e3a1111",
+      profile: { preferred_genres: ["rock"] },
+    } as any;
+
+    jest
+      .spyOn(EstablishmentOutputMapper, "toOutput")
+      .mockReturnValueOnce(establishmentOutput);
+
+    const useCase = new GetHiringDashboardUseCase(
+      establishmentRepo,
+      musicianRepo,
+      bandRepo,
+      eventRepo,
+    );
+
+    const output = await useCase.execute({
+      establishment_id: "3b5e3b9e-4b7f-4e74-9f5c-4a8d4e3a1111",
+    } as any);
+
+    expect(output.compatible_bands.items).toHaveLength(1);
+    const members = output.compatible_bands.items[0].members;
+    expect(members).toHaveLength(1);
+    expect(members[0].musician_id).toBe(acceptedMusicianId.id);
+    expect(members[0].status).toBe("accepted");
   });
 
   it("should use preferred_genres and musician_filter.instruments together", async () => {

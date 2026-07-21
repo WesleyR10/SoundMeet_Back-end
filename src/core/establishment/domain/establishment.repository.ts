@@ -17,6 +17,11 @@ export type EstablishmentFilter = {
   capacity_max?: number | null;
   is_active?: boolean | null;
   is_verified?: boolean | null;
+  // Busca por proximidade (roadmap 7.13): os três juntos ativam o filtro
+  // geográfico (bounding box + Haversine) e ordenação por distância.
+  lat?: number | null;
+  lng?: number | null;
+  radius_km?: number | null;
 };
 
 export class EstablishmentSearchParams extends DefaultSearchParams<EstablishmentFilter> {
@@ -73,6 +78,16 @@ export class EstablishmentSearchParams extends DefaultSearchParams<Establishment
       ...(_value &&
         typeof _value.is_verified === "boolean" && {
           is_verified: _value.is_verified,
+        }),
+      // Coerção explícita (query string entrega strings) — só entra com o
+      // trio completo e válido; raio máximo sanitizado em 500km.
+      ...(_value &&
+        Number.isFinite(Number(_value.lat)) &&
+        Number.isFinite(Number(_value.lng)) &&
+        Number(_value.radius_km) > 0 && {
+          lat: Number(_value.lat),
+          lng: Number(_value.lng),
+          radius_km: Math.min(Number(_value.radius_km), 500),
         }),
     };
 
