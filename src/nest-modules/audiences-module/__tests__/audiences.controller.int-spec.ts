@@ -487,6 +487,7 @@ describe("AudiencesController Integration Tests", () => {
         .aMusician()
         .withGenres(["Rock"])
         .withInstruments(["Guitar"])
+        .withOpenToGigs(true)
         .build(),
     );
     await musicianRepository.insert(
@@ -494,6 +495,7 @@ describe("AudiencesController Integration Tests", () => {
         .aMusician()
         .withGenres(["Rock"])
         .withInstruments(["Guitar"])
+        .withOpenToGigs(true)
         .build(),
     );
     await musicianRepository.insert(
@@ -501,6 +503,7 @@ describe("AudiencesController Integration Tests", () => {
         .aMusician()
         .withGenres(["Jazz"])
         .withInstruments(["Piano"])
+        .withOpenToGigs(true)
         .build(),
     );
 

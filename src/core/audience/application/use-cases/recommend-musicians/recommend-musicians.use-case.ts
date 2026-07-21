@@ -47,7 +47,10 @@ export class RecommendMusiciansUseCase implements IUseCase<
       ...(favoriteGenres.length > 0 ? { genres: favoriteGenres } : {}),
     };
 
-    const params = MusicianSearchParams.create({
+    // Gate de consentimento via único ponto de aplicação — indicar músico
+    // para contratação sempre exige opt-in, sem bypass (diferente de
+    // is_active/only_active acima, que o chamador pode desligar).
+    const params = MusicianSearchParams.createPublic({
       page: input.page,
       per_page: input.per_page,
       sort: input.sort ?? "rating",
