@@ -33,6 +33,7 @@ function makeMusicianOutput(
     total_ratings: 0,
     is_active: true,
     is_verified: false,
+    open_to_gigs: null,
     profile: null,
     created_at: now,
     updated_at: now,
@@ -227,19 +228,29 @@ describe("MusiciansController Unit Tests", () => {
         profile: {
           id: "3c8e2e5b-9e76-4dbd-8ee4-5d6f1b53ac01",
           musician_id: id,
-          price_range: {
-            model: "per_hour",
-            min: 100,
-            max: 200,
-            currency: "BRL" as Currency,
-            notes: null,
-          },
+          price_ranges: [
+            {
+              model: "per_hour",
+              min: 100,
+              max: 200,
+              currency: "BRL" as Currency,
+              notes: null,
+            },
+          ],
           location: {
             city: "São Paulo",
             state: "SP",
             latitude: null,
             longitude: null,
+            street: null,
+            number: null,
+            complement: null,
+            neighborhood: null,
+            zip_code: null,
           },
+          touring_location: null,
+          touring_expires_at: null,
+          is_touring: false,
           social_links: { instagram: "@john" },
           experience: 5,
           instruments: ["Guitar"],
@@ -276,6 +287,88 @@ describe("MusiciansController Unit Tests", () => {
       expect(serializeSpy).toHaveBeenCalledWith(output);
       expect(presenter).toBeInstanceOf(MusicianPresenter);
       expect(presenter).toStrictEqual(new MusicianPresenter(output));
+    });
+  });
+
+  describe("setTouringLocation", () => {
+    it("should activate touring mode", async () => {
+      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+      const output = makeMusicianOutput({
+        id,
+        profile: {
+          id: "3c8e2e5b-9e76-4dbd-8ee4-5d6f1b53ac01",
+          musician_id: id,
+          price_ranges: [],
+          location: {
+            city: "São Paulo",
+            state: "SP",
+            latitude: null,
+            longitude: null,
+            street: null,
+            number: null,
+            complement: null,
+            neighborhood: null,
+            zip_code: null,
+          },
+          touring_location: {
+            city: "Recife",
+            state: "PE",
+            latitude: -8.0476,
+            longitude: -34.877,
+            street: null,
+            number: null,
+            complement: null,
+            neighborhood: null,
+            zip_code: null,
+          },
+          touring_expires_at: new Date("2025-01-06T00:00:00.000Z"),
+          is_touring: true,
+          social_links: null,
+          experience: 0,
+          instruments: [],
+          genres: [],
+          created_at: new Date("2025-01-01T00:00:00.000Z"),
+          updated_at: new Date("2025-01-01T00:00:00.000Z"),
+        },
+      });
+
+      const mockSetTouringLocationUseCase = {
+        execute: jest.fn().mockResolvedValue(output),
+      };
+      (controller as any).setTouringLocationUseCase = mockSetTouringLocationUseCase;
+
+      const serializeSpy = jest.spyOn(MusiciansController, "serialize");
+      const input = {
+        city: "Recife",
+        state: "PE",
+        latitude: -8.0476,
+        longitude: -34.877,
+        duration_days: 5,
+      } as any;
+
+      const presenter = await controller.setTouringLocation(id, input);
+
+      expect(mockSetTouringLocationUseCase.execute).toHaveBeenCalledWith({
+        id,
+        ...input,
+      });
+      expect(serializeSpy).toHaveBeenCalledWith(output);
+      expect(presenter).toBeInstanceOf(MusicianPresenter);
+      expect(presenter.profile?.is_touring).toBe(true);
+    });
+  });
+
+  describe("clearTouringLocation", () => {
+    it("should clear touring mode", async () => {
+      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+      const mockClearTouringLocationUseCase = {
+        execute: jest.fn().mockResolvedValue(makeMusicianOutput({ id })),
+      };
+      (controller as any).clearTouringLocationUseCase = mockClearTouringLocationUseCase;
+
+      await controller.clearTouringLocation(id);
+
+      expect(mockClearTouringLocationUseCase.execute).toHaveBeenCalledWith({ id });
     });
   });
 

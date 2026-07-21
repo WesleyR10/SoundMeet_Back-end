@@ -20,15 +20,18 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
-import { AddBandMemberInput } from "../../core/musician/application/use-cases/add-band-member/add-band-member.input";
-import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { AcceptBandInviteUseCase } from "../../core/musician/application/use-cases/accept-band-invite/accept-band-invite.use-case";
 import { BandOutput } from "../../core/musician/application/use-cases/common/band-output";
 import { CreateBandInput } from "../../core/musician/application/use-cases/create-band/create-band.input";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
+import { DeclineBandInviteUseCase } from "../../core/musician/application/use-cases/decline-band-invite/decline-band-invite.use-case";
 import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
+import { InviteBandMemberInput } from "../../core/musician/application/use-cases/invite-band-member/invite-band-member.input";
+import { InviteBandMemberUseCase } from "../../core/musician/application/use-cases/invite-band-member/invite-band-member.use-case";
 import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
+import { SetBandOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
 import { UpdateBandInput } from "../../core/musician/application/use-cases/update-band/update-band.input";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
 import {
@@ -42,10 +45,11 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { BandCollectionPresenter, BandPresenter } from "./band.presenter";
-import { AddBandMemberDto } from "./dto/add-band-member.dto";
 import { CreateBandDto } from "./dto/create-band.dto";
+import { InviteBandMemberDto } from "./dto/invite-band-member.dto";
 import { RemoveBandMemberDto } from "./dto/remove-band-member.dto";
 import { SearchBandsDto } from "./dto/search-bands.dto";
+import { SetBandOpenToGigsDto } from "./dto/set-band-open-to-gigs.dto";
 import { UpdateBandDto } from "./dto/update-band.dto";
 
 @ApiTags("Bands")
@@ -68,11 +72,20 @@ export class BandsController {
   @Inject(ListBandsUseCase)
   private listBandsUseCase: ListBandsUseCase;
 
-  @Inject(AddBandMemberUseCase)
-  private addBandMemberUseCase: AddBandMemberUseCase;
+  @Inject(InviteBandMemberUseCase)
+  private inviteBandMemberUseCase: InviteBandMemberUseCase;
 
   @Inject(RemoveBandMemberUseCase)
   private removeBandMemberUseCase: RemoveBandMemberUseCase;
+
+  @Inject(AcceptBandInviteUseCase)
+  private acceptBandInviteUseCase: AcceptBandInviteUseCase;
+
+  @Inject(DeclineBandInviteUseCase)
+  private declineBandInviteUseCase: DeclineBandInviteUseCase;
+
+  @Inject(SetBandOpenToGigsUseCase)
+  private setBandOpenToGigsUseCase: SetBandOpenToGigsUseCase;
 
   @Post()
   @Roles("musician", "admin")
@@ -143,9 +156,32 @@ export class BandsController {
         avatar: dto.avatar,
         genres: dto.genres,
         priceRange: dto.priceRange,
+        address: dto.address,
+        open_to_gigs: dto.open_to_gigs,
         is_active: dto.is_active,
       }),
     );
+    return BandsController.serialize(output);
+  }
+
+  @Patch(":id/open-to-gigs")
+  @Roles("musician", "admin")
+  @UseGuards(BandOwnershipGuard)
+  @ApiOperation({
+    summary: "Definir disponibilidade da banda para contratação",
+    description:
+      "Consentimento explícito do líder para a banda aparecer na busca de estabelecimentos — independente do open_to_gigs individual de cada membro. Nunca ligado por padrão.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: BandPresenter })
+  async setOpenToGigs(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: SetBandOpenToGigsDto,
+  ) {
+    const output = await this.setBandOpenToGigsUseCase.execute({
+      band_id: id,
+      open_to_gigs: dto.open_to_gigs,
+    });
     return BandsController.serialize(output);
   }
 
@@ -169,23 +205,64 @@ export class BandsController {
   @Roles("musician", "admin")
   @UseGuards(BandOwnershipGuard)
   @ApiOperation({
-    summary: "Adicionar membro na banda",
-    description: "Adiciona um músico como membro de uma banda.",
+    summary: "Convidar membro para a banda",
+    description:
+      "Convida um músico para a banda (fica pending até o próprio músico aceitar ou recusar via /invites).",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: BandPresenter })
   async addMember(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     band_id: string,
-    @Body() dto: AddBandMemberDto,
+    @Body() dto: InviteBandMemberDto,
   ) {
-    const input = new AddBandMemberInput({
+    const input = new InviteBandMemberInput({
       band_id,
       musician_id: dto.musician_id,
       role: dto.role,
       instrument: dto.instrument,
     });
-    const output = await this.addBandMemberUseCase.execute(input);
+    const output = await this.inviteBandMemberUseCase.execute(input);
+    return BandsController.serialize(output);
+  }
+
+  @Post(":id/invites/accept")
+  @Roles("musician")
+  @ApiOperation({
+    summary: "Aceitar convite de banda",
+    description:
+      "O músico autenticado aceita seu próprio convite pendente para esta banda. musician_id vem sempre do token — não é possível aceitar convite de outro músico.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: BandPresenter })
+  async acceptInvite(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const output = await this.acceptBandInviteUseCase.execute({
+      band_id: id,
+      musician_id: currentUser.userId,
+    });
+    return BandsController.serialize(output);
+  }
+
+  @Post(":id/invites/decline")
+  @Roles("musician")
+  @ApiOperation({
+    summary: "Recusar convite de banda",
+    description:
+      "O músico autenticado recusa seu próprio convite pendente para esta banda. musician_id vem sempre do token.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: BandPresenter })
+  async declineInvite(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const output = await this.declineBandInviteUseCase.execute({
+      band_id: id,
+      musician_id: currentUser.userId,
+    });
     return BandsController.serialize(output);
   }
 

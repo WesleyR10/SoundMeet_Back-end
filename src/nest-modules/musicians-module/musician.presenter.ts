@@ -18,6 +18,7 @@ export class MusicianPresenter {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  open_to_gigs: boolean | null;
   genres: string[];
   instruments: string[];
   experience_years: number;
@@ -46,6 +47,7 @@ export class MusicianPresenter {
     this.total_ratings = output.total_ratings;
     this.is_active = output.is_active;
     this.is_verified = output.is_verified;
+    this.open_to_gigs = output.open_to_gigs;
     this.genres = output.genres;
     this.instruments = output.instruments;
     this.experience_years = output.experience_years;

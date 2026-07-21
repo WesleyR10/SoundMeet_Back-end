@@ -30,12 +30,15 @@ import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 
 import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
+import { ClearMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
+import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
+import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
@@ -53,6 +56,8 @@ import { CreateMusicianDto } from "./dto/create-musician.dto";
 import { CustomizeQRCodeDto } from "./dto/customize-qr-code.dto";
 import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { RegisterPushTokenDto } from "./dto/register-push-token.dto";
+import { SetMusicianOpenToGigsDto } from "./dto/set-musician-open-to-gigs.dto";
+import { SetMusicianTouringLocationDto } from "./dto/set-musician-touring-location.dto";
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
 import { UpdateMusicianProfileDto } from "./dto/update-musician-profile.dto";
 import {
@@ -74,8 +79,17 @@ export class MusiciansController {
   @Inject(UpdateMusicianProfileUseCase)
   private updateProfileUseCase: UpdateMusicianProfileUseCase;
 
+  @Inject(SetMusicianTouringLocationUseCase)
+  private setTouringLocationUseCase: SetMusicianTouringLocationUseCase;
+
+  @Inject(ClearMusicianTouringLocationUseCase)
+  private clearTouringLocationUseCase: ClearMusicianTouringLocationUseCase;
+
   @Inject(RegisterPushTokenUseCase)
   private registerPushTokenUseCase: RegisterPushTokenUseCase;
+
+  @Inject(SetMusicianOpenToGigsUseCase)
+  private setOpenToGigsUseCase: SetMusicianOpenToGigsUseCase;
 
   @Inject(DeleteMusicianUseCase)
   private deleteUseCase: DeleteMusicianUseCase;
@@ -304,6 +318,62 @@ export class MusiciansController {
     @Body() dto: UpdateMusicianProfileDto,
   ) {
     const output = await this.updateProfileUseCase.execute({ ...dto, id });
+    return MusiciansController.serialize(output);
+  }
+
+  @Patch(":id/touring-location")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Ativar modo turnê",
+    description:
+      "Define uma localização temporária (com expiração automática, máx. 30 dias) somada à base permanente para busca por proximidade.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async setTouringLocation(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: SetMusicianTouringLocationDto,
+  ) {
+    const output = await this.setTouringLocationUseCase.execute({ ...dto, id });
+    return MusiciansController.serialize(output);
+  }
+
+  @Delete(":id/touring-location")
+  @HttpCode(204)
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Encerrar modo turnê",
+    description:
+      "Remove a localização temporária antes do prazo (volta a valer só a base permanente).",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
+  async clearTouringLocation(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    await this.clearTouringLocationUseCase.execute({ id });
+  }
+
+  @Patch(":id/open-to-gigs")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Definir disponibilidade para contratação",
+    description:
+      "Consentimento explícito do músico para aparecer na busca de estabelecimentos (radar de contratação para eventos/freelas). Nunca ligado por padrão — decisão do próprio músico.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async setOpenToGigs(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: SetMusicianOpenToGigsDto,
+  ) {
+    const output = await this.setOpenToGigsUseCase.execute({
+      id,
+      open_to_gigs: dto.open_to_gigs,
+    });
     return MusiciansController.serialize(output);
   }
 

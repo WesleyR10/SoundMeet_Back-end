@@ -1,12 +1,15 @@
 import { Test, TestingModule } from "@nestjs/testing";
 
-import { AddBandMemberUseCase } from "../../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { AcceptBandInviteUseCase } from "../../../core/musician/application/use-cases/accept-band-invite/accept-band-invite.use-case";
 import { BandOutputMapper } from "../../../core/musician/application/use-cases/common/band-output";
 import { CreateBandUseCase } from "../../../core/musician/application/use-cases/create-band/create-band.use-case";
+import { DeclineBandInviteUseCase } from "../../../core/musician/application/use-cases/decline-band-invite/decline-band-invite.use-case";
 import { DeleteBandUseCase } from "../../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { GetBandUseCase } from "../../../core/musician/application/use-cases/get-band/get-band.use-case";
+import { InviteBandMemberUseCase } from "../../../core/musician/application/use-cases/invite-band-member/invite-band-member.use-case";
 import { ListBandsUseCase } from "../../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
+import { SetBandOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
 import { UpdateBandUseCase } from "../../../core/musician/application/use-cases/update-band/update-band.use-case";
 import { Band, BandId } from "../../../core/musician/domain/band.aggregate";
 import { IBandRepository } from "../../../core/musician/domain/band.repository";
@@ -65,17 +68,35 @@ describe("BandsController Integration Tests", () => {
           inject: ["BandRepository"],
         },
         {
-          provide: AddBandMemberUseCase,
+          provide: InviteBandMemberUseCase,
           useFactory: (
             bandRepo: IBandRepository,
             musicianRepo: IMusicianRepository,
-          ) => new AddBandMemberUseCase(bandRepo, musicianRepo),
+          ) => new InviteBandMemberUseCase(bandRepo, musicianRepo),
           inject: ["BandRepository", "MusicianRepository"],
         },
         {
           provide: RemoveBandMemberUseCase,
           useFactory: (repo: IBandRepository) =>
             new RemoveBandMemberUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
+          provide: AcceptBandInviteUseCase,
+          useFactory: (repo: IBandRepository) =>
+            new AcceptBandInviteUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
+          provide: DeclineBandInviteUseCase,
+          useFactory: (repo: IBandRepository) =>
+            new DeclineBandInviteUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
+          provide: SetBandOpenToGigsUseCase,
+          useFactory: (repo: IBandRepository) =>
+            new SetBandOpenToGigsUseCase(repo),
           inject: ["BandRepository"],
         },
       ],
@@ -96,8 +117,8 @@ describe("BandsController Integration Tests", () => {
     expect(controller["deleteBandUseCase"]).toBeInstanceOf(DeleteBandUseCase);
     expect(controller["getBandUseCase"]).toBeInstanceOf(GetBandUseCase);
     expect(controller["listBandsUseCase"]).toBeInstanceOf(ListBandsUseCase);
-    expect(controller["addBandMemberUseCase"]).toBeInstanceOf(
-      AddBandMemberUseCase,
+    expect(controller["inviteBandMemberUseCase"]).toBeInstanceOf(
+      InviteBandMemberUseCase,
     );
     expect(controller["removeBandMemberUseCase"]).toBeInstanceOf(
       RemoveBandMemberUseCase,
@@ -177,5 +198,86 @@ describe("BandsController Integration Tests", () => {
 
     const bandAfterRemove = await bandRepository.findById(band.band_id);
     expect(bandAfterRemove!.members).toHaveLength(0);
+  });
+
+  it("should invite a member as pending, then let the invited musician accept", async () => {
+    const musician = Musician.fake()
+      .aMusician()
+      .withName("Invited")
+      .withEmail("invited@example.com")
+      .build();
+    await musicianRepository.insert(musician);
+
+    const band = Band.fake().aBand().withName("My Band").build();
+    await bandRepository.insert(band);
+
+    const presenterAfterInvite = await controller.addMember(band.band_id.id, {
+      musician_id: musician.musician_id.id,
+      role: "member",
+      instrument: "Guitar",
+    } as any);
+
+    expect(presenterAfterInvite.members[0].status).toBe("pending");
+
+    const currentUser = {
+      userId: musician.musician_id.id,
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+
+    const presenterAfterAccept = await controller.acceptInvite(
+      band.band_id.id,
+      currentUser as any,
+    );
+
+    expect(presenterAfterAccept.members[0].status).toBe("accepted");
+  });
+
+  it("should let the invited musician decline a pending invite", async () => {
+    const musician = Musician.fake()
+      .aMusician()
+      .withName("Invited")
+      .withEmail("invited2@example.com")
+      .build();
+    await musicianRepository.insert(musician);
+
+    const band = Band.fake().aBand().withName("My Band").build();
+    await bandRepository.insert(band);
+
+    await controller.addMember(band.band_id.id, {
+      musician_id: musician.musician_id.id,
+      role: "member",
+      instrument: "Guitar",
+    } as any);
+
+    const currentUser = {
+      userId: musician.musician_id.id,
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+
+    const presenterAfterDecline = await controller.declineInvite(
+      band.band_id.id,
+      currentUser as any,
+    );
+
+    expect(presenterAfterDecline.members[0].status).toBe("declined");
+  });
+
+  it("should set band open_to_gigs, never defaulting to true", async () => {
+    const band = Band.fake().aBand().withName("My Band").build();
+    await bandRepository.insert(band);
+
+    expect(band.open_to_gigs).toBeNull();
+
+    const presenter = await controller.setOpenToGigs(band.band_id.id, {
+      open_to_gigs: true,
+    } as any);
+
+    expect(presenter.open_to_gigs).toBe(true);
   });
 });

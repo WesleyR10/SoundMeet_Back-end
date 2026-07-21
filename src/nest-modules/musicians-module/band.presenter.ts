@@ -12,6 +12,8 @@ export class BandPresenter {
   genres: string[];
   members: BandOutput["members"];
   priceRange: BandOutput["priceRange"];
+  address: BandOutput["address"];
+  open_to_gigs: boolean | null;
   is_active: boolean;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   created_at: Date;
@@ -26,6 +28,8 @@ export class BandPresenter {
     this.genres = output.genres;
     this.members = output.members;
     this.priceRange = output.priceRange;
+    this.address = output.address;
+    this.open_to_gigs = output.open_to_gigs;
     this.is_active = output.is_active;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;

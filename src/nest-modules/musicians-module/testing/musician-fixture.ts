@@ -308,6 +308,7 @@ export class ListMusiciansFixture {
       .withName((i) => `name-${i}`)
       .withEmail((i) => `user-${i}@example.com`)
       .withcreated_at((i) => new Date(base + i * 2000))
+      .withOpenToGigs(true)
       .build();
 
     const entitiesMap = {
@@ -371,7 +372,7 @@ export class ListMusiciansFixture {
   }
 
   static arrangeUnsorted() {
-    const faker = Musician.fake().aMusician();
+    const faker = Musician.fake().aMusician().withOpenToGigs(true);
 
     const entitiesMap = {
       a: faker.withName("a").withEmail("a@example.com").build(),

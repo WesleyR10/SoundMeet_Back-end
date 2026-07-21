@@ -1,12 +1,15 @@
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-profile-output";
+import { ClearMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
+import { SetMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { CreateMusicianUseCase } from "../../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeleteMusicianUseCase } from "../../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
+import { SetMusicianOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
 import { UpdateMusicianUseCase } from "../../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
@@ -73,9 +76,27 @@ describe("MusiciansController Integration Tests", () => {
           inject: ["MusicianRepository"],
         },
         {
+          provide: SetMusicianTouringLocationUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new SetMusicianTouringLocationUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
+          provide: ClearMusicianTouringLocationUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new ClearMusicianTouringLocationUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
           provide: ListMusiciansUseCase,
           useFactory: (repo: IMusicianRepository) =>
             new ListMusiciansUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
+          provide: SetMusicianOpenToGigsUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new SetMusicianOpenToGigsUseCase(repo),
           inject: ["MusicianRepository"],
         },
         {
@@ -294,5 +315,21 @@ describe("MusiciansController Integration Tests", () => {
         },
       );
     });
+  });
+
+  it("should set open_to_gigs, never defaulting to true", async () => {
+    const musician = Musician.fake().aMusician().build();
+    await repository.insert(musician);
+
+    expect(musician.open_to_gigs).toBeNull();
+
+    const presenter = await controller.setOpenToGigs(musician.musician_id.id, {
+      open_to_gigs: true,
+    } as any);
+
+    expect(presenter.open_to_gigs).toBe(true);
+
+    const found = await repository.findById(musician.musician_id);
+    expect(found!.open_to_gigs).toBe(true);
   });
 });

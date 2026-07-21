@@ -1,16 +1,23 @@
+import { AcceptBandInviteUseCase } from "../../core/musician/application/use-cases/accept-band-invite/accept-band-invite.use-case";
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
+import { ClearMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
+import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
+import { DeclineBandInviteUseCase } from "../../core/musician/application/use-cases/decline-band-invite/decline-band-invite.use-case";
 import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
+import { InviteBandMemberUseCase } from "../../core/musician/application/use-cases/invite-band-member/invite-band-member.use-case";
 import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
+import { SetBandOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
+import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
@@ -25,11 +32,23 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "@nestjs/config";
 import AWS from "aws-sdk";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
+import { IGeocodingService } from "../../core/shared/domain/geocoding.service";
+import { HttpGeocodingService } from "../../core/shared/infra/geocoding/http-geocoding.service";
 import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
 import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
 export const MUSICIAN_STORAGE_TOKEN = "MusicianStorage";
+export const GEOCODING_SERVICE_TOKEN = "GeocodingService";
+
+// Geocodificacao best-effort (7.13c) usada pelo update de perfil — endereco
+// cadastrado (CEP) vira coordenadas pra busca por raio, sem GPS do musico.
+export const SERVICES = {
+  GEOCODING_SERVICE: {
+    provide: GEOCODING_SERVICE_TOKEN,
+    useClass: HttpGeocodingService,
+  },
+};
 
 export const REPOSITORIES = {
   MUSICIAN_REPOSITORY: {
@@ -139,15 +158,42 @@ export const USE_CASES = {
   },
   UPDATE_MUSICIAN_PROFILE_USE_CASE: {
     provide: UpdateMusicianProfileUseCase,
-    useFactory: (musicianRepo: IMusicianRepository) => {
-      return new UpdateMusicianProfileUseCase(musicianRepo);
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      geocodingService: IGeocodingService,
+    ) => {
+      return new UpdateMusicianProfileUseCase(musicianRepo, geocodingService);
     },
-    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, GEOCODING_SERVICE_TOKEN],
   },
   REGISTER_PUSH_TOKEN_USE_CASE: {
     provide: RegisterPushTokenUseCase,
     useFactory: (musicianRepo: IMusicianRepository) => {
       return new RegisterPushTokenUseCase(musicianRepo);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+  SET_MUSICIAN_OPEN_TO_GIGS_USE_CASE: {
+    provide: SetMusicianOpenToGigsUseCase,
+    useFactory: (musicianRepo: IMusicianRepository) => {
+      return new SetMusicianOpenToGigsUseCase(musicianRepo);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+  SET_MUSICIAN_TOURING_LOCATION_USE_CASE: {
+    provide: SetMusicianTouringLocationUseCase,
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      geocodingService: IGeocodingService,
+    ) => {
+      return new SetMusicianTouringLocationUseCase(musicianRepo, geocodingService);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, GEOCODING_SERVICE_TOKEN],
+  },
+  CLEAR_MUSICIAN_TOURING_LOCATION_USE_CASE: {
+    provide: ClearMusicianTouringLocationUseCase,
+    useFactory: (musicianRepo: IMusicianRepository) => {
+      return new ClearMusicianTouringLocationUseCase(musicianRepo);
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
   },
@@ -210,6 +256,9 @@ export const USE_CASES = {
     },
     inject: [REPOSITORIES.BAND_REPOSITORY.provide],
   },
+  // @deprecated — mantido registrado (não injetado em nenhum controller) só
+  // para não quebrar quem ainda referencia AddBandMemberUseCase diretamente.
+  // Substituído por INVITE_BAND_MEMBER_USE_CASE (fluxo com convite/aceite).
   ADD_BAND_MEMBER_USE_CASE: {
     provide: AddBandMemberUseCase,
     useFactory: (
@@ -224,6 +273,42 @@ export const USE_CASES = {
       REPOSITORIES.MUSICIAN_REPOSITORY.provide,
       PlanCheckService,
     ],
+  },
+  INVITE_BAND_MEMBER_USE_CASE: {
+    provide: InviteBandMemberUseCase,
+    useFactory: (
+      bandRepo: IBandRepository,
+      musicianRepo: IMusicianRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new InviteBandMemberUseCase(bandRepo, musicianRepo, planCheckService);
+    },
+    inject: [
+      REPOSITORIES.BAND_REPOSITORY.provide,
+      REPOSITORIES.MUSICIAN_REPOSITORY.provide,
+      PlanCheckService,
+    ],
+  },
+  ACCEPT_BAND_INVITE_USE_CASE: {
+    provide: AcceptBandInviteUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new AcceptBandInviteUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  DECLINE_BAND_INVITE_USE_CASE: {
+    provide: DeclineBandInviteUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new DeclineBandInviteUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  SET_BAND_OPEN_TO_GIGS_USE_CASE: {
+    provide: SetBandOpenToGigsUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new SetBandOpenToGigsUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
   },
   REMOVE_BAND_MEMBER_USE_CASE: {
     provide: RemoveBandMemberUseCase,
@@ -289,6 +374,7 @@ export const EVENTS = {
 export const MUSICIANS_PROVIDERS = {
   REPOSITORIES,
   STORAGE,
+  SERVICES,
   USE_CASES,
   EVENTS,
 };
