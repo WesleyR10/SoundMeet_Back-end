@@ -88,8 +88,15 @@ export class CampaignController {
     description: "Lista campanhas com paginação e filtros.",
   })
   @ApiResponse({ status: 200, type: CampaignCollectionPresenter })
-  async findAll(@Query() query: SearchCampaignsDto) {
-    const output = await this.listUseCase.execute(query);
+  async findAll(
+    @Query() query: SearchCampaignsDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    const output = await this.listUseCase.execute({
+      ...query,
+      requesting_establishment_id: currentUser?.establishmentIds?.[0],
+      is_admin: currentUser?.roles.includes("admin"),
+    });
     return new CampaignCollectionPresenter(output);
   }
 
@@ -100,8 +107,13 @@ export class CampaignController {
   @ApiResponse({ status: 200, type: CampaignPresenter })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const output = await this.getUseCase.execute({ campaign_id: id });
+    const output = await this.getUseCase.execute({
+      campaign_id: id,
+      requesting_establishment_id: currentUser?.establishmentIds?.[0],
+      is_admin: currentUser?.roles.includes("admin"),
+    });
     return CampaignController.serialize(output);
   }
 

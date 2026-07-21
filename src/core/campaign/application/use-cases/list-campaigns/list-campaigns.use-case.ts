@@ -17,6 +17,12 @@ export type ListCampaignsInput = {
   establishment_id?: string | null;
   status?: string | null;
   title?: string | null;
+  // Estabelecimento autenticado — quando presente e não-admin, força o
+  // filtro pro próprio estabelecimento, ignorando qualquer establishment_id
+  // que o cliente tenha pedido (evita listar campanhas de outro
+  // estabelecimento). Ausente = chamada interna/admin, sem restrição.
+  requesting_establishment_id?: string;
+  is_admin?: boolean;
 };
 
 export type ListCampaignsOutput = PaginationOutput<CampaignOutput>;
@@ -27,13 +33,18 @@ export class ListCampaignsUseCase
   constructor(private readonly campaignRepo: ICampaignRepository) {}
 
   async execute(input: ListCampaignsInput): Promise<ListCampaignsOutput> {
+    const establishment_id =
+      !input.is_admin && input.requesting_establishment_id
+        ? input.requesting_establishment_id
+        : (input.establishment_id ?? null);
+
     const params = CampaignSearchParams.create({
       page: input.page,
       per_page: input.per_page,
       sort: input.sort,
       sort_dir: input.sort_dir,
       filter: {
-        establishment_id: input.establishment_id ?? null,
+        establishment_id,
         status: input.status ?? null,
         title: input.title ?? null,
       },
