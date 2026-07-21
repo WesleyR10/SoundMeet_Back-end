@@ -240,6 +240,42 @@ export const CONFIG_SYNCED_LYRICS_SCHEMA = {
   }),
 };
 
+export const CONFIG_GOOGLE_CALENDAR_SCHEMA = {
+  // Client OAuth próprio para Calendar — SEPARADO do login social
+  // (GOOGLE_KEYCLOAK_CLIENT_ID/SECRET), que tem storeToken:false no Keycloak
+  GOOGLE_CALENDAR_CLIENT_ID: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+  GOOGLE_CALENDAR_CLIENT_SECRET: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+  GOOGLE_CALENDAR_REDIRECT_URI: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+  GOOGLE_CALENDAR_SYNC_TRANSPORT: Joi.string()
+    .valid("noop", "rabbitmq")
+    .default("noop"),
+  RABBITMQ_ROUTING_KEY_GOOGLE_CALENDAR_BOOKING_CONFIRMED:
+    Joi.string().optional(),
+  RABBITMQ_ROUTING_KEY_GOOGLE_CALENDAR_BOOKING_CANCELLED:
+    Joi.string().optional(),
+  RABBITMQ_QUEUE_GOOGLE_CALENDAR_BOOKING_CONFIRMED: Joi.string().optional(),
+  RABBITMQ_QUEUE_GOOGLE_CALENDAR_BOOKING_CANCELLED: Joi.string().optional(),
+  // Chave AES-256-GCM (32 bytes base64) para tokens OAuth em repouso.
+  // Gerar com: openssl rand -base64 32
+  TOKEN_ENCRYPTION_KEY: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().base64().min(43).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+};
+
 @Global()
 @Module({})
 export class ConfigModuleRoot extends NestConfigModule {
@@ -290,6 +326,7 @@ export class ConfigModuleRoot extends NestConfigModule {
         ...CONFIG_AI_AUDIO_SCHEMA,
         ...CONFIG_AI_CIFRA_SCHEMA,
         ...CONFIG_SYNCED_LYRICS_SCHEMA,
+        ...CONFIG_GOOGLE_CALENDAR_SCHEMA,
       }),
       ...restOptions,
     });

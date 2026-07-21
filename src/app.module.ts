@@ -1,36 +1,37 @@
 import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
-import { ConfigService } from "@nestjs/config";
 
 import { HealthController } from "./health.controller";
-import {
-  ConfigSchemaType,
-  EnvConfig,
-} from "./nest-modules/config-module/config.schema";
 import { AiAudioModule } from "./nest-modules/ai-audio-module/ai-audio.module";
 import { AiCifraModule } from "./nest-modules/ai-cifra-module/ai-cifra.module";
 import { AudiencesModule } from "./nest-modules/audiences-module/audiences.module";
 import { AuthModule } from "./nest-modules/auth-module/auth.module";
+import { CampaignModule } from "./nest-modules/campaign-module/campaign.module";
+import { ChatModule } from "./nest-modules/chat-module/chat.module";
+import {
+  ConfigSchemaType,
+  EnvConfig,
+} from "./nest-modules/config-module/config.schema";
 import { ConfigModuleRoot } from "./nest-modules/config-module/config-module.module";
 import { DatabaseModule } from "./nest-modules/database-module/database.module";
 import { EstablishmentsModule } from "./nest-modules/establishments-module/establishments.module";
 import { EventModule } from "./nest-modules/events-module/events.module";
 import { GamificationModule } from "./nest-modules/gamification-module/gamification.module";
+import { GoogleCalendarModule } from "./nest-modules/google-calendar-module/google-calendar.module";
+import { MailModule } from "./nest-modules/mail-module/mail.module";
 import { MusicLibraryModule } from "./nest-modules/music-library-module/music-library.module";
 import { MusicianAnalyticsModule } from "./nest-modules/musician-analytics-module/musician-analytics.module";
 import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
+import { NotificationsModule } from "./nest-modules/notifications-module/notifications.module";
 import { PaymentModule } from "./nest-modules/payment-module/payment.module";
 import { RabbitmqModule } from "./nest-modules/rabbitmq-module/rabbitmq.module";
+import { RepertoireModule } from "./nest-modules/repertoire-module/repertoire.module";
 import { RequestsModule } from "./nest-modules/requests-module/requests.module";
 import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.module";
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
-import { MailModule } from "./nest-modules/mail-module/mail.module";
-import { CampaignModule } from "./nest-modules/campaign-module/campaign.module";
-import { NotificationsModule } from "./nest-modules/notifications-module/notifications.module";
-import { RepertoireModule } from "./nest-modules/repertoire-module/repertoire.module";
-import { ChatModule } from "./nest-modules/chat-module/chat.module";
 
 const normalizeTransport = (value: string | undefined, fallback: string) =>
   (value ?? fallback).trim().toLowerCase();
@@ -42,7 +43,11 @@ const shouldRegisterRabbitmqHandlers =
     "rabbitmq" ||
   normalizeTransport(process.env.SYNCED_LYRICS_BULK_TRANSPORT, "inline") ===
     "rabbitmq" ||
-  normalizeTransport(process.env.GAMIFICATION_PROCESSING_TRANSPORT, "inline") ===
+  normalizeTransport(
+    process.env.GAMIFICATION_PROCESSING_TRANSPORT,
+    "inline",
+  ) === "rabbitmq" ||
+  normalizeTransport(process.env.GOOGLE_CALENDAR_SYNC_TRANSPORT, "noop") ===
     "rabbitmq";
 
 @Module({
@@ -80,6 +85,7 @@ const shouldRegisterRabbitmqHandlers =
     SyncedLyricsModule,
     NotificationsModule,
     ChatModule,
+    GoogleCalendarModule,
 
     // Event System
     // messaging-module

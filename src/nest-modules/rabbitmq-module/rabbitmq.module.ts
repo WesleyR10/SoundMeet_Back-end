@@ -94,6 +94,9 @@ export class RabbitmqModule implements OnApplicationBootstrap {
               gamification_events: {
                 prefetchCount: 10,
               },
+              google_calendar_sync: {
+                prefetchCount: 5,
+              },
             },
           }),
           inject: [ConfigService],

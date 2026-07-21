@@ -143,6 +143,19 @@ export type EnvConfig = {
   SYNCED_LYRICS_BULK_BACKPRESSURE_TICK_MS?: number;
   SYNCED_LYRICS_BULK_TOKEN?: string;
 
+  // Google Calendar (integração de agenda do músico — client OAuth próprio,
+  // separado do login social GOOGLE_KEYCLOAK_CLIENT_ID/SECRET)
+  GOOGLE_CALENDAR_CLIENT_ID?: string;
+  GOOGLE_CALENDAR_CLIENT_SECRET?: string;
+  GOOGLE_CALENDAR_REDIRECT_URI?: string;
+  GOOGLE_CALENDAR_SYNC_TRANSPORT?: "noop" | "rabbitmq";
+  RABBITMQ_ROUTING_KEY_GOOGLE_CALENDAR_BOOKING_CONFIRMED?: string;
+  RABBITMQ_ROUTING_KEY_GOOGLE_CALENDAR_BOOKING_CANCELLED?: string;
+  RABBITMQ_QUEUE_GOOGLE_CALENDAR_BOOKING_CONFIRMED?: string;
+  RABBITMQ_QUEUE_GOOGLE_CALENDAR_BOOKING_CANCELLED?: string;
+  // Chave AES-256-GCM (32 bytes base64) para segredos cifrados em repouso
+  TOKEN_ENCRYPTION_KEY?: string;
+
   // Asaas — cachê de show, escrow, assinaturas, saque PIX
   ASAAS_API_URL: string;
   ASAAS_API_KEY?: string;

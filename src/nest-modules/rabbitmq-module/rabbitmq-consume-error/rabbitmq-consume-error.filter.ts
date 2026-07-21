@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { ConsumeMessage, MessagePropertyHeaders } from "amqplib";
 
+import { GoogleCalendarAuthError } from "../../../core/google-calendar/application/ports/google-calendar-gateway.interface";
 import { NotFoundError } from "../../../core/shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../core/shared/domain/validators/validation.error";
 
@@ -19,6 +20,8 @@ export class RabbitmqConsumeErrorFilter implements ExceptionFilter {
     NotFoundError,
     EntityValidationError,
     UnprocessableEntityException,
+    // Token Google revogado — retry não resolve, o músico precisa reconectar.
+    GoogleCalendarAuthError,
   ];
 
   constructor(private amqpConnection: AmqpConnection) {}
