@@ -94,7 +94,7 @@ export class ConfirmTipPaymentUseCase implements IUseCase<
         throw new NotFoundError(tip.band_id.id, Band);
       }
 
-      const activeMembers = band.members;
+      const activeMembers = band.acceptedMembers;
       if (activeMembers.length > 0) {
         // Split amount among band members
         // For simplicity, splitting equally for now.

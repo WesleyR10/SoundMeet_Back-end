@@ -119,7 +119,7 @@ export class TipFakeBuilder<TBuild = any> {
         event_id: this.callFactory(this._event_id, index) ?? null,
         amount:
           this.callFactory(this._amount, index) ??
-          new Money(this.chance.floating({ min: 1, max: 100 })),
+          new Money(this.chance.floating({ min: 1, max: 100, fixed: 2 })),
         message:
           this.callFactory(this._message, index) ?? this.chance.sentence(),
         payment_method:

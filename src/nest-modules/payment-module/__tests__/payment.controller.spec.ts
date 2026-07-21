@@ -109,6 +109,8 @@ describe("PaymentController", () => {
       transaction_id: "22222222-2222-4222-8222-222222222222",
       wallet_balance: 50,
       status: "completed",
+      min_withdrawal_amount_brl: 110,
+      withdrawal_days: 5,
     };
     const useCase = { execute: jest.fn().mockResolvedValue(output) };
     (controller as any).withdrawToPixUseCase = useCase;

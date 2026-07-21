@@ -108,16 +108,25 @@ export class TransactionFakeBuilder<TBuild = any> {
           transaction_id:
             this.callFactory(this._transaction_id, index) ??
             new TransactionId(),
-          user_id: this.callFactory(this._user_id, index) ?? new Uuid(),
-          musician_id: this.callFactory(this._musician_id, index) ?? new Uuid(),
+          // `?? new Uuid()` engoliria um null explícito (campos NULÁVEIS —
+          // saque não tem user_id) e geraria um UUID aleatório que viola a
+          // FK; o default aleatório só vale quando o campo nunca foi setado.
+          user_id:
+            this._user_id === undefined
+              ? new Uuid()
+              : this.callFactory(this._user_id, index),
+          musician_id:
+            this._musician_id === undefined
+              ? new Uuid()
+              : this.callFactory(this._musician_id, index),
           type: this.callFactory(this._type, index) ?? TransactionType.TIP,
           amount:
             this.callFactory(this._amount, index) ??
-            new Money(this.chance.floating({ min: 1, max: 100 })),
+            new Money(this.chance.floating({ min: 1, max: 100, fixed: 2 })),
           fee: this.callFactory(this._fee, index) ?? new Money(0),
           net_amount:
             this.callFactory(this._net_amount, index) ??
-            new Money(this.chance.floating({ min: 1, max: 100 })),
+            new Money(this.chance.floating({ min: 1, max: 100, fixed: 2 })),
           status:
             this.callFactory(this._status, index) ?? TransactionStatus.PENDING,
           payment_method:

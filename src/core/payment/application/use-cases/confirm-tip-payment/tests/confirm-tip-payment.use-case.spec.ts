@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { Band } from "@core/musician/domain/band.aggregate";
 import { IBandRepository } from "@core/musician/domain/band.repository";
+import { Uuid } from "@core/shared/domain/value-objects/uuid.vo";
 import {
   MusicianWallet,
   PaymentMethod,
@@ -138,5 +139,54 @@ describe("ConfirmTipPaymentUseCase", () => {
     expect(output.tip_id).toBe(tip.tip_id.id);
     expect(output.transaction_id).toBeDefined();
     expect(output.wallet_balance).toBe(97);
+  });
+
+  it("splits the tip only among accepted band members, excluding pending invites", async () => {
+    const tipRepo = new TipInMemoryRepository();
+    const txRepo = new TransactionInMemoryRepository();
+    const walletRepo = new MusicianWalletRepoStub();
+    const bandRepo = new BandRepoStub();
+    const useCase = new ConfirmTipPaymentUseCase(
+      tipRepo,
+      txRepo,
+      walletRepo,
+      bandRepo,
+      uowMock,
+      domainEventMediatorMock,
+    );
+
+    const acceptedMemberA = new Uuid();
+    const acceptedMemberB = new Uuid();
+    const pendingMember = new Uuid();
+
+    const band = Band.create({ name: "The Band", genres: ["rock"] });
+    band.inviteMember(acceptedMemberA, "leader", "vocals");
+    band.inviteMember(acceptedMemberB, "member", "guitar");
+    band.inviteMember(pendingMember, "member", "drums");
+    band.acceptInvite(acceptedMemberA);
+    band.acceptInvite(acceptedMemberB);
+    await bandRepo.insert(band);
+
+    const tip = Tip.create({
+      audience_id: "123e4567-e89b-12d3-a456-426614174000",
+      band_id: band.band_id.id,
+      amount: 100,
+      payment_method: PaymentMethod.PIX,
+    });
+    await tipRepo.insert(tip);
+
+    await useCase.execute({
+      tip_id: tip.tip_id.id,
+      payment: { amount: 100, fee: 0, payment_method: PaymentMethod.PIX },
+    });
+
+    const walletA = await walletRepo.findByMusicianId(acceptedMemberA.id);
+    const walletB = await walletRepo.findByMusicianId(acceptedMemberB.id);
+    const walletPending = await walletRepo.findByMusicianId(pendingMember.id);
+
+    expect(walletA).not.toBeNull();
+    expect(walletB).not.toBeNull();
+    expect(walletA!.balance.amount + walletB!.balance.amount).toBe(100);
+    expect(walletPending).toBeNull();
   });
 });
