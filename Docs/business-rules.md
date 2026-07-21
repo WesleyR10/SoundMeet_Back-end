@@ -94,8 +94,9 @@ Marcações:
        Código: musician-in-memory.repository.ts ([5]).  
        Regra: `applyFilter` suporta filtros por `name`, `stage_name`, `email`, `genres`, `instruments`, `is_active`, e ordenação por `name` e `created_at`.
 
-- [~] Dashboard de contratação com histórico de performances e engajamento  
-  A filtragem por perfil de músico já existe; porém não há ainda um agregado ou use-case dedicado a “Dashboard de contratação” com histórico consolidado de eventos, performance e engajamento para estabelecimentos.
+- [x] Dashboard de contratação com histórico de performances e engajamento  
+       Código: get-hiring-dashboard.use-case.ts ([5]).  
+       Regra: `GetHiringDashboardUseCase` consolida histórico de eventos/performance/engajamento por músico para o estabelecimento; exposto em `GET establishments/:id/hiring-dashboard`, protegido por `EstablishmentOwnershipGuard`. **(corrigido jul/2026 — texto anterior estava desatualizado)**
 
 ---
 
@@ -136,11 +137,11 @@ Marcações:
 
 **Funcionalidades avançadas para estabelecimentos (planejadas)**
 
-- [ ] Dashboard de contratação com histórico de performances e engajamento
+- [x] Dashboard de contratação com histórico de performances e engajamento — ver Domínio Musician acima (`get-hiring-dashboard.use-case.ts`) **(corrigido jul/2026)**
 - [ ] Sistema de avaliações/reviews entre estabelecimentos e músicos
-- [ ] Agenda compartilhada em tempo real com disponibilidade de músicos e bandas
-- [ ] Sistema de comunicação (chat seguro, histórico de conversas)
-- [ ] Gestão de indicações com priorização por relevância
+- [~] Agenda compartilhada com disponibilidade de músicos e bandas — leitura já existe (`GET scheduling/calendar/free-busy`, `GET scheduling/calendar/month-slots`, ambos `@Public()`); falta o "tempo real" (push via WebSocket) **(corrigido jul/2026 — estava `[ ]`)**
+- [x] Sistema de comunicação (chat seguro, histórico de conversas) — `src/core/chat/` (Conversation + Message) + `chat-module` (gateway `/chat`, REST, 15 testes de integração), registrado em `app.module.ts` **(corrigido jul/2026 — estava `[ ]`, contradizia roadmap.md Bloco 7.1 que já marca `✅`)**
+- [ ] Gestão de indicações com priorização por relevância — `IndicateMusicianUseCase` existe do lado do público (audiência ganha pontos), mas falta notificação/dashboard do lado do estabelecimento
 - [ ] Gestão completa de eventos (confirmação, lembretes, pagamentos automatizados)
 - [ ] Módulo de marketing (integração social, geração de artes, campanhas, cupons)
 
@@ -191,6 +192,20 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 - [~] Limite de shows por dia configurável  
   O campo existe (`max_shows_per_day`), mas ainda não há regra consolidada aplicando esse limite no cálculo de disponibilidade.
+
+**Google Calendar (sync one-way de bookings — jul/2026)**
+
+- [x] Músico (ou líder de banda) conecta a própria conta Google e bookings confirmados viram eventos na agenda pessoal dele; cancelamentos removem o evento  
+       Código: domínio `src/core/google-calendar/`, módulo `src/nest-modules/google-calendar-module/`.  
+       Regras:
+  - Sync é **one-way** (SoundMeet → Google). Nunca lê a agenda do Google de volta.
+  - Conexão é sempre por `musician_id` (1:1, tabela `google_calendar_integrations`). Em booking de banda, sincroniza **apenas a agenda do líder** (`role === "leader"` em `Band.members`); banda sem líder é no-op. O registro `google_calendar_synced_events` guarda em qual agenda o evento foi criado — cancelamento usa esse registro, nunca re-resolve o líder (troca de liderança não aponta pra agenda errada).
+  - Tokens OAuth persistidos **cifrados** (AES-256-GCM, chave `TOKEN_ENCRYPTION_KEY` de 32 bytes via env; IV único por operação). Nunca em texto claro, nunca logados, nunca expostos em presenter/`toJSON()`.
+  - Client OAuth **separado** do login social (`GOOGLE_CALENDAR_CLIENT_ID/SECRET` ≠ `GOOGLE_KEYCLOAK_CLIENT_ID/SECRET` — o IdP do Keycloak tem `storeToken:false` e é inutilizável para Calendar). Escopo mínimo: `calendar.events` + `openid email`.
+  - Callback OAuth é rota fixa `GET /google-calendar/oauth/callback` (`@Public()` — redirect de navegador sem Bearer): a autenticidade vem do `state` assinado (HMAC-SHA256 + nonce + expiração de 10min), validado antes de qualquer troca de `code`.
+  - Sync é assíncrono via RabbitMQ (`GOOGLE_CALENDAR_SYNC_TRANSPORT`, default `noop` = feature inerte): handler `@OnEvent` cross-module só enfileira, o consumer chama a API do Google. Idempotência em 3 camadas: `messageId` na fila, status em `google_calendar_synced_events` e id determinístico do evento no Google (UUID do booking sem hífens; 409 = já criado = sucesso). Corrida confirm/cancel entre filas tem compensação: re-check do status pós-create remove evento órfão.
+  - `GoogleCalendarAuthError` (token revogado) é **não-retriável** (listado no `RabbitmqConsumeErrorFilter`) e desativa a integração — o músico reconecta pelo app. Indisponibilidade do Google é retriável (backoff da fila). Músico sem conta conectada é estado normal → no-op silencioso, nunca erro.
+  - Disconnect (`DELETE /musicians/:id/google-calendar`) revoga o token no Google best-effort e **sempre** zera os tokens locais (indisponibilidade do Google não bloqueia o disconnect).
 
 ---
 
