@@ -1,3 +1,6 @@
+import { Event, EventId } from "@core/events/domain";
+import { EventInMemoryRepository } from "@core/events/infra/db/in-memory";
+
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Request } from "../../../../domain/request.aggregate";
@@ -8,10 +11,12 @@ import { GetRequestUseCase } from "../get-request.use-case";
 describe("GetRequestUseCase Unit Tests", () => {
   let useCase: GetRequestUseCase;
   let repository: RequestInMemoryRepository;
+  let eventRepo: EventInMemoryRepository;
 
   beforeEach(() => {
     repository = new RequestInMemoryRepository();
-    useCase = new GetRequestUseCase(repository);
+    eventRepo = new EventInMemoryRepository();
+    useCase = new GetRequestUseCase(repository, eventRepo);
   });
 
   it("should throw an error when request is not found", async () => {
@@ -161,5 +166,87 @@ describe("GetRequestUseCase Unit Tests", () => {
     expect(output.is_rejected).toBe(true);
     expect(output.is_pending).toBe(false);
     expect(output.is_accepted).toBe(false);
+  });
+
+  describe("ownership scoping", () => {
+    const buildRequest = () =>
+      Request.create({
+        event_id: new Uuid().id,
+        audience_id: new Uuid().id,
+        musician_id: new Uuid().id,
+        song_title: "Song",
+      });
+
+    it("should allow the requesting audience to view their own request", async () => {
+      const request = buildRequest();
+      await repository.insert(request);
+
+      const output = await useCase.execute({
+        id: request.request_id.id,
+        requesting_user_id: request.audience_id.id,
+      });
+
+      expect(output.id).toBe(request.request_id.id);
+    });
+
+    it("should allow the target musician to view the request", async () => {
+      const request = buildRequest();
+      await repository.insert(request);
+
+      const output = await useCase.execute({
+        id: request.request_id.id,
+        requesting_user_id: request.musician_id.id,
+      });
+
+      expect(output.id).toBe(request.request_id.id);
+    });
+
+    it("should allow the establishment that owns the event to view the request", async () => {
+      const establishment_id = new Uuid().id;
+      const request = buildRequest();
+      await repository.insert(request);
+      await eventRepo.insert(
+        new Event({
+          event_id: new EventId(request.event_id.id),
+          establishment_id: new Uuid(establishment_id),
+          name: "Event",
+          start_at: new Date(),
+          end_at: new Date(Date.now() + 60 * 60 * 1000),
+          status: "active",
+        }),
+      );
+
+      const output = await useCase.execute({
+        id: request.request_id.id,
+        requesting_user_id: establishment_id,
+      });
+
+      expect(output.id).toBe(request.request_id.id);
+    });
+
+    it("should throw ForbiddenException for an unrelated user", async () => {
+      const request = buildRequest();
+      await repository.insert(request);
+
+      await expect(() =>
+        useCase.execute({
+          id: request.request_id.id,
+          requesting_user_id: new Uuid().id,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it("should allow admin regardless of ownership", async () => {
+      const request = buildRequest();
+      await repository.insert(request);
+
+      const output = await useCase.execute({
+        id: request.request_id.id,
+        requesting_user_id: new Uuid().id,
+        is_admin: true,
+      });
+
+      expect(output.id).toBe(request.request_id.id);
+    });
   });
 });

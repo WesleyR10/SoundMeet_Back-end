@@ -111,10 +111,10 @@ export const USE_CASES = {
   },
   GET_REQUEST_USE_CASE: {
     provide: GetRequestUseCase,
-    useFactory: (requestRepo: IRequestRepository) => {
-      return new GetRequestUseCase(requestRepo);
+    useFactory: (requestRepo: IRequestRepository, eventRepo: IEventRepository) => {
+      return new GetRequestUseCase(requestRepo, eventRepo);
     },
-    inject: [REPOSITORIES.REQUEST_REPOSITORY.provide],
+    inject: [REPOSITORIES.REQUEST_REPOSITORY.provide, "EventRepository"],
   },
   UPDATE_REQUEST_USE_CASE: {
     provide: UpdateRequestUseCase,
@@ -240,10 +240,18 @@ export const USE_CASES = {
   },
   GET_REQUEST_FEEDBACK_USE_CASE: {
     provide: GetRequestFeedbackUseCase,
-    useFactory: (feedbackRepo: IRequestFeedbackRepository) => {
-      return new GetRequestFeedbackUseCase(feedbackRepo);
+    useFactory: (
+      feedbackRepo: IRequestFeedbackRepository,
+      requestRepo: IRequestRepository,
+      eventRepo: IEventRepository,
+    ) => {
+      return new GetRequestFeedbackUseCase(feedbackRepo, requestRepo, eventRepo);
     },
-    inject: [REPOSITORIES.REQUEST_FEEDBACK_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.REQUEST_FEEDBACK_REPOSITORY.provide,
+      REPOSITORIES.REQUEST_REPOSITORY.provide,
+      "EventRepository",
+    ],
   },
 };
 

@@ -14,6 +14,7 @@ export type CreateRequestFeedbackInputConstructorProps = {
   request_id: string;
   rating: number;
   comment?: string | null;
+  musician_id?: string;
 };
 
 export class CreateRequestFeedbackInput {
@@ -32,12 +33,19 @@ export class CreateRequestFeedbackInput {
   @MaxLength(500, { message: "Comment cannot exceed 500 characters" })
   comment?: string | null;
 
+  // Músico autenticado que está avaliando (undefined = admin, pula a checagem
+  // de ownership — mesmo padrão de mark-request-played.input.ts).
+  @IsUUID()
+  @IsOptional()
+  musician_id?: string;
+
   constructor(props: CreateRequestFeedbackInputConstructorProps) {
     if (!props) return;
 
     this.request_id = props.request_id;
     this.rating = props.rating;
     this.comment = props.comment;
+    this.musician_id = props.musician_id;
   }
 }
 

@@ -153,8 +153,11 @@ describe("RequestsController Integration Tests", () => {
         },
         {
           provide: GetRequestUseCase,
-          useFactory: (repo: IRequestRepository) => new GetRequestUseCase(repo),
-          inject: ["RequestRepository"],
+          useFactory: (
+            repo: IRequestRepository,
+            eventRepo: EventInMemoryRepository,
+          ) => new GetRequestUseCase(repo, eventRepo),
+          inject: ["RequestRepository", "EventRepository"],
         },
         {
           provide: UpdateRequestUseCase,
@@ -234,6 +237,8 @@ describe("RequestsController Integration Tests", () => {
           provide: GetRequestFeedbackUseCase,
           useValue: new GetRequestFeedbackUseCase(
             requestFeedbackRepositoryInstance,
+            repositoryInstance,
+            eventRepository,
           ),
         },
       ],
@@ -456,6 +461,71 @@ describe("RequestsController Integration Tests", () => {
     expect(presenter.requests.length).toBe(2);
     expect(presenter.total_count).toBe(2);
     expect(presenter.pending_count).toBe(2);
+  });
+
+  it("should let an audience list their own requests", async () => {
+    const musicianId = new Uuid().id;
+    const eventId = new Uuid().id;
+    const audienceId = new Uuid().id;
+    const otherAudienceId = new Uuid().id;
+
+    await setupEventWithMusicians(eventId, [musicianId]);
+    await setupAudienceInEvent(eventId, audienceId);
+    await setupAudienceInEvent(eventId, otherAudienceId);
+
+    await controller.create(
+      { event_id: eventId, musician_id: musicianId, song_title: "Song 1" } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
+    await controller.create(
+      { event_id: eventId, musician_id: musicianId, song_title: "Song 2" } as any,
+      { userId: otherAudienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
+
+    const presenter = await controller.getAudienceRequests(
+      audienceId,
+      { page: 1, per_page: 10 } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
+
+    expect(presenter).toBeInstanceOf(RequestCollectionPresenter);
+    expect(presenter.data.length).toBe(1);
+    expect(presenter.data[0].song_title).toBe("Song 1");
+  });
+
+  it("should forbid an audience from listing another audience's requests", async () => {
+    const audienceId = new Uuid().id;
+    const otherAudienceId = new Uuid().id;
+
+    await expect(
+      controller.getAudienceRequests(
+        otherAudienceId,
+        { page: 1, per_page: 10 } as any,
+        { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      ),
+    ).rejects.toThrow("Você não tem permissão para ver pedidos de outro fã.");
+  });
+
+  it("should let an admin list any audience's requests", async () => {
+    const musicianId = new Uuid().id;
+    const eventId = new Uuid().id;
+    const audienceId = new Uuid().id;
+
+    await setupEventWithMusicians(eventId, [musicianId]);
+    await setupAudienceInEvent(eventId, audienceId);
+
+    await controller.create(
+      { event_id: eventId, musician_id: musicianId, song_title: "Song 1" } as any,
+      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+    );
+
+    const presenter = await controller.getAudienceRequests(
+      audienceId,
+      { page: 1, per_page: 10 } as any,
+      { userId: new Uuid().id, roles: ["admin"], establishmentIds: [], bandIds: [], isAdmin: true },
+    );
+
+    expect(presenter.data.length).toBe(1);
   });
 
   it("should delete a request", async () => {

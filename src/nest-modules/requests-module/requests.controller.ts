@@ -195,6 +195,35 @@ export class RequestsController {
     return new MusicianRequestsPresenter(output);
   }
 
+  @Get("audiences/:audience_id")
+  @Roles("audience", "admin")
+  @ApiOperation({
+    summary: "Listar pedidos do próprio fã",
+    description:
+      "Lista o histórico de pedidos musicais do fã autenticado (ou de qualquer fã, se admin).",
+  })
+  @ApiParam({ name: "audience_id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestCollectionPresenter })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  async getAudienceRequests(
+    @Param("audience_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    audience_id: string,
+    @Query() query: SearchRequestsDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    if (
+      currentUser?.roles.includes("audience") &&
+      !currentUser.roles.includes("admin") &&
+      currentUser.userId !== audience_id
+    ) {
+      throw new ForbiddenException(
+        "Você não tem permissão para ver pedidos de outro fã.",
+      );
+    }
+    const output = await this.listUseCase.execute({ ...query, audience_id });
+    return new RequestCollectionPresenter(output);
+  }
+
   @Patch(":id/respond")
   @Roles("musician", "admin")
   @ApiOperation({
@@ -276,8 +305,13 @@ export class RequestsController {
   @ApiResponse({ status: 200, type: RequestPresenter })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const input: GetRequestInput = { id };
+    const input: GetRequestInput = {
+      id,
+      requesting_user_id: currentUser?.userId,
+      is_admin: currentUser?.roles.includes("admin"),
+    };
     const output = await this.getUseCase.execute(input);
     return RequestsController.serialize(output);
   }
@@ -338,11 +372,15 @@ export class RequestsController {
   async createFeedback(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: CreateRequestFeedbackDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const output = await this.createFeedbackUseCase.execute({
       request_id: id,
       rating: dto.rating,
       comment: dto.comment,
+      musician_id: currentUser?.roles.includes("admin")
+        ? undefined
+        : currentUser?.userId,
     });
     return new RequestFeedbackPresenter(output);
   }
@@ -358,8 +396,13 @@ export class RequestsController {
   @ApiResponse({ status: 404, description: "Avaliação não encontrada" })
   async getFeedback(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const output = await this.getFeedbackUseCase.execute({ request_id: id });
+    const output = await this.getFeedbackUseCase.execute({
+      request_id: id,
+      requesting_user_id: currentUser?.userId,
+      is_admin: currentUser?.roles.includes("admin"),
+    });
     return new RequestFeedbackPresenter(output);
   }
 
