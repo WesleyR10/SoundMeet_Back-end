@@ -40,6 +40,9 @@ const DEFAULT_ALLOWED_MODEL_IDS = [
   "omar_rq_crnn_v1",
   "omar_rq_crnn_chords1217_8epochs",
   "chordformer_v12",
+  "chordformer_v20_phase2b",
+  "chordformer_v21_phase2",
+  "chordformer_v21_phase2b",
 ] as const;
 
 export const REPOSITORIES = {
