@@ -3,6 +3,7 @@ import { Test } from "@nestjs/testing";
 import { AudienceInMemoryRepository } from "../../../core/audience/infra/db/in-memory/audience-in-memory.repository";
 import { LoginUseCase } from "../../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../../core/auth/application/use-cases/register/register.use-case";
+import { AddRoleUseCase } from "../../../core/auth/application/use-cases/add-role/add-role.use-case";
 import { SocialSignupUseCase } from "../../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { IEmailVerificationIssuer } from "../../../core/auth/infra/gateways/email-verification-issuer.interface";
 import {
@@ -76,6 +77,11 @@ describe("AuthController register() Integration Tests", () => {
               audienceRepo,
               identityGateway,
             ),
+        },
+        {
+          provide: AddRoleUseCase,
+          useFactory: () =>
+            new AddRoleUseCase(musicianRepo, audienceRepo, identityGateway),
         },
       ],
     });

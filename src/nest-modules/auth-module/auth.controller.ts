@@ -17,6 +17,8 @@ import {
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 
+import { AddRoleOutput } from "../../core/auth/application/use-cases/add-role/add-role.output";
+import { AddRoleUseCase } from "../../core/auth/application/use-cases/add-role/add-role.use-case";
 import { LoginOutput } from "../../core/auth/application/use-cases/login/login.output";
 import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterOutput } from "../../core/auth/application/use-cases/register/register.output";
@@ -27,6 +29,7 @@ import { Public } from "./auth.decorators";
 import { AuthGuard } from "./auth.guard";
 import { CurrentUserContextGuard } from "./current-user-context.guard";
 import { CurrentUser } from "./decorators/current-user.decorator";
+import { AddRoleDto } from "./dto/add-role.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { SocialSignupDto } from "./dto/social-signup.dto";
@@ -44,6 +47,7 @@ export class AuthController {
     private readonly registerUseCase: RegisterUseCase,
     private readonly loginUseCase: LoginUseCase,
     private readonly socialSignupUseCase: SocialSignupUseCase,
+    private readonly addRoleUseCase: AddRoleUseCase,
   ) {}
 
   @Post("register")
@@ -104,6 +108,33 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<SocialSignupOutput> {
     return this.socialSignupUseCase.execute({
+      user_id: user.userId,
+      existing_roles: user.roles,
+      role: dto.role,
+      cpf: dto.cpf,
+      phone: dto.phone,
+    });
+  }
+
+  @Post("add-role")
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({
+    summary: "Adiciona um segundo papel ao usuário autenticado",
+    description:
+      "Multi-role (mobile 10.5): usuário já cadastrado com um papel (músico ou fã) adiciona o outro — atribui a role no Keycloak e cria o aggregate que falta com o mesmo id do token. O app deve fazer token refresh silencioso em seguida para a nova role entrar no JWT.",
+  })
+  @ApiResponse({ status: 201, description: "Papel adicionado" })
+  @ApiResponse({ status: 409, description: "Usuário já possui este papel" })
+  @ApiResponse({ status: 422, description: "Dados inválidos" })
+  @ApiResponse({
+    status: 503,
+    description: "Provedor de identidade indisponível",
+  })
+  async addRole(
+    @Body() dto: AddRoleDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AddRoleOutput> {
+    return this.addRoleUseCase.execute({
       user_id: user.userId,
       existing_roles: user.roles,
       role: dto.role,

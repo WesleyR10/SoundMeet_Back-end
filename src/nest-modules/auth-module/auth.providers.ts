@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
 import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../core/auth/application/use-cases/register/register.use-case";
+import { AddRoleUseCase } from "../../core/auth/application/use-cases/add-role/add-role.use-case";
 import { SocialSignupUseCase } from "../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { KeycloakAdminGateway } from "../../core/auth/infra/gateways/keycloak-admin.gateway";
 import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
@@ -91,6 +92,19 @@ export const AUTH_USE_CASES = {
       audienceRepo: AudiencePrismaRepository,
       identityGateway: KeycloakAdminGateway,
     ) => new SocialSignupUseCase(musicianRepo, audienceRepo, identityGateway),
+    inject: [
+      MusicianPrismaRepository,
+      AudiencePrismaRepository,
+      IDENTITY_PROVIDER_GATEWAY,
+    ],
+  },
+  ADD_ROLE_USE_CASE: {
+    provide: AddRoleUseCase,
+    useFactory: (
+      musicianRepo: MusicianPrismaRepository,
+      audienceRepo: AudiencePrismaRepository,
+      identityGateway: KeycloakAdminGateway,
+    ) => new AddRoleUseCase(musicianRepo, audienceRepo, identityGateway),
     inject: [
       MusicianPrismaRepository,
       AudiencePrismaRepository,
