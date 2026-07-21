@@ -4,6 +4,10 @@ import {
   PrismaClient,
 } from "@prisma/client";
 
+import {
+  boundingBoxForRadius,
+  haversineKm,
+} from "../../../../shared/domain/geo.utils";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
@@ -145,6 +149,18 @@ export class EventPrismaRepository implements IEventRepository {
   }
 
   async search(props: EventSearchParams): Promise<EventSearchResult> {
+    const geo = props.filter;
+    if (
+      geo?.lat !== null &&
+      geo?.lat !== undefined &&
+      geo?.lng !== null &&
+      geo?.lng !== undefined &&
+      geo?.radius_km !== null &&
+      geo?.radius_km !== undefined
+    ) {
+      return this.searchByProximity(props, geo.lat, geo.lng, geo.radius_km);
+    }
+
     const offset = (props.page - 1) * props.per_page;
     const limit = props.per_page;
 
@@ -168,6 +184,75 @@ export class EventPrismaRepository implements IEventRepository {
     return new EventSearchResult({
       items,
       total: count,
+      current_page: props.page,
+      per_page: props.per_page,
+    });
+  }
+
+  // Busca por proximidade (7.13b): Event não tem lat/lng próprio — a
+  // localização é 100% herdada de establishment_id → Establishment.profile.
+  // Mesmo padrão de EstablishmentPrismaRepository.searchByProximity (bounding
+  // box indexável como pré-filtro + Haversine exato em memória), mas o
+  // bounding box entra via join na relação establishment.profile.
+  private async searchByProximity(
+    props: EventSearchParams,
+    lat: number,
+    lng: number,
+    radiusKm: number,
+  ): Promise<EventSearchResult> {
+    const where = this.buildWhereClause(props.filter);
+    const box = boundingBoxForRadius(lat, lng, radiusKm);
+    where.establishment = {
+      profile: {
+        is: {
+          location_lat: { gte: box.min_lat, lte: box.max_lat },
+          location_lng: { gte: box.min_lng, lte: box.max_lng },
+        },
+      },
+    };
+
+    const candidates = await this.prisma.event.findMany({
+      where,
+      select: {
+        id: true,
+        establishment: {
+          select: {
+            profile: { select: { location_lat: true, location_lng: true } },
+          },
+        },
+      },
+    });
+
+    const withinRadius = candidates
+      .map((candidate) => ({
+        id: candidate.id,
+        distance: haversineKm(
+          lat,
+          lng,
+          candidate.establishment.profile!.location_lat!,
+          candidate.establishment.profile!.location_lng!,
+        ),
+      }))
+      .filter((candidate) => candidate.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    const offset = (props.page - 1) * props.per_page;
+    const pageIds = withinRadius
+      .slice(offset, offset + props.per_page)
+      .map((candidate) => candidate.id);
+
+    const models = pageIds.length
+      ? await this.prisma.event.findMany({ where: { id: { in: pageIds } } })
+      : [];
+    const modelById = new Map(models.map((model) => [model.id, model]));
+    const items = pageIds
+      .map((id) => modelById.get(id))
+      .filter((model): model is NonNullable<typeof model> => !!model)
+      .map((model) => EventModelMapper.toEntity(model as any));
+
+    return new EventSearchResult({
+      items,
+      total: withinRadius.length,
       current_page: props.page,
       per_page: props.per_page,
     });

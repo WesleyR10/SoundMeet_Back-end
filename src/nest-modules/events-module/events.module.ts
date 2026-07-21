@@ -3,12 +3,13 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { DatabaseModule } from "../database-module/database.module";
 import { EventsController } from "./events.controller";
+import { EventsDiscoveryController } from "./events-discovery.controller";
 import { EVENTS_PROVIDERS } from "./events.providers";
 
 @Global()
 @Module({
   imports: [DatabaseModule, EventEmitterModule.forRoot()],
-  controllers: [EventsController],
+  controllers: [EventsController, EventsDiscoveryController],
   providers: [
     ...Object.values(EVENTS_PROVIDERS.REPOSITORIES),
     ...Object.values(EVENTS_PROVIDERS.USE_CASES),

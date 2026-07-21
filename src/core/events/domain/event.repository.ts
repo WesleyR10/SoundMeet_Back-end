@@ -12,6 +12,12 @@ export type EventFilter = {
   date_gte?: Date | null;
   date_lte?: Date | null;
   is_public?: boolean | null;
+  // Busca por proximidade (7.13b) — mesmo contrato de EstablishmentFilter/
+  // MusicianFilter: só entra com o trio completo; localização é herdada de
+  // establishment_id (Event não tem lat/lng próprio).
+  lat?: number | null;
+  lng?: number | null;
+  radius_km?: number | null;
 };
 
 export class EventSearchParams extends DefaultSearchParams<EventFilter> {
@@ -51,6 +57,16 @@ export class EventSearchParams extends DefaultSearchParams<EventFilter> {
       ...(dateFrom(_value?.date_lte) && {
         date_lte: dateFrom(_value?.date_lte)!,
       }),
+      // Coerção explícita (query string entrega strings) — só entra com o
+      // trio completo e válido; raio máximo sanitizado em 500km.
+      ...(_value &&
+        Number.isFinite(Number(_value.lat)) &&
+        Number.isFinite(Number(_value.lng)) &&
+        Number(_value.radius_km) > 0 && {
+          lat: Number(_value.lat),
+          lng: Number(_value.lng),
+          radius_km: Math.min(Number(_value.radius_km), 500),
+        }),
     };
 
     this._filter = Object.keys(filter).length === 0 ? null : (filter as any);

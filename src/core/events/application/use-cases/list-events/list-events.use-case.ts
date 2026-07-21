@@ -13,7 +13,7 @@ import { SortDirection } from "../../../../shared/domain/repository/search-param
 import { EventOutput, EventOutputMapper } from "../common/event-output";
 
 export type ListEventsInput = {
-  establishment_id: string;
+  establishment_id?: string;
   page?: number;
   per_page?: number;
   sort?: string | null;
@@ -30,15 +30,22 @@ export class ListEventsUseCase implements IUseCase<
   constructor(private readonly eventRepo: IEventRepository) {}
 
   async execute(input: ListEventsInput): Promise<ListEventsOutput> {
+    const filter: EventFilter = { ...(input.filter ?? null) };
+    if (input.establishment_id) {
+      filter.establishment_id = input.establishment_id;
+    } else {
+      // Discovery pública cross-establishment (7.13b): sem establishment_id
+      // pinado, nunca expõe eventos privados — força is_public mesmo que o
+      // cliente mande false.
+      filter.is_public = true;
+    }
+
     const params = EventSearchParams.create({
       page: input.page,
       per_page: input.per_page,
       sort: input.sort,
       sort_dir: input.sort_dir,
-      filter: {
-        ...(input.filter ?? null),
-        establishment_id: input.establishment_id,
-      } as any,
+      filter,
     });
     const searchResult = await this.eventRepo.search(params);
     const items = searchResult.items.map((i) => EventOutputMapper.toOutput(i));

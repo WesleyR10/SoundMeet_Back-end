@@ -1,9 +1,12 @@
 import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { haversineKm } from "../../../../shared/domain/geo.utils";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
+import { IEstablishmentRepository } from "../../../../establishment/domain/establishment.repository";
+import { EstablishmentId } from "../../../../establishment/domain/establishment.aggregate";
 import { Event, EventId } from "../../../domain";
 import {
   EventFilter,
@@ -17,6 +20,15 @@ export class EventInMemoryRepository
   implements IEventRepository
 {
   sortableFields: string[] = ["date", "start_at", "created_at", "name"];
+
+  // Busca por proximidade (7.13b): Event não tem localização própria — para
+  // espelhar o join-through do EventPrismaRepository (establishment.profile),
+  // o repositório in-memory precisa enxergar o perfil do estabelecimento.
+  // Opcional e retrocompatível: sem ele, filtro geo lança erro explícito em
+  // vez de silenciosamente retornar vazio.
+  constructor(private establishmentRepo?: IEstablishmentRepository) {
+    super();
+  }
 
   private attendees = new Map<string, Set<string>>();
   private performers = new Map<
@@ -52,7 +64,7 @@ export class EventInMemoryRepository
       return items;
     }
 
-    return items.filter((event) => {
+    const filtered = items.filter((event) => {
       let matches = true;
 
       if (filter.establishment_id) {
@@ -78,6 +90,43 @@ export class EventInMemoryRepository
 
       return matches;
     });
+
+    if (
+      filter.lat !== null &&
+      filter.lat !== undefined &&
+      filter.lng !== null &&
+      filter.lng !== undefined &&
+      filter.radius_km !== null &&
+      filter.radius_km !== undefined
+    ) {
+      if (!this.establishmentRepo) {
+        throw new InvalidArgumentError(
+          "EventInMemoryRepository requires establishmentRepo to filter by proximity",
+        );
+      }
+      const lat = filter.lat;
+      const lng = filter.lng;
+      const radiusKm = filter.radius_km;
+      const withinRadius = await Promise.all(
+        filtered.map(async (event) => {
+          const establishment = await this.establishmentRepo!.findById(
+            new EstablishmentId(event.establishment_id.id),
+          );
+          const location = establishment?.profile?.location ?? null;
+          if (!location?.hasCoordinates) return null;
+          const distance = haversineKm(
+            lat,
+            lng,
+            location.latitude!,
+            location.longitude!,
+          );
+          return distance <= radiusKm ? event : null;
+        }),
+      );
+      return withinRadius.filter((event): event is Event => event !== null);
+    }
+
+    return filtered;
   }
 
   protected applySort(
