@@ -172,13 +172,17 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
           musician_id: memberA,
           role: "member",
           instrument: "guitar",
+          status: "accepted",
           joined_at: new Date("2024-01-01T00:00:00.000Z"),
+          responded_at: null,
         },
         {
           musician_id: memberB,
           role: "member",
           instrument: "drums",
+          status: "accepted",
           joined_at: new Date("2024-01-01T00:00:00.000Z"),
+          responded_at: null,
         },
       ],
     });
@@ -221,6 +225,55 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
     expect(availabilityB!.isAvailable(blockedStart, blockedEnd)).toBe(false);
   });
 
+  it("should not block a member whose band invite is still pending", async () => {
+    const bandRepo = new BandInMemoryRepository();
+    const bookingRepo = new BookingInMemoryRepository();
+    const availabilityRepo = new AvailabilityInMemoryRepository();
+    const dateTimeService = new LuxonDateTimeService();
+
+    const acceptedMember = new Uuid();
+    const pendingMember = new Uuid();
+    const band = Band.create({ name: "The Band", genres: ["rock"] });
+    band.inviteMember(acceptedMember, "leader", "vocals");
+    band.inviteMember(pendingMember, "member", "guitar");
+    band.acceptInvite(acceptedMember);
+    await bandRepo.insert(band);
+
+    const now = new Date("2024-01-01T09:00:00.000Z");
+    const booking = Booking.fake()
+      .aBooking()
+      .pending()
+      .withMusicianId(null)
+      .withBandId(band.band_id)
+      .withStartAt(new Date("2024-01-01T10:00:00.000Z"))
+      .withEndAt(new Date("2024-01-01T11:00:00.000Z"))
+      .withBufferMinutes(30)
+      .withExpiresAt(new Date("2024-01-02T09:00:00.000Z"))
+      .build();
+    await bookingRepo.insert(booking);
+
+    const useCase = new ConfirmBookingUseCase(
+      bookingRepo,
+      dateTimeService,
+      availabilityRepo,
+      bandRepo,
+      { now: () => now },
+    );
+
+    const output = await useCase.execute({ booking_id: booking.booking_id.id });
+    expect(output.status).toBe("confirmed");
+
+    const availabilityAccepted = await availabilityRepo.findByMusicianId(
+      acceptedMember.id,
+    );
+    expect(availabilityAccepted).not.toBeNull();
+
+    const availabilityPending = await availabilityRepo.findByMusicianId(
+      pendingMember.id,
+    );
+    expect(availabilityPending).toBeNull();
+  });
+
   it("should confirm a band booking even when a member has conflicts", async () => {
     const bandRepo = new BandInMemoryRepository();
     const bookingRepo = new BookingInMemoryRepository();
@@ -237,13 +290,17 @@ describe("ConfirmBookingUseCase Unit Tests", () => {
           musician_id: memberA,
           role: "member",
           instrument: "guitar",
+          status: "accepted",
           joined_at: new Date("2024-01-01T00:00:00.000Z"),
+          responded_at: null,
         },
         {
           musician_id: memberB,
           role: "member",
           instrument: "drums",
+          status: "accepted",
           joined_at: new Date("2024-01-01T00:00:00.000Z"),
+          responded_at: null,
         },
       ],
     });

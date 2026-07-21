@@ -169,7 +169,7 @@ export class ConfirmBookingUseCase implements IUseCase<
         throw new NotFoundError(entity.band_id.id, Band);
       }
 
-      const members = band.members;
+      const members = band.acceptedMembers;
       bandMembers = members as any;
     }
 
