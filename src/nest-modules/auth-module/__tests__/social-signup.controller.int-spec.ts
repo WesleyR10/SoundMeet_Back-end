@@ -1,9 +1,10 @@
 import { Test } from "@nestjs/testing";
 
 import { AudienceInMemoryRepository } from "../../../core/audience/infra/db/in-memory/audience-in-memory.repository";
+import { AddRoleUseCase } from "../../../core/auth/application/use-cases/add-role/add-role.use-case";
 import { LoginUseCase } from "../../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../../core/auth/application/use-cases/register/register.use-case";
-import { AddRoleUseCase } from "../../../core/auth/application/use-cases/add-role/add-role.use-case";
+import { RegisterEstablishmentUseCase } from "../../../core/auth/application/use-cases/register-establishment/register-establishment.use-case";
 import { SocialSignupUseCase } from "../../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { IEmailVerificationIssuer } from "../../../core/auth/infra/gateways/email-verification-issuer.interface";
 import { IIdentityProviderGateway } from "../../../core/auth/infra/gateways/identity-provider-gateway.interface";
@@ -61,6 +62,11 @@ describe("AuthController socialSignup() Integration Tests", () => {
               identityGateway,
               emailIssuer,
             ),
+        },
+        // Não exercitado aqui — só satisfaz a injeção do AuthController.
+        {
+          provide: RegisterEstablishmentUseCase,
+          useValue: { execute: jest.fn() },
         },
         {
           provide: LoginUseCase,

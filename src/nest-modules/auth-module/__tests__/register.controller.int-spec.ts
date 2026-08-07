@@ -1,9 +1,10 @@
 import { Test } from "@nestjs/testing";
 
 import { AudienceInMemoryRepository } from "../../../core/audience/infra/db/in-memory/audience-in-memory.repository";
+import { AddRoleUseCase } from "../../../core/auth/application/use-cases/add-role/add-role.use-case";
 import { LoginUseCase } from "../../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../../core/auth/application/use-cases/register/register.use-case";
-import { AddRoleUseCase } from "../../../core/auth/application/use-cases/add-role/add-role.use-case";
+import { RegisterEstablishmentUseCase } from "../../../core/auth/application/use-cases/register-establishment/register-establishment.use-case";
 import { SocialSignupUseCase } from "../../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { IEmailVerificationIssuer } from "../../../core/auth/infra/gateways/email-verification-issuer.interface";
 import {
@@ -11,16 +12,21 @@ import {
   IdentityProviderUnavailableError,
   IIdentityProviderGateway,
 } from "../../../core/auth/infra/gateways/identity-provider-gateway.interface";
+import { EstablishmentInMemoryRepository } from "../../../core/establishment/infra/db/in-memory/establishment-in-memory.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { IIdentityClaimsWriter } from "../../../core/shared/application/identity-claims.interface";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import { AuthController } from "../auth.controller";
 import { RegisterDto } from "../dto/register.dto";
+import { RegisterEstablishmentDto } from "../dto/register-establishment.dto";
 import { VerifyEmailService } from "../verify-email.service";
 
 describe("AuthController register() Integration Tests", () => {
   let controller: AuthController;
   let musicianRepo: MusicianInMemoryRepository;
   let audienceRepo: AudienceInMemoryRepository;
+  let establishmentRepo: EstablishmentInMemoryRepository;
+  let claimsWriter: jest.Mocked<IIdentityClaimsWriter>;
   let identityGateway: jest.Mocked<IIdentityProviderGateway>;
 
   const KEYCLOAK_USER_ID = "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e";
@@ -28,6 +34,8 @@ describe("AuthController register() Integration Tests", () => {
   beforeEach(async () => {
     musicianRepo = new MusicianInMemoryRepository();
     audienceRepo = new AudienceInMemoryRepository();
+    establishmentRepo = new EstablishmentInMemoryRepository();
+    claimsWriter = { addClaimValue: jest.fn().mockResolvedValue(undefined) };
     identityGateway = {
       createUser: jest
         .fn()
@@ -61,6 +69,16 @@ describe("AuthController register() Integration Tests", () => {
               musicianRepo,
               audienceRepo,
               identityGateway,
+              emailIssuer,
+            ),
+        },
+        {
+          provide: RegisterEstablishmentUseCase,
+          useFactory: () =>
+            new RegisterEstablishmentUseCase(
+              establishmentRepo,
+              identityGateway,
+              claimsWriter,
               emailIssuer,
             ),
         },
@@ -140,5 +158,66 @@ describe("AuthController register() Integration Tests", () => {
       name: "ExternalServiceError",
     });
     expect(musicianRepo.items).toHaveLength(0);
+  });
+
+  describe("registerEstablishment()", () => {
+    function buildEstablishmentDto(
+      overrides: Partial<RegisterEstablishmentDto> = {},
+    ): RegisterEstablishmentDto {
+      const dto = new RegisterEstablishmentDto();
+      dto.name = "Bar do Zé";
+      dto.email = "contato@bardoze.com.br";
+      dto.password = "Senha123";
+      dto.phone = "31999998888";
+      dto.establishment_type = "bar";
+      return Object.assign(dto, overrides);
+    }
+
+    it("creates the establishment and returns tokens", async () => {
+      const output = await controller.registerEstablishment(
+        buildEstablishmentDto(),
+      );
+
+      expect(output).toMatchObject({
+        access_token: "access-token",
+        role: "establishment",
+        needs_token_refresh: true,
+      });
+      expect(establishmentRepo.items).toHaveLength(1);
+    });
+
+    // Esta é a diferença estrutural entre este fluxo e o POST /auth/register:
+    // músico/público têm aggregate_id == sub; estabelecimento não, e por isso
+    // depende do claim para ser operável depois.
+    it("uses an id different from the keycloak sub and links it via claim", async () => {
+      const output = await controller.registerEstablishment(
+        buildEstablishmentDto(),
+      );
+
+      expect(output.establishment_id).not.toBe(KEYCLOAK_USER_ID);
+      expect(claimsWriter.addClaimValue).toHaveBeenCalledWith(
+        KEYCLOAK_USER_ID,
+        "establishment_ids",
+        output.establishment_id,
+      );
+    });
+
+    it("assigns the establishment realm role", async () => {
+      await controller.registerEstablishment(buildEstablishmentDto());
+
+      expect(identityGateway.assignRealmRole).toHaveBeenCalledWith(
+        KEYCLOAK_USER_ID,
+        "establishment",
+      );
+    });
+
+    it("propagates ConflictError when the email is already taken", async () => {
+      await controller.registerEstablishment(buildEstablishmentDto());
+
+      await expect(
+        controller.registerEstablishment(buildEstablishmentDto()),
+      ).rejects.toMatchObject({ name: "ConflictError" });
+      expect(establishmentRepo.items).toHaveLength(1);
+    });
   });
 });

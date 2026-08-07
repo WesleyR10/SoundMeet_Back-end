@@ -27,7 +27,11 @@ import { VerifyEmailService } from "./verify-email.service";
       useFactory: (configService: ConfigSchemaType) => ({
         secret: configService.get<string>("JWT_SECRET"),
         signOptions: {
-          expiresIn: configService.get<string>("JWT_EXPIRES_IN") ?? "24h",
+          // @nestjs/jwt v11 tipa expiresIn com o `StringValue` do pacote `ms`
+          // (template literal tipo "24h"), que um string livre de env não
+          // satisfaz — daí o cast.
+          expiresIn: (configService.get<string>("JWT_EXPIRES_IN") ??
+            "24h") as `${number}h`,
         },
       }),
       inject: [ConfigService],
@@ -57,6 +61,9 @@ import { VerifyEmailService } from "./verify-email.service";
     CurrentUserContextGuard,
     EstablishmentOwnershipGuard,
     MusicianOwnershipGuard,
+    // Consumido por establishments-module e musicians-module para vincular
+    // establishment_ids/band_ids ao dono no provedor de identidade.
+    AUTH_GATEWAYS.IDENTITY_CLAIMS_WRITER.provide,
   ],
 })
 export class AuthModule {}

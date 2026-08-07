@@ -129,6 +129,7 @@ export class EstablishmentsController {
     const output = await this.createUseCase.execute({
       ...dto,
       existing_establishment_ids: currentUser?.establishmentIds ?? [],
+      owner_user_id: currentUser?.userId,
     });
     return EstablishmentsController.serialize(output);
   }

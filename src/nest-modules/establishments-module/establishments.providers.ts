@@ -1,16 +1,20 @@
-import AWS from "aws-sdk";
-import { ConfigService } from "@nestjs/config";
-
-import { IDateTimeService } from "@core/shared/domain/date-time.service";
-import { LuxonDateTimeService } from "@core/shared/infra/date-time/luxon-date-time.service";
-import { IGeocodingService } from "@core/shared/domain/geocoding.service";
-import { HttpGeocodingService } from "@core/shared/infra/geocoding/http-geocoding.service";
-import { PlanCheckService } from "@core/plans/domain/plan-check.service";
+import { S3Client } from "@aws-sdk/client-s3";
 import { IEventRepository } from "@core/events/domain";
+import { PlanCheckService } from "@core/plans/domain/plan-check.service";
+import { IIdentityClaimsWriter } from "@core/shared/application/identity-claims.interface";
+import { IDENTITY_CLAIMS_WRITER } from "../auth-module/auth.providers";
+import { IDateTimeService } from "@core/shared/domain/date-time.service";
+import { IGeocodingService } from "@core/shared/domain/geocoding.service";
+import { LuxonDateTimeService } from "@core/shared/infra/date-time/luxon-date-time.service";
+import { HttpGeocodingService } from "@core/shared/infra/geocoding/http-geocoding.service";
+import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
+import { IEstablishmentStorage } from "../../core/establishment/application/ports/establishment-storage.interface";
 import { CreateEstablishmentUseCase } from "../../core/establishment/application/use-cases/create-establishment/create-establishment.use-case";
 import { CreateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/create-establishment-profile/create-establishment-profile.use-case";
 import { DeleteEstablishmentUseCase } from "../../core/establishment/application/use-cases/delete-establishment/delete-establishment.use-case";
+import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { DeleteEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/delete-establishment-profile/delete-establishment-profile.use-case";
 import { GetEstablishmentUseCase } from "../../core/establishment/application/use-cases/get-establishment/get-establishment.use-case";
 import { GetHiringDashboardUseCase } from "../../core/establishment/application/use-cases/get-hiring-dashboard/get-hiring-dashboard.use-case";
@@ -20,18 +24,15 @@ import { RecalculateEstablishmentAnalyticsUseCase } from "../../core/establishme
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
 import { UploadEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
-import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import { IEstablishmentRepository } from "../../core/establishment/domain/establishment.repository";
-import { IEstablishmentStorage } from "../../core/establishment/application/ports/establishment-storage.interface";
-import { S3EstablishmentStorage } from "../../core/establishment/infra/storage/s3-establishment.storage";
 import { IEstablishmentAnalyticsRepository } from "../../core/establishment/domain/establishment-analytics.repository";
-import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { EstablishmentAnalyticsPrismaRepository } from "../../core/establishment/infra/db/prisma/establishment-analytics-prisma.repository";
 import { EstablishmentPrismaRepository } from "../../core/establishment/infra/db/prisma/establishment-prisma.repository";
+import { S3EstablishmentStorage } from "../../core/establishment/infra/storage/s3-establishment.storage";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
-import { EventEmitter2 } from "@nestjs/event-emitter";
+import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { EVENTS_PROVIDERS } from "../events-module/events.providers";
 import { MUSICIANS_PROVIDERS } from "../musicians-module/musicians.providers";
@@ -63,46 +64,59 @@ export const STORAGE = {
   ESTABLISHMENT_STORAGE: {
     provide: ESTABLISHMENT_STORAGE_TOKEN,
     useFactory: (configService: ConfigService): IEstablishmentStorage => {
-      const provider = configService.get<string>("ESTABLISHMENT_STORAGE_PROVIDER");
+      const provider = configService.get<string>(
+        "ESTABLISHMENT_STORAGE_PROVIDER",
+      );
       const region = configService.get<string>("AWS_REGION") ?? "us-east-1";
 
       const r2Endpoint = configService.get<string>("CLOUDFLARE_R2_ENDPOINT");
-      const r2AccessKey = configService.get<string>("CLOUDFLARE_R2_ACCESS_KEY_ID");
-      const r2SecretKey = configService.get<string>("CLOUDFLARE_R2_SECRET_ACCESS_KEY");
+      const r2AccessKey = configService.get<string>(
+        "CLOUDFLARE_R2_ACCESS_KEY_ID",
+      );
+      const r2SecretKey = configService.get<string>(
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+      );
       const r2Bucket = configService.get<string>("CLOUDFLARE_R2_BUCKET");
-      const r2PublicBaseUrl = configService.get<string>("CLOUDFLARE_R2_PUBLIC_BASE_URL") ?? null;
+      const r2PublicBaseUrl =
+        configService.get<string>("CLOUDFLARE_R2_PUBLIC_BASE_URL") ?? null;
 
       if (provider === "cloudflare_r2") {
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint: r2Endpoint,
-          accessKeyId: r2AccessKey,
-          secretAccessKey: r2SecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: r2AccessKey!,
+            secretAccessKey: r2SecretKey!,
+          },
+          forcePathStyle: true,
         });
         return new S3EstablishmentStorage(s3, r2Bucket!, r2PublicBaseUrl);
       }
 
-      const minioEndpoint = configService.get<string>("MINIO_ENDPOINT") ?? "localhost";
+      const minioEndpoint =
+        configService.get<string>("MINIO_ENDPOINT") ?? "localhost";
       const minioPort = configService.get<number>("MINIO_PORT") ?? 9000;
-      const minioAccessKey = configService.get<string>("MINIO_ACCESS_KEY") ?? "soundmeet";
-      const minioSecretKey = configService.get<string>("MINIO_SECRET_KEY") ?? "soundmeet123";
-      const minioBucket = configService.get<string>("MINIO_BUCKET") ?? "soundmeet-media";
-      const minioPublicEndpoint = configService.get<string>("MINIO_PUBLIC_ENDPOINT");
+      const minioAccessKey =
+        configService.get<string>("MINIO_ACCESS_KEY") ?? "soundmeet";
+      const minioSecretKey =
+        configService.get<string>("MINIO_SECRET_KEY") ?? "soundmeet123";
+      const minioBucket =
+        configService.get<string>("MINIO_BUCKET") ?? "soundmeet-media";
+      const minioPublicEndpoint = configService.get<string>(
+        "MINIO_PUBLIC_ENDPOINT",
+      );
       const minioPublicPort = configService.get<number>("MINIO_PUBLIC_PORT");
 
       if (provider === "minio" || !provider) {
         const endpoint = `http://${minioEndpoint}:${minioPort}`;
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint,
-          accessKeyId: minioAccessKey,
-          secretAccessKey: minioSecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: minioAccessKey,
+            secretAccessKey: minioSecretKey,
+          },
+          forcePathStyle: true,
         });
         const publicBaseUrl =
           minioPublicEndpoint && minioPublicPort && minioBucket
@@ -111,9 +125,11 @@ export const STORAGE = {
         return new S3EstablishmentStorage(s3, minioBucket, publicBaseUrl);
       }
 
-      const awsBucket = configService.get<string>("AWS_S3_BUCKET") ?? "soundmeet-media";
-      const cloudfrontUrl = configService.get<string>("AWS_CLOUDFRONT_URL") ?? null;
-      const s3 = new AWS.S3({ apiVersion: "2006-03-01", signatureVersion: "v4", region });
+      const awsBucket =
+        configService.get<string>("AWS_S3_BUCKET") ?? "soundmeet-media";
+      const cloudfrontUrl =
+        configService.get<string>("AWS_CLOUDFRONT_URL") ?? null;
+      const s3 = new S3Client({ region });
       return new S3EstablishmentStorage(s3, awsBucket, cloudfrontUrl);
     },
     inject: [ConfigService],
@@ -148,10 +164,22 @@ export const REPOSITORIES = {
 export const USE_CASES = {
   CREATE_ESTABLISHMENT_USE_CASE: {
     provide: CreateEstablishmentUseCase,
-    useFactory: (repo: IEstablishmentRepository, planCheckService: PlanCheckService) => {
-      return new CreateEstablishmentUseCase(repo, planCheckService);
+    useFactory: (
+      repo: IEstablishmentRepository,
+      planCheckService: PlanCheckService,
+      identityClaims: IIdentityClaimsWriter,
+    ) => {
+      return new CreateEstablishmentUseCase(
+        repo,
+        planCheckService,
+        identityClaims,
+      );
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, PlanCheckService],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      PlanCheckService,
+      IDENTITY_CLAIMS_WRITER,
+    ],
   },
   UPDATE_ESTABLISHMENT_USE_CASE: {
     provide: UpdateEstablishmentUseCase,
@@ -161,7 +189,10 @@ export const USE_CASES = {
     ) => {
       return new UpdateEstablishmentUseCase(repo, domainEventMediator);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, DomainEventMediator],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      DomainEventMediator,
+    ],
   },
   DELETE_ESTABLISHMENT_USE_CASE: {
     provide: DeleteEstablishmentUseCase,
@@ -172,10 +203,16 @@ export const USE_CASES = {
   },
   GET_ESTABLISHMENT_USE_CASE: {
     provide: GetEstablishmentUseCase,
-    useFactory: (repo: IEstablishmentRepository, dateTimeService: IDateTimeService) => {
+    useFactory: (
+      repo: IEstablishmentRepository,
+      dateTimeService: IDateTimeService,
+    ) => {
       return new GetEstablishmentUseCase(repo, dateTimeService);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, DATE_TIME_SERVICE_TOKEN],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      DATE_TIME_SERVICE_TOKEN,
+    ],
   },
   GET_HIRING_DASHBOARD_USE_CASE: {
     provide: GetHiringDashboardUseCase,
@@ -201,10 +238,16 @@ export const USE_CASES = {
   },
   LIST_ESTABLISHMENTS_USE_CASE: {
     provide: ListEstablishmentsUseCase,
-    useFactory: (repo: IEstablishmentRepository, dateTimeService: IDateTimeService) => {
+    useFactory: (
+      repo: IEstablishmentRepository,
+      dateTimeService: IDateTimeService,
+    ) => {
       return new ListEstablishmentsUseCase(repo, dateTimeService);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, DATE_TIME_SERVICE_TOKEN],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      DATE_TIME_SERVICE_TOKEN,
+    ],
   },
   LIST_ESTABLISHMENT_ANALYTICS_USE_CASE: {
     provide: ListEstablishmentAnalyticsUseCase,
@@ -228,7 +271,10 @@ export const USE_CASES = {
     ) => {
       return new UpdateEstablishmentProfileUseCase(repo, geocodingService);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, GEOCODING_SERVICE_TOKEN],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      GEOCODING_SERVICE_TOKEN,
+    ],
   },
   DELETE_ESTABLISHMENT_PROFILE_USE_CASE: {
     provide: DeleteEstablishmentProfileUseCase,
@@ -268,7 +314,10 @@ export const USE_CASES = {
     ) => {
       return new UploadEstablishmentMenuPdfUseCase(repo, storage);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, ESTABLISHMENT_STORAGE_TOKEN],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      ESTABLISHMENT_STORAGE_TOKEN,
+    ],
   },
   DELETE_ESTABLISHMENT_MENU_PDF_USE_CASE: {
     provide: DeleteEstablishmentMenuPdfUseCase,
@@ -278,7 +327,10 @@ export const USE_CASES = {
     ) => {
       return new DeleteEstablishmentMenuPdfUseCase(repo, storage);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide, ESTABLISHMENT_STORAGE_TOKEN],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      ESTABLISHMENT_STORAGE_TOKEN,
+    ],
   },
 };
 
