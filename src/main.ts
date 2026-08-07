@@ -1,3 +1,7 @@
+// Precisa ser o primeiro import do arquivo, antes de @nestjs/core e de
+// qualquer módulo da aplicação — ver comentário em instrument.ts.
+import "./instrument";
+
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
@@ -54,6 +58,7 @@ async function bootstrap() {
       .addTag("Events", "Gestão de eventos")
       .addTag("Gamification", "Sistema de gamificação")
       .addTag("Payments", "Pagamentos e gorjetas")
+      .addTag("Plans", "Catálogo de planos e assinaturas recorrentes")
       .addTag("Music Library", "Catalogo musical canonico")
       .addTag("AI Cifra", "Análise de cifra (BPM, tom, acordes, estrutura)")
       .addTag("AI Audio", "Separacao e processamento de audio")

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { SentryModule } from "@sentry/nestjs/setup";
 
 import { HealthController } from "./health.controller";
 import { AiAudioModule } from "./nest-modules/ai-audio-module/ai-audio.module";
@@ -27,9 +28,12 @@ import { MusicianAnalyticsModule } from "./nest-modules/musician-analytics-modul
 import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
 import { NotificationsModule } from "./nest-modules/notifications-module/notifications.module";
 import { PaymentModule } from "./nest-modules/payment-module/payment.module";
+import { PersonalChordSheetModule } from "./nest-modules/personal-chord-sheet-module/personal-chord-sheet.module";
+import { PlansModule } from "./nest-modules/plans-module/plans.module";
 import { RabbitmqModule } from "./nest-modules/rabbitmq-module/rabbitmq.module";
 import { RepertoireModule } from "./nest-modules/repertoire-module/repertoire.module";
 import { RequestsModule } from "./nest-modules/requests-module/requests.module";
+import { ReviewsModule } from "./nest-modules/reviews-module/reviews.module";
 import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.module";
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
 
@@ -52,6 +56,9 @@ const shouldRegisterRabbitmqHandlers =
 
 @Module({
   imports: [
+    // Primeiro import — enriquece requests/exceptions capturados pelo Sentry
+    // com contexto do NestJS (handler, controller, rota).
+    SentryModule.forRoot(),
     ConfigModuleRoot.forRoot(),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
@@ -77,9 +84,12 @@ const shouldRegisterRabbitmqHandlers =
     GamificationModule,
     MusicLibraryModule,
     PaymentModule,
+    PlansModule,
     MusicianAnalyticsModule,
     CampaignModule,
     RepertoireModule,
+    ReviewsModule,
+    PersonalChordSheetModule,
     AiAudioModule,
     AiCifraModule,
     SyncedLyricsModule,
