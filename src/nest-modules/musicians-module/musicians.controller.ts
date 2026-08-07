@@ -45,7 +45,9 @@ import { UploadMusicianAvatarUseCase } from "../../core/musician/application/use
 import { UploadQrLogoUseCase } from "../../core/musician/application/use-cases/upload-qr-logo/upload-qr-logo.use-case";
 import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import {
+  AuthenticatedUser,
   AuthGuard,
+  CurrentUser,
   CurrentUserContextGuard,
   MusicianOwnershipGuard,
   Public,
@@ -63,6 +65,7 @@ import { UpdateMusicianProfileDto } from "./dto/update-musician-profile.dto";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
+  PublicMusicianPresenter,
 } from "./musician.presenter";
 
 @ApiTags("Musicians")
@@ -140,15 +143,21 @@ export class MusiciansController {
   @Public()
   @ApiOperation({
     summary: "Buscar músico por ID",
-    description: "Retorna os detalhes do perfil do músico.",
+    description:
+      "Retorna os detalhes do perfil do músico. Dono ou admin recebem email/telefone; qualquer outro chamador (autenticado ou anônimo) recebe a versão pública, sem PII.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: MusicianPresenter })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const output = await this.getUseCase.execute({ id });
-    return MusiciansController.serialize(output);
+    const isOwnerOrAdmin =
+      currentUser?.isAdmin || currentUser?.userId === output.id;
+    return isOwnerOrAdmin
+      ? MusiciansController.serialize(output)
+      : new PublicMusicianPresenter(output);
   }
 
   @Patch(":id")

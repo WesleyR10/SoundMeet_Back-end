@@ -32,11 +32,28 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+    const request: Request = context.switchToHttp().getRequest();
+
     if (isPublic) {
+      // Soft-auth: uma rota @Public() nunca EXIGE token, mas se um Bearer
+      // válido vier junto (caso comum — o app manda o JWT em toda chamada,
+      // mesmo nas públicas), popula request.user mesmo assim. Isso permite a
+      // um handler diferenciar "dono/admin vendo" de "estranho/anônimo vendo"
+      // sem tornar a rota autenticada (ex.: GET /musicians/:id — estranho vê
+      // versão sem PII, o próprio dono continua vendo os campos completos).
+      // Token ausente ou inválido aqui NUNCA lança — degrada para anônimo.
+      const token = this.extractTokenFromHeader(request);
+      if (token) {
+        try {
+          const payload = await this.jwtVerifier.verify(token);
+          (request as any).user = this.normalizeUser(payload);
+        } catch {
+          // Anônimo — comportamento idêntico a não mandar token nenhum.
+        }
+      }
       return true;
     }
 
-    const request: Request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
     if (!token) {
       throw new UnauthorizedException();

@@ -9,6 +9,7 @@ import { UpdateMusicianProfileDto } from "../dto/update-musician-profile.dto";
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
+  PublicMusicianPresenter,
 } from "../musician.presenter";
 import { MusiciansController } from "../musicians.controller";
 
@@ -146,21 +147,73 @@ describe("MusiciansController Unit Tests", () => {
   });
 
   describe("findOne", () => {
-    it("should get a musician", async () => {
-      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+    const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+    const strangerUser = {
+      userId: "other-uuid",
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+    const adminUser = {
+      userId: "admin-uuid",
+      roles: ["admin"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: true,
+    };
+
+    // Rota @Public() com soft-auth (AuthGuard) — currentUser vem undefined
+    // (anônimo), de um estranho autenticado, do próprio dono, ou de admin.
+    // Só dono/admin recebem email/phone; os outros dois casos recebem a
+    // versão pública (sem PII) pela MESMA rota.
+    it("anônimo (sem currentUser) recebe PublicMusicianPresenter, sem email/phone", async () => {
       const output = makeMusicianOutput({ id });
-      const mockGetUseCase = {
-        execute: jest.fn().mockResolvedValue(output),
-      };
+      const mockGetUseCase = { execute: jest.fn().mockResolvedValue(output) };
       (controller as any).getUseCase = mockGetUseCase;
 
-      const serializeSpy = jest.spyOn(MusiciansController, "serialize");
       const presenter = await controller.findOne(id);
 
       expect(mockGetUseCase.execute).toHaveBeenCalledWith({ id });
+      expect(presenter).toBeInstanceOf(PublicMusicianPresenter);
+      expect(presenter).not.toHaveProperty("email");
+      expect(presenter).not.toHaveProperty("phone");
+    });
+
+    it("estranho autenticado (outro musician_id) recebe PublicMusicianPresenter", async () => {
+      const output = makeMusicianOutput({ id });
+      const mockGetUseCase = { execute: jest.fn().mockResolvedValue(output) };
+      (controller as any).getUseCase = mockGetUseCase;
+
+      const presenter = await controller.findOne(id, strangerUser as any);
+
+      expect(presenter).toBeInstanceOf(PublicMusicianPresenter);
+      expect(presenter).not.toHaveProperty("email");
+    });
+
+    it("o próprio dono recebe MusicianPresenter completo, com email/phone", async () => {
+      const output = makeMusicianOutput({ id });
+      const mockGetUseCase = { execute: jest.fn().mockResolvedValue(output) };
+      (controller as any).getUseCase = mockGetUseCase;
+      const serializeSpy = jest.spyOn(MusiciansController, "serialize");
+      const ownerUser = { ...strangerUser, userId: id };
+
+      const presenter = await controller.findOne(id, ownerUser as any);
+
       expect(serializeSpy).toHaveBeenCalledWith(output);
       expect(presenter).toBeInstanceOf(MusicianPresenter);
       expect(presenter).toStrictEqual(new MusicianPresenter(output));
+    });
+
+    it("admin recebe MusicianPresenter completo mesmo vendo o perfil de outro músico", async () => {
+      const output = makeMusicianOutput({ id });
+      const mockGetUseCase = { execute: jest.fn().mockResolvedValue(output) };
+      (controller as any).getUseCase = mockGetUseCase;
+
+      const presenter = await controller.findOne(id, adminUser as any);
+
+      expect(presenter).toBeInstanceOf(MusicianPresenter);
+      expect((presenter as MusicianPresenter).email).toBe(output.email);
     });
 
     it("should throw when get use case throws", async () => {
@@ -170,7 +223,6 @@ describe("MusiciansController Unit Tests", () => {
       };
       (controller as any).getUseCase = mockGetUseCase;
 
-      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
       await expect(controller.findOne(id)).rejects.toThrow(error);
     });
   });

@@ -29,6 +29,7 @@ import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock
 import {
   MusicianCollectionPresenter,
   MusicianPresenter,
+  PublicMusicianPresenter,
 } from "../musician.presenter";
 import { MusiciansController } from "../musicians.controller";
 import {
@@ -246,7 +247,7 @@ describe("MusiciansController Integration Tests", () => {
     await expect(repository.findById(musician.musician_id)).resolves.toBeNull();
   });
 
-  it("should get a musician", async () => {
+  it("should get a musician — dono autenticado recebe email/telefone", async () => {
     const musician = Musician.fake()
       .aMusician()
       .withName("John Doe")
@@ -256,8 +257,19 @@ describe("MusiciansController Integration Tests", () => {
       .build();
     await repository.insert(musician);
 
-    const presenter = await controller.findOne(musician.musician_id.id);
+    const ownerUser = {
+      userId: musician.musician_id.id,
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+    const presenter = (await controller.findOne(
+      musician.musician_id.id,
+      ownerUser as any,
+    )) as MusicianPresenter;
 
+    expect(presenter).toBeInstanceOf(MusicianPresenter);
     expect(presenter.id).toBe(musician.musician_id.id);
     expect(presenter.name).toBe(musician.name);
     expect(presenter.email).toBe(musician.email.value);
@@ -266,6 +278,39 @@ describe("MusiciansController Integration Tests", () => {
     expect(presenter.qr_code).toBe(
       `soundmeet://musician/${musician.musician_id.id}`,
     );
+  });
+
+  // 1.d (auditoria jul/2026): GET /musicians/:id é @Public() — sem esse
+  // teste, um estranho ou um chamador anônimo receberiam email/telefone do
+  // músico, dado pessoal sensível e chave anti-multi-conta (business-rules).
+  it("should get a musician — estranho/anônimo recebe versão pública, sem email/telefone", async () => {
+    const musician = Musician.fake()
+      .aMusician()
+      .withName("John Doe")
+      .withEmail("john@example.com")
+      .build();
+    await repository.insert(musician);
+
+    const anonymousView = await controller.findOne(musician.musician_id.id);
+    const strangerUser = {
+      userId: "other-musician-uuid",
+      roles: ["musician"],
+      establishmentIds: [],
+      bandIds: [],
+      isAdmin: false,
+    };
+    const strangerView = await controller.findOne(
+      musician.musician_id.id,
+      strangerUser as any,
+    );
+
+    for (const presenter of [anonymousView, strangerView]) {
+      expect(presenter).toBeInstanceOf(PublicMusicianPresenter);
+      expect(presenter).not.toHaveProperty("email");
+      expect(presenter).not.toHaveProperty("phone");
+      expect(presenter.id).toBe(musician.musician_id.id);
+      expect(presenter.name).toBe(musician.name);
+    }
   });
 
   describe("findAll method", () => {

@@ -1,4 +1,5 @@
 import {
+  AssertConversationParticipantUseCase,
   GetConversationUseCase,
   ListConversationsUseCase,
   MarkAsReadUseCase,
@@ -29,6 +30,15 @@ export const REPOSITORIES = {
 };
 
 export const USE_CASES = {
+  ASSERT_CONVERSATION_PARTICIPANT: {
+    provide: AssertConversationParticipantUseCase,
+    useFactory: (
+      convRepo: IConversationRepository,
+    ): AssertConversationParticipantUseCase => {
+      return new AssertConversationParticipantUseCase(convRepo);
+    },
+    inject: [REPOSITORIES.CONVERSATION.provide],
+  },
   OPEN_CONVERSATION: {
     provide: OpenConversationUseCase,
     useFactory: (convRepo: IConversationRepository): OpenConversationUseCase => {

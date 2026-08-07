@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Request } from "express";
 
 import { AuthUser } from "./auth.roles";
+import { toAuthenticatedUser } from "./authenticated-user.mapper";
 import { AuthenticatedUser } from "./interfaces/authenticated-user.interface";
 
 declare module "express" {
@@ -26,16 +27,7 @@ export class CurrentUserContextGuard implements CanActivate {
       return true;
     }
 
-    const roles = user.roles ?? [];
-
-    request.currentUser = {
-      userId: user.sub ?? "",
-      roles,
-      establishmentIds: (user as any).establishment_ids ?? [],
-      bandIds: (user as any).band_ids ?? [],
-      organizationId: (user as any).organization_id,
-      isAdmin: roles.includes("admin"),
-    } satisfies AuthenticatedUser;
+    request.currentUser = toAuthenticatedUser(user);
 
     return true;
   }
