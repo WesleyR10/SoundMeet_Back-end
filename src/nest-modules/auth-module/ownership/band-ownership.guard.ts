@@ -4,12 +4,18 @@ import {
   ForbiddenException,
   Injectable,
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import { Request } from "express";
 
 import { AuthenticatedUser } from "../interfaces/authenticated-user.interface";
+import { resolveOwnershipId } from "./resolve-ownership-id";
+
+const FALLBACK_PARAMS = ["band_id", "bandId", "id"] as const;
 
 @Injectable()
 export class BandOwnershipGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+
   canActivate(context: ExecutionContext): boolean {
     if (context.getType() !== "http") {
       return true;
@@ -26,14 +32,7 @@ export class BandOwnershipGuard implements CanActivate {
       return true;
     }
 
-    const bandId =
-      request.params["id"] ??
-      request.params["bandId"] ??
-      request.params["band_id"];
-
-    if (!bandId) {
-      return true;
-    }
+    const bandId = resolveOwnershipId(context, this.reflector, FALLBACK_PARAMS);
 
     if (!currentUser.bandIds.includes(bandId)) {
       throw new ForbiddenException(

@@ -29,6 +29,7 @@ import {
   CurrentUser,
   CurrentUserContextGuard,
   EstablishmentOwnershipGuard,
+  OwnershipParam,
   Roles,
   RolesGuard,
 } from "../auth-module";
@@ -59,6 +60,10 @@ export class CampaignController {
 
   @Post()
   @Roles("establishment", "admin")
+  // Rota de criação não tem :id — o guard valida o establishment_id do body
+  // contra as claims do JWT (sem isto, estabelecimento A criava campanha em
+  // nome de B, consumindo o gate de plano alheio).
+  @OwnershipParam({ bodyKey: "establishment_id" })
   @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Criar campanha promocional (GROWTH/PRO)",
@@ -117,10 +122,13 @@ export class CampaignController {
     return CampaignController.serialize(output);
   }
 
+  // Sem EstablishmentOwnershipGuard aqui: ":id" é o UUID da CAMPANHA, não do
+  // estabelecimento — o guard comparava campanha×establishmentIds e devolvia
+  // 403 pro próprio dono. Ownership é garantido no DeleteCampaignUseCase
+  // (establishment_id divergente → NotFoundError).
   @HttpCode(204)
   @Delete(":id")
   @Roles("establishment", "admin")
-  @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({ summary: "Remover campanha" })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 204 })
@@ -133,6 +141,7 @@ export class CampaignController {
     await this.deleteUseCase.execute({
       campaign_id: id,
       establishment_id,
+      is_admin: currentUser?.roles.includes("admin"),
     });
   }
 

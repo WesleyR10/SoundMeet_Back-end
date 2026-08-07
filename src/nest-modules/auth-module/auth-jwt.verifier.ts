@@ -1,4 +1,9 @@
-import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { createPublicKey } from "crypto";
@@ -31,6 +36,8 @@ type CachedKey = {
 @Injectable()
 export class AuthJwtVerifier {
   private readonly keyCache = new Map<string, CachedKey>();
+  private readonly logger = new Logger(AuthJwtVerifier.name);
+  private readonly observedAudiences = new Set<string>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -154,20 +161,101 @@ export class AuthJwtVerifier {
     return `${baseUrl}/realms/${realm}`;
   }
 
+  /**
+   * Exige que o token tenha sido emitido PARA esta API, e não apenas pelo mesmo
+   * realm. Sem isso, qualquer client do realm (inclusive um de integração com
+   * escopo diferente) produzia token aceito aqui — token confusion.
+   *
+   * A checagem virou E lógico: `aud` precisa conter exatamente o audience desta
+   * API, e — quando há allowlist configurada — o `azp` precisa ser um client
+   * autorizado. Antes era OU, então bastava o `azp` bater para dispensar o `aud`.
+   */
   private assertKeycloakClient(payload: Record<string, any>) {
-    const shouldVerifyAudience =
-      this.configService.get<boolean>("KEYCLOAK_VERIFY_AUDIENCE") ?? false;
-    if (!shouldVerifyAudience) {
+    const expectedAudience = this.getExpectedAudience();
+    const audiences = this.normalizeAudiences(payload.aud);
+    const azp = typeof payload.azp === "string" ? payload.azp : null;
+
+    if (!this.shouldVerifyAudience()) {
+      this.logAudienceTelemetry(expectedAudience, audiences, azp);
       return;
     }
 
-    const clientId = this.configService.get<string>("KEYCLOAK_CLIENT_ID");
-    const audience = payload.aud;
-    const audiences = Array.isArray(audience) ? audience : [audience];
-    if (audiences.includes(clientId) || payload.azp === clientId) {
-      return;
+    if (!audiences.includes(expectedAudience)) {
+      throw new UnauthorizedException("Invalid JWT audience");
     }
 
-    throw new UnauthorizedException("Invalid JWT audience");
+    const allowedAzp = this.getAllowedAzp();
+    if (allowedAzp.length > 0 && (!azp || !allowedAzp.includes(azp))) {
+      throw new UnauthorizedException("Invalid JWT authorized party");
+    }
+  }
+
+  private shouldVerifyAudience(): boolean {
+    const configured = this.configService.get<boolean>(
+      "KEYCLOAK_VERIFY_AUDIENCE",
+    );
+    if (typeof configured === "boolean") {
+      return configured;
+    }
+    return this.configService.get<string>("NODE_ENV") === "production";
+  }
+
+  /**
+   * `KEYCLOAK_AUDIENCE` existe separado de `KEYCLOAK_CLIENT_ID` porque os dois
+   * não são o mesmo conceito: o client id é a credencial confidencial que o
+   * backend usa na Admin API, enquanto o audience é o valor que o
+   * `oidc-audience-mapper` injeta nos tokens dos clients públicos. Hoje eles
+   * divergem (`soundmeet-backend` vs `soundmeet-api`) — ligar a verificação sem
+   * essa separação rejeitaria todo token válido.
+   */
+  private getExpectedAudience(): string {
+    return (
+      this.configService.get<string>("KEYCLOAK_AUDIENCE") ??
+      this.configService.get<string>("KEYCLOAK_CLIENT_ID")!
+    );
+  }
+
+  private getAllowedAzp(): string[] {
+    return (this.configService.get<string>("KEYCLOAK_ALLOWED_AZP") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  private normalizeAudiences(audience: unknown): string[] {
+    if (Array.isArray(audience)) {
+      return audience.filter(
+        (value): value is string => typeof value === "string",
+      );
+    }
+    return typeof audience === "string" ? [audience] : [];
+  }
+
+  /**
+   * Etapa 1 da migração: com a verificação desligada, registra o que os tokens
+   * reais trazem para dimensionar o impacto antes de tornar obrigatório. Loga
+   * uma vez por combinação para não inundar o log a cada request.
+   */
+  private logAudienceTelemetry(
+    expectedAudience: string,
+    audiences: string[],
+    azp: string | null,
+  ): void {
+    const signature = `${audiences.join("|")}#${azp ?? ""}`;
+    if (this.observedAudiences.has(signature)) {
+      return;
+    }
+    this.observedAudiences.add(signature);
+
+    const wouldReject = !audiences.includes(expectedAudience);
+    this.logger.warn(
+      JSON.stringify({
+        event: "auth.audience_check_disabled",
+        expected_audience: expectedAudience,
+        token_aud: audiences,
+        token_azp: azp,
+        would_reject_if_enabled: wouldReject,
+      }),
+    );
   }
 }
