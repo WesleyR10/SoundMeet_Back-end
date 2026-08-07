@@ -21,7 +21,6 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
-      - MONGODB_URL=mongodb://soundmeet:soundmeet123@mongo:27017/soundmeet?authSource=admin
       - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://soundmeet:soundmeet123@rabbitmq:5672
       - AUTH_JWT_VALIDATION_MODE=keycloak
@@ -36,7 +35,7 @@ services:
       - KEYCLOAK_VERIFY_AUDIENCE=false
       - AI_CIFRA_ANALYSIS_HTTP_BASE_URL=http://ai-cifra-worker-gpu:8000
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
-      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v21_phase2
+      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v22_phase2
       - AI_CIFRA_SIMPMUSIC_YTDLP_BIN=yt-dlp
       - AI_CIFRA_MUSIFY_PIPED_BASE_URL=https://api.piped.private.coffee
       - AI_CIFRA_MUSIFY_PIPED_TIMEOUT_MS=10000
@@ -48,8 +47,6 @@ services:
       - SWAGGER_EXAMPLES_REQUIRED_ONLY=false
     depends_on:
       postgres:
-        condition: service_healthy
-      mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -102,7 +99,9 @@ services:
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: soundmeet
-      POSTGRES_PASSWORD: soundmeet123
+      # Precisa ficar igual ao KC_DB_PASSWORD do serviço keycloak abaixo —
+      # mesma env var nos dois para não dessincronizar (SM-014).
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-soundmeet123}
     volumes:
       - postgres_keycloak_data:/var/lib/postgresql/data
     networks:
@@ -115,39 +114,9 @@ services:
       timeout: 5s
       retries: 12
 
-  # MongoDB - Analytics e Logs
-  mongo:
-    image: mongo:7.0
-    container_name: soundmeet-mongo
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: soundmeet
-      MONGO_INITDB_ROOT_PASSWORD: soundmeet123
-      MONGO_INITDB_DATABASE: soundmeet
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - soundmeet-network
-    restart: unless-stopped
-    logging: *default-logging
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "mongosh",
-          "--username",
-          "soundmeet",
-          "--password",
-          "soundmeet123",
-          "--authenticationDatabase",
-          "admin",
-          "--eval",
-          "db.runCommand({ ping: 1 })",
-        ]
-      interval: 10s
-      timeout: 10s
-      retries: 12
+  # MongoDB (analytics/logs) foi removido junto com mongoose/@nestjs/mongoose:
+  # o backend não tinha um único @Schema/InjectModel — só abria a conexão.
+  # Restaurar no item 7.4 do roadmap, quando houver telemetria de volume.
 
   # Redis - Cache e Sessões
   redis:
@@ -193,16 +162,22 @@ services:
       retries: 12
 
   # Keycloak - Autenticação
+  #
+  # ⚠️ DEV-ONLY (SM-014) — `start-dev`, HTTP sem TLS e KC_HOSTNAME_STRICT=false
+  # são inseguros por design e o próprio Keycloak documenta isso. Este bloco
+  # NUNCA deve ser promovido a produção sem revisão — usar o compose dedicado
+  # em `infra/keycloak/docker-compose.prod.yml` (start, TLS, hostname estrito,
+  # segredos via secret manager).
   keycloak:
     image: quay.io/keycloak/keycloak:22.0
     container_name: soundmeet-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
       KC_DB_USERNAME: soundmeet
-      KC_DB_PASSWORD: soundmeet123
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-soundmeet123}
       KC_HOSTNAME: localhost
       KC_HOSTNAME_PORT: 8080
       KC_HOSTNAME_STRICT: false
@@ -262,7 +237,6 @@ services:
       - "8083:8080"
     depends_on:
       - postgres
-      - mongo
     networks:
       - soundmeet-network
     restart: unless-stopped
@@ -283,7 +257,6 @@ services:
       - AI_CIFRA_STORAGE_PROVIDER=minio
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
       - AI_CIFRA_ENABLE_NEURAL_CHORDS=true
-      - AI_CIFRA_ENABLE_V12=true
       - AI_CIFRA_OMAR_RQ_DEVICE=cpu
       - AI_CIFRA_MAX_AUDIO_SECONDS=800
       - HF_HOME=/home/wesleyr10/Programação/Projetos/SoundMeet/.cache/huggingface
@@ -328,7 +301,6 @@ services:
       - AI_CIFRA_STORAGE_PROVIDER=minio
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
       - AI_CIFRA_ENABLE_NEURAL_CHORDS=1
-      - AI_CIFRA_ENABLE_V12=1
       - AI_CIFRA_OMAR_RQ_DEVICE=cuda
       - AI_CIFRA_MAX_AUDIO_SECONDS=600
       - AWS_REGION=us-east-1
@@ -351,6 +323,62 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # Separação de stems (Demucs/MSST) — consumido pelo ai-audio-module via
+  # AI_AUDIO_SEPARATION_HTTP_BASE_URL. Só existe imagem GPU
+  # (soundmeet-audio-separation/Dockerfile.gpu), daí o profile "gpu", igual ao
+  # ai-cifra-worker-gpu. O contexto é a raiz do monorepo porque o Dockerfile
+  # copia de soundmeet-audio-separation/.
+  #
+  # ⚠️ SUBA UM WORKER DE GPU POR VEZ em placa de 8GB. Medido em 28/jul/2026
+  # numa RTX 2060 SUPER (8GB): o ai-cifra-worker-gpu sozinho já reserva
+  # ~7,7GB. Com este serviço também de pé — mesmo ocioso — o e2e do ai-cifra
+  # foi de 293s para 3603s (timeout), 12x mais lento. Não é contenção de
+  # paralelismo do Jest: é VRAM, e `--runInBand` não resolve.
+  #   docker compose --profile gpu up -d ai-cifra-worker-gpu   # análise de cifra
+  #   docker compose --profile gpu up -d ai-audio-separation   # separação de stems
+  # Parar o outro antes de subir. Em placa com folga (>=16GB), coexistem.
+  ai-audio-separation:
+    build:
+      context: ..
+      dockerfile: soundmeet-audio-separation/Dockerfile.gpu
+    container_name: soundmeet-ai-audio-separation
+    profiles: ["gpu"]
+    init: true
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../soundmeet-audio-separation/models:/app/models:ro
+      - /root/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - AI_AUDIO_STORAGE_PROVIDER=minio
+      - AI_AUDIO_PROGRESS_URL=http://app:3000/api/v1/ai-audio/internal/separations
+      - AI_AUDIO_PROGRESS_TOKEN=${AI_AUDIO_PROGRESS_TOKEN:-change-me}
+      - AWS_REGION=us-east-1
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=soundmeet
+      - MINIO_SECRET_KEY=soundmeet123
+      - MINIO_BUCKET=soundmeet-media
+    depends_on:
+      - minio
+    networks:
+      - soundmeet-network
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   ai-cifra-train:
     build:
@@ -500,7 +528,6 @@ services:
 volumes:
   postgres_data:
   postgres_keycloak_data:
-  mongo_data:
   redis_data:
   rabbitmq_data:
   minio_data:
