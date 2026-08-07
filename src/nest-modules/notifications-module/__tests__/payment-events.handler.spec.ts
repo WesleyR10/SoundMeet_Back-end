@@ -11,15 +11,21 @@ import { NotificationsGateway } from "../notifications.gateway";
 import { NotificationsPaymentEventsHandler } from "../payment-events.handler";
 import { PushNotificationService } from "../push-notification.service";
 
-const makeGatewayMock = (): jest.Mocked<Pick<NotificationsGateway, "notifyTipReceived">> => ({
+const makeGatewayMock = (): jest.Mocked<
+  Pick<NotificationsGateway, "notifyTipReceived">
+> => ({
   notifyTipReceived: jest.fn(),
 });
 
-const makeMusicianRepoMock = (): jest.Mocked<Pick<IMusicianRepository, "findById">> => ({
+const makeMusicianRepoMock = (): jest.Mocked<
+  Pick<IMusicianRepository, "findById">
+> => ({
   findById: jest.fn(),
 });
 
-const makeAudienceRepoMock = (): jest.Mocked<Pick<IAudienceRepository, "findById">> => ({
+const makeAudienceRepoMock = (): jest.Mocked<
+  Pick<IAudienceRepository, "findById">
+> => ({
   findById: jest.fn(),
 });
 
@@ -27,7 +33,9 @@ const makeTipRepoMock = (): jest.Mocked<Pick<ITipRepository, "findById">> => ({
   findById: jest.fn(),
 });
 
-const makePushServiceMock = (): jest.Mocked<Pick<PushNotificationService, "send">> => ({
+const makePushServiceMock = (): jest.Mocked<
+  Pick<PushNotificationService, "send">
+> => ({
   send: jest.fn(),
 });
 
@@ -37,7 +45,9 @@ describe("NotificationsPaymentEventsHandler", () => {
   let musicianRepo: jest.Mocked<Pick<IMusicianRepository, "findById">>;
   let audienceRepo: jest.Mocked<Pick<IAudienceRepository, "findById">>;
   let tipRepo: jest.Mocked<Pick<ITipRepository, "findById">>;
-  let pushNotificationService: jest.Mocked<Pick<PushNotificationService, "send">>;
+  let pushNotificationService: jest.Mocked<
+    Pick<PushNotificationService, "send">
+  >;
 
   const musicianId = "8c0e9a2e-1b7a-4f3e-9c2a-2a6b1e4d5f01";
   const audienceId = "22222222-2222-4222-8222-222222222222";
@@ -141,7 +151,9 @@ describe("NotificationsPaymentEventsHandler", () => {
   it("should not send a push notification when the musician has no push_token", async () => {
     tipRepo.findById.mockResolvedValue(null);
     audienceRepo.findById.mockResolvedValue(null);
-    musicianRepo.findById.mockResolvedValue(Musician.fake().aMusician().build());
+    musicianRepo.findById.mockResolvedValue(
+      Musician.fake().aMusician().build(),
+    );
 
     await handler.handleTipCompleted(makeEvent());
 
@@ -166,7 +178,9 @@ describe("NotificationsPaymentEventsHandler", () => {
   it("should not throw when a repository lookup fails", async () => {
     tipRepo.findById.mockRejectedValue(new Error("db down"));
 
-    await expect(handler.handleTipCompleted(makeEvent())).resolves.not.toThrow();
+    await expect(
+      handler.handleTipCompleted(makeEvent()),
+    ).resolves.not.toThrow();
     expect(pushNotificationService.send).not.toHaveBeenCalled();
   });
 });

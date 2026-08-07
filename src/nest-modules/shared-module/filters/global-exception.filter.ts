@@ -4,6 +4,7 @@ import {
   ExceptionFilter,
   HttpException,
 } from "@nestjs/common";
+import * as Sentry from "@sentry/nestjs";
 import { Response } from "express";
 
 import { ConflictError } from "../../../core/shared/domain/errors/conflict.error";
@@ -295,6 +296,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ...toExceptionLogContext(exception),
         }),
       );
+      // Único ponto de captura no filtro: só chega aqui o que não é um dos
+      // DomainError/HttpException já tratados acima — ou seja, bug de
+      // verdade, não resultado de negócio esperado (404/422/402/409/503).
+      Sentry.captureException(exception);
     } else {
       console.error(
         "GlobalExceptionFilter non-error throw",
@@ -302,6 +307,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           value: safeJsonStringify(exception) ?? String(exception),
         }),
       );
+      Sentry.captureException(exception);
     }
     response.status(500).json({
       statusCode: 500,

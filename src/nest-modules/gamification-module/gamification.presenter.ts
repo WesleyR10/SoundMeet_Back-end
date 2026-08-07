@@ -71,6 +71,9 @@ export class UserPointsPresenter {
   created_at: Date;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   updated_at: Date;
+  // Só populado no leaderboard — ver UserPointsOutput.
+  nickname?: string | null;
+  avatar?: string | null;
 
   constructor(output: UserPointsOutput) {
     this.id = output.id;
@@ -87,6 +90,8 @@ export class UserPointsPresenter {
     this.is_active_supporter = output.is_active_supporter;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
+    this.nickname = output.nickname;
+    this.avatar = output.avatar;
   }
 }
 

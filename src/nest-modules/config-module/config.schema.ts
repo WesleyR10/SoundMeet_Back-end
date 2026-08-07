@@ -12,7 +12,6 @@ export type EnvConfig = {
 
   // Database URLs
   DATABASE_URL: string;
-  MONGODB_URL?: string;
   REDIS_URL: string;
 
   // RabbitMQ
@@ -41,6 +40,8 @@ export type EnvConfig = {
   KEYCLOAK_INTERNAL_URL?: string;
   KEYCLOAK_JWKS_URI?: string;
   KEYCLOAK_JWKS_CACHE_TTL_SECONDS?: number;
+  KEYCLOAK_AUDIENCE?: string;
+  KEYCLOAK_ALLOWED_AZP?: string;
   KEYCLOAK_VERIFY_AUDIENCE?: boolean;
 
   // JWT
@@ -108,6 +109,11 @@ export type EnvConfig = {
   AI_CIFRA_ANALYSIS_HTTP_PATH?: string;
   AI_CIFRA_ANALYSIS_HTTP_TIMEOUT_MS?: number;
   AI_CIFRA_PROCESSING_TRANSPORT?: "http" | "rabbitmq";
+  /**
+   * Kill-switch da comunidade de cifras. "false" derruba as rotas de
+   * /community/personal-chord-sheets sem deploy — as do dono seguem intactas.
+   */
+  PERSONAL_CHORD_SHEET_COMMUNITY_ENABLED?: string;
   AI_CIFRA_PROCESSING_CONCURRENCY?: number;
   AI_CIFRA_PROCESSING_MAX_QUEUE_SIZE?: number;
   AI_CIFRA_PROCESSING_BACKPRESSURE_ENQUEUE_DELAY_MS?: number;
@@ -168,12 +174,6 @@ export type EnvConfig = {
   IUGU_ACCOUNT_ID?: string;
   IUGU_WEBHOOK_TOKEN?: string;
 
-  // Push Notifications
-  FIREBASE_PROJECT_ID?: string;
-  FIREBASE_PRIVATE_KEY?: string;
-  FIREBASE_CLIENT_EMAIL?: string;
-  FIREBASE_SERVICE_ACCOUNT_KEY?: string;
-
   // Email — Resend
   RESEND_API_KEY?: string;
   MAIL_FROM?: string;
@@ -204,9 +204,14 @@ export type EnvConfig = {
 
   // Scheduling
   BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: number;
+  BOOKING_COMPLETION_DELAY_HOURS: number;
 
   // Prisma
   PRISMA_LOG_QUERIES: boolean;
+
+  // Monitoramento (Sentry)
+  SENTRY_DSN?: string;
+  SENTRY_TRACES_SAMPLE_RATE?: number;
 };
 
 export type ConfigSchemaType = ConfigService<EnvConfig>;

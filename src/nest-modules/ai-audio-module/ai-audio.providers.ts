@@ -1,7 +1,7 @@
+import { S3Client } from "@aws-sdk/client-s3";
 import { AmqpConnection } from "@golevelup/nestjs-rabbitmq";
 import { ConfigService } from "@nestjs/config";
 import { ModuleRef } from "@nestjs/core";
-import AWS from "aws-sdk";
 
 import { IAiAudioSeparationClient } from "../../core/ai-audio/application/ports/ai-audio-separation-client.interface";
 import { IAiAudioSeparationDispatcher } from "../../core/ai-audio/application/ports/ai-audio-separation-dispatcher.interface";
@@ -94,28 +94,28 @@ export const INFRA_PROVIDERS = {
       const r2Bucket = configService.get<string>("CLOUDFLARE_R2_BUCKET");
 
       if (provider === "cloudflare_r2") {
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint: r2Endpoint,
-          accessKeyId: r2AccessKey,
-          secretAccessKey: r2SecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: r2AccessKey!,
+            secretAccessKey: r2SecretKey!,
+          },
+          forcePathStyle: true,
         });
         return new S3AiAudioStorage(s3, r2Bucket!, null);
       }
 
       if (provider === "minio") {
         const endpoint = `http://${minioEndpoint}:${minioPort}`;
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint,
-          accessKeyId: minioAccessKey,
-          secretAccessKey: minioSecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: minioAccessKey!,
+            secretAccessKey: minioSecretKey!,
+          },
+          forcePathStyle: true,
         });
         const publicBaseUrl =
           minioPublicEndpoint && minioPublicPort && minioBucket
@@ -124,11 +124,7 @@ export const INFRA_PROVIDERS = {
         return new S3AiAudioStorage(s3, minioBucket!, publicBaseUrl);
       }
 
-      const s3 = new AWS.S3({
-        apiVersion: "2006-03-01",
-        signatureVersion: "v4",
-        region,
-      });
+      const s3 = new S3Client({ region });
       return new S3AiAudioStorage(s3, awsBucket!, cloudfrontUrl);
     },
     inject: [ConfigService],

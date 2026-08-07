@@ -1,28 +1,16 @@
+import KeyvRedis from "@keyv/redis";
 import { CacheModule } from "@nestjs/cache-manager";
 import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import {
-  MongooseModule,
-  type MongooseModuleFactoryOptions,
-} from "@nestjs/mongoose";
-import { redisStore } from "cache-manager-redis-store";
+import { Keyv } from "keyv";
 
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "./prisma/prisma.service";
 
-export function createMongoConnectionOptions(
-  configService: ConfigSchemaType,
-): MongooseModuleFactoryOptions {
-  const uri = configService.get<string>("MONGODB_URL");
-  if (!uri?.trim()) {
-    throw new Error("MONGODB_URL is not configured");
-  }
-  return {
-    uri,
-    retryWrites: true,
-    w: "majority" as const,
-  };
-}
+// TTL padrão do cache global. A partir do cache-manager v6 (Keyv) todo TTL é
+// em MILISSEGUNDOS — na v5 era em segundos. Ver DEFAULT_CACHE_TTL_MS e os
+// call sites de `cache.set(...)`, que também passaram a multiplicar por 1000.
+export const DEFAULT_CACHE_TTL_MS = 300 * 1000;
 
 export async function createRedisCacheOptions(configService: ConfigSchemaType) {
   const redisUrl = configService.get<string>("REDIS_URL")!;
@@ -31,29 +19,18 @@ export async function createRedisCacheOptions(configService: ConfigSchemaType) {
   const port = parsedUrl.port ? Number(parsedUrl.port) : 6379;
   const password = parsedUrl.password || undefined;
   return {
-    store: redisStore as any,
+    stores: [new Keyv({ store: new KeyvRedis(redisUrl) })],
     url: redisUrl,
     host,
     port,
     password,
-    ttl: 300,
+    ttl: DEFAULT_CACHE_TTL_MS,
   };
 }
-
-const mongoModule =
-  process.env.MONGODB_URL && process.env.MONGODB_URL.trim().length > 0
-    ? [
-        MongooseModule.forRootAsync({
-          useFactory: createMongoConnectionOptions,
-          inject: [ConfigService],
-        }),
-      ]
-    : [];
 
 @Global()
 @Module({
   imports: [
-    ...mongoModule,
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: createRedisCacheOptions,
@@ -61,6 +38,6 @@ const mongoModule =
     }),
   ],
   providers: [PrismaService],
-  exports: [PrismaService, ...(mongoModule.length ? [MongooseModule] : [])],
+  exports: [PrismaService],
 })
 export class DatabaseModule {}

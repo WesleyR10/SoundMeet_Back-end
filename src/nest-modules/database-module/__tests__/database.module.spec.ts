@@ -36,8 +36,8 @@ import { Test } from "@nestjs/testing";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import {
-  createMongoConnectionOptions,
   createRedisCacheOptions,
+  DEFAULT_CACHE_TTL_MS,
 } from "../database.module";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -52,29 +52,6 @@ describe("DatabaseModule Unit Tests", () => {
     jest.mocked(PrismaPg).mockClear();
   });
 
-  describe("mongodb connection", () => {
-    it("should configure MongooseModule using MONGODB_URL", () => {
-      const configService = createConfigService({
-        MONGODB_URL: "mongodb://localhost:27017/soundmeet",
-      });
-
-      const options = createMongoConnectionOptions(configService);
-      expect(options).toEqual({
-        uri: "mongodb://localhost:27017/soundmeet",
-        retryWrites: true,
-        w: "majority",
-      });
-    });
-
-    it("should fail fast when MONGODB_URL is missing and Mongo is explicitly configured", () => {
-      const configService = createConfigService({});
-
-      expect(() => createMongoConnectionOptions(configService)).toThrow(
-        "MONGODB_URL is not configured",
-      );
-    });
-  });
-
   describe("redis cache", () => {
     it("should parse REDIS_URL with password and port", async () => {
       const configService = createConfigService({
@@ -85,7 +62,9 @@ describe("DatabaseModule Unit Tests", () => {
       expect(options.host).toBe("redis-host");
       expect(options.port).toBe(6380);
       expect(options.password).toBe("pass");
-      expect(options.ttl).toBe(300);
+      // cache-manager v6+ (Keyv) usa TTL em milissegundos — antes eram 300s
+      expect(options.ttl).toBe(DEFAULT_CACHE_TTL_MS);
+      expect(options.ttl).toBe(300 * 1000);
     });
 
     it("should default port to 6379 and password to undefined", async () => {

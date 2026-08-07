@@ -8,19 +8,27 @@ import { NotificationsChatEventsHandler } from "../chat-message-events.handler";
 import { NotificationsGateway } from "../notifications.gateway";
 import { PushNotificationService } from "../push-notification.service";
 
-const makeGatewayMock = (): jest.Mocked<Pick<NotificationsGateway, "notifyChatMessage">> => ({
+const makeGatewayMock = (): jest.Mocked<
+  Pick<NotificationsGateway, "notifyChatMessage">
+> => ({
   notifyChatMessage: jest.fn(),
 });
 
-const makeConvRepoMock = (): jest.Mocked<Pick<IConversationRepository, "findById">> => ({
+const makeConvRepoMock = (): jest.Mocked<
+  Pick<IConversationRepository, "findById">
+> => ({
   findById: jest.fn(),
 });
 
-const makeMusicianRepoMock = (): jest.Mocked<Pick<IMusicianRepository, "findById">> => ({
+const makeMusicianRepoMock = (): jest.Mocked<
+  Pick<IMusicianRepository, "findById">
+> => ({
   findById: jest.fn(),
 });
 
-const makePushServiceMock = (): jest.Mocked<Pick<PushNotificationService, "send">> => ({
+const makePushServiceMock = (): jest.Mocked<
+  Pick<PushNotificationService, "send">
+> => ({
   send: jest.fn(),
 });
 
@@ -29,7 +37,9 @@ describe("NotificationsChatEventsHandler", () => {
   let gateway: jest.Mocked<Pick<NotificationsGateway, "notifyChatMessage">>;
   let convRepo: jest.Mocked<Pick<IConversationRepository, "findById">>;
   let musicianRepo: jest.Mocked<Pick<IMusicianRepository, "findById">>;
-  let pushNotificationService: jest.Mocked<Pick<PushNotificationService, "send">>;
+  let pushNotificationService: jest.Mocked<
+    Pick<PushNotificationService, "send">
+  >;
 
   const musicianId = "8c0e9a2e-1b7a-4f3e-9c2a-2a6b1e4d5f01";
   const establishmentId = "22222222-2222-4222-8222-222222222222";

@@ -48,7 +48,10 @@ export class RabbitmqModule implements OnApplicationBootstrap {
     return {
       module: RabbitmqModule,
       imports: [
-        RabbitMQModule.forRootAsync(RabbitMQModule, {
+        // @golevelup/nestjs-rabbitmq v5+ virou ConfigurableModuleClass: o
+        // forRootAsync passou a receber 1 argumento (antes era o módulo + as
+        // opções).
+        RabbitMQModule.forRootAsync({
           useFactory: (configService: ConfigSchemaType) => ({
             uri: configService.get("RABBITMQ_URL") as string,
             registerHandlers:

@@ -53,7 +53,9 @@ export class SyncedLyricsRateLimitGuard implements CanActivate {
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
-      await this.cache.set(key, current + 1, ttlSeconds);
+      // TTL em MILISSEGUNDOS (cache-manager v6+ / Keyv); RATE_LIMIT_TTL
+      // continua expresso em segundos na config.
+      await this.cache.set(key, current + 1, ttlSeconds * 1000);
     } catch (error) {
       if (
         error instanceof HttpException &&

@@ -7,7 +7,6 @@ import {
   CONFIG_ENV_SCHEMA,
   CONFIG_EXTERNAL_APIS_SCHEMA,
   CONFIG_LIMITS_SCHEMA,
-  CONFIG_NOTIFICATIONS_SCHEMA,
   CONFIG_PAYMENT_SCHEMA,
   CONFIG_PRISMA_SCHEMA,
   CONFIG_RABBITMQ_SCHEMA,
@@ -29,7 +28,6 @@ describe("Schema Unit Tests", () => {
     ...CONFIG_STORAGE_SCHEMA,
     ...CONFIG_EXTERNAL_APIS_SCHEMA,
     ...CONFIG_PAYMENT_SCHEMA,
-    ...CONFIG_NOTIFICATIONS_SCHEMA,
     ...CONFIG_LIMITS_SCHEMA,
     ...CONFIG_PRISMA_SCHEMA,
   });
@@ -61,13 +59,6 @@ describe("Schema Unit Tests", () => {
 
     test("valid cases", () => {
       expectValidate(schema, minimalRequired).not.toContain("is required");
-    });
-
-    test("should allow MongoDB to be disabled while analytics Mongo is not active", () => {
-      expectValidate(schema, {
-        ...minimalRequired,
-        MONGODB_URL: "",
-      }).not.toContain("MONGODB_URL");
     });
   });
 

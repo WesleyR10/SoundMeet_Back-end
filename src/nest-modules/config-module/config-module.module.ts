@@ -22,7 +22,6 @@ export const CONFIG_ENV_SCHEMA = {
 
 export const CONFIG_DATABASE_CACHE_SCHEMA = {
   DATABASE_URL: Joi.string().required(),
-  MONGODB_URL: Joi.string().allow("").optional(),
   REDIS_URL: Joi.string().required(),
 };
 
@@ -66,7 +65,20 @@ export const CONFIG_AUTH_SCHEMA = {
   KEYCLOAK_INTERNAL_URL: Joi.string().uri().optional(),
   KEYCLOAK_JWKS_URI: Joi.string().uri().optional(),
   KEYCLOAK_JWKS_CACHE_TTL_SECONDS: Joi.number().min(1).default(300),
-  KEYCLOAK_VERIFY_AUDIENCE: Joi.boolean().default(false),
+  // Valor esperado em `aud` — é o audience injetado pelo oidc-audience-mapper
+  // nos clients públicos, NÃO o client confidencial do backend. Sem default:
+  // o verifier cai em KEYCLOAK_CLIENT_ID quando ausente.
+  KEYCLOAK_AUDIENCE: Joi.string().optional(),
+  // Clients autorizados a emitir token para esta API (claim `azp`). Vazio =
+  // camada extra desligada; a checagem de `aud` continua valendo.
+  KEYCLOAK_ALLOWED_AZP: Joi.string().allow("").optional(),
+  // Obrigatório em produção. Ligar em outros ambientes exige o audience mapper
+  // configurado no realm (scripts/keycloak-sync.mjs) — ver Docs/auth/keycloak.md.
+  KEYCLOAK_VERIFY_AUDIENCE: Joi.boolean().when("NODE_ENV", {
+    is: "production",
+    then: Joi.boolean().default(true),
+    otherwise: Joi.boolean().default(false),
+  }),
   JWT_SECRET: Joi.string().required(),
   JWT_EXPIRES_IN: Joi.string().default("24h"),
   JWT_REFRESH_SECRET: Joi.string().required(),
@@ -142,13 +154,6 @@ export const CONFIG_PAYMENT_SCHEMA = {
   }),
 };
 
-export const CONFIG_NOTIFICATIONS_SCHEMA = {
-  FIREBASE_PROJECT_ID: Joi.string().optional(),
-  FIREBASE_PRIVATE_KEY: Joi.string().optional(),
-  FIREBASE_CLIENT_EMAIL: Joi.string().optional(),
-  FIREBASE_SERVICE_ACCOUNT_KEY: Joi.string().optional(),
-};
-
 export const CONFIG_LIMITS_SCHEMA = {
   RATE_LIMIT_TTL: Joi.number().default(60), // Tempo de expiração do limite de taxa em segundos
   RATE_LIMIT_MAX: Joi.number().default(100), // Máximo de requisições permitidas por RATE_LIMIT_TTL
@@ -167,10 +172,20 @@ export const CONFIG_LIMITS_SCHEMA = {
   VOTING_INTERVAL_MINUTES: Joi.number().default(3), // Intervalo de votação em minutos
 
   BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: Joi.number().min(0).default(72),
+  BOOKING_COMPLETION_DELAY_HOURS: Joi.number().min(0).default(24), // Janela de disputa pós-show (Docs/payment-gateway-decisions.md) antes de completar automaticamente
 };
 
 export const CONFIG_PRISMA_SCHEMA = {
   PRISMA_LOG_QUERIES: Joi.boolean().default(false),
+};
+
+// Monitoramento nunca é dependência dura de boot — SENTRY_DSN ausente
+// (dev/testes, ou produção sem conta Sentry ainda) só desativa o envio de
+// eventos, nunca impede o app de subir (diferente de ASAAS_API_KEY/
+// TOKEN_ENCRYPTION_KEY, que são dependências reais de fluxo de produto).
+export const CONFIG_MONITORING_SCHEMA = {
+  SENTRY_DSN: Joi.string().allow("").optional(),
+  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.2),
 };
 
 export const CONFIG_AI_AUDIO_SCHEMA = {
@@ -320,9 +335,9 @@ export class ConfigModuleRoot extends NestConfigModule {
         ...CONFIG_STORAGE_SCHEMA,
         ...CONFIG_EXTERNAL_APIS_SCHEMA,
         ...CONFIG_PAYMENT_SCHEMA,
-        ...CONFIG_NOTIFICATIONS_SCHEMA,
         ...CONFIG_LIMITS_SCHEMA,
         ...CONFIG_PRISMA_SCHEMA,
+        ...CONFIG_MONITORING_SCHEMA,
         ...CONFIG_AI_AUDIO_SCHEMA,
         ...CONFIG_AI_CIFRA_SCHEMA,
         ...CONFIG_SYNCED_LYRICS_SCHEMA,

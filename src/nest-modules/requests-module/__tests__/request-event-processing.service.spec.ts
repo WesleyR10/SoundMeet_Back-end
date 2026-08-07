@@ -33,10 +33,11 @@ describe("RequestEventProcessingService", () => {
     await expect(service.processOnce("accepted:1", work)).resolves.toBe("ok");
 
     expect(work).toHaveBeenCalledTimes(2);
+    // TTL em milissegundos (cache-manager v6+ / Keyv) — 24h de idempotência
     expect(cache.set).toHaveBeenCalledWith(
       "request_event:accepted:1",
       true,
-      60 * 60 * 24,
+      60 * 60 * 24 * 1000,
     );
   });
 });

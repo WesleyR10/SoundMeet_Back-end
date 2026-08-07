@@ -41,6 +41,12 @@ export class CustomizeQRCodeDto {
   @ApiProperty({
     description:
       "Só aceita null, para remover o logo atual. Para definir um novo logo, use POST /musicians/:id/qr-code/logo.",
+    // `type` explícito é obrigatório aqui: o tipo TS é só `null`, então o
+    // `design:type` emitido é `Object` e o SchemaObjectFactory do
+    // @nestjs/swagger 11 (mais estrito que o 7) aborta com "circular
+    // dependency detected", derrubando a geração do documento inteiro.
+    // Não afeta runtime — @Equals(null) continua sendo a regra de validação.
+    type: String,
     nullable: true,
     required: false,
   })

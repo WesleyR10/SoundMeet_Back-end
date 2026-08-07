@@ -1,12 +1,15 @@
-import { Readable } from "stream";
+import { Readable } from "node:stream";
 
-import { UploadEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
-import { DeleteEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { IEstablishmentStorage } from "../../../core/establishment/application/ports/establishment-storage.interface";
+import { DeleteEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
+import { UploadEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
+import {
+  Establishment,
+  EstablishmentId,
+} from "../../../core/establishment/domain/establishment.aggregate";
 import { EstablishmentInMemoryRepository } from "../../../core/establishment/infra/db/in-memory/establishment-in-memory.repository";
-import { Establishment, EstablishmentId } from "../../../core/establishment/domain/establishment.aggregate";
-import { EntityValidationError } from "../../../core/shared/domain/validators/validation.error";
 import { NotFoundError } from "../../../core/shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../core/shared/domain/validators/validation.error";
 
 class StorageMemoryImpl implements IEstablishmentStorage {
   readonly uploads: Map<string, { data: Buffer; content_type: string }> =
@@ -14,7 +17,7 @@ class StorageMemoryImpl implements IEstablishmentStorage {
 
   async putObject(input: {
     object_key: string;
-    data: Buffer | NodeJS.ReadableStream;
+    data: Buffer | Readable;
     content_type: string;
   }): Promise<void> {
     const chunks: Buffer[] = [];
@@ -22,11 +25,9 @@ class StorageMemoryImpl implements IEstablishmentStorage {
       chunks.push(input.data);
     } else {
       await new Promise<void>((resolve, reject) => {
-        (input.data as NodeJS.ReadableStream).on("data", (c) =>
-          chunks.push(Buffer.from(c)),
-        );
-        (input.data as NodeJS.ReadableStream).on("end", resolve);
-        (input.data as NodeJS.ReadableStream).on("error", reject);
+        (input.data as Readable).on("data", (c) => chunks.push(Buffer.from(c)));
+        (input.data as Readable).on("end", resolve);
+        (input.data as Readable).on("error", reject);
       });
     }
     this.uploads.set(input.object_key, {

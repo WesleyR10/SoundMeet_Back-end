@@ -21,17 +21,24 @@ const makeMusicianRepoMock = (): jest.Mocked<
   findById: jest.fn(),
 });
 
-const makePushServiceMock = (): jest.Mocked<Pick<PushNotificationService, "send">> => ({
+const makePushServiceMock = (): jest.Mocked<
+  Pick<PushNotificationService, "send">
+> => ({
   send: jest.fn(),
 });
 
 describe("RequestEventsHandler", () => {
   let handler: RequestEventsHandler;
   let gateway: jest.Mocked<
-    Pick<NotificationsGateway, "notifyRequestStatusChanged" | "notifyNewRequest">
+    Pick<
+      NotificationsGateway,
+      "notifyRequestStatusChanged" | "notifyNewRequest"
+    >
   >;
   let musicianRepo: jest.Mocked<Pick<IMusicianRepository, "findById">>;
-  let pushNotificationService: jest.Mocked<Pick<PushNotificationService, "send">>;
+  let pushNotificationService: jest.Mocked<
+    Pick<PushNotificationService, "send">
+  >;
 
   const requestId = new RequestId();
   const audienceId = "audience-uuid-001";
@@ -86,9 +93,8 @@ describe("RequestEventsHandler", () => {
 
       handler.handleRequestAccepted(event);
 
-      const [, payload] = (
-        gateway.notifyRequestStatusChanged as jest.Mock
-      ).mock.calls[0] as [string, { occurred_at: string }];
+      const [, payload] = (gateway.notifyRequestStatusChanged as jest.Mock).mock
+        .calls[0] as [string, { occurred_at: string }];
 
       const occurredAt = new Date(payload.occurred_at);
       expect(occurredAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
@@ -134,9 +140,8 @@ describe("RequestEventsHandler", () => {
 
       handler.handleRequestRejected(event);
 
-      const [, payload] = (
-        gateway.notifyRequestStatusChanged as jest.Mock
-      ).mock.calls[0] as [string, { rejection_reason: string | null }];
+      const [, payload] = (gateway.notifyRequestStatusChanged as jest.Mock).mock
+        .calls[0] as [string, { rejection_reason: string | null }];
 
       expect(payload.rejection_reason).toBeNull();
     });
@@ -207,7 +212,9 @@ describe("RequestEventsHandler", () => {
     it("should not throw when the musician repository fails", async () => {
       musicianRepo.findById.mockRejectedValue(new Error("db down"));
 
-      await expect(handler.handleRequestCreated(makeEvent())).resolves.not.toThrow();
+      await expect(
+        handler.handleRequestCreated(makeEvent()),
+      ).resolves.not.toThrow();
       expect(pushNotificationService.send).not.toHaveBeenCalled();
     });
   });

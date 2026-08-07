@@ -17,7 +17,9 @@ export class RequestEventProcessingService {
     }
 
     const result = await this.retry(work);
-    await this.cache.set(key, true, 60 * 60 * 24);
+    // TTL em MILISSEGUNDOS (cache-manager v6+ / Keyv) — 24h de janela de
+    // idempotência; em segundos viraria 86s e reprocessaria o pedido.
+    await this.cache.set(key, true, 60 * 60 * 24 * 1000);
     return result;
   }
 

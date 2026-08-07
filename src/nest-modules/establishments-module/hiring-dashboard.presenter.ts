@@ -1,3 +1,4 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 
 import { HiringDashboardOutput } from "../../core/establishment/application/use-cases/get-hiring-dashboard/get-hiring-dashboard.output";
@@ -19,6 +20,24 @@ export class HiringDashboardMusicianPresenter {
   rating: number;
   total_ratings: number;
   is_verified: boolean;
+
+  // Tipo TS é um array de objeto anônimo (indexed access), então o
+  // `design:type` emitido é só `Array` — o SchemaObjectFactory do
+  // @nestjs/swagger 11 tenta resolver o elemento e aborta com "circular
+  // dependency", derrubando o documento inteiro. `type` explícito resolve.
+  @ApiProperty({
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        model: { type: "string" },
+        min: { type: "number" },
+        max: { type: "number" },
+        currency: { type: "string" },
+        notes: { type: "string", nullable: true },
+      },
+    },
+  })
   price_ranges: MusicianProfileOutput["price_ranges"];
 
   constructor(output: MusicianOutput) {

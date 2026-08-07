@@ -14,6 +14,9 @@ export function applyGlobalConfig(app: INestApplication) {
     new ValidationPipe({
       errorHttpStatusCode: 422,
       transform: true,
+      // Remove do body qualquer propriedade sem decorator no DTO — proteção
+      // contra mass-assignment (vários controllers fazem spread de `...dto`).
+      whitelist: true,
       validationError: { target: false, value: false },
     }),
   );
