@@ -10,7 +10,9 @@ import { IRenderableChordSheetReadModel } from "../../core/synced-lyrics/applica
 import { IRenderableChordSheetWriteModel } from "../../core/synced-lyrics/application/gateways/renderable-chord-sheet-write-model.interface";
 import { IGeniusClient } from "../../core/synced-lyrics/application/ports/genius-client.interface";
 import { ILrcLibClient } from "../../core/synced-lyrics/application/ports/lrclib-client.interface";
+import { ILyricsAlignmentClient } from "../../core/synced-lyrics/application/ports/lyrics-alignment-client.interface";
 import { ISyncedLyricsBulkDispatcher } from "../../core/synced-lyrics/application/ports/synced-lyrics-bulk-dispatcher.interface";
+import { AlignSyncedLyricsWordTimestampsUseCase } from "../../core/synced-lyrics/application/use-cases/align-synced-lyrics-word-timestamps/align-synced-lyrics-word-timestamps.use-case";
 import { DownloadSyncedLyricsForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/download-synced-lyrics-for-music-library/download-synced-lyrics-for-music-library.use-case";
 import { GetChordSheetForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/get-chord-sheet-for-music-library/get-chord-sheet-for-music-library.use-case";
 import { GetRenderableChordSheetForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/get-renderable-chord-sheet-for-music-library/get-renderable-chord-sheet-for-music-library.use-case";
@@ -41,6 +43,7 @@ import {
   GeniusNoopClient,
 } from "../../core/synced-lyrics/infra/http/genius-http.client";
 import { LrcLibHttpClient } from "../../core/synced-lyrics/infra/http/lrclib-http.client";
+import { LyricsAlignmentHttpClient } from "../../core/synced-lyrics/infra/http/lyrics-alignment-http.client";
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import {
@@ -122,6 +125,27 @@ export const INFRA_PROVIDERS = {
       return GeniusHttpClient.create({
         accessToken: token.trim(),
         timeoutMs: 9000,
+      });
+    },
+    inject: [ConfigService],
+  },
+  LYRICS_ALIGNMENT_CLIENT: {
+    provide: "LyricsAlignmentClient",
+    // Mesmo worker do ai-cifra-module (ai-cifra-mir-worker), endpoint
+    // diferente (/v1/align-lyrics) -- por isso reaproveita as MESMAS envs
+    // AI_CIFRA_ANALYSIS_HTTP_BASE_URL/TIMEOUT_MS em vez de criar um par
+    // novo só pra apontar pro mesmo host.
+    useFactory: (configService: ConfigSchemaType): ILyricsAlignmentClient => {
+      const baseURL =
+        configService.get<string>("AI_CIFRA_ANALYSIS_HTTP_BASE_URL") ??
+        "http://ai-cifra-worker:8000";
+      const timeoutMs =
+        configService.get<number>("AI_CIFRA_ANALYSIS_HTTP_TIMEOUT_MS") ??
+        30 * 60 * 1000;
+      return LyricsAlignmentHttpClient.create({
+        baseURL,
+        timeoutMs,
+        path: "/v1/align-lyrics",
       });
     },
     inject: [ConfigService],
@@ -293,6 +317,16 @@ export const USE_CASES = {
       return new GetSyncedLyricsBulkJobUseCase(jobRepo);
     },
     inject: [REPOSITORIES.SYNCED_LYRICS_BULK_JOB_REPOSITORY.provide],
+  },
+  ALIGN_SYNCED_LYRICS_WORD_TIMESTAMPS_USE_CASE: {
+    provide: AlignSyncedLyricsWordTimestampsUseCase,
+    useFactory: (repo: ISyncedLyricsRepository, client: ILyricsAlignmentClient) => {
+      return new AlignSyncedLyricsWordTimestampsUseCase(repo, client);
+    },
+    inject: [
+      REPOSITORIES.SYNCED_LYRICS_REPOSITORY.provide,
+      INFRA_PROVIDERS.LYRICS_ALIGNMENT_CLIENT.provide,
+    ],
   },
   PROCESS_SYNCED_LYRICS_BULK_ITEM_USE_CASE: {
     provide: ProcessSyncedLyricsBulkItemUseCase,

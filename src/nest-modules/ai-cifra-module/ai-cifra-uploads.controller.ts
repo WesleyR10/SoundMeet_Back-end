@@ -19,23 +19,27 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
-import axios from "axios";
+import { Throttle } from "@nestjs/throttler";
 import { isUUID } from "class-validator";
 import { randomUUID } from "crypto";
-import { createReadStream, createWriteStream, promises as fs } from "fs";
+import { createReadStream, promises as fs } from "fs";
 import { diskStorage } from "multer";
 import { tmpdir } from "os";
 import { join } from "path";
-import { Readable } from "stream";
 
 import { AiCifraAudioCandidate } from "../../core/ai-cifra/application/ports/ai-cifra-audio-candidates-resolver.interface";
 import { CreateAiCifraUploadUseCase } from "../../core/ai-cifra/application/use-cases/create-ai-cifra-upload/create-ai-cifra-upload.use-case";
 import { RequestAiCifraAnalysisUseCase } from "../../core/ai-cifra/application/use-cases/request-ai-cifra-analysis/request-ai-cifra-analysis.use-case";
 import { ResolveAiCifraAudioCandidatesUseCase } from "../../core/ai-cifra/application/use-cases/resolve-ai-cifra-audio-candidates/resolve-ai-cifra-audio-candidates.use-case";
 import { MusifyPipedCatalogClient } from "../../core/ai-cifra/infra/audio-sources/musify-piped.catalog-client";
-import { Throttle } from "@nestjs/throttler";
-
-import { AuthGuard, Roles, RolesGuard } from "../auth-module";
+import { safeFetchToFile } from "../../core/shared/infra/http/safe-url-fetcher";
+import {
+  AuthGuard,
+  CurrentUserContextGuard,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
+import { MusicianOwnershipGuard } from "../auth-module/ownership/musician-ownership.guard";
 import { MusicLibraryCatalogService } from "../music-library-module/music-library.service";
 import {
   AiCifraAnalysisJobPresenter,
@@ -52,7 +56,12 @@ const MAX_FILE_SIZE_BYTES = Number(
 
 @ApiTags("AI Cifra")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(
+  AuthGuard,
+  RolesGuard,
+  CurrentUserContextGuard,
+  MusicianOwnershipGuard,
+)
 @Roles("musician", "admin")
 @Controller("musicians/:musician_id/ai-cifra/uploads")
 export class AiCifraUploadsController {
@@ -486,16 +495,24 @@ export class AiCifraUploadsController {
       );
 
       try {
-        const downloaded = await this.downloadAudioToTempFile({
+        const downloaded = await safeFetchToFile({
           url: candidate.audio_url,
-          tmpPath,
+          destPath: tmpPath,
           maxBytes: MAX_FILE_SIZE_BYTES,
+          contentTypeHint: candidate.content_type ?? null,
         });
 
-        const contentType =
-          candidate.content_type ?? downloaded.content_type ?? "audio/mpeg";
+        // content_type nunca vem do que o cliente declarou (SM-001): o
+        // servidor detecta pelos magic bytes do que foi de fato baixado; o
+        // hint do cliente só serve de fallback se a detecção for inconclusiva.
+        const contentType = downloaded.content_type ?? "audio/mpeg";
         const originalFilename =
-          candidate.original_filename ?? downloaded.original_filename;
+          candidate.original_filename ??
+          new URL(candidate.audio_url).pathname
+            .split("/")
+            .filter(Boolean)
+            .pop() ??
+          "audio";
 
         const upload = await this.createUploadUseCase.execute({
           musician_id,
@@ -537,65 +554,5 @@ export class AiCifraUploadsController {
     }
 
     throw new UnprocessableEntityException(lastErrorMessage);
-  }
-
-  private async downloadAudioToTempFile(input: {
-    url: string;
-    tmpPath: string;
-    maxBytes: number;
-  }): Promise<{
-    file_size: number;
-    content_type: string | null;
-    original_filename: string;
-  }> {
-    const response = await axios.get(input.url, {
-      responseType: "stream",
-      timeout: 60_000,
-      maxRedirects: 5,
-      validateStatus: (status) => status >= 200 && status < 300,
-    });
-
-    const rawContentType =
-      typeof response.headers?.["content-type"] === "string"
-        ? response.headers["content-type"]
-        : null;
-    const contentType = rawContentType
-      ? rawContentType.split(";")[0]?.trim() || null
-      : null;
-
-    const urlObj = new URL(input.url);
-    const urlName = urlObj.pathname.split("/").filter(Boolean).pop();
-    const originalFilename = urlName && urlName.length > 0 ? urlName : "audio";
-
-    const stream = response.data as unknown as Readable;
-    const writer = createWriteStream(input.tmpPath);
-
-    let totalBytes = 0;
-    const sizeError = new Error("AI cifra audio file exceeds max size");
-
-    await new Promise<void>((resolve, reject) => {
-      writer.on("error", (err) => {
-        stream.destroy();
-        reject(err);
-      });
-      stream.on("error", (err) => {
-        writer.destroy();
-        reject(err);
-      });
-      stream.on("data", (chunk: Buffer) => {
-        totalBytes += chunk.length;
-        if (totalBytes > input.maxBytes) {
-          stream.destroy(sizeError);
-        }
-      });
-      writer.on("finish", resolve);
-      stream.pipe(writer);
-    });
-
-    return {
-      file_size: totalBytes,
-      content_type: contentType,
-      original_filename: originalFilename,
-    };
   }
 }

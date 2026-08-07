@@ -1,7 +1,7 @@
+import { S3Client } from "@aws-sdk/client-s3";
 import { AmqpConnection } from "@golevelup/nestjs-rabbitmq";
 import { ConfigService } from "@nestjs/config";
 import { ModuleRef } from "@nestjs/core";
-import AWS from "aws-sdk";
 
 import { IAiCifraAnalysisClient } from "../../core/ai-cifra/application/ports/ai-cifra-analysis-client.interface";
 import { IAiCifraAnalysisDispatcher } from "../../core/ai-cifra/application/ports/ai-cifra-analysis-dispatcher.interface";
@@ -24,9 +24,11 @@ import { SimpMusicYtDlpAudioCandidatesResolver } from "../../core/ai-cifra/infra
 import { AiCifraAnalysisJobPrismaRepository } from "../../core/ai-cifra/infra/db/prisma/ai-cifra-analysis-job-prisma.repository";
 import { AiCifraUploadPrismaRepository } from "../../core/ai-cifra/infra/db/prisma/ai-cifra-upload-prisma.repository";
 import { AiCifraAnalysisHttpClient } from "../../core/ai-cifra/infra/http/ai-cifra-analysis-http.client";
+import { MusicLibraryOwnershipChecker } from "../../core/ai-cifra/infra/ownership/music-library-ownership.checker";
 import { S3AiCifraStorage } from "../../core/ai-cifra/infra/storage/s3-ai-cifra.storage";
 import { GetMusicLibraryUseCase } from "../../core/music-library/application/use-cases/get-music-library/get-music-library.use-case";
 import { UpdateMusicLibraryUseCase } from "../../core/music-library/application/use-cases/update-music-library/update-music-library.use-case";
+import { AlignSyncedLyricsWordTimestampsUseCase } from "../../core/synced-lyrics/application/use-cases/align-synced-lyrics-word-timestamps/align-synced-lyrics-word-timestamps.use-case";
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import {
@@ -43,6 +45,8 @@ const DEFAULT_ALLOWED_MODEL_IDS = [
   "chordformer_v20_phase2b",
   "chordformer_v21_phase2",
   "chordformer_v21_phase2b",
+  "chordformer_v22_phase2",
+  "chordformer_v22_phase2b",
 ] as const;
 
 export const REPOSITORIES = {
@@ -104,28 +108,28 @@ export const INFRA_PROVIDERS = {
       const r2Bucket = configService.get<string>("CLOUDFLARE_R2_BUCKET");
 
       if (provider === "cloudflare_r2") {
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint: r2Endpoint,
-          accessKeyId: r2AccessKey,
-          secretAccessKey: r2SecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: r2AccessKey!,
+            secretAccessKey: r2SecretKey!,
+          },
+          forcePathStyle: true,
         });
         return new S3AiCifraStorage(s3, r2Bucket!, null);
       }
 
       if (provider === "minio" || !provider) {
         const endpoint = `http://${minioEndpoint}:${minioPort}`;
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint,
-          accessKeyId: minioAccessKey,
-          secretAccessKey: minioSecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: minioAccessKey!,
+            secretAccessKey: minioSecretKey!,
+          },
+          forcePathStyle: true,
         });
         const publicBaseUrl =
           minioPublicEndpoint && minioPublicPort && minioBucket
@@ -134,11 +138,7 @@ export const INFRA_PROVIDERS = {
         return new S3AiCifraStorage(s3, minioBucket!, publicBaseUrl);
       }
 
-      const s3 = new AWS.S3({
-        apiVersion: "2006-03-01",
-        signatureVersion: "v4",
-        region,
-      });
+      const s3 = new S3Client({ region });
       return new S3AiCifraStorage(s3, awsBucket!, cloudfrontUrl);
     },
     inject: [ConfigService],
@@ -268,6 +268,7 @@ export const USE_CASES = {
       uploadRepo: IAiCifraUploadRepository,
       storage: IAiCifraStorage,
       configService: ConfigSchemaType,
+      getMusicLibraryUseCase: GetMusicLibraryUseCase,
     ) => {
       const maxSize =
         configService.get<number>("AI_CIFRA_MAX_FILE_SIZE") ?? 70 * 1024 * 1024;
@@ -285,12 +286,14 @@ export const USE_CASES = {
         storage,
         maxSize,
         allowedMime,
+        new MusicLibraryOwnershipChecker(getMusicLibraryUseCase),
       );
     },
     inject: [
       REPOSITORIES.AI_CIFRA_UPLOAD_REPOSITORY.provide,
       INFRA_PROVIDERS.AI_CIFRA_STORAGE.provide,
       ConfigService,
+      GetMusicLibraryUseCase,
     ],
   },
   REQUEST_AI_CIFRA_ANALYSIS_USE_CASE: {
@@ -328,6 +331,8 @@ export const USE_CASES = {
       client: IAiCifraAnalysisClient,
       storage: IAiCifraStorage,
       getMusicLibraryUseCase: GetMusicLibraryUseCase,
+      updateMusicLibraryUseCase: UpdateMusicLibraryUseCase,
+      alignSyncedLyricsUseCase: AlignSyncedLyricsWordTimestampsUseCase,
     ) => {
       const musicLibraryLookup = {
         async findById(id: string) {
@@ -348,6 +353,8 @@ export const USE_CASES = {
         client,
         storage,
         musicLibraryLookup,
+        updateMusicLibraryUseCase,
+        alignSyncedLyricsUseCase,
       );
     },
     inject: [
@@ -356,6 +363,8 @@ export const USE_CASES = {
       INFRA_PROVIDERS.AI_CIFRA_ANALYSIS_CLIENT.provide,
       INFRA_PROVIDERS.AI_CIFRA_STORAGE.provide,
       GetMusicLibraryUseCase,
+      UpdateMusicLibraryUseCase,
+      AlignSyncedLyricsWordTimestampsUseCase,
     ],
   },
   COMPLETE_AI_CIFRA_ANALYSIS_JOB_USE_CASE: {
@@ -365,12 +374,14 @@ export const USE_CASES = {
       jobRepo: IAiCifraAnalysisJobRepository,
       storage: IAiCifraStorage,
       updateMusicLibraryUseCase: UpdateMusicLibraryUseCase,
+      alignSyncedLyricsUseCase: AlignSyncedLyricsWordTimestampsUseCase,
     ) => {
       return new CompleteAiCifraAnalysisJobUseCase(
         uploadRepo,
         jobRepo,
         storage,
         updateMusicLibraryUseCase,
+        alignSyncedLyricsUseCase,
       );
     },
     inject: [
@@ -378,6 +389,7 @@ export const USE_CASES = {
       REPOSITORIES.AI_CIFRA_ANALYSIS_JOB_REPOSITORY.provide,
       INFRA_PROVIDERS.AI_CIFRA_STORAGE.provide,
       UpdateMusicLibraryUseCase,
+      AlignSyncedLyricsWordTimestampsUseCase,
     ],
   },
   FAIL_AI_CIFRA_ANALYSIS_JOB_USE_CASE: {

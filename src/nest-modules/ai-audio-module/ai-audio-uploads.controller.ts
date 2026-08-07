@@ -24,7 +24,13 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 import { CreateAiAudioUploadUseCase } from "../../core/ai-audio/application/use-cases/create-ai-audio-upload/create-ai-audio-upload.use-case";
-import { AuthGuard, Roles, RolesGuard } from "../auth-module";
+import {
+  AuthGuard,
+  CurrentUserContextGuard,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
+import { MusicianOwnershipGuard } from "../auth-module/ownership/musician-ownership.guard";
 import { AiAudioUploadPresenter } from "./ai-audio.presenter";
 
 const MAX_FILE_SIZE_BYTES = Number(
@@ -33,7 +39,12 @@ const MAX_FILE_SIZE_BYTES = Number(
 
 @ApiTags("AI Audio")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(
+  AuthGuard,
+  RolesGuard,
+  CurrentUserContextGuard,
+  MusicianOwnershipGuard,
+)
 @Roles("musician", "admin")
 @Controller("musicians/:musician_id/ai-audio/uploads")
 export class AiAudioUploadsController {

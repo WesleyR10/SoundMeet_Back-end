@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { DatabaseModule } from "../database-module/database.module";
 import { MusicLibraryModule } from "../music-library-module/music-library.module";
 import { RabbitmqModule } from "../rabbitmq-module/rabbitmq.module";
+import { SyncedLyricsModule } from "../synced-lyrics-module/synced-lyrics.module";
 import {
   AiCifraAnalysisCompletedConsumer,
   AiCifraAnalysisFailedConsumer,
@@ -18,6 +19,7 @@ import { AiCifraUploadsController } from "./ai-cifra-uploads.controller";
   imports: [
     DatabaseModule,
     MusicLibraryModule,
+    SyncedLyricsModule,
     ...((process.env.AI_CIFRA_PROCESSING_TRANSPORT ?? "http") === "rabbitmq"
       ? [RabbitmqModule.forFeature()]
       : []),

@@ -19,7 +19,13 @@ import { Throttle } from "@nestjs/throttler";
 
 import { SearchAiCifraCatalogUseCase } from "../../core/ai-cifra/application/use-cases/search-ai-cifra-catalog/search-ai-cifra-catalog.use-case";
 import { MusifyPipedCatalogClient } from "../../core/ai-cifra/infra/audio-sources/musify-piped.catalog-client";
-import { AuthGuard, Roles, RolesGuard } from "../auth-module";
+import {
+  AuthGuard,
+  CurrentUserContextGuard,
+  Roles,
+  RolesGuard,
+} from "../auth-module";
+import { MusicianOwnershipGuard } from "../auth-module/ownership/musician-ownership.guard";
 import { SearchAiCifraCatalogResultPresenter } from "./ai-cifra.presenter";
 import { SearchAiCifraCatalogDto } from "./dto/search-ai-cifra-catalog.dto";
 
@@ -28,7 +34,12 @@ import { SearchAiCifraCatalogDto } from "./dto/search-ai-cifra-catalog.dto";
 // esse client, configurado só via env por request (não há estado a reter).
 @ApiTags("AI Cifra")
 @ApiBearerAuth("JWT-auth")
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(
+  AuthGuard,
+  RolesGuard,
+  CurrentUserContextGuard,
+  MusicianOwnershipGuard,
+)
 @Roles("musician", "admin")
 @Controller("musicians/:musician_id/ai-cifra")
 export class AiCifraSearchController {

@@ -28,6 +28,9 @@ import { SyncedLyricsRateLimitGuard } from "./synced-lyrics-rate-limit.guard";
   exports: [
     SYNCED_LYRICS_PROVIDERS.REPOSITORIES.SYNCED_LYRICS_REPOSITORY.provide,
     SYNCED_LYRICS_PROVIDERS.USE_CASES.GET_CHORD_SHEET_FOR_MUSIC_LIBRARY_USE_CASE.provide,
+    // Consumido por ai-cifra-module (Process/CompleteAiCifraAnalysisJobUseCase)
+    // -- ver Docs/AI-musician/chord-sheet.md "Alinhamento forçado (MMS_FA)".
+    SYNCED_LYRICS_PROVIDERS.USE_CASES.ALIGN_SYNCED_LYRICS_WORD_TIMESTAMPS_USE_CASE.provide,
   ],
 })
 export class SyncedLyricsModule {}
