@@ -32,11 +32,13 @@ import { InviteBandMemberUseCase } from "../../core/musician/application/use-cas
 import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { SetBandOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
+import { TransferBandLeadershipInput } from "../../core/musician/application/use-cases/transfer-band-leadership/transfer-band-leadership.input";
+import { TransferBandLeadershipUseCase } from "../../core/musician/application/use-cases/transfer-band-leadership/transfer-band-leadership.use-case";
 import { UpdateBandInput } from "../../core/musician/application/use-cases/update-band/update-band.input";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   BandOwnershipGuard,
   CurrentUser,
   CurrentUserContextGuard,
@@ -50,6 +52,7 @@ import { InviteBandMemberDto } from "./dto/invite-band-member.dto";
 import { RemoveBandMemberDto } from "./dto/remove-band-member.dto";
 import { SearchBandsDto } from "./dto/search-bands.dto";
 import { SetBandOpenToGigsDto } from "./dto/set-band-open-to-gigs.dto";
+import { TransferBandLeadershipDto } from "./dto/transfer-band-leadership.dto";
 import { UpdateBandDto } from "./dto/update-band.dto";
 
 @ApiTags("Bands")
@@ -86,6 +89,9 @@ export class BandsController {
 
   @Inject(SetBandOpenToGigsUseCase)
   private setBandOpenToGigsUseCase: SetBandOpenToGigsUseCase;
+
+  @Inject(TransferBandLeadershipUseCase)
+  private transferBandLeadershipUseCase: TransferBandLeadershipUseCase;
 
   @Post()
   @Roles("musician", "admin")
@@ -263,6 +269,37 @@ export class BandsController {
       band_id: id,
       musician_id: currentUser.userId,
     });
+    return BandsController.serialize(output);
+  }
+
+  @Patch(":id/leadership")
+  @Roles("musician", "admin")
+  @UseGuards(BandOwnershipGuard)
+  @ApiOperation({
+    summary: "Transferir liderança da banda",
+    description:
+      "Passa a liderança para outro integrante aceito. Só o líder atual (ou admin) transfere. É o único caminho para trocar quem decide pela banda — remover ou rebaixar o líder é bloqueado justamente para não deixar a banda sem quem aceite show.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: BandPresenter })
+  @ApiResponse({ status: 403, description: "Quem pede não é o líder atual" })
+  @ApiResponse({
+    status: 422,
+    description: "Sucessor não é membro aceito da banda",
+  })
+  async transferLeadership(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    band_id: string,
+    @Body() dto: TransferBandLeadershipDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const input = new TransferBandLeadershipInput({
+      band_id,
+      new_leader_musician_id: dto.new_leader_musician_id,
+      requesting_musician_id: currentUser.userId,
+      is_admin: currentUser.isAdmin,
+    });
+    const output = await this.transferBandLeadershipUseCase.execute(input);
     return BandsController.serialize(output);
   }
 

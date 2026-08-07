@@ -1,11 +1,14 @@
+import { S3Client } from "@aws-sdk/client-s3";
+import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+
+import { IMusicianStorage } from "../../core/musician/application/ports/musician-storage.interface";
 import { AcceptBandInviteUseCase } from "../../core/musician/application/use-cases/accept-band-invite/accept-band-invite.use-case";
 import { AddBandMemberUseCase } from "../../core/musician/application/use-cases/add-band-member/add-band-member.use-case";
 import { ClearMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
-import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
-import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
-import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import { CreateBandUseCase } from "../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
+import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeclineBandInviteUseCase } from "../../core/musician/application/use-cases/decline-band-invite/decline-band-invite.use-case";
 import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
@@ -18,24 +21,25 @@ import { RegisterPushTokenUseCase } from "../../core/musician/application/use-ca
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { SetBandOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
+import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
+import { TransferBandLeadershipUseCase } from "../../core/musician/application/use-cases/transfer-band-leadership/transfer-band-leadership.use-case";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
 import { UploadQrLogoUseCase } from "../../core/musician/application/use-cases/upload-qr-logo/upload-qr-logo.use-case";
+import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
-import { IMusicianStorage } from "../../core/musician/application/ports/musician-storage.interface";
+import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
+import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
 import { S3MusicianStorage } from "../../core/musician/infra/storage/s3-musician.storage";
 import { PlanCheckService } from "../../core/plans/domain/plan-check.service";
-import { EventEmitter2 } from "@nestjs/event-emitter";
-import { ConfigService } from "@nestjs/config";
-import AWS from "aws-sdk";
+import { IIdentityClaimsWriter } from "../../core/shared/application/identity-claims.interface";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { IGeocodingService } from "../../core/shared/domain/geocoding.service";
 import { HttpGeocodingService } from "../../core/shared/infra/geocoding/http-geocoding.service";
-import { BandPrismaRepository } from "../../core/musician/infra/db/prisma/band-prisma.repository";
-import { MusicianPrismaRepository } from "../../core/musician/infra/db/prisma/musician-prisma.repository";
+import { IDENTITY_CLAIMS_WRITER } from "../auth-module/auth.providers";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
 export const MUSICIAN_STORAGE_TOKEN = "MusicianStorage";
@@ -81,46 +85,59 @@ export const STORAGE = {
   MUSICIAN_STORAGE: {
     provide: MUSICIAN_STORAGE_TOKEN,
     useFactory: (configService: ConfigService): IMusicianStorage => {
-      const provider = configService.get<string>("ESTABLISHMENT_STORAGE_PROVIDER");
+      const provider = configService.get<string>(
+        "ESTABLISHMENT_STORAGE_PROVIDER",
+      );
       const region = configService.get<string>("AWS_REGION") ?? "us-east-1";
 
       const r2Endpoint = configService.get<string>("CLOUDFLARE_R2_ENDPOINT");
-      const r2AccessKey = configService.get<string>("CLOUDFLARE_R2_ACCESS_KEY_ID");
-      const r2SecretKey = configService.get<string>("CLOUDFLARE_R2_SECRET_ACCESS_KEY");
+      const r2AccessKey = configService.get<string>(
+        "CLOUDFLARE_R2_ACCESS_KEY_ID",
+      );
+      const r2SecretKey = configService.get<string>(
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+      );
       const r2Bucket = configService.get<string>("CLOUDFLARE_R2_BUCKET");
-      const r2PublicBaseUrl = configService.get<string>("CLOUDFLARE_R2_PUBLIC_BASE_URL") ?? null;
+      const r2PublicBaseUrl =
+        configService.get<string>("CLOUDFLARE_R2_PUBLIC_BASE_URL") ?? null;
 
       if (provider === "cloudflare_r2") {
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint: r2Endpoint,
-          accessKeyId: r2AccessKey,
-          secretAccessKey: r2SecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: r2AccessKey!,
+            secretAccessKey: r2SecretKey!,
+          },
+          forcePathStyle: true,
         });
         return new S3MusicianStorage(s3, r2Bucket!, r2PublicBaseUrl);
       }
 
-      const minioEndpoint = configService.get<string>("MINIO_ENDPOINT") ?? "localhost";
+      const minioEndpoint =
+        configService.get<string>("MINIO_ENDPOINT") ?? "localhost";
       const minioPort = configService.get<number>("MINIO_PORT") ?? 9000;
-      const minioAccessKey = configService.get<string>("MINIO_ACCESS_KEY") ?? "soundmeet";
-      const minioSecretKey = configService.get<string>("MINIO_SECRET_KEY") ?? "soundmeet123";
-      const minioBucket = configService.get<string>("MINIO_BUCKET") ?? "soundmeet-media";
-      const minioPublicEndpoint = configService.get<string>("MINIO_PUBLIC_ENDPOINT");
+      const minioAccessKey =
+        configService.get<string>("MINIO_ACCESS_KEY") ?? "soundmeet";
+      const minioSecretKey =
+        configService.get<string>("MINIO_SECRET_KEY") ?? "soundmeet123";
+      const minioBucket =
+        configService.get<string>("MINIO_BUCKET") ?? "soundmeet-media";
+      const minioPublicEndpoint = configService.get<string>(
+        "MINIO_PUBLIC_ENDPOINT",
+      );
       const minioPublicPort = configService.get<number>("MINIO_PUBLIC_PORT");
 
       if (provider === "minio" || !provider) {
         const endpoint = `http://${minioEndpoint}:${minioPort}`;
-        const s3 = new AWS.S3({
-          apiVersion: "2006-03-01",
-          signatureVersion: "v4",
+        const s3 = new S3Client({
           region,
           endpoint,
-          accessKeyId: minioAccessKey,
-          secretAccessKey: minioSecretKey,
-          s3ForcePathStyle: true,
+          credentials: {
+            accessKeyId: minioAccessKey,
+            secretAccessKey: minioSecretKey,
+          },
+          forcePathStyle: true,
         });
         const publicBaseUrl =
           minioPublicEndpoint && minioPublicPort && minioBucket
@@ -129,9 +146,11 @@ export const STORAGE = {
         return new S3MusicianStorage(s3, minioBucket, publicBaseUrl);
       }
 
-      const awsBucket = configService.get<string>("AWS_S3_BUCKET") ?? "soundmeet-media";
-      const cloudfrontUrl = configService.get<string>("AWS_CLOUDFRONT_URL") ?? null;
-      const s3 = new AWS.S3({ apiVersion: "2006-03-01", signatureVersion: "v4", region });
+      const awsBucket =
+        configService.get<string>("AWS_S3_BUCKET") ?? "soundmeet-media";
+      const cloudfrontUrl =
+        configService.get<string>("AWS_CLOUDFRONT_URL") ?? null;
+      const s3 = new S3Client({ region });
       return new S3MusicianStorage(s3, awsBucket, cloudfrontUrl);
     },
     inject: [ConfigService],
@@ -186,7 +205,10 @@ export const USE_CASES = {
       musicianRepo: IMusicianRepository,
       geocodingService: IGeocodingService,
     ) => {
-      return new SetMusicianTouringLocationUseCase(musicianRepo, geocodingService);
+      return new SetMusicianTouringLocationUseCase(
+        musicianRepo,
+        geocodingService,
+      );
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, GEOCODING_SERVICE_TOKEN],
   },
@@ -223,10 +245,13 @@ export const USE_CASES = {
   },
   CREATE_BAND_USE_CASE: {
     provide: CreateBandUseCase,
-    useFactory: (bandRepo: IBandRepository) => {
-      return new CreateBandUseCase(bandRepo);
+    useFactory: (
+      bandRepo: IBandRepository,
+      identityClaims: IIdentityClaimsWriter,
+    ) => {
+      return new CreateBandUseCase(bandRepo, identityClaims);
     },
-    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide, IDENTITY_CLAIMS_WRITER],
   },
   LIST_BANDS_USE_CASE: {
     provide: ListBandsUseCase,
@@ -281,7 +306,11 @@ export const USE_CASES = {
       musicianRepo: IMusicianRepository,
       planCheckService: PlanCheckService,
     ) => {
-      return new InviteBandMemberUseCase(bandRepo, musicianRepo, planCheckService);
+      return new InviteBandMemberUseCase(
+        bandRepo,
+        musicianRepo,
+        planCheckService,
+      );
     },
     inject: [
       REPOSITORIES.BAND_REPOSITORY.provide,
@@ -314,6 +343,13 @@ export const USE_CASES = {
     provide: RemoveBandMemberUseCase,
     useFactory: (bandRepo: IBandRepository) => {
       return new RemoveBandMemberUseCase(bandRepo);
+    },
+    inject: [REPOSITORIES.BAND_REPOSITORY.provide],
+  },
+  TRANSFER_BAND_LEADERSHIP_USE_CASE: {
+    provide: TransferBandLeadershipUseCase,
+    useFactory: (bandRepo: IBandRepository) => {
+      return new TransferBandLeadershipUseCase(bandRepo);
     },
     inject: [REPOSITORIES.BAND_REPOSITORY.provide],
   },

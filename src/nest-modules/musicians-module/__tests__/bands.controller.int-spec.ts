@@ -10,6 +10,7 @@ import { InviteBandMemberUseCase } from "../../../core/musician/application/use-
 import { ListBandsUseCase } from "../../../core/musician/application/use-cases/list-bands/list-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { SetBandOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
+import { TransferBandLeadershipUseCase } from "../../../core/musician/application/use-cases/transfer-band-leadership/transfer-band-leadership.use-case";
 import { UpdateBandUseCase } from "../../../core/musician/application/use-cases/update-band/update-band.use-case";
 import { Band, BandId } from "../../../core/musician/domain/band.aggregate";
 import { IBandRepository } from "../../../core/musician/domain/band.repository";
@@ -97,6 +98,12 @@ describe("BandsController Integration Tests", () => {
           provide: SetBandOpenToGigsUseCase,
           useFactory: (repo: IBandRepository) =>
             new SetBandOpenToGigsUseCase(repo),
+          inject: ["BandRepository"],
+        },
+        {
+          provide: TransferBandLeadershipUseCase,
+          useFactory: (repo: IBandRepository) =>
+            new TransferBandLeadershipUseCase(repo),
           inject: ["BandRepository"],
         },
       ],
