@@ -15,6 +15,10 @@ export type AsaasPaymentWebhookPayload = {
   netValue: number;
   billingType: string;
   status: string;
+  /** Presente quando o pagamento pertence a uma assinatura recorrente. */
+  subscription?: string | null;
+  /** Id do customer no Asaas (dono do pagamento). */
+  customer?: string | null;
 };
 
 export type AsaasTransferWebhookPayload = {
