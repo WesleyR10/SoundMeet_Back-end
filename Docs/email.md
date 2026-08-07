@@ -159,6 +159,8 @@ O `MailModule` é global — qualquer outro módulo NestJS pode injetar `MailSer
 | ✅ | Templates e métodos de serviço para verificação, troca, booking e boas-vindas |
 | ⏳ | Integração Keycloak Admin API para troca de email (chamar `execute-actions-email` no novo endereço) |
 | ⏳ | `MailEventHandler` para `*CreatedEvent` → envio do welcome email (requer wiring do `DomainEventMediator` nos create use-cases) |
+| ✅ | **Booking confirmado/cancelado → e-mail para músico E estabelecimento** — `NotificationsSchedulingEventsHandler` (Bloco 9.5, 07/ago/2026). Os templates existiam desde sempre sem chamador; `BookingEventsHandlers` só logava. Best-effort: falha de e-mail não desfaz o booking, e falha num destinatário não impede o outro. |
+| ✅ | **Inquiry criada/aceita/recusada → tempo real** (socket + push), deliberadamente **sem** e-mail: é negociação, não comprovante. O estabelecimento recebe na room `establishment:<id>`, nova no mesmo bloco. |
 | ⏳ | Emails de saque PIX (`WithdrawalRequestedEvent`) |
 | ⏳ | Emails para músico e estabelecimento verificados por admin |
 | ⏳ | Template e método `weekly-musician-report.tsx` (Bloco 7) |

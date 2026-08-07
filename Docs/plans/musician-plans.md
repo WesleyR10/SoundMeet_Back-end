@@ -117,14 +117,29 @@ src/core/plans/domain/plan-features.config.ts → MUSICIAN_PLAN_FEATURES
 
 ## Features pendentes de implementação
 
+> **Revisado em 06/ago/2026.** Esta tabela estava congelada em jun/2026 e listava como *Pendente*
+> sete itens que já haviam sido concluídos nos Blocos 4C/4D — inclusive Repertório e Play Mode,
+> que estão em produção no app desde jul/2026. Reverificar contra o código antes de reintroduzir
+> qualquer linha aqui.
+
 | Feature | Status | Bloco Roadmap |
 |---------|--------|---------------|
-| Repertório/Setlist domain | Pendente | 4D.1–4D.4 |
-| Play Mode (tela ao vivo) | Pendente | 4D.2 |
-| Banner generation (templates) | Pendente | 4D.5 |
-| Progress bar de saque (UX) | Pendente | 4D.7 |
-| Billing anual | Pendente | 4D.8 |
-| Enforcement analytics (4C.1) | Pendente | 4C.1 |
-| ~~Enforcement QR custom (4C.4)~~ | Concluído jul/2026 — persistência, output e gate (402) corrigidos | 4C.4 |
-| Enforcement split banda (4C.6) | Pendente | 4C.6 |
-| Enforcement saque config (4C.2) | Pendente | 4C.2 |
+| Repertório/Setlist domain | ✅ Concluído — `src/core/repertoire/` + 14 endpoints | 4D.1 |
+| Play Mode (tela ao vivo) | ✅ Concluído — `PlayModeScreen` no mobile (Bloco 7) | 4D.2 |
+| ⚠️ Enforcement analytics | **Soft gate, não bloqueia.** `GetMusicianAnalyticsUseCase` chama `getMusicianFeatures()` e só **reporta** `realtime_available` no output — **não existe `assert` algum**, e o músico FREE recebe exatamente os mesmos dados (pedidos aceitos/rejeitados, total de gorjetas, top músicas). Decidir: é o desenho pretendido (diferencial = stream realtime, que também não existe ainda) ou falta o gate? | 4C.1 |
+| Enforcement saque config | ✅ Concluído — `getMusicianWithdrawalConfig()` em `WithdrawToPixUseCase` | 4C.2 |
+| Enforcement QR custom | ✅ Concluído jul/2026 — persistência, output e gate (402) corrigidos | 4C.4 |
+| Enforcement split banda | ✅ Concluído — gate em `AddBandMemberUseCase` (role `leader`) | 4C.6 |
+| Billing anual | ✅ Concluído — `BillingCycle` no aggregate + pricing config + gateway Asaas | 4D.8 |
+| Progress bar de saque (UX) | ✅ Concluído — `WithdrawProgressBar` no mobile (Bloco 5.5) | 4D.7 |
+| **Banner generation (templates)** | ⏳ Pendente — o **gate já existe** (`assertMusicianCanGenerateBanner` em `plan-check.service.ts`), falta a feature que o chamaria | 4D.5 |
+| ⚠️ `api_access` | **Flag existe, nunca é lida** — só aparece na união de tipos de `plan-check.service.ts`. Não há noção de API key no código | — |
+| ⚠️ `white_label` | **Flag existe, nunca é lida** — idem | — |
+
+> **Auditoria de gates (06/ago/2026).** Dos 18 campos de `MusicianPlanFeatures`, **13 são realmente
+> aplicados** (repertórios, músicas por repertório, QR custom, membros de banda, split automático,
+> compartilhamento e convite de repertório, cifras pessoais, comunidade, taxa de gorjeta, mínimo e
+> prazo de saque). `banner_generation_per_month` tem gate pronto sem feature. `music_library_access`
+> é `true` em todos os tiers por decisão de produto. `tuner_noise_filter` é aplicado no cliente
+> (mobile), por desenho. Os problemas reais são os 3 marcados com ⚠️ acima.
+> **O lado do estabelecimento está bem pior** — ver [establishment-plans.md](establishment-plans.md).

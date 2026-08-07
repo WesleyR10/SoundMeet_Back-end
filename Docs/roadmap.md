@@ -109,7 +109,7 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 > **Decisões de design:** pedidos ilimitados em todos os planos (removido gate de request); busca e chat com músicos ilimitados para estabelecimentos.  
 > **Taxa de gorjeta:** 9% FREE / 7% ESSENTIAL / 5% PRO (1% gateway incluso). Saque mínimo: R$110 / R$70 / R$50. Prazo: 5 / 3 / 1 dia útil.
 
-- [x] **4C.1** Analytics em tempo real — `GetMusicianAnalyticsUseCase` com `assertMusicianFeature(musician_id, "realtime_analytics")` + endpoint `GET /musicians/:id/analytics`; FREE → `realtime_available: false`; ESSENTIAL/PRO → dados em tempo real
+- [~] **4C.1** Analytics em tempo real — endpoint `GET /musicians/:id/analytics` ✅. **⚠️ Correção (06/ago/2026, auditoria de gates):** a descrição anterior afirmava que `GetMusicianAnalyticsUseCase` chama `assertMusicianFeature(musician_id, "realtime_analytics")` — **isso nunca foi verdade**. O use-case chama `getMusicianFeatures()` e apenas **reporta** `realtime_available` no output; não há `assert` e nenhum dado é retido. O músico FREE recebe os mesmos `accepted_requests_count`/`rejected_requests_count`/`total_tips_amount`/`top_requested_songs` do PRO. Na prática é um **soft gate**: o diferencial prometido é o stream em tempo real, que também não existe (não há WebSocket de analytics). Decidir se o gate deve ser aplicado de fato ou se a promessa sai da tabela de preços — ver Bloco 9.7
 - [x] **4C.2** Saque (withdrawal) — `getMusicianWithdrawalConfig(musician_id)` em `WithdrawToPixUseCase`; mínimos por plano: FREE R$110/5d · ESSENTIAL R$70/3d · PRO R$50/1d
 - [x] **4C.3** ~~Busca de músicos por estabelecimento (gate removido — busca ilimitada em todos os planos por decisão de produto jun/2026)~~
 - [x] **4C.4** QR Code personalizado — `CustomizeQRCodeUseCase` com `assertMusicianFeature(musician_id, "custom_qr_code")`; `QRCustomization` VO (cores, logo, label); endpoint `POST /musicians/:id/qr-code/customize` (PRO only). **jul/2026: corrigido** — a customização não persistia (coluna faltando no Prisma), não era devolvida no output/presenter, `customizeQRCode()` substituía em vez de fazer merge (perdia logo ao trocar só a cor), e o gate de plano (`PlanLimitExceededError`) caía em HTTP 500 genérico por não ser tratado no `GlobalExceptionFilter` (agora mapeado para 402). Endpoint de upload de logo dedicado adicionado: `POST /musicians/:id/qr-code/logo`. **jul/2026 (2ª rodada, auditoria):** `QRCode.validate()` agora rejeita pares foreground/background de contraste insuficiente (`hasSufficientQrContrast`, fórmula WCAG, `InvalidArgumentError` → 422) — antes nada impedia salvar um QR permanente ilegível; `customizeQRCode()` passou a aceitar `QRCustomizationPatch` (semântica JSON merge patch — `null` remove a chave/reverte ao padrão, ausente mantém), já que o merge-sempre anterior não deixava reverter um campo isoladamente; `CustomizeQRCodeDto.logo_url` só aceita `null` agora (setar uma URL string é rejeitado) — antes o DTO aceitava qualquer URL externa via `@IsUrl()`, contornando a validação de tamanho/mimetype do upload dedicado.
@@ -205,6 +205,12 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 - [ ] **6.4** Tuning Demucs — [audio-separation.md](AI-musician/audio-separation.md). **jul/2026, esclarecimento:** o Demucs já roda em produção em toda análise real de áudio (`/v2/analyze` → `ChordInferenceServiceV12`, `separation_method="demucs"` como default, extrai o stem harmônico `bass+other` antes do ChordFormer inferir os acordes — ganho já medido em ablação: "+0.8pp sevenths" vs. mix cru). O que falta não é integração, é o *tuning* de `segment`/`overlap` (trade-off tempo/custo de GPU vs. qualidade da separação) — item de otimização incremental, sem urgência de produto.
 - [x] **6.5** **(jul/2026, durante o Bloco 7 mobile)** Ponte pipeline → catálogo, achado durante a investigação do fluxo "buscar cifra" do mobile: `CompleteAiCifraAnalysisJobUseCase` (chamado por `POST /ai-cifra/internal/analyses/:id/complete`, o worker Python) gravava `bpm/key/chords/segments` só no aggregate `AiCifraAnalysisJob.result` — **nada escrevia de volta em `MusicLibrary.chords/structure_segments/bpm/key`**, que é o que `GET /music-library/:id/chord-sheet` realmente lê. Só o script CLI offline `preload-chord-sheets-top-100.ts` fazia essa ponte, via Prisma cru, pulando a camada de domínio. Resultado prático: completar uma análise via `from-provider/analyses` nunca preenchia a cifra de verdade. Corrigido injetando `UpdateMusicLibraryUseCase` (já existia, reaproveitado) em `CompleteAiCifraAnalysisJobUseCase` — escreve best-effort (falha aqui não desfaz a conclusão do job) quando `upload.music_library_id` está setado. Testes novos em `complete-ai-cifra-analysis-job.use-case.spec.ts`.
 - [x] **6.6** **(jul/2026, durante o Bloco 7 mobile)** Endpoint novo `GET /musicians/:musician_id/ai-cifra/search?query=&limit=` (`AiCifraSearchController`) — busca por texto livre (título/artista) via `MusifyPipedCatalogClient.searchVideos`, que já existia mas só era chamado por um script CLI offline, nunca por HTTP. Alimenta o fluxo mobile de "buscar cifra por nome ou cantor" (Bloco 7): resultado → `POST /music-library/items` (cria o item, cliente já sabe o id) → `POST .../from-provider/analyses` (com o id, ativa o `updateCatalogSource`) → poll `GET /ai-cifra/analyses/:id` → cifra populada via 6.5. Throttle `10s/15req` por músico. Testes em `search-ai-cifra-catalog.use-case.spec.ts`.
+- [x] **6.7** **(jul/2026, auditoria de precisão do alinhamento acorde↔letra, disparada por pedido do usuário de revisar a abordagem antes de construir a tela de cifra no mobile)** Quatro achados corrigidos, ver [chord-sheet.md](AI-musician/chord-sheet.md) pros detalhes completos de cada um:
+  - **Modo A implementado de verdade** — antes não existia ASR/forced-alignment nenhum no código (só `hasWordLevelTimings`/`coerceLineWords` já preparados pra consumir, sem produtor). Novo `POST /v1/align-lyrics` no worker (`app/lyrics_alignment_service.py`, pacote `ctc-forced-aligner` do HuggingFace — modelo `MahmoudAshraf/mms-300m-1130-forced-aligner` — sobre stem de voz do Demucs) + `AlignSyncedLyricsWordTimestampsUseCase` (`core/synced-lyrics`), disparado de `ProcessAiCifraAnalysisJobUseCase`/`CompleteAiCifraAnalysisJobUseCase` logo antes do `deleteObject` do áudio. **Não validado empiricamente** (escrito sem GPU/torch no ambiente) — precisa rodar contra áudio real antes de confiar em produção. **Limitação arquitetural real:** só funciona se a letra já estiver sincronizada no momento em que a análise de acordes termina (áudio é apagado logo depois, sem segunda chance) — não é uma limitação deste use-case, é da política de retenção de áudio já existente. **Correção (3ª rodada, pergunta direta do usuário — "mas do LRC ela já não vem separada?"):** a 2ª rodada concatenava todas as linhas antes de mandar pro aligner (1 chamada, áudio+texto inteiros) e reconstruía as linhas de volta contando palavras — jogava fora a fronteira de linha que o LRC já dá, e a reconstrução tinha um risco real não verificado (romanização podia não preservar 1:1 a contagem de palavras do texto concatenado, atribuindo palavra à linha errada silenciosamente). Corrigido pra alinhar linha por linha, cada uma contra seu próprio recorte de áudio (janela do LRC + 500ms de folga) — sem concatenação, sem reconstrução, ver [chord-sheet.md](AI-musician/chord-sheet.md) "Estado da implementação — Modo A".
+  - **Genius parou de violar a própria regra de compliance do projeto** — `SyncSyncedLyricsForMusicLibraryUseCase` fazia scrape da letra completa da página do Genius e persistia como LRC sintética; agora só captura metadado (`song_id`/`url`) pra link-out, nunca o texto.
+  - **`duration_mismatch`** — `pickBestLyrics` (auto-sync) não pontuava duração ao escolher entre candidatos LRCLIB, diferente do endpoint irmão de busca manual; podia casar letra de versão errada da música sem penalidade. Agora usa a mesma fórmula de bucket dos dois lados; divergência `>12s` vira `quality_flag`. **Débito fechado (jul/2026, 3ª rodada):** `MusicLibrary.duration_seconds` nunca era escrito por nenhum use-case do pipeline — adicionado `MusicLibrary.changeDurationSeconds()` (aggregate) + campo em `UpdateMusicLibraryInput` + repasse de `result.artifacts.duration_seconds` (já devolvido pelo worker em `/v1` e `/v2/analyze`) nos dois caminhos de conclusão de análise (`ProcessAiCifraAnalysisJobUseCase`/`CompleteAiCifraAnalysisJobUseCase`, mesmo padrão de `chords`/`bpm`/`key`). Testes de regressão em ambos + `music-library.aggregate.spec.ts`.
+  - **Config de deploy do v22 corrigida** — `envs/.env.example` apontava `/v1/analyze` (legado) enquanto `docker-compose.yml` raiz já apontava `/v2/analyze`; `ai-cifra-mir-worker/docker-compose.yml` (compose standalone do worker) também corrigido + comentário apontando o compose raiz como fonte de verdade. `AI_CIFRA_ENABLE_V12` (nunca lido em `main.py`) removido dos dois profiles do compose raiz.
+  - **🔴 Bug crítico achado e corrigido (revisão pós-implementação, a pedido do usuário):** `ProcessAiCifraAnalysisJobUseCase` — o caminho SÍNCRONO de conclusão de análise, usado por padrão via `AI_CIFRA_PROCESSING_TRANSPORT=http` (valor default em `envs/.env.example`) — **nunca chamava `UpdateMusicLibraryUseCase`**, ao contrário do que o item 6.5 (acima) parecia ter corrigido "de vez": 6.5 só emendou o caminho irmão (`CompleteAiCifraAnalysisJobUseCase`, usado no modo webhook/RabbitMQ). Resultado prático: no transporte padrão, terminar uma análise de cifra podia nunca escrever `bpm/key/chords/structure_segments` em `MusicLibrary` — e `GET .../chord-sheet` lê direto de lá, não do job. Corrigido espelhando a mesma ponte best-effort no caminho síncrono; teste de regressão em `process-ai-cifra-analysis-job.use-case.spec.ts` prova a gravação. **Precedente:** já é a terceira vez que um "fix" documentado como concluído (6.5) na verdade só cobria metade dos dois caminhos de conclusão gêmeos deste módulo — vale conferir os dois sempre que mexer em qualquer coisa pós-análise aqui.
 
 ---
 
@@ -242,18 +248,18 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 - [x] **7.6** **Afinador cromático** — completo (jul/2026): backend (7.6a) + mobile (Bloco 8 do roadmap-mobile: detecção MPM via react-native-pitchy, modos Guitarra/Cromático, gate do filtro de ruído):
   - [x] **7.6a** Adicionar `tuner_noise_filter: boolean` em `MusicianPlanFeatures` e `plan-features.config.ts`
   - Posicionamento: "já no app, sem trocar de contexto" — entry point do ritual pré-show  
-  - Frontend + mobile: ver [roadmap-frontend.md](roadmap-frontend.md) (7.6b/7.6c/7.6d)
+  - Mobile: ✅ concluído — `TunerScreen` (modos Guitarra/Cromático, MPM via `react-native-pitchy`), ver [roadmap-mobile.md](../../soundmeet-mobile/Docs/roadmap-mobile.md) Bloco 8
 - [x] **7.7** **Cardápio PDF do Estabelecimento** — confirmação de descoberta no perfil (todos os planos):
   - [x] **7.7a** Prisma: `menu_pdf_url String?` e `menu_pdf_updated_at DateTime?` em `EstablishmentProfile`
   - [x] **7.7b** Aggregate: `changeMenuPdf(url, updatedAt)` + `clearMenuPdf()` em `EstablishmentProfile`
   - [x] **7.7c** `POST /api/v1/establishments/:id/menu-pdf` — Multer diskStorage → fileFilter MIME (camada 1) + `file-type` v20 dynamic import nos bytes reais (camada 2) → Cloudflare R2 → salva URL; limite 5MB; ownership guard; armazenado em `establishments/{name-slug}/{id}/menu-pdf/menu-{ts}.pdf`
   - [x] **7.7d** `DELETE /api/v1/establishments/:id/menu-pdf` — remove do R2 + limpa campos no perfil
   - [x] **7.7e** Presenter atualizado (`menu_pdf_url`, `menu_pdf_updated_at`); `IEstablishmentStorage` port + `S3EstablishmentStorage` + providers
-  - Viewer inline e aviso de PDF desatualizado: ver [roadmap-frontend.md](roadmap-frontend.md) (7.7)
+  - Upload/gestão do cardápio pelo dono: fatia **W1** de [roadmap-web.md](roadmap-web.md) (o estabelecimento é web-only). Leitura pelo fã: ✅ mobile abre via `Linking.openURL` (roadmap-mobile 11.5). Aviso de PDF desatualizado (>30 dias) segue pendente nos dois — o campo `menu_pdf_updated_at` já é persistido
 - [x] **7.8** **Badge "Aberto agora"** — backend completo:
   - [x] **7.8a** Campo calculado `is_open_now: boolean` no `EstablishmentOutputMapper.toOutput()` via `OperatingHours.isOpenAt(now, dateTimeService)` — presente em todos os outputs de establishment
   - [x] **7.8b** `IDateTimeService` / `LuxonDateTimeService` injetado em `EstablishmentsModule`; passado para `ListEstablishmentsUseCase` e `GetEstablishmentUseCase`; cálculo com timezone correto (UTC)
-  - Badge e formulário de horários no dashboard: ver [roadmap-frontend.md](roadmap-frontend.md) (7.8c/7.8d)
+  - Formulário de horários (dono) e badge "Aberto agora" no dashboard: fatia **W1** de [roadmap-web.md](roadmap-web.md). ⚠️ O `is_open_now` já sai em todos os outputs de establishment, mas **nenhuma plataforma tem UI para o dono preencher `operating_hours`** — na prática o campo é `null` para todo mundo, então o badge nunca acende. É o maior valor/esforço do web v1
 - [ ] **7.11** **Missão de gamificação: compartilhamento social com Instagram** — público grava/envia clipe do evento no SoundMeet e compartilha no Instagram marcando músico e estabelecimento:
   - **Mecânica decidida (jun/2026):** sem integração direta com API do Meta (restrição de aprovação); fluxo é "grave/suba no SoundMeet → app gera card compartilhável com @handles do músico e do estabelecimento → usuário abre Instagram Stories/Feed manualmente e posta"
   - **Verificação:** usuário envia print/link do post como prova → moderação automática (hash de imagem) ou manual → XP creditado
@@ -277,8 +283,9 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - [x] **7.13d** **Modo turnê temporário (16/jul/2026, implementado por decisão explícita — item estava marcado como futuro):** investigação disparada por dúvida do usuário sobre músico temporariamente em outra cidade confirmou que, antes desta tarefa, atualizar o endereço do perfil (`PATCH :id/profile`) já tornava o músico localizável na cidade nova imediatamente — mas **sobrescrevendo** a base permanente (sem expiração, sem reverter sozinho, e se a geocodificação falhasse ele sumia de **todas** as buscas). Implementado um segundo ponto de busca opcional, com expiração automática (máx. 30 dias, `MAX_TOURING_DAYS` em `musician-profile.aggregate.ts`), somado à base permanente (nunca a substitui): `MusicianProfile.touring_location`/`touring_expires_at` + `setTouringLocation()`/`clearTouringLocation()`/`isTouring` (expiração computada em leitura, mesmo padrão de `Subscription.isActive()` — sem cron). Colunas denormalizadas `touring_lat/touring_lng/touring_expires_at` em `MusicianProfile` (migration `20260716120000_add_musician_touring_location`, mesmo padrão do 7.13c). `searchByProximity` (Prisma + in-memory) passou a considerar os dois pontos (base OU turnê ativo), usando a menor distância. Endpoints `PATCH /musicians/:id/touring-location` (`SetMusicianTouringLocationUseCase` — geocodifica se faltar lat/lng, mas **aqui a falha de geocodificação BLOQUEIA** o save, ao contrário do update de perfil best-effort: sem coordenadas o modo turnê não tem função nenhuma) e `DELETE /musicians/:id/touring-location` (`ClearMusicianTouringLocationUseCase`); `MusicianOwnershipGuard` aplicado. `MusicianProfileOutput` ganhou `touring_location`/`touring_expires_at`/`is_touring`.
   - Desbloqueia: `soundmeet-mobile/Docs/roadmap-mobile.md` Bloco 11.3/11.4 (feed de descoberta e busca do fã) sem depender do fallback por `location_city`
 
-- [ ] **7.14** **Navegação de repertório para o público** — `MusicLibraryController` é `@Roles("musician","admin")` na classe inteira; um fã não pode ver o catálogo de um músico pra escolher a música ao pedir:
-  - [ ] **7.14a** Relaxar `GET /music-library/items` e `GET /music-library/items/:id` para role `audience`, escopado a `musician_id` de um perfil público e apenas itens não-privados (definir flag de visibilidade se não existir), ou criar endpoint dedicado `GET /musicians/:id/repertoire` (`@Public` ou `audience`-only)
+- [x] **7.14** ✅ **Concluído em 07/ago/2026 (Bloco 9.6c)** — `GET /musicians/:musician_id/repertoire` (`@Public()`) com `PublicMusicLibraryItemPresenter`: só metadado (título, artista, gênero, dificuldade, duração), controller próprio em vez de afrouxar o genérico, allowlist explícita com teste de regressão. **Navegação de repertório para o público** — `MusicLibraryController` é `@Roles("musician","admin")` na classe inteira; um fã não pode ver o catálogo de um músico pra escolher a música ao pedir:
+  - [x] **7.14a** Resolvido pelo **endpoint dedicado** (a segunda opção listada aqui), não pelo afrouxamento da rota genérica: relaxar `MusicLibraryController` exigiria lembrar em toda mudança futura de não deixar `chords`/`lyrics` escaparem no presenter. O controller novo nasce com um presenter que só sabe montar metadado.
+  - **Escopo revisado (jul/2026, decisão do usuário durante auditoria):** `MusicLibrary.musicianId` é obrigatório no schema — cada item pertence a um músico específico, não é catálogo global. Com o modelo de IA de cifra ainda em treino, a maioria dos itens hoje tem só `title`/`artist` preenchidos, sem `chords`/`chord_sheet`/`lyrics`. Por isso o endpoint deve expor **só metadado de busca** (título, artista, gênero, difficulty) — **nunca** `chords`/`chord_sheet`/`lyrics`/`notes` — via um `PublicMusicLibraryPresenter` novo (mesmo padrão do `PublicMusicianPresenter`, Bloco 1.d). Mesma filosofia da busca que o músico já usa (`GET /musicians/:id/ai-cifra/search`, Bloco 6.6): identificar a música antes de qualquer conteúdo de cifra existir. Endpoint dedicado (`GET /musicians/:id/repertoire`, exigindo `musician_id` — nunca lista solta) é mais seguro que relaxar a rota genérica, evita vazar campo sensível por engano na resposta.
   - Desbloqueia: `soundmeet-mobile/Docs/roadmap-mobile.md` Bloco 11.8 (`SongRequestScreen` com catálogo navegável em vez de só free-text/sugestões)
 
 - [ ] **7.15** **Validação de QR de estabelecimento** (baixa prioridade — não expandir escopo agora) — `ScanQRUseCase` (`src/core/audience/application/use-cases/scan-qr/scan-qr.use-case.ts`) só valida o esquema `soundmeet://musician/<uuid>`; se/quando check-in de estabelecimento via QR virar feature real, espelhar a mesma validação atômica + anti-abuso (5 scans/dia) para `soundmeet://establishment/<uuid>`. Registrar aqui apenas para não perder o rastro — não detalhar sub-tarefas até haver decisão de produto.
@@ -295,7 +302,7 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - [x] **7.18d** Fluxo OAuth: `GET /musicians/:id/google-calendar/connect` (ownership guard; URL de consentimento com escopo mínimo `calendar.events`+`openid email`, `access_type=offline`+`prompt=consent`, `state` HMAC-assinado c/ nonce+exp 10min) → callback **rota fixa** `GET /google-calendar/oauth/callback` (`@Public()` — o Google exige redirect URI exato, por isso não aninhada; `musician_id` viaja no state assinado, validado ANTES da troca do code) → `ConnectGoogleCalendarUseCase` (upsert por musician_id, reconexão preserva id/histórico). + `GET .../status` e `DELETE .../` (revogação best-effort + tokens zerados sempre)
   - [x] **7.18e** Sync assíncrono via RabbitMQ (trio dispatcher/consumers/rabbitmq no padrão synced-lyrics, channel `google_calendar_sync` prefetch 5, 2 filas — confirmed/cancelled): `GoogleCalendarSyncEventsHandler` escuta `BookingConfirmedEvent`/`BookingCancelledEvent` **cross-module via EventEmitter2** (precedente do notifications-module — scheduling-module ficou 100% intocado, zero acoplamento) e só enfileira; erros engolidos+logados (emitAsync propagaria pro fluxo de booking). `GoogleCalendarAuthError` adicionado a `NON_RETRIABLE_ERRORS` (token revogado → DLX direto, integração desativada). Transporte `GOOGLE_CALENDAR_SYNC_TRANSPORT` (`noop` default — inerte até ligar)
   - [x] **7.18f** Use cases do consumer: `SyncBookingConfirmedToGoogleCalendarUseCase` (resolve músico direto ou líder via `Band.members`, no-op se não conectado/sem líder/booking não mais confirmado; compensação da corrida confirm×cancel entre filas — re-check pós-create deleta evento órfão; título enriquecido best-effort com nome do estabelecimento) e `SyncBookingCancelledToGoogleCalendarUseCase` (fonte autoritativa = registro de sync, **não** re-resolve líder — troca de liderança não aponta pra agenda errada)
-  - [x] **7.18g** Testes: 15 suítes novas, 93 casos (criptografia incl. adulteração/IV único; aggregates; token service c/ refresh+revogação; connect/status/disconnect; os 2 syncs incl. banda-líder, idempotência, compensação de corrida; HTTP client c/ axios mockado incl. retry/409/404; state service incl. state forjado/expirado; dispatcher/consumers/handler; controllers incl. XSS escape no callback). Suíte completa: 271/271, 2001/2001 ✅ (inclui fix de teste flaky pré-existente em `musician-profile-touring.aggregate.spec.ts` — dependia da data real)
+  - [x] **7.18g** Testes: 15 suítes novas, 93 casos (criptografia incl. adulteração/IV único; aggregates; token service c/ refresh+revogação; connect/status/disconnect; os 2 syncs incl. banda-líder, idempotência, compensação de corrida; HTTP client c/ axios mockado incl. retry/409/404; state service incl. state forjado/expirado; dispatcher/consumers/handler; controllers incl. XSS escape no callback). Suíte completa **na época**: 271/271, 2001/2001 ✅ (inclui fix de teste flaky pré-existente em `musician-profile-touring.aggregate.spec.ts` — dependia da data real). Baseline atual: **315 suítes / 2700 testes** (jul/2026, pós-8E)
   - **Pendente (pós-chaves reais):** teste manual E2E com client OAuth real do Google Cloud (connect → confirmar booking → evento na agenda → cancelar → evento some) e conferência de que nenhum token aparece nos logs do consumer
 - [x] **7.17** **Corrigido (jul/2026, revisão do Bloco 11):** `GET /gamification/leaderboard?limit=N` retornava **422 em toda chamada** — `GetLeaderboardInput.limit`/`level` (`get-leaderboard.input.ts`) tinham `@IsNumber()` sem `@Type(() => Number)`; como o `ValidationPipe` global não usa `enableImplicitConversion`, o valor de query string (`"20"`) nunca virava `number` antes da validação, e `@IsNumber` rejeitava a string. Todos os DTOs irmãos (`SearchEstablishmentsDto`, `SearchEventsDto`, `GetRequestSuggestionsInput`) já tinham esse `@Type`; só este ficou de fora. Corrigido adicionando `@Type(() => Number)` em ambos os campos; verificado com `plainToClass`+`validateSync` isolado (antes: `isNumber`/`min`/`max` falhavam; depois: `limit: 20` como `number`, zero erros) e suíte `gamification` completa (190/190 passando). Achado durante revisão de qualidade do `LeaderboardScreen` do fã, não estava documentado como item aberto antes.
 
@@ -303,45 +310,87 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 
 ### Bloco 8 — Cifra Pessoal e Comunidade de Cifras 🎸
 
-> Músico pode criar uma versão pessoal da cifra gerada pela IA (fork), editar livremente (transpor, adicionar notas, corrigir acordes) e opcionalmente compartilhar com a comunidade — que só pode visualizar. A original da IA permanece imutável.
+> O músico cria a versão **pessoal** de uma cifra gerada pela IA (fork), corrige os acordes que o modelo errou, escolhe tom/capotraste/complexidade e opcionalmente compartilha — com a banda ou com a comunidade. A cifra original da IA permanece imutável.
+
+> ⚠️ **O desenho antigo deste bloco foi superado.** A versão anterior previa copiar
+> `AiCifraAnalysisJob.chord_data` para dentro do fork, com `schema_version` e
+> `is_shared` booleano, em rotas `/chord-sheet-forks`. O que foi implementado é
+> diferente e melhor: **overlay de edições, não cópia**; `base_fingerprint` em
+> vez de `schema_version`; `share_scope` de três valores em vez de booleano;
+> `reconcile_status` para a re-análise da IA. O texto abaixo descreve o que
+> existe no código.
+
+#### Por que overlay e não cópia
+Copiar a cifra congela o fork na análise em que ele nasceu. Quando o modelo é
+retreinado e a música é re-analisada, o músico fica com uma cifra velha para
+sempre, ou perde as correções. Guardando **o que ele mudou**, as correções são
+reaplicadas sobre a análise nova e as que não ancoram viram conflito explícito.
 
 #### Regras de negócio
-- A cifra original (`AiCifraAnalysisJob.chord_data`) é **imutável** — nunca modificada pelo usuário
-- Cada músico pode ter **no máximo 1 fork por `music_library_id`**
-- Fork é **privado por padrão** (`is_shared = false`)
-- Fork compartilhado é **read-only** para todos os outros músicos
-- O músico pode **descompartilhar** a qualquer momento (volta a privado)
-- `schema_version` detecta incompatibilidade quando o modelo de IA é atualizado
-- Admin pode deletar qualquer fork (moderação)
+- A cifra original (`music_library.chord_sheet`) é **imutável** — o fork nunca a toca
+- Cada músico tem **no máximo 1 fork por `music_library_id`** (índice único no banco)
+- Fork é **privado por padrão**; escopos: `private` | `band` | `community`
+- Anotações pessoais (`notes`) **nunca** são visíveis para terceiros, nem na comunidade
+- Ler NÃO escreve: a re-análise é sinalizada (`base_changed`), nunca aplicada sozinha
+- Importar da comunidade **reancora** as correções contra a análise do importador
+- Admin pode remover qualquer fork (moderação/takedown)
 
-#### Domínio — `src/core/personal-chord-sheet/`
-- [ ] **8.1** Aggregate `PersonalChordSheet` com campos: `personal_chord_sheet_id`, `music_library_id`, `musician_id`, `chord_data` (JSON — mesmo schema do `AiCifraAnalysisJob`), `schema_version`, `notes`, `is_shared`, `shared_at`, `created_at`, `updated_at`
-- [ ] **8.2** `IPersonalChordSheetRepository` (interface + in-memory + Prisma)
-- [ ] **8.3** Use-cases:
-  - [ ] **8.3a** `CreatePersonalChordSheet` — valida unicidade `(musician_id, music_library_id)`; copia `chord_data` + `schema_version` do job AI mais recente
-  - [ ] **8.3b** `UpdatePersonalChordSheet` — ownership check; valida schema compatível
-  - [ ] **8.3c** `DeletePersonalChordSheet` — ownership check (admin bypass)
-  - [ ] **8.3d** `GetPersonalChordSheet` — retorna próprio fork ou fork público de outro músico
-  - [ ] **8.3e** `ListPersonalChordSheets` — lista do músico; filtra por `is_shared=true` para comunidade
-  - [ ] **8.3f** `SharePersonalChordSheet` — seta `is_shared = true`, `shared_at = now()`
-  - [ ] **8.3g** `UnsharePersonalChordSheet` — reverte para privado
-- [ ] **8.4** `PersonalChordSheet.fake()` builder + testes de domínio
+#### 8A — Fundação de teoria musical ✅
+- [x] **8A.1** `ChordSymbol` VO (`shared/domain/value-objects/chord-symbol.vo.ts`) — acorde como estrutura, não string. Aceita as duas notações que circulam no sistema: colon do worker MIR (`C:maj`, `B:hdim7`) e padrão/brasileira (`C7M`, `C#m7(b5)/G#`). `transpose()`, `respell()`, `simplify()`, `equalsEnharmonically()`, `pitchClasses`. Símbolo não parseável devolve `null` e o chamador **preserva o texto verbatim**
+- [x] **8A.2** `ChordEdit` e `ChordSheetViewSettings` VOs — o sinal de `transpose − capo` é a única conta de capotraste do repo
+- [x] **8A.3** `chord-alignment.service.ts` extraído do use-case base e delegado
+- [x] **8A.4** **Unificação do `ChordSymbol` (8E, jul/2026):** `get-chord-sheet-for-music-library.use-case.ts` mantinha uma segunda implementação de acordes — 7 métodos privados que conheciam 9 qualidades colon e só aplicavam grafia enarmônica no ramo colon. Substituídos por delegação ao VO, com testes de caracterização escritos **antes** do refactor. Três divergências corrigidas, todas visíveis para o músico:
+  - `C:dim7`, `B:hdim7`, `A:minmaj7`, `D:min6`, `F:maj6`, `G:9` saíam **crus, com dois-pontos** — a tabela antiga devolvia `null` e o símbolo vazava para o app
+  - notação de sufixo não era normalizada (`F7M` ficava `F7M` em vez de `Fmaj7`)
+  - a grafia por tonalidade **não era aplicada em acorde de sufixo** — e como o ChordFormer emite sufixo, na prática nenhum acorde dele recebia a grafia certa (`A#m7` em tom de Fá, onde o correto é `Bbm7`)
 
-#### Prisma schema
-- [ ] **8.5** Adicionar tabela `PersonalChordSheet` com índice único `(musician_id, music_library_id)` e índice em `is_shared` para listagem de comunidade
+#### 8B — Domínio, persistência e use-cases ✅
+- [x] **8B.1** Aggregate `PersonalChordSheet`: `edits[]` (overlay), `view`, `notes`, `share_scope`, `base_fingerprint`, `base_pipeline_version`, `reconcile_status`
+- [x] **8B.2** `IPersonalChordSheetRepository` (interface + in-memory + Prisma), **com o override de `SearchParams.filter`** — sem ele o repositório devolveria os dados de todos os usuários
+- [x] **8B.3** `chord-sheet-fingerprint.ts` (exclui `confidence`, string canônica) — o sinal real de "a IA re-analisou"
+- [x] **8B.4** `chord-sheet-overlay-applier.ts` — não muta o base, remapeia âncoras, 100% determinístico. Conflitos: `anchor_not_found`, `symbol_mismatch`, `ambiguous_match`, `unparseable_symbol`, `out_of_range`
+- [x] **8B.5** 14 use-cases (fork, get, view, list, apply/remove edits, view settings, notes, share/unshare, delete, check access, import, list community)
+- [x] **8B.6** `PersonalChordSheet.fake()` builder + testes de domínio
+- [x] **8B.7** Prisma model + migration `20260728150000_add_personal_chord_sheets`
 
-#### NestJS — `src/nest-modules/personal-chord-sheet-module/`
-- [ ] **8.6** Module, providers, controller, presenter, DTOs
-- [ ] **8.7** Endpoints protegidos:
-  - [ ] **8.7a** `POST /music-library/:id/chord-sheet-forks` — cria fork (`@Roles("musician")`)
-  - [ ] **8.7b** `GET /music-library/:id/chord-sheet-forks/mine` — meu fork (`@Roles("musician")`)
-  - [ ] **8.7c** `PATCH /chord-sheet-forks/:id` — edita meu fork (`@Roles("musician")` + ownership)
-  - [ ] **8.7d** `DELETE /chord-sheet-forks/:id` — deleta (`@Roles("musician", "admin")` + ownership)
-  - [ ] **8.7e** `POST /chord-sheet-forks/:id/share` + `DELETE /chord-sheet-forks/:id/share` — compartilhar / descompartilhar (`@Roles("musician")` + ownership)
-  - [ ] **8.7f** `GET /community/chord-sheet-forks` + `GET /community/chord-sheet-forks/:id` — browse público (`@Public()`)
-- [ ] **8.8** Testes de integração: create, update, share/unshare, acesso cruzado bloqueado, admin delete
+#### 8E — Exposição HTTP ✅ (jul/2026)
+- [x] **8E.1** `is_owner` **fail-closed**: obrigatório em `PersonalChordSheetOutputMapper.toOutput`. Era `?? true` com default no mapper — qualquer esquecimento numa rota de comunidade vazaria `notes` no JSON. Sem default, o mesmo esquecimento é erro de compilação
+- [x] **8E.1b** (29/jul/2026) **IDOR na rota do dono, encontrado em auditoria pós-entrega.** Obrigar o campo não bastou: `GET /musicians/:musician_id/personal-chord-sheets/:personal_chord_sheet_id` afirmava `is_owner: true` e o `GetPersonalChordSheetUseCase` só fazia `findById` — era o único use-case alcançado por rota do dono fora do `loadOwnedSheet`. O `MusicianOwnershipGuard` aprova a URL porque o `musician_id` É o do token; ele não sabe de quem é o fork do path. Um músico lia a cifra **privada** de outro, com `notes`, passando o próprio id na URL e o id alheio no sub-recurso. Corrigido trocando o input por `owner_musician_id` + `requesting_musician_id`: posse exigida via `loadOwnedSheet` e `is_owner` **derivado** do dono real. Os testes não pegaram porque o caso "terceiro lê fork privado → 403" só existia no controller de comunidade — agora existe nos dois, com o do use-case incluído
+- [x] **8E.2** Conflito `out_of_range` no applier: `insert_chord` fora da duração da música vira conflito em vez de entrar no timeline e deformar a cifra inteira via `normalizeTimeline`
+- [x] **8E.3** Read-model de listagem (`IPersonalChordSheetReadModel` + Prisma/in-memory): `edit_count` calculado com `jsonb_array_length` **no Postgres** — a coluna `edits` (até 500 edits ≈ 60 KB/linha) nunca sai do banco numa listagem
+- [x] **8E.4** Gating de plano — `max_personal_chord_sheets` (FREE: 3, demais: ilimitado) e `chord_sheet_community_sharing` (FREE: false) em `plan-features.config.ts`; `assertMusicianCanCreatePersonalChordSheet` em `PlanCheckService`. Grant-at-action: cobrado no fork e no import, **nunca na leitura** — quem cai de plano continua tocando as cifras que já tem. Compartilhar com a **banda** é core em todos os tiers
+  - ⚠️ **Quebra de assinatura:** o gate ficou DENTRO dos use-cases (padrão `CreateRepertoireUseCase`, "lógica de negócio no core"), então `ForkChordSheetUseCase`, `ImportCommunityChordSheetUseCase` e `SharePersonalChordSheetUseCase` passaram a receber `PlanCheckService` no construtor. Qualquer chamador novo precisa injetá-lo
+- [x] **8E.5** Módulo NestJS `personal-chord-sheet-module/` com 3 controllers:
+  - `musicians/:musician_id/personal-chord-sheets` (dono) — fork, list, get, chord-sheet, edits, view, notes, share/unshare, delete
+  - `community/personal-chord-sheets` (comunidade) — list, get, chord-sheet, import
+  - `admin/personal-chord-sheets` (moderação) — browse + takedown
+  - ⚠️ **Desvio consciente do desenho antigo (8.7f):** a navegação da comunidade era para ser `@Public()`. Ficou **autenticada** (`@Roles("musician","admin")`). Cifra da comunidade carrega **letra**, e a decisão 7.14 fixou que endpoint público nunca expõe `lyrics`/`chords` — publicar sem login contradiria isso e ampliaria o risco de licenciamento que o kill-switch existe para conter. Se um dia virar vitrine pública de aquisição, é decisão de produto **com** revisão de licenciamento, não um `@Public()` a mais
+- [x] **8E.6** Pares de banda resolvidos via `ListBandsUseCase` (`filter.musician_id`, achatando `members[]` com `status === "accepted"`) — sem isso `share_scope: "band"` seria aceito na escrita e ilegível na leitura
+- [x] **8E.7** Kill-switch `PERSONAL_CHORD_SHEET_COMMUNITY_ENABLED` (default `true`) — desliga a comunidade sem deploy (rotas de comunidade → 404); rotas do dono seguem intactas. Entradas em `config.schema.ts` e `envs/.env.example`
+- [x] **8E.8** Registrado em `app.module.ts` (24 módulos de feature)
+- [x] **8E.9** Testes:
+  - int-spec do módulo (fork/409/402, terceiro em fork privado → 403, fork community com `notes: null`, `owner_musician_id` na rota de comunidade, banda vs. estranho, takedown de admin, kill-switch ligado/desligado, `edit_count` sem `edits`)
+  - regressão do `MusicianOwnershipGuard` em rota aninhada de 3 ids (`ownership.int-spec.ts`)
+  - **spec ausente do `GetPersonalChordSheetUseCase`** — era o único dos 14 use-cases de 8B sem teste nenhum, justamente o que decide a redação de `notes`
+  - testes de caracterização de formatação de acorde (rede de proteção do 8A.4), escritos ANTES do refactor
+  - e2e `test/personal-chord-sheet/` contra Postgres real: fork → correção → overlay com transpose+capô → re-análise → `base_updated` sem write-on-read → share → leitura pela comunidade → import reancorado. É onde o `jsonb_array_length` do read-model roda de verdade
+  - Suíte: **315 suítes / 2700 testes** ✅ (baseline anterior 313/2638)
+- [x] **8E.10** `CHORD_EDIT_TYPES` exportado de `chord-edit.vo.ts` — a lista em runtime para o DTO validar sem repetir os literais (espelha `PERSONAL_CHORD_SHEET_SHARE_SCOPES`)
+- [x] **8E.11** Documentação: este bloco reescrito (o texto anterior descrevia o desenho superado e estava ativamente errado), seção **Personal Chord Sheet** nova em `business-rules.md` (não havia uma linha sobre cifra pessoal) e nota do módulo + 3 armadilhas em `CLAUDE.md`, com `personal-chord-sheet` acrescentado aos domínios e aos escopos de commit
 
-**Referência:** [AI-musician/chord-sheet.md](AI-musician/chord-sheet.md) · core `ai-cifra` (schema de `chord_data`)
+#### Armadilhas registradas (não repetir)
+- **Nunca `:id` para o sub-recurso.** `MusicianOwnershipGuard` resolve por `FALLBACK_PARAMS = ["musician_id","musicianId","id"]`; um `:id` de filho colide e dá 403 no dono legítimo. Sempre `:personal_chord_sheet_id` + `@OwnershipParam({ param: "musician_id" })`
+- **`owner_musician_id`, não `currentUser.userId`.** Nas rotas de comunidade, `GetPersonalChordSheetViewUseCase` precisa do id do DONO: a linha de `music_library` é dele e o use-case base lança `NotFoundError` se não bater
+- **`base_version` é coluna morta** — nunca populada, sempre 0. É advisory por desenho: `MusicLibrary.updateChords()` não incrementa versão, então quem detecta re-análise é `base_fingerprint`. Não usar como fast-path
+- **Os dois caminhos gêmeos de conclusão.** `CompleteAiCifraAnalysisJobUseCase` e `ProcessAiCifraAnalysisJobUseCase` são gêmeos; mudanças já cobriram só metade deles três vezes. Se 8C entrar com hook de invalidação de fork, tocar **os dois**
+
+#### Pendente
+- [ ] **8C** Reconciliação: `markBaseUpdated()` / `markReconciled()` / `clearEdits()` existem no agregado e **ainda não têm chamador de produção**. Precisa de use-case de reconciliação + hook de invalidação nos dois caminhos gêmeos de conclusão do ai-cifra
+- [ ] **8C.1** `POST /:id/report` (denúncia) — fora do escopo de 8E: não existe use-case de denúncia em 8B e criar um agregado de moderação inflaria a entrega. Takedown de admin + kill-switch cobrem a emergência
+- [~] **8D** UI no mobile — implementação completa em `soundmeet-mobile` (6 telas na `RepertoireStack`, editor de overlay, notas privadas/anotações públicas, compartilhamento, comunidade e import); typecheck/Expo config/100 testes limpos. Falta validação manual em device contra backend real antes de marcar `[x]`
+- [ ] **8F** Diagramas de digitação por instrumento (`ChordSymbol.pitchClasses` já existe para isso)
+
+**Referência:** [AI-musician/chord-sheet.md](AI-musician/chord-sheet.md) · `src/core/personal-chord-sheet/`
 
 ---
 
@@ -371,8 +420,8 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 | Gamificação (domínio)      | ✅                                                   |
 | Folha de cifra / IA        | ✅ sync/bulk/materialização (6.1–6.3); ~ tuning Demucs (6.4) |
 | Auth Keycloak              | ✅ JWT validado, guards aplicados, ownership completo (4B.1–4B.6), rate limit global |
-| Feature Gating (planos)    | ✅ Bloco 4C completo (4C.1–4C.10): analytics, saque, QR, split, multi-estabelecimento, campanhas |
-| Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — frontend em roadmap-frontend.md |
+| Feature Gating (planos)    | ~ **parcial (revisto 06/ago/2026)** — músico: 13 de 18 flags aplicadas de fato; estabelecimento: **só 2 de 6** (`promotional_campaigns`, `multi_establishment`). `advanced_analytics`, `api_access`, `max_qr_codes`, `white_label` existem no config e **nunca são lidas**; o limite "1 evento ativo no Free" não existe nem como flag. Ver Bloco 9.7 e [plans/establishment-plans.md](plans/establishment-plans.md) |
+| Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — sem UI de preenchimento em nenhuma plataforma; fatia W1 de [roadmap-web.md](roadmap-web.md) |
 | Dashboard estabelecimento  | ~ parcial                                            |
 | Chat integrado             | ✅ Bloco 7.1 completo (Conversation/Message, gateway `/chat`, push, 15 testes) **(corrigido jul/2026 — tabela estava desatualizada frente ao Bloco 7.1 acima)** |
 

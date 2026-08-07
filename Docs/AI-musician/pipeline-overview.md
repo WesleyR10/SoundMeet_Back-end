@@ -41,6 +41,8 @@ Cada bloco é independente e orquestrado via job/fila + worker (padrão já usad
 
 O worker atual usa **ChordFormer v12** para inferência de acordes a partir de áudio, sem separação obrigatória. Demucs e MT3 entram como evolução para maior fidelidade polifônica.
 
+**Alinhamento forçado letra↔áudio (jul/2026):** endpoint novo `POST /v1/align-lyrics` no mesmo worker (`app/lyrics_alignment_service.py`) — pacote `ctc-forced-aligner` (HuggingFace, modelo `MahmoudAshraf/mms-300m-1130-forced-aligner`, mesma família MMS/wav2vec2, romanização já embutida) sobre o stem de voz do Demucs, produz timestamps reais por palavra que alimentam o "Modo A" da folha de cifra (ver [chord-sheet.md](chord-sheet.md) "Estado da implementação — Modo A"). **Não validado empiricamente ainda** (escrito sem GPU/torch disponíveis) e só dispara quando a letra já está sincronizada no momento em que a análise de acordes termina — o áudio é apagado do storage logo depois, então não há segunda chance.
+
 ## Roadmap prático de estudo (referência)
 
 1. **Fundamentos** — álgebra linear, DSP (FFT, espectrogramas), harmonia, ritmo

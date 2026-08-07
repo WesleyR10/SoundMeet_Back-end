@@ -23,6 +23,10 @@ Marcações:
   **Invariante crítica — NUNCA quebrar:** o ID do aggregate criado (`musician_id` ou `audience_id`) é sempre **igual ao `sub`** do usuário no Keycloak. O sistema de ownership (`MusicianOwnershipGuard`/`AudienceOwnershipGuard`, Bloco 4B) compara `currentUser.userId` (== `sub` do JWT) diretamente contra o ID do recurso na URL — se um fluxo de criação de conta usar um ID diferente do `sub`, o ownership dessa conta quebra silenciosamente (o dono nunca consegue editar o próprio recurso). Qualquer novo fluxo de criação de `Musician`/`Audience` vinculado a uma conta Keycloak deve respeitar essa invariante.
   Detalhes de arquitetura em [auth/keycloak.md](auth/keycloak.md).
 - [x] Login por email/senha via `POST /api/v1/auth/login` (`src/core/auth/application/use-cases/login/login.use-case.ts`) — resolve `role`/`profile_id` consultando os repositórios locais por email, nunca decodificando o JWT no backend.
+- [x] Registro de estabelecimento via `POST /api/v1/auth/register-establishment` (`src/core/auth/application/use-cases/register-establishment/register-establishment.use-case.ts`, 06/ago/2026) — rota **separada** do `POST /auth/register`, que só aceita `musician`/`audience`. Antes disto não existia caminho nenhum para criar a primeira conta de estabelecimento: `POST /establishments` já exigia a role `establishment`.
+  **A invariante `aggregate_id == sub` NÃO se aplica aqui — e isso é deliberado.** Uma conta pode operar até 3 estabelecimentos, então o `Establishment` tem UUID próprio e quem autoriza o dono é o claim multivalorado `establishment_ids` (escrito via `IIdentityClaimsWriter`), lido pelo `EstablishmentOwnershipGuard`. Qualquer fluxo novo que crie `Establishment` vinculado a uma conta deve escrever esse claim — sem ele o dono fica trancado para fora do que acabou de criar.
+  Ordem importa: o claim é gravado **antes** do insert. Falhar antes não cria nada; a ordem inversa deixaria um estabelecimento inoperável que *parece* ter sido criado com sucesso.
+  ⚠️ O claim só entra no **próximo** token — o output devolve `needs_token_refresh: true` e o cliente precisa renovar antes da primeira chamada protegida, senão toma 403.
 - [x] Login social + cadastro pendente via `POST /api/v1/auth/social-signup` (`src/core/auth/application/use-cases/social-signup/social-signup.use-case.ts`) — cobre usuário autenticado via provedor externo (Google) no Keycloak mas ainda sem role/aggregate local. **A invariante `musician_id`/`audience_id` == `sub` também vale neste caminho** — o aggregate é criado usando o `userId` do token (`@CurrentUser()`), nunca um ID novo. Compensação em caso de falha remove só a role atribuída (`removeRealmRole`), nunca deleta o usuário Keycloak (a conta não foi criada por nós).
 
 ---
@@ -107,9 +111,9 @@ Marcações:
 - [x] Cadastro de estabelecimento com endereço e tipo (bar, restaurante, etc.)  
        Código: establishment.aggregate.ts ([6]).  
        Regras:
-  - `create` exige `name`, `email`, `address` e `establishment_type`.
-  - `Address` é VO com campos obrigatórios (`street`, `number`, `city`, `state`, `zipCode`).
-  - `CNPJ` opcional, validado via VO específico (`CNPJ`).
+  - `create` valida **apenas `name`, `email` e `establishment_type`** — ver `establishment.validate(["name", "email", "establishment_type"])`. **(corrigido 07/ago/2026: o texto anterior dizia que `address` era obrigatório; não é, e essa premissa errada quase entrou no DTO de cadastro do Bloco 9.1.)**
+  - Endereço **não** pertence ao agregado raiz: vive em `EstablishmentProfile`, preenchido depois. `Address` é VO com campos obrigatórios (`street`, `number`, `city`, `state`, `zipCode`) quando informado.
+  - `CNPJ` opcional, validado via VO específico (`CNPJ`), **único no banco** e checado antes de tocar o provedor de identidade no registro (`findByCnpj`, Bloco 9.1).
 
 - [x] QR Code permanente do estabelecimento  
        Código: establishment.aggregate.ts ([6]) (`generateQRCode`).  
@@ -174,6 +178,18 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
        Regras:
   - A confirmação valida disponibilidade do alvo (músico ou banda) e conflitos confirmados do próprio alvo.
   - Em reservas de banda, após confirmar, o sistema tenta bloquear a agenda dos membros no intervalo com buffer, criando `unavailabilities` para cada membro. Esse bloqueio é operacional e não impede a confirmação caso algum membro já esteja indisponível.
+
+**Leitura de agenda (Bloco 9.2 — 07/ago/2026)**
+
+- [x] Listar reservas e propostas do usuário autenticado — `GET /scheduling/bookings`,
+      `GET /scheduling/bookings/:id`, `GET /scheduling/inquiries`.
+      Código: `list-bookings.use-case.ts`, `get-booking.use-case.ts`, `list-inquiries.use-case.ts`.
+      Regras:
+  - Antes disto o domínio só tinha propose/confirm/cancel e create/accept/reject: **o estabelecimento propunha uma reserva e nunca mais a via**. As únicas leituras eram `free-busy`/`month-slots`, agregadas e sem status/cachê.
+  - **O escopo vem do token, nunca da query.** `participant_ids` recebe todas as identidades (`sub` + claims `establishment_ids`/`band_ids`) e casa em **OR** contra `establishment_id`/`musician_id`/`band_id` — um id só não dá conta, porque o lado pelo qual a pessoa participa depende do papel. Filtros de query apenas **refinam** dentro do escopo (AND); pedir o `establishment_id` de outro devolve zero.
+  - **Fail-closed:** ator identificado mas sem nenhuma identidade utilizável recebe 403. Lista vazia de identidades **nunca** vira "sem filtro" — isso devolveria a agenda de todos os usuários.
+  - **Ver ≠ decidir.** `GetBooking` usa `assertNegotiationViewer`: qualquer integrante da banda lê o show marcado, sem precisar ser líder. Liderança segue exigida para confirmar/cancelar (`assertNegotiationParticipant`).
+  - Admin e chamadas internas sem ator (jobs) não são restringidos.
 
 **Availability (Agenda/Disponibilidade)**
 
@@ -350,7 +366,9 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 - [x] Agregado Tip com vínculo a público, músico e banda  
        Código: tip.aggregate.ts ([19]).  
        Regras:
-  - Campos: `tip_id`, `user_id` (opcional), `musician_id`, `band_id`, `amount`, `message`, `is_anonymous`, `show_in_wall`, `status`, `payment_method`, `pix_key`.
+  - Campos: `tip_id`, `audience_id`, `musician_id`, `band_id`, `amount`, `message`, `is_anonymous`, `show_in_wall`, `status`, `payment_method`, `pix_key`.
+  - ⚠️ **Correção (07/ago/2026):** o texto anterior dizia `user_id` **(opcional)**. **É `audience_id` e é obrigatório** — `Tip.audience_id: Uuid` no agregado e `audienceId String` **NOT NULL** com FK `onDelete: Restrict` no Prisma. A premissa errada quase virou uma tarefa de "gorjeta anônima" no Bloco 9.6.
+  - **Anonimato é propriedade de EXIBIÇÃO, não ausência de registro.** `is_anonymous` esconde o nome do fã no wall e na notificação; a identidade continua gravada. É o modelo correto para dinheiro: gorjeta sem identidade não pode ser estornada, contestada nem ter recibo, e a FK existe justamente para proteger a integridade financeira.
   - `create` valida valores (amount > 0, pelo menos um destinatário).
   - Estados: `pending`, `completed`, `failed`.
   - `complete` e `fail` aplicam eventos de domínio e congelam certos campos.
@@ -399,8 +417,15 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 **Monetização e planos**
 
-- [ ] Planos de assinatura para músicos e estabelecimentos (valores, limites, taxas diferenciadas)  
-       Ainda não há agregados específicos de plano, cobrança recorrente ou lógica de pricing implementados, apesar de descritos na seção “Resumo de Monetização” em _Features_.
+- [x] Planos de assinatura para músicos e estabelecimentos (valores, limites, taxas diferenciadas) **(corrigido 06/ago/2026 — o texto anterior dizia que "ainda não há agregados de plano, cobrança recorrente ou lógica de pricing", o que estava desatualizado desde jun/2026)**  
+       Código: `src/core/plans/` completo — aggregate `Subscription` (com `BillingCycle` mensal/anual e `expires_at` auto-computado), `PlanCheckService`, `plan-features.config.ts` (`MUSICIAN_PLAN_FEATURES`/`ESTABLISHMENT_PLAN_FEATURES` + tabelas de pricing), validator, repositórios in-memory + Prisma, e 5 use-cases (`list-plans`, `get-active-subscription`, `create-subscription-checkout`, `activate-subscription-from-payment`, `cancel-subscription`).  
+       Regras:
+  - Cobrança recorrente real via `AsaasSubscriptionGateway` (`POST /v3/subscriptions`). `billingType: UNDEFINED` faz o Asaas gerar uma **fatura hospedada** (`invoiceUrl`) em que o pagador escolhe PIX/cartão/boleto — a plataforma **nunca** coleta dados de cartão.
+  - Exposto em `src/nest-modules/plans-module/plans.controller.ts`: `GET /plans` (`@Public()`), `GET/POST/DELETE /musicians/:id/subscription[/checkout]` e `GET/POST/DELETE /establishments/:id/subscription[/checkout]`, todos com o ownership guard correspondente.
+  - Taxas diferenciadas de gorjeta (9%/7%/5%) e config de saque por tier já aplicadas em `WithdrawToPixUseCase`.
+  - ⚠️ **Enforcement é grant-at-action:** o gate é cobrado no momento da ação, nunca revalidado na leitura. Quem faz downgrade mantém o que já concedeu (link compartilhado, convite). Detalhado em [plans/musician-plans.md](plans/musician-plans.md#️-enforcement-de-gates-ação-vs-leitura-ler-antes-de-mexer-em-qualquer-gate-de-plano).
+
+- [~] Gorjeta com gateway PIX real — **é o único vértice de pagamento ainda mockado.** `send-tip` usa `PixGatewayMock`, aguardando chaves da Iugu. Saque (`AsaasGatewayAdapter`) e assinatura (`AsaasSubscriptionGateway`) já são reais. Ver [payment-gateway-decisions.md](payment-gateway-decisions.md).
 
 ---
 
@@ -459,6 +484,92 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 - [~] Algoritmo completo de ranking mensal (Top Fãs, Top Sugestões, Top Discoverers, etc.)  
   Estrutura de `Ranking` e `UserPoints` já está pronta, com use-cases para cálculo e leaderboard; contudo, a lógica fina de cada tipo de ranking (combinações específicas de métricas) ainda pode ser expandida para refletir todos os cenários descritos em _Features_.
+
+---
+
+## Domínio Review (Avaliações)
+
+> Introduzido no Bloco 9.3 (07/ago/2026). Antes disto `rating`/`total_ratings` eram apenas
+> contadores incrementais, sem registro de autor — não havia como impedir avaliação repetida,
+> listar comentários nem recalcular a média.
+
+- [x] **A avaliação é um ledger, não um contador.** `src/core/review/` + tabela `reviews` são a
+      fonte de verdade; `Musician.rating`/`total_ratings` e `Establishment.rating`/`total_ratings`
+      passam a ser **projeção derivada**, reescrita por `syncRatingProjection()` a partir do ledger
+      inteiro. Mesmo par que gamificação já usa (`UserScore` ledger × `UserPoints` projeção).
+- [x] **Só avalia quem tem vínculo comprovado** (`ReviewEligibilityService`):
+  - Público: precisa ser `EventAttendee` do evento **e** o alvo precisa estar ligado àquele evento —
+    `EventMusician` para músico, `event.establishment_id` para estabelecimento. Só presença não
+    basta: permitiria avaliar qualquer músico usando um evento assistido.
+  - Músico ↔ estabelecimento: precisa de um `Booking` com status **`COMPLETED`**. Confirmado não
+    conta (não houve show, e abriria retaliação por cancelamento).
+  - Ninguém avalia a si mesmo.
+- [x] **Uma avaliação por autor, por alvo, por contexto** — unique `(target_type, target_id,
+      author_id, context_id)` **no banco**; checagem na aplicação é só o caminho feliz. Avaliar de
+      novo o mesmo contexto **atualiza** a nota, sem somar duas vezes na média.
+- [x] **O autor vem do JWT, nunca do corpo** (`review-author.resolver.ts`). ⚠️ Para músico e público
+      `author_id` é o `sub`; para estabelecimento **não** — vem do claim `establishment_ids`, e conta
+      com mais de uma unidade precisa informar `author_establishment_id` (conferido contra o token).
+- [x] Nota é inteiro de 1 a 5. O VO `Rating` **não** é usado na entrada: aceita `0` e uma casa
+      decimal porque foi feito para médias.
+- [x] Leitura pública paginada: `GET /musicians/:id/ratings`, `GET /establishments/:id/ratings`,
+      com filtro `has_comment` e ordenação padrão pela mais recente.
+- [ ] Moderação/denúncia de avaliação — não implementado.
+- [ ] `EstablishmentRatedEvent` segue sem ouvinte (evento morto, anterior a este bloco).
+
+---
+
+## Domínio Personal Chord Sheet (Cifra Pessoal e Comunidade)
+
+> A versão que o músico tem de uma cifra gerada pela IA. Guarda **o que ele
+> mudou** (overlay), não uma cópia: a original em `music_library.chord_sheet`
+> permanece imutável e continua servida a todos.
+
+### Criação e unicidade
+- [x] **A cifra original da IA é imutável.** Nenhuma operação da cifra pessoal escreve em `music_library.chord_sheet` — o fork é a camada por cima.
+- [x] **Um fork por música por músico.** Índice único `(musician_id, music_library_id)` no banco; a checagem na aplicação é só o caminho feliz. Dois POSTs simultâneos: o segundo recebe **409**.
+- [x] **Qualquer música de qualquer artista pode ser cifrada e editada** — não existe restrição de catálogo. O músico busca (`ai-cifra/search`), analisa, e a análise materializa a linha dele em `music_library`.
+- [x] O fork é criado sobre a **linha do próprio músico** em `music_library`. Isso não limita *quais músicas* (`music_library` é biblioteca **pessoal**, não catálogo global: `musicianId` é obrigatório e a linha carrega `notes`/`isFavorite`/`difficulty` do dono, e cada músico tem a sua própria linha da mesma música). Limita *qual linha*: o use-case base lança `NotFoundError` quando a linha é de outro músico, que é o que impede editar a cifra pessoal alheia.
+- [x] O fork nasce **sem nenhuma edição**, ancorado no `base_fingerprint` (sha256 do timeline normalizado) da análise vigente.
+
+### Overlay de edições
+- [x] Seis tipos de edição: `replace_chord`, `insert_chord`, `delete_chord`, `shift_chord`, `relabel_section`, `annotate`. Máximo de **500 por fork**.
+- [x] As edições são ancoradas por **(instante, símbolo)**, nunca por índice — índice não sobrevive a uma re-análise que insira ou remova um acorde.
+- [x] Edição que não acha mais onde ancorar vira **conflito explícito** e não é aplicada: `anchor_not_found`, `symbol_mismatch`, `ambiguous_match`, `unparseable_symbol`, `out_of_range`. O músico revisa dois conflitos; ele não descobre no palco que a cifra saiu do lugar.
+- [x] Símbolo de acorde que o sistema não entende é **preservado verbatim**, nunca descartado.
+- [x] O matching é **enarmônico**: o músico gravou `Db`, a IA re-analisou como `C#`, a correção dele continua valendo.
+
+### Visualização
+- [x] Tom, capotraste, complexidade, instrumento e velocidade de rolagem são **parâmetros de visualização**, nunca gravados no acorde. Um único artefato serve todos os tons.
+- [x] Deslocamento efetivo = `transpose_semitones − capo_fret`. Transpor +2 com capô 2 devolve as **mesmas formas** — que é o ponto do capotraste.
+- [x] A rota `/chord-sheet` aceita overrides de query **efêmeros**: sobrepõem a view salva só naquela resposta, sem persistir nada.
+
+### Re-análise da IA (reconciliação)
+- [x] Quem detecta que a IA re-analisou é o **`base_fingerprint`**, não `base_version` — `MusicLibrary.updateChords()` não incrementa versão, então a coluna é advisory e está sempre em 0.
+- [x] **Leitura não escreve.** A divergência é sinalizada (`base_changed: true`, `reconcile_status: "base_updated"` na resposta) mas o fork no banco não é tocado: reconciliar é ato explícito do músico.
+- [ ] Use-case de reconciliação (`markReconciled`) — **pendente**, Bloco 8C do roadmap.
+
+### Compartilhamento
+- [x] Fork é **privado por padrão**. Escopos: `private` | `band` | `community`.
+- [x] `band` libera para os músicos que dividem alguma banda com o autor, contando só membros com `status = "accepted"`.
+- [x] `community` publica para qualquer músico da plataforma, **somente leitura**.
+- [x] **As anotações pessoais (`notes`) nunca são visíveis para terceiros** — nem na comunidade, nem para o par de banda, nem para o admin. É o único campo redigido na leitura de terceiro (`is_owner` derivado do dono real do fork, nunca afirmado pelo controller).
+- [x] ⚠️ **A edição `annotate` NÃO é privada.** Ela também é texto livre, mas vive em `edits[]` e é publicada junto com as correções — são duas gavetas diferentes: `notes` é o **caderno** (privado), `annotate` é **recado colado na cifra** (compartilhado). Defensável por desenho, mas a UI precisa deixar explícito no momento de escrever, senão o músico publica sem querer.
+- [x] Descompartilhar tem **efeito imediato**, sem carência.
+- [x] Fork da comunidade não é lido "no lugar" do próprio: o leitor **importa**, e as correções são reancoradas contra a análise dele. As que não ancoram voltam como conflito e não entram.
+
+### Planos
+- [x] Editar, transpor e usar cifra é **core em todos os tiers** (coerente com `music_library_access: true` nos três).
+- [x] `max_personal_chord_sheets` — FREE: 3; ESSENCIAL e PRO: ilimitado.
+- [x] `chord_sheet_community_sharing` — FREE: não; ESSENCIAL e PRO: sim. Compartilhar com a **própria banda não é gateado** em nenhum tier.
+- [x] **Grant-at-action:** o limite é cobrado no fork e no import, **nunca na leitura**. Quem cai de plano continua abrindo e tocando as cifras que já tem.
+
+### Moderação
+- [x] Admin pode remover **qualquer** fork (takedown) via `DELETE /admin/personal-chord-sheets/:id`.
+- [x] A navegação de moderação (`GET /admin/personal-chord-sheets`) só lista o que está **publicado na comunidade** — o admin não *descobre* fork privado por listagem.
+- [x] O admin **lê qualquer fork por id**, inclusive `private`, por `GET /community/personal-chord-sheets/:id` e `/:id/chord-sheet`: `resolveAccess` manda `requesting_musician_id: undefined`, que é o bypass de moderação do `CheckPersonalChordSheetAccessUseCase` (retorna antes de consultar `share_scope`). Vê as correções, a view e a cifra renderizada com a letra; **`notes` continua redigido**, porque `is_owner` sai `false`. Decisão consciente (jul/2026): o admin é o próprio fundador, e restringir seria proteger o dono do produto dele mesmo. **Revisar no dia em que existir admin que não seja o dono** — a role passa a dar leitura de qualquer cifra privada a quem a tiver.
+- [x] `PERSONAL_CHORD_SHEET_COMMUNITY_ENABLED=false` derruba a comunidade inteira sem deploy; as rotas do dono seguem intactas.
+- [ ] Denúncia (`POST /:id/report`) — **pendente**, Bloco 8C.1.
 
 ---
 

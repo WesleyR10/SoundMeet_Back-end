@@ -15,9 +15,9 @@ Ver implementação em [chord-sheet.md](chord-sheet.md).
 
 | Provedor | Uso | Restrições |
 |----------|-----|------------|
-| **Vagalume** (BR) | Letras + metadados PT-BR | API oficial; atribuição + link; rate limit |
-| **Musixmatch** | Escala global | Licenciado; cache local restrito no plano Enterprise |
-| **Genius** | Metadados/anotações | Letra completa comercial exige licença |
+| **Vagalume** (BR) | Letras + metadados PT-BR | API oficial; atribuição + link; rate limit. **Sem cliente implementado** — documentado como opção futura. |
+| **Musixmatch** | Escala global | Licenciado; cache local restrito no plano Enterprise. **Sem cliente implementado** — documentado como opção futura. |
+| **Genius** | Metadados/anotações | Letra completa comercial exige licença. **Cliente implementado (`GeniusHttpClient`) só extrai metadados (song_id/url/full_title) pra link-out — nunca persiste o texto raspado da página como LRC (corrigido jul/2026, violava esta mesma regra antes).** |
 
 ## APIs de teoria musical (acordes isolados)
 

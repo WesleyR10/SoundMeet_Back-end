@@ -108,14 +108,24 @@ src/core/plans/domain/plan-features.config.ts → ESTABLISHMENT_PLAN_FEATURES
 
 ## Features pendentes de implementação
 
+> **Revisado em 06/ago/2026.** Tabela congelada em jun/2026 — quatro linhas listadas como
+> *Pendente* já estavam concluídas. Reverificar contra o código antes de reintroduzir qualquer item.
+
 | Feature | Status | Bloco Roadmap |
 |---------|--------|---------------|
-| Banner generation (templates) | Pendente | 4D.5 |
-| Campanhas promocionais | Pendente | 7.1+ |
-| Multi-estabelecimento (Keycloak) | Pendente | 4C.7 |
-| Enforcement campanhas (4C.7) | Pendente | 4C.7 |
-| Billing anual | Pendente | 4D.8 |
-| **Cardápio PDF** (`menu_pdf_url` + upload S3) | Pendente | 7.7 |
-| **Horário de funcionamento — UX** | Domínio pronto ✅; falta formulário no dashboard + badge "Aberto agora" | Quick win |
+| Campanhas promocionais | ✅ Concluído — domínio + `CampaignModule` + controller + tabela `campaigns` | 4C.10 |
+| Enforcement campanhas | ✅ Concluído — `assertEstablishmentFeature(..., "promotional_campaigns")` | 4C.10 |
+| Multi-estabelecimento | ✅ Concluído — gate em `CreateEstablishmentUseCase`, hard-limit 3 unidades, PRO only | 4C.7 |
+| Billing anual | ✅ Concluído — `BillingCycle` + `ESTABLISHMENT_PLAN_PRICING` + `AsaasSubscriptionGateway` | 4D.8 |
+| Cardápio PDF (upload + R2) | ✅ Concluído — `POST/DELETE /establishments/:id/menu-pdf`, magic-byte check, 5MB | 7.7 |
+| **Horário de funcionamento — UX** | ⏳ Pendente — domínio 100% pronto; falta o formulário do dono. **Sem UI em nenhuma plataforma**, então `operating_hours` é `null` na prática e o badge "Aberto agora" nunca acende | W1 |
+| **Banner generation (templates)** | ⏳ Pendente | 4D.5 |
+| **⚠️ `advanced_analytics`** | ⏳ **Flag existe, nunca é lida.** Está em `EstablishmentPlanFeatures` (`false`/`true`/`true`) mas **nenhum use-case chama o gate** — hoje o Free tem o mesmo analytics do Pro. Falta o `assertEstablishmentFeature` + UI/export CSV-PDF | W4 |
+| **⚠️ `max_qr_codes` (1 / 3 / ∞)** | ⏳ **Flag existe, nunca é lida** — e o domínio **não suporta múltiplos QR**: `Establishment.qr_code` é um campo único e `generateQRCode()` sobrescreve. Vender "3 QR codes" no Growth exige mudança de agregado, não só um gate | — |
+| **⚠️ `api_access`** | ⏳ **Flag existe, nunca é lida** — não há nenhuma noção de API key/acesso programático no código | — |
+| **⚠️ Calendário: "1 evento ativo" no Free** | ⏳ **Não existe nem como flag.** A tabela de preços acima promete o limite, mas não há campo em `EstablishmentPlanFeatures` nem gate — qualquer tier cria eventos sem limite | — |
+| **🔴 Cadastro de estabelecimento** | ⏳ **Bloqueador** — não existe caminho para criar a primeira conta | 9.1 |
+| **🔴 Listagem de bookings/inquiries** | ⏳ **Bloqueador** — o estabelecimento não vê as próprias contratações | 9.2 |
+| **Dashboard web (UI de tudo acima)** | ⏳ `soundmeet-web` não existe | [roadmap-web.md](../roadmap-web.md) |
 
-> **Nota técnica:** `OperatingHours` já está completamente implementado no domínio, Prisma mapper e presenter. O campo `operating_hours` já é retornado no `GET /establishments/:id`. O que falta é exclusivamente a camada de UX (frontend) para o estabelecimento preencher os horários e para o público ver o badge "Aberto agora".
+> **Nota técnica:** `OperatingHours` já está completamente implementado no domínio, Prisma mapper e presenter. O campo `operating_hours` já é retornado no `GET /establishments/:id`, e o campo calculado `is_open_now` já sai em todos os outputs (7.8a/7.8b). O que falta é exclusivamente a camada de UX — **e ela não existe em plataforma nenhuma hoje**, porque o estabelecimento é web-only e o web ainda não foi criado. É a fatia **W1** do [roadmap-web.md](../roadmap-web.md), e a de maior relação valor/esforço do v1: backend 100% pronto, falta só o formulário.

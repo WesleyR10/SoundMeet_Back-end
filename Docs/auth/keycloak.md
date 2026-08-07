@@ -190,13 +190,25 @@ KEYCLOAK_VERIFY_AUDIENCE=false
 
 Quando a API roda dentro do Docker, `KEYCLOAK_URL` deve continuar representando o issuer publico do token (`http://localhost:8080` no ambiente local) — ele precisa bater exatamente com o `iss` do JWT. Ja `KEYCLOAK_JWKS_URI` e `KEYCLOAK_INTERNAL_URL` podem apontar para o host interno Docker (`http://keycloak:8080/...`) para evitar acesso via host bridge. `KEYCLOAK_INTERNAL_URL` e usado pelo `KeycloakAdminGateway` (Admin API + Direct Access Grant do fluxo de registro, ver secao abaixo) — sem ele, dentro de um container o backend tentaria acessar `KEYCLOAK_URL` (`localhost`) e cairia nele mesmo, nao no container do Keycloak.
 
-`KEYCLOAK_VERIFY_AUDIENCE=false` e tolerante para desenvolvimento, porque alguns clients publicos podem nao emitir `aud` exatamente como a API espera sem ajustes adicionais de audience mapper. Em producao, a recomendacao e ligar:
+### Validacao de audience
 
-```bash
-KEYCLOAK_VERIFY_AUDIENCE=true
-```
+`KEYCLOAK_VERIFY_AUDIENCE` agora tem **default `true` em producao** e `false` nos demais ambientes. Quando ligado, a checagem e um E logico:
 
-e garantir que tokens emitidos pelos clients carreguem `aud` ou `azp` compativel com `soundmeet-api`.
+1. `aud` precisa conter exatamente `KEYCLOAK_AUDIENCE` (ou `KEYCLOAK_CLIENT_ID`, se aquele nao estiver setado);
+2. se `KEYCLOAK_ALLOWED_AZP` estiver preenchido, o `azp` precisa estar na lista.
+
+Antes era um OU (`aud` contem o client **ou** `azp` bate), o que fazia um token emitido para outro client do mesmo realm ser aceito pela API.
+
+> **Atencao ao ligar:** `KEYCLOAK_AUDIENCE` e `KEYCLOAK_CLIENT_ID` sao coisas diferentes. O mapper criado por `scripts/keycloak-sync.mjs` injeta o audience fixo `soundmeet-api`, enquanto `envs/.env` local usa `KEYCLOAK_CLIENT_ID=soundmeet-backend`. Ligar a verificacao sem setar `KEYCLOAK_AUDIENCE=soundmeet-api` rejeitaria todo token valido.
+
+Migracao em duas etapas, como recomendado:
+
+1. **Telemetria** — com `KEYCLOAK_VERIFY_AUDIENCE=false` a API loga uma vez por combinacao observada:
+   ```json
+   {"event":"auth.audience_check_disabled","expected_audience":"soundmeet-api","token_aud":["account","soundmeet-api"],"token_azp":"soundmeet-mobile","would_reject_if_enabled":false}
+   ```
+   Confirme `would_reject_if_enabled: false` para todos os clients em uso.
+2. **Obrigatorio** — rode `node scripts/keycloak-sync.mjs` (garante o audience mapper nos clients) e ligue `KEYCLOAK_VERIFY_AUDIENCE=true`.
 
 ## Seguranca
 
