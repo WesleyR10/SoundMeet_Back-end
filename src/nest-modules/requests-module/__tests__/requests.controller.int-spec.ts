@@ -19,6 +19,7 @@ import { GetRequestFeedbackUseCase } from "../../../core/request/application/use
 import { GetRequestSuggestionsUseCase } from "../../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsUseCase } from "../../../core/request/application/use-cases/list-requests/list-requests.use-case";
 import { MarkRequestPlayedUseCase } from "../../../core/request/application/use-cases/mark-request-played/mark-request-played.use-case";
+import { BatchRespondToRequestsUseCase } from "../../../core/request/application/use-cases/batch-respond-to-requests/batch-respond-to-requests.use-case";
 import { RespondToRequestAction } from "../../../core/request/application/use-cases/respond-to-request/respond-to-request.input";
 import { RespondToRequestUseCase } from "../../../core/request/application/use-cases/respond-to-request/respond-to-request.use-case";
 import { UpdateRequestUseCase } from "../../../core/request/application/use-cases/update-request/update-request.use-case";
@@ -179,6 +180,12 @@ describe("RequestsController Integration Tests", () => {
           inject: ["RequestRepository"],
         },
         {
+          provide: BatchRespondToRequestsUseCase,
+          useFactory: (respondUseCase: RespondToRequestUseCase) =>
+            new BatchRespondToRequestsUseCase(respondUseCase),
+          inject: [RespondToRequestUseCase],
+        },
+        {
           provide: RespondToRequestUseCase,
           useFactory: (
             repo: IRequestRepository,
@@ -281,7 +288,13 @@ describe("RequestsController Integration Tests", () => {
         artist: "Artist",
         message: "Message",
       } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const entity = await repository.findById(new RequestId(presenter.id));
@@ -319,7 +332,13 @@ describe("RequestsController Integration Tests", () => {
         musician_id: musicianId,
         song_title: "Song Title",
       } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const fetched = await controller.findOne(presenter.id);
@@ -341,7 +360,13 @@ describe("RequestsController Integration Tests", () => {
           musician_id: musicianId,
           song_title: `Song ${i}`,
         } as any,
-        { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+        {
+          userId: audienceId,
+          roles: ["audience"],
+          establishmentIds: [],
+          bandIds: [],
+          isAdmin: false,
+        },
       );
     }
 
@@ -369,7 +394,13 @@ describe("RequestsController Integration Tests", () => {
         song_title: "Original Song",
         artist: "Original Artist",
       } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const updated = await controller.update(created.id, {
@@ -400,7 +431,13 @@ describe("RequestsController Integration Tests", () => {
         musician_id: musicianId,
         song_title: "Song Title",
       } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const responded = await controller.respond(
@@ -439,7 +476,13 @@ describe("RequestsController Integration Tests", () => {
         musician_id: musicianId,
         song_title: "Song 1",
       } as any,
-      { userId: firstAudienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: firstAudienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     await controller.create(
@@ -448,7 +491,13 @@ describe("RequestsController Integration Tests", () => {
         musician_id: musicianId,
         song_title: "Song 2",
       } as any,
-      { userId: secondAudienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: secondAudienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const presenter = await controller.getMusicianRequests(musicianId, {
@@ -474,18 +523,44 @@ describe("RequestsController Integration Tests", () => {
     await setupAudienceInEvent(eventId, otherAudienceId);
 
     await controller.create(
-      { event_id: eventId, musician_id: musicianId, song_title: "Song 1" } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song 1",
+      } as any,
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
     await controller.create(
-      { event_id: eventId, musician_id: musicianId, song_title: "Song 2" } as any,
-      { userId: otherAudienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song 2",
+      } as any,
+      {
+        userId: otherAudienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const presenter = await controller.getAudienceRequests(
       audienceId,
       { page: 1, per_page: 10 } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     expect(presenter).toBeInstanceOf(RequestCollectionPresenter);
@@ -501,7 +576,13 @@ describe("RequestsController Integration Tests", () => {
       controller.getAudienceRequests(
         otherAudienceId,
         { page: 1, per_page: 10 } as any,
-        { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+        {
+          userId: audienceId,
+          roles: ["audience"],
+          establishmentIds: [],
+          bandIds: [],
+          isAdmin: false,
+        },
       ),
     ).rejects.toThrow("Você não tem permissão para ver pedidos de outro fã.");
   });
@@ -515,14 +596,30 @@ describe("RequestsController Integration Tests", () => {
     await setupAudienceInEvent(eventId, audienceId);
 
     await controller.create(
-      { event_id: eventId, musician_id: musicianId, song_title: "Song 1" } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        event_id: eventId,
+        musician_id: musicianId,
+        song_title: "Song 1",
+      } as any,
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const presenter = await controller.getAudienceRequests(
       audienceId,
       { page: 1, per_page: 10 } as any,
-      { userId: new Uuid().id, roles: ["admin"], establishmentIds: [], bandIds: [], isAdmin: true },
+      {
+        userId: new Uuid().id,
+        roles: ["admin"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: true,
+      },
     );
 
     expect(presenter.data.length).toBe(1);
@@ -542,7 +639,13 @@ describe("RequestsController Integration Tests", () => {
         musician_id: musicianId,
         song_title: "Song Title",
       } as any,
-      { userId: audienceId, roles: ["audience"], establishmentIds: [], bandIds: [], isAdmin: false },
+      {
+        userId: audienceId,
+        roles: ["audience"],
+        establishmentIds: [],
+        bandIds: [],
+        isAdmin: false,
+      },
     );
 
     const response = await controller.remove(created.id);

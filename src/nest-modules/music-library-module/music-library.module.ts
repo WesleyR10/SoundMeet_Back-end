@@ -4,10 +4,11 @@ import { DatabaseModule } from "../database-module/database.module";
 import { MusicLibraryController } from "./music-library.controller";
 import { MUSIC_LIBRARY_PROVIDERS } from "./music-library.providers";
 import { MusicLibraryCatalogService } from "./music-library.service";
+import { PublicRepertoireController } from "./public-repertoire.controller";
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [MusicLibraryController],
+  controllers: [MusicLibraryController, PublicRepertoireController],
   providers: [
     ...Object.values(MUSIC_LIBRARY_PROVIDERS.REPOSITORIES),
     ...Object.values(MUSIC_LIBRARY_PROVIDERS.USE_CASES),

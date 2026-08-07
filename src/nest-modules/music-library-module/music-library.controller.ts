@@ -26,8 +26,8 @@ import { GetMusicLibraryUseCase } from "../../core/music-library/application/use
 import { ListMusicLibraryUseCase } from "../../core/music-library/application/use-cases/list-music-library/list-music-library.use-case";
 import { UpdateMusicLibraryUseCase } from "../../core/music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   Roles,
@@ -73,9 +73,10 @@ export class MusicLibraryController {
     @Body() dto: CreateMusicLibraryDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    const musician_id = currentUser.isAdmin && dto.musician_id
-      ? dto.musician_id
-      : currentUser.userId;
+    const musician_id =
+      currentUser.isAdmin && dto.musician_id
+        ? dto.musician_id
+        : currentUser.userId;
 
     const output = await this.createUseCase.execute({ ...dto, musician_id });
     return new MusicLibraryPresenter(output);
@@ -84,7 +85,8 @@ export class MusicLibraryController {
   @Get()
   @ApiOperation({
     summary: "Listar biblioteca musical",
-    description: "Lista itens da MusicLibrary. Músicos só veem a própria biblioteca; admin pode filtrar por qualquer musician_id.",
+    description:
+      "Lista itens da MusicLibrary. Músicos só veem a própria biblioteca; admin pode filtrar por qualquer musician_id.",
   })
   @ApiResponse({ status: 200, type: MusicLibraryCollectionPresenter })
   async findAll(
@@ -154,7 +156,8 @@ export class MusicLibraryController {
   @Delete(":id")
   @ApiOperation({
     summary: "Remover item da biblioteca musical",
-    description: "Remove um item da MusicLibrary. Músico só pode remover os próprios itens.",
+    description:
+      "Remove um item da MusicLibrary. Músico só pode remover os próprios itens.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 204 })

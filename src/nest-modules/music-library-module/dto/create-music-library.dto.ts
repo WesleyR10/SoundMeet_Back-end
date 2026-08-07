@@ -5,7 +5,8 @@ import { CreateMusicLibraryInput } from "../../../core/music-library/application
 export class CreateMusicLibraryDto extends CreateMusicLibraryInput {
   @ApiPropertyOptional({
     format: "uuid",
-    description: "Ignorado para músicos — preenchido automaticamente do JWT. Admin pode especificar outro musician_id.",
+    description:
+      "Ignorado para músicos — preenchido automaticamente do JWT. Admin pode especificar outro musician_id.",
   })
   declare musician_id: string;
 

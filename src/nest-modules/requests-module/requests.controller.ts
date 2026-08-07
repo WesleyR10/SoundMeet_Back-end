@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   HttpCode,
+  HttpStatus,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -20,17 +21,19 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 
+import { BatchRespondToRequestsUseCase } from "../../core/request/application/use-cases/batch-respond-to-requests/batch-respond-to-requests.use-case";
 import { RequestOutput } from "../../core/request/application/use-cases/common/request-output";
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
 import { CreateRequestFeedbackUseCase } from "../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
-import { GetRequestFeedbackUseCase } from "../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { DeleteRequestInput } from "../../core/request/application/use-cases/delete-request/delete-request.input";
 import { DeleteRequestUseCase } from "../../core/request/application/use-cases/delete-request/delete-request.use-case";
 import { GetMusicianRequestsInput } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.input";
 import { GetMusicianRequestsUseCase } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestInput } from "../../core/request/application/use-cases/get-request/get-request.input";
 import { GetRequestUseCase } from "../../core/request/application/use-cases/get-request/get-request.use-case";
+import { GetRequestFeedbackUseCase } from "../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { GetRequestSuggestionsInput } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.input";
 import { GetRequestSuggestionsUseCase } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsUseCase } from "../../core/request/application/use-cases/list-requests/list-requests.use-case";
@@ -43,13 +46,15 @@ import { UpdateRequestUseCase } from "../../core/request/application/use-cases/u
 import { VoteRequestInput } from "../../core/request/application/use-cases/vote-request/vote-request.input";
 import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
+  resolveParticipantIds,
   Roles,
   RolesGuard,
 } from "../auth-module";
+import { BatchRespondRequestsDto } from "./dto/batch-respond-requests.dto";
 import { CreateRequestDto } from "./dto/create-request.dto";
 import { CreateRequestFeedbackDto } from "./dto/create-request-feedback.dto";
 import { GetMusicianRequestsDto } from "./dto/get-musician-requests.dto";
@@ -90,6 +95,9 @@ export class RequestsController {
   @Inject(RespondToRequestUseCase)
   private respondUseCase: RespondToRequestUseCase;
 
+  @Inject(BatchRespondToRequestsUseCase)
+  private batchRespondUseCase: BatchRespondToRequestsUseCase;
+
   @Inject(GetMusicianRequestsUseCase)
   private getMusicianRequestsUseCase: GetMusicianRequestsUseCase;
 
@@ -126,11 +134,16 @@ export class RequestsController {
     return RequestsController.serialize(output);
   }
 
+  // Admin-only: a listagem global não tem escopo por participante. Músico usa
+  // GET /requests/musicians/:musician_id; fã usa GET /requests/audiences/:audience_id.
+  // Se o dashboard web de estabelecimento precisar disso, criar rota escopada
+  // por evento com checagem de ownership — não reabrir esta.
   @Get()
-  @Roles("musician", "establishment", "admin")
+  @Roles("admin")
   @ApiOperation({
-    summary: "Listar pedidos musicais",
-    description: "Lista pedidos musicais com paginação, ordenação e filtros.",
+    summary: "Listar pedidos musicais (admin)",
+    description:
+      "Lista pedidos musicais de toda a plataforma com paginação, ordenação e filtros. Restrito a admin.",
   })
   @ApiResponse({ status: 200, type: RequestCollectionPresenter })
   async findAll(@Query() query: SearchRequestsDto) {
@@ -224,6 +237,41 @@ export class RequestsController {
     return new RequestCollectionPresenter(output);
   }
 
+  @Post("batch-respond")
+  @HttpCode(HttpStatus.OK)
+  @Roles("musician", "admin")
+  // Amplificação de escrita: 1 requisição vira até 50 respostas, cada uma com
+  // transição de estado e evento de domínio (gamificação, push). O throttle
+  // global conta requisições, não trabalho — por isso um teto próprio, mais
+  // apertado. 6/min cobre com folga o uso real (voltar do intervalo).
+  @Throttle({ default: { ttl: 60000, limit: 6 } })
+  @ApiOperation({
+    summary: "Responder vários pedidos de uma vez",
+    description:
+      "Aceita ou rejeita até 50 pedidos numa chamada — o músico volta do intervalo com a fila acumulada. BEST-EFFORT: um item que falha (já respondido, expirado, de outro músico) não anula os demais; a resposta traz `succeeded` e `failed` com o motivo por request_id. O músico é sempre o do token.",
+  })
+  @ApiResponse({ status: 200, description: "Relatório por pedido" })
+  @ApiResponse({
+    status: 422,
+    description: "Lote vazio, acima de 50 ou com UUID inválido",
+  })
+  async batchRespond(
+    @Body() dto: BatchRespondRequestsDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    const output = await this.batchRespondUseCase.execute({
+      request_ids: dto.request_ids,
+      musician_id: currentUser?.userId ?? "",
+      action: dto.action,
+      rejection_reason: dto.rejection_reason,
+    });
+
+    return {
+      succeeded: output.succeeded.map((r) => RequestsController.serialize(r)),
+      failed: output.failed,
+    };
+  }
+
   @Patch(":id/respond")
   @Roles("musician", "admin")
   @ApiOperation({
@@ -309,7 +357,9 @@ export class RequestsController {
   ) {
     const input: GetRequestInput = {
       id,
-      requesting_user_id: currentUser?.userId,
+      requesting_participant_ids: currentUser
+        ? resolveParticipantIds(currentUser)
+        : undefined,
       is_admin: currentUser?.roles.includes("admin"),
     };
     const output = await this.getUseCase.execute(input);
@@ -364,7 +414,8 @@ export class RequestsController {
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Avaliar pedido musical",
-    description: "Músico avalia o pedido após tocá-lo (rating 1-5, comentário opcional).",
+    description:
+      "Músico avalia o pedido após tocá-lo (rating 1-5, comentário opcional).",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: RequestFeedbackPresenter })
@@ -400,7 +451,9 @@ export class RequestsController {
   ) {
     const output = await this.getFeedbackUseCase.execute({
       request_id: id,
-      requesting_user_id: currentUser?.userId,
+      requesting_participant_ids: currentUser
+        ? resolveParticipantIds(currentUser)
+        : undefined,
       is_admin: currentUser?.roles.includes("admin"),
     });
     return new RequestFeedbackPresenter(output);

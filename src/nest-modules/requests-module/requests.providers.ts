@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { IAudienceRepository } from "../../core/audience/domain";
 import { IEventRepository } from "../../core/events/domain";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { BatchRespondToRequestsUseCase } from "../../core/request/application/use-cases/batch-respond-to-requests/batch-respond-to-requests.use-case";
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
 import { CreateRequestFeedbackUseCase } from "../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
 import { DeleteRequestUseCase } from "../../core/request/application/use-cases/delete-request/delete-request.use-case";
@@ -16,8 +17,8 @@ import { RespondToRequestUseCase } from "../../core/request/application/use-case
 import { UpdateRequestUseCase } from "../../core/request/application/use-cases/update-request/update-request.use-case";
 import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import { IRequestRepository } from "../../core/request/domain/request.repository";
-import { IRequestVoteRepository } from "../../core/request/domain/request-vote.repository";
 import { IRequestFeedbackRepository } from "../../core/request/domain/request-feedback.repository";
+import { IRequestVoteRepository } from "../../core/request/domain/request-vote.repository";
 import { RequestFeedbackPrismaRepository } from "../../core/request/infra/db/prisma/request-feedback-prisma.repository";
 import { RequestPrismaRepository } from "../../core/request/infra/db/prisma/request-prisma.repository";
 import { RequestVotePrismaRepository } from "../../core/request/infra/db/prisma/request-vote-prisma.repository";
@@ -111,7 +112,10 @@ export const USE_CASES = {
   },
   GET_REQUEST_USE_CASE: {
     provide: GetRequestUseCase,
-    useFactory: (requestRepo: IRequestRepository, eventRepo: IEventRepository) => {
+    useFactory: (
+      requestRepo: IRequestRepository,
+      eventRepo: IEventRepository,
+    ) => {
       return new GetRequestUseCase(requestRepo, eventRepo);
     },
     inject: [REPOSITORIES.REQUEST_REPOSITORY.provide, "EventRepository"],
@@ -169,6 +173,13 @@ export const USE_CASES = {
       ConfigService,
       DomainEventMediator,
     ],
+  },
+  // Bloco 9.4c — compõe o use case individual, não reimplementa.
+  BATCH_RESPOND_TO_REQUESTS_USE_CASE: {
+    provide: BatchRespondToRequestsUseCase,
+    useFactory: (respondUseCase: RespondToRequestUseCase) =>
+      new BatchRespondToRequestsUseCase(respondUseCase),
+    inject: [RespondToRequestUseCase],
   },
   GET_MUSICIAN_REQUESTS_USE_CASE: {
     provide: GetMusicianRequestsUseCase,
@@ -245,7 +256,11 @@ export const USE_CASES = {
       requestRepo: IRequestRepository,
       eventRepo: IEventRepository,
     ) => {
-      return new GetRequestFeedbackUseCase(feedbackRepo, requestRepo, eventRepo);
+      return new GetRequestFeedbackUseCase(
+        feedbackRepo,
+        requestRepo,
+        eventRepo,
+      );
     },
     inject: [
       REPOSITORIES.REQUEST_FEEDBACK_REPOSITORY.provide,
