@@ -129,6 +129,22 @@ export class ChordSheetAnchorPresenter {
   }
 }
 
+export class ChordSheetAnnotationPresenter {
+  atMs: number;
+  text: string;
+  sectionIndex: number;
+  lineIndex: number;
+  tokenIndex: number;
+
+  constructor(output: NonNullable<ChordSheetOutput["annotations"]>[number]) {
+    this.atMs = output.atMs;
+    this.text = output.text;
+    this.sectionIndex = output.sectionIndex;
+    this.lineIndex = output.lineIndex;
+    this.tokenIndex = output.tokenIndex;
+  }
+}
+
 export class ChordSheetAlignmentPresenter {
   @ApiProperty({ type: Object })
   anchors: Record<string, ChordSheetAnchorPresenter>;
@@ -181,6 +197,14 @@ export class ChordSheetPresenter {
   @ApiProperty({ type: () => ChordSheetMetaPresenter })
   meta: ChordSheetMetaPresenter;
 
+  /**
+   * Sempre ausente na cifra canônica da IA — só a visão pessoal do músico
+   * (Bloco 8) carrega anotações. Por isso o campo é opcional e nunca aparece
+   * na resposta quando não há nada anotado.
+   */
+  @ApiProperty({ type: () => [ChordSheetAnnotationPresenter], required: false })
+  annotations?: ChordSheetAnnotationPresenter[];
+
   @Transform(({ value }: { value: Date }) => value.toISOString())
   updated_at: Date;
 
@@ -193,6 +217,11 @@ export class ChordSheetPresenter {
     this.chords = new ChordSheetChordsPresenter(output.chords);
     this.alignment = new ChordSheetAlignmentPresenter(output.alignment);
     this.meta = new ChordSheetMetaPresenter(output.meta);
+    if (output.annotations && output.annotations.length > 0) {
+      this.annotations = output.annotations.map(
+        (annotation) => new ChordSheetAnnotationPresenter(annotation),
+      );
+    }
     this.updated_at = output.updated_at;
   }
 }
