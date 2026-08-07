@@ -1,11 +1,12 @@
+import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { randomBytes } from "crypto";
 
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { ConfirmTipPaymentUseCase } from "../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
 import { GetMusicianTipsUseCase } from "../../core/payment/application/use-cases/get-musician-tips/get-musician-tips.use-case";
 import { GetMusicianWalletUseCase } from "../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipUseCase } from "../../core/payment/application/use-cases/send-tip/send-tip.use-case";
-import { PlanCheckService } from "../../core/plans";
 import { UpdateMusicianPixKeyUseCase } from "../../core/payment/application/use-cases/update-musician-pix-key/update-musician-pix-key.use-case";
 import { WithdrawToPixUseCase } from "../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import {
@@ -22,10 +23,51 @@ import { AsaasGatewayAdapter } from "../../core/payment/infra/gateways/asaas-gat
 import { IPixGateway } from "../../core/payment/infra/gateways/pix-gateway.interface";
 import { PixGatewayMock } from "../../core/payment/infra/gateways/pix-gateway.mock";
 import { IPixWithdrawGateway } from "../../core/payment/infra/gateways/pix-withdraw-gateway.interface";
+import { PlanCheckService } from "../../core/plans";
+import { IEncryptionService } from "../../core/shared/domain/encryption.service";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
+import { AesGcmEncryptionService } from "../../core/shared/infra/crypto/aes-gcm-encryption.service";
 import { PrismaUnitOfWork } from "../../core/shared/infra/db/prisma/prisma-unit-of-work";
-import { PrismaService } from "../database-module/prisma/prisma.service";
 import { EnvConfig } from "../config-module/config.schema";
+import { PrismaService } from "../database-module/prisma/prisma.service";
+
+export const INFRA_PROVIDERS = {
+  // SM-016: cifra pix_key/bank_account em repouso (AES-256-GCM). Mesmo token
+  // "EncryptionService" e mesma TOKEN_ENCRYPTION_KEY do GoogleCalendarModule
+  // (google-calendar.providers.ts) — não importamos aquele módulo aqui para
+  // não criar dependência cruzada entre domínios; a chave é infra genérica.
+  ENCRYPTION_SERVICE: {
+    provide: "EncryptionService",
+    useFactory: (
+      configService: ConfigService<EnvConfig>,
+    ): IEncryptionService => {
+      const key = configService.get<string>("TOKEN_ENCRYPTION_KEY");
+      if (key && key.trim()) {
+        return new AesGcmEncryptionService(key);
+      }
+      new Logger("PaymentModule").warn(
+        "TOKEN_ENCRYPTION_KEY ausente — usando chave efêmera de desenvolvimento (pix key/dados bancários cifrados não sobrevivem a restart)",
+      );
+      return new AesGcmEncryptionService(randomBytes(32).toString("base64"));
+    },
+    inject: [ConfigService],
+  },
+  PIX_GATEWAY: {
+    provide: "PixGateway",
+    useClass: PixGatewayMock,
+  },
+  ASAAS_PIX_WITHDRAW_GATEWAY: {
+    provide: "AsaasPixWithdrawGateway",
+    useFactory: (
+      configService: ConfigService<EnvConfig>,
+    ): IPixWithdrawGateway => {
+      const apiUrl = configService.get<string>("ASAAS_API_URL")!;
+      const apiKey = configService.get<string>("ASAAS_API_KEY") ?? "";
+      return new AsaasGatewayAdapter(apiUrl, apiKey);
+    },
+    inject: [ConfigService],
+  },
+};
 
 export const REPOSITORIES = {
   TIP_REPOSITORY: {
@@ -34,10 +76,13 @@ export const REPOSITORIES = {
   },
   TIP_PRISMA_REPOSITORY: {
     provide: TipPrismaRepository,
-    useFactory: (prismaService: PrismaService) => {
-      return new TipPrismaRepository(prismaService);
+    useFactory: (
+      prismaService: PrismaService,
+      encryption: IEncryptionService,
+    ) => {
+      return new TipPrismaRepository(prismaService, undefined, encryption);
     },
-    inject: [PrismaService],
+    inject: [PrismaService, INFRA_PROVIDERS.ENCRYPTION_SERVICE.provide],
   },
   TRANSACTION_REPOSITORY: {
     provide: "TransactionRepository",
@@ -56,26 +101,17 @@ export const REPOSITORIES = {
   },
   MUSICIAN_WALLET_PRISMA_REPOSITORY: {
     provide: MusicianWalletPrismaRepository,
-    useFactory: (prismaService: PrismaService) => {
-      return new MusicianWalletPrismaRepository(prismaService);
+    useFactory: (
+      prismaService: PrismaService,
+      encryption: IEncryptionService,
+    ) => {
+      return new MusicianWalletPrismaRepository(
+        prismaService,
+        undefined,
+        encryption,
+      );
     },
-    inject: [PrismaService],
-  },
-};
-
-export const INFRA_PROVIDERS = {
-  PIX_GATEWAY: {
-    provide: "PixGateway",
-    useClass: PixGatewayMock,
-  },
-  ASAAS_PIX_WITHDRAW_GATEWAY: {
-    provide: "AsaasPixWithdrawGateway",
-    useFactory: (configService: ConfigService<EnvConfig>): IPixWithdrawGateway => {
-      const apiUrl = configService.get<string>("ASAAS_API_URL")!;
-      const apiKey = configService.get<string>("ASAAS_API_KEY") ?? "";
-      return new AsaasGatewayAdapter(apiUrl, apiKey);
-    },
-    inject: [ConfigService],
+    inject: [PrismaService, INFRA_PROVIDERS.ENCRYPTION_SERVICE.provide],
   },
 };
 
@@ -101,11 +137,16 @@ export const USE_CASES = {
       prismaService: PrismaService,
       bandRepo: IBandRepository,
       domainEventMediator: DomainEventMediator,
+      encryption: IEncryptionService,
     ) => {
       const uow = new PrismaUnitOfWork(prismaService);
-      const tipRepo = new TipPrismaRepository(prismaService, uow);
+      const tipRepo = new TipPrismaRepository(prismaService, uow, encryption);
       const txRepo = new TransactionPrismaRepository(prismaService, uow);
-      const walletRepo = new MusicianWalletPrismaRepository(prismaService, uow);
+      const walletRepo = new MusicianWalletPrismaRepository(
+        prismaService,
+        uow,
+        encryption,
+      );
 
       return new ConfirmTipPaymentUseCase(
         tipRepo,
@@ -116,7 +157,12 @@ export const USE_CASES = {
         domainEventMediator,
       );
     },
-    inject: [PrismaService, "BandRepository", DomainEventMediator],
+    inject: [
+      PrismaService,
+      "BandRepository",
+      DomainEventMediator,
+      INFRA_PROVIDERS.ENCRYPTION_SERVICE.provide,
+    ],
   },
   GET_MUSICIAN_WALLET_USE_CASE: {
     provide: GetMusicianWalletUseCase,
@@ -153,7 +199,12 @@ export const USE_CASES = {
       pixWithdrawGateway: IPixWithdrawGateway,
       planCheckService: PlanCheckService,
     ) => {
-      return new WithdrawToPixUseCase(walletRepo, txRepo, pixWithdrawGateway, planCheckService);
+      return new WithdrawToPixUseCase(
+        walletRepo,
+        txRepo,
+        pixWithdrawGateway,
+        planCheckService,
+      );
     },
     inject: [
       REPOSITORIES.MUSICIAN_WALLET_REPOSITORY.provide,

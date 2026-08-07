@@ -25,7 +25,12 @@ export class PushNotificationService {
 
   async send(pushToken: string, message: PushMessage): Promise<void> {
     if (!Expo.isExpoPushToken(pushToken)) {
-      this.logger.warn(`Invalid Expo push token, skipping: ${pushToken}`);
+      // SM-016: nunca logar o token completo — só um prefixo curto, o
+      // suficiente para correlacionar em suporte sem virar PII vazada no
+      // Sentry/CloudWatch (retenção longa, acesso mais amplo que o banco).
+      this.logger.warn(
+        `Invalid Expo push token, skipping: ${String(pushToken).slice(0, 12)}…`,
+      );
       return;
     }
 

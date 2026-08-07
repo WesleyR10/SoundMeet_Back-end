@@ -321,7 +321,10 @@ describe("PaymentController Integration Tests", () => {
 
       expect(result).toBeInstanceOf(MusicianWalletPresenter);
       expect(result.musician_id).toBe(MUSICIAN_ID);
-      expect(result.pix_key).toBe("52998224725");
+      // SM-016: o presenter nunca devolve a pix key completa, nem no eco de
+      // confirmação — só o sufixo mascarado (a chave crua fica só no banco).
+      expect(result.pix_key).toBe("*******4725");
+      expect(result.pix_key).not.toContain("52998224725");
 
       const wallet = await walletRepo.findByMusicianId(MUSICIAN_ID);
       expect(wallet?.pix_key?.key).toBe("52998224725");
@@ -336,7 +339,8 @@ describe("PaymentController Integration Tests", () => {
         pix_key_type: "email",
       } as any);
 
-      expect(result.pix_key).toBe("musico@pix.com");
+      expect(result.pix_key).toBe("**********.com");
+      expect(result.pix_key).not.toContain("musico@pix.com");
     });
 
     it("should reject an invalid pix key for the given type", async () => {

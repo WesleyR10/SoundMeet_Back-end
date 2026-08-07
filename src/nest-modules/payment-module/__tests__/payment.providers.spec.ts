@@ -39,7 +39,14 @@ describe("Payment providers", () => {
         },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue("mock_value") },
+          useValue: {
+            // TOKEN_ENCRYPTION_KEY precisa ficar undefined (não "mock_value")
+            // para cair no fallback de chave efêmera do AesGcmEncryptionService
+            // em vez de falhar a validação de 32 bytes base64 (SM-016).
+            get: jest.fn((key: string) =>
+              key === "TOKEN_ENCRYPTION_KEY" ? undefined : "mock_value",
+            ),
+          },
         },
         {
           provide: PlanCheckService,

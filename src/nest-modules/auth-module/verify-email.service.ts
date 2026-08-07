@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 import { IEmailVerificationIssuer } from "../../core/auth/infra/gateways/email-verification-issuer.interface";
 import { PrismaService } from "../database-module/prisma/prisma.service";
@@ -27,31 +27,41 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
     private readonly mailService: MailService,
   ) {}
 
-  async issueVerificationToken(
-    type: "musician" | "audience",
-    id: string,
-  ): Promise<void> {
+  // SM-016: o e-mail carrega o token em claro (é assim que o link de
+  // verificação funciona), mas o banco só guarda o hash — nunca decifrado,
+  // só comparado (mesma ideia de um token de reset de senha). Sem chave
+  // secreta: alta entropia (randomUUID) já torna força-bruta inviável mesmo
+  // com o hash vazado.
+  private hashToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  async issueVerificationToken(type: ProfileType, id: string): Promise<void> {
     const token = randomUUID();
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + this.TOKEN_TTL_HOURS);
 
     const data = {
-      email_token: token,
+      email_token: null,
+      email_token_hash: this.hashToken(token),
       email_token_expires_at: expiresAt,
     };
 
+    const select = { name: true, email: true };
+
+    // `establishment` entrou no Bloco 9.1: as três tabelas têm as mesmas
+    // colunas de token, e `verify()` abaixo já resolvia os três tipos —
+    // só a emissão estava restrita a músico/público.
     const profile =
       type === "musician"
-        ? await this.prisma.musician.update({
-            where: { id },
-            data,
-            select: { name: true, email: true },
-          })
-        : await this.prisma.audience.update({
-            where: { id },
-            data,
-            select: { name: true, email: true },
-          });
+        ? await this.prisma.musician.update({ where: { id }, data, select })
+        : type === "establishment"
+          ? await this.prisma.establishment.update({
+              where: { id },
+              data,
+              select,
+            })
+          : await this.prisma.audience.update({ where: { id }, data, select });
 
     await this.mailService.sendEmailVerification(profile.email, {
       name: profile.name,
@@ -79,8 +89,15 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
   }
 
   private async findByToken(token: string): Promise<TokenRecord | null> {
+    // Busca por hash (fluxo normal) OR pelo texto puro legado — cobre tokens
+    // emitidos antes do backfill de email_token_hash (SM-016), que ainda têm
+    // só email_token preenchido. Some com o tempo (TTL de 24h).
+    const where = {
+      OR: [{ email_token_hash: this.hashToken(token) }, { email_token: token }],
+    };
+
     const musician = await this.prisma.musician.findFirst({
-      where: { email_token: token },
+      where,
       select: {
         id: true,
         email_pending: true,
@@ -97,7 +114,7 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
     }
 
     const establishment = await this.prisma.establishment.findFirst({
-      where: { email_token: token },
+      where,
       select: {
         id: true,
         email_pending: true,
@@ -114,7 +131,7 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
     }
 
     const audience = await this.prisma.audience.findFirst({
-      where: { email_token: token },
+      where,
       select: {
         id: true,
         email_pending: true,
@@ -136,6 +153,7 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
   private async confirmEmail(record: TokenRecord): Promise<void> {
     const clearFields = {
       email_token: null,
+      email_token_hash: null,
       email_token_expires_at: null,
       email_verified_at: new Date(),
       email_pending: null,

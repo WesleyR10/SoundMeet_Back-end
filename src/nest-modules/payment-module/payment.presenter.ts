@@ -6,6 +6,10 @@ import { GetMusicianTipsOutput } from "../../core/payment/application/use-cases/
 import { GetMusicianWalletOutput } from "../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
 import { SendTipOutput } from "../../core/payment/application/use-cases/send-tip/send-tip.use-case";
 import { WithdrawToPixOutput } from "../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
+import {
+  maskBankAccount,
+  maskSecretTail,
+} from "../shared-module/masking/mask-secret";
 
 export class SendTipPresenter {
   id: string;
@@ -55,8 +59,10 @@ export class MusicianWalletPresenter {
     this.balance = output.balance;
     this.total_earned = output.total_earned;
     this.total_withdrawn = output.total_withdrawn;
-    this.pix_key = output.pix_key;
-    this.bank_account = output.bank_account;
+    // SM-016: nunca devolve pix_key/bank_account completos por HTTP, mesmo
+    // atrás do MusicianOwnershipGuard — só o sufixo, como confirmação visual.
+    this.pix_key = maskSecretTail(output.pix_key);
+    this.bank_account = maskBankAccount(output.bank_account);
     this.is_active = output.is_active;
     this.min_withdrawal_amount_brl = output.min_withdrawal_amount_brl;
     this.withdrawal_days = output.withdrawal_days;
