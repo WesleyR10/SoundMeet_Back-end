@@ -58,4 +58,32 @@ describe("EstablishmentAnalyticsEventsHandlers", () => {
       }),
     );
   });
+
+  it("engole erro do recálculo — nunca propaga pro fluxo de booking (emitAsync)", async () => {
+    const bookingId = new BookingId();
+    const bookingLookup: IBookingLookupGateway = {
+      findBookingAnalyticsLookup: jest
+        .fn()
+        .mockRejectedValue(new Error("lookup indisponível")),
+    };
+    const analyticsRepo = {
+      calculateDailyMetrics: jest.fn(),
+      upsertDaily: jest.fn(),
+    };
+    const handler = new EstablishmentAnalyticsEventsHandlers(
+      bookingLookup,
+      analyticsRepo as any,
+    );
+
+    await expect(
+      handler.handleBookingConfirmed(
+        new BookingConfirmedEvent({
+          booking_id: bookingId,
+          confirmed_at: new Date("2026-06-18T12:00:00.000Z"),
+        }),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(analyticsRepo.upsertDaily).not.toHaveBeenCalled();
+  });
 });

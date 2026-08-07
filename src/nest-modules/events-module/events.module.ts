@@ -2,15 +2,17 @@ import { Global, Module } from "@nestjs/common";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { DatabaseModule } from "../database-module/database.module";
+import { AutoFinishEventsJob } from "./auto-finish-events.job";
 import { EventsController } from "./events.controller";
-import { EventsDiscoveryController } from "./events-discovery.controller";
 import { EVENTS_PROVIDERS } from "./events.providers";
+import { EventsDiscoveryController } from "./events-discovery.controller";
 
 @Global()
 @Module({
   imports: [DatabaseModule, EventEmitterModule.forRoot()],
   controllers: [EventsController, EventsDiscoveryController],
   providers: [
+    AutoFinishEventsJob,
     ...Object.values(EVENTS_PROVIDERS.REPOSITORIES),
     ...Object.values(EVENTS_PROVIDERS.USE_CASES),
     ...Object.values(EVENTS_PROVIDERS.EVENTS),

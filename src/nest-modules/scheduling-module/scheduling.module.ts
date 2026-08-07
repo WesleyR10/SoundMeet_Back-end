@@ -27,6 +27,9 @@ import { SCHEDULING_PROVIDERS } from "./scheduling.providers";
   exports: [
     SCHEDULING_PROVIDERS.REPOSITORIES.BOOKING_REPOSITORY.provide,
     SCHEDULING_PROVIDERS.REPOSITORIES.AVAILABILITY_REPOSITORY.provide,
+    // Bloco 9.5 — NotificationsSchedulingEventsHandler resolve de quem é a
+    // inquiry para notificar o estabelecimento certo.
+    SCHEDULING_PROVIDERS.REPOSITORIES.INQUIRY_REPOSITORY.provide,
   ],
 })
 export class SchedulingModule {}

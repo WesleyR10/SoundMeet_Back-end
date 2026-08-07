@@ -1,3 +1,4 @@
+import { Injectable, Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -5,12 +6,14 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { Injectable, Logger } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 
 import { AuthJwtVerifier } from "../auth-module/auth-jwt.verifier";
+import { toAuthenticatedUser } from "../auth-module/authenticated-user.mapper";
 import {
+  BookingUpdatePayload,
   ChatMessageNewPayload,
+  InquiryUpdatePayload,
   NewRequestPayload,
   RequestStatusChangedPayload,
   TipReceivedPayload,
@@ -44,10 +47,26 @@ export class NotificationsGateway
     }
     try {
       const payload = await this.authJwtVerifier.verify(token);
-      const userId = payload.sub as string;
+      // Mesma leitura de claims do HTTP — `toAuthenticatedUser` é a fonte
+      // única; duplicar aqui abriria espaço para um transporte aceitar o que o
+      // outro recusa.
+      const user = toAuthenticatedUser(payload as never);
+      const userId = user.userId;
+
       client.data.userId = userId;
       await client.join(`user:${userId}`);
-      this.logger.debug(`Connected: user=${userId} socket=${client.id}`);
+
+      // Bloco 9.5 — o estabelecimento NÃO é o `sub`: uma conta pode operar até
+      // 3 unidades, e quem diz quais é o claim `establishment_ids`. Sem estas
+      // rooms não há como empurrar nada para o dashboard web.
+      client.data.establishmentIds = user.establishmentIds;
+      for (const establishmentId of user.establishmentIds) {
+        await client.join(`establishment:${establishmentId}`);
+      }
+
+      this.logger.debug(
+        `Connected: user=${userId} establishments=${user.establishmentIds.length} socket=${client.id}`,
+      );
     } catch {
       client.disconnect();
     }
@@ -80,5 +99,33 @@ export class NotificationsGateway
   // pro namespace /chat, que é screen-scoped (ver ChatGateway).
   notifyChatMessage(musicianId: string, payload: ChatMessageNewPayload): void {
     this.server.to(`user:${musicianId}`).emit("chat.message.new", payload);
+  }
+
+  /** Músico: room pessoal (`Musician.id === sub`). */
+  notifyBookingUpdate(userId: string, payload: BookingUpdatePayload): void {
+    this.server.to(`user:${userId}`).emit("booking.updated", payload);
+  }
+
+  /** Estabelecimento: room por unidade, derivada do claim no connect. */
+  notifyEstablishmentBookingUpdate(
+    establishmentId: string,
+    payload: BookingUpdatePayload,
+  ): void {
+    this.server
+      .to(`establishment:${establishmentId}`)
+      .emit("booking.updated", payload);
+  }
+
+  notifyInquiryUpdate(userId: string, payload: InquiryUpdatePayload): void {
+    this.server.to(`user:${userId}`).emit("inquiry.updated", payload);
+  }
+
+  notifyEstablishmentInquiryUpdate(
+    establishmentId: string,
+    payload: InquiryUpdatePayload,
+  ): void {
+    this.server
+      .to(`establishment:${establishmentId}`)
+      .emit("inquiry.updated", payload);
   }
 }

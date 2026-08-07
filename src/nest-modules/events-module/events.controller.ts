@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  UnprocessableEntityException,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -34,12 +35,12 @@ import { ListEventMusiciansUseCase } from "../../core/events/application/use-cas
 import { ListEventsUseCase } from "../../core/events/application/use-cases/list-events/list-events.use-case";
 import { RemoveEventAttendeeUseCase } from "../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
-import { UpdateEventMusicianStatusUseCase } from "../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import { UpdateEventInput } from "../../core/events/application/use-cases/update-event/update-event.input";
 import { UpdateEventUseCase } from "../../core/events/application/use-cases/update-event/update-event.use-case";
+import { UpdateEventMusicianStatusUseCase } from "../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   EstablishmentOwnershipGuard,
@@ -60,6 +61,7 @@ import {
   EventMusicianPresenter,
   EventPresenter,
 } from "./event.presenter";
+import { EventAttendeeAccessGuard } from "./guards/event-attendee-access.guard";
 
 @ApiTags("Events")
 @ApiBearerAuth("JWT-auth")
@@ -151,6 +153,7 @@ export class EventsController {
   async listEvents(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query() query: SearchEventsDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const output = await this.listEventsUseCase.execute({
       establishment_id: id,
@@ -159,6 +162,32 @@ export class EventsController {
       sort: query.sort,
       sort_dir: query.sort_dir,
       filter: query.filter,
+      // Soft-auth (rota @Public): anônimo e terceiro só veem evento público;
+      // o dono continua vendo os privados. Bloco 9.4d.
+      requesting_establishment_ids: currentUser?.establishmentIds,
+      is_admin: currentUser?.isAdmin,
+    });
+    return new EventCollectionPresenter(output);
+  }
+
+  @Get("active")
+  @Public()
+  @ApiOperation({
+    summary: "Eventos ativos do estabelecimento",
+    description:
+      "Atalho do fluxo de QR code: o app escaneia, bate aqui e obtém o evento em andamento sem listar tudo e filtrar no cliente. Devolve lista (o modelo permite mais de um ativo; o cliente usa o primeiro). Mesma regra de visibilidade da listagem.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: EventCollectionPresenter })
+  async listActiveEvents(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    const output = await this.listEventsUseCase.execute({
+      establishment_id: id,
+      filter: { status: "active" },
+      requesting_establishment_ids: currentUser?.establishmentIds,
+      is_admin: currentUser?.isAdmin,
     });
     return new EventCollectionPresenter(output);
   }
@@ -176,10 +205,13 @@ export class EventsController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Param("event_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     event_id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     const output = await this.getEventUseCase.execute({
       establishment_id: id,
       event_id,
+      requesting_establishment_ids: currentUser?.establishmentIds,
+      is_admin: currentUser?.isAdmin,
     });
     return new EventPresenter(output);
   }
@@ -306,6 +338,7 @@ export class EventsController {
 
   @Post(":event_id/attendees")
   @Roles("audience", "establishment", "admin")
+  @UseGuards(EventAttendeeAccessGuard)
   @ApiOperation({
     summary: "Adicionar attendee",
     description:
@@ -321,10 +354,15 @@ export class EventsController {
     @Body() dto: AddEventAttendeeDto,
     @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const audienceId =
-      currentUser?.roles.includes("audience")
-        ? currentUser.userId
-        : (dto.audience_id ?? "");
+    // Audience é sempre ele mesmo; establishment/admin precisam dizer quem.
+    const audienceId = currentUser?.roles.includes("audience")
+      ? currentUser.userId
+      : dto.audience_id;
+    if (!audienceId) {
+      throw new UnprocessableEntityException(
+        "audience_id é obrigatório para establishment/admin",
+      );
+    }
     const output = await this.addEventAttendeeUseCase.execute({
       establishment_id: id,
       event_id,
@@ -335,6 +373,7 @@ export class EventsController {
 
   @Delete(":event_id/attendees/:audience_id")
   @Roles("audience", "establishment", "admin")
+  @UseGuards(EventAttendeeAccessGuard)
   @ApiOperation({
     summary: "Remover attendee",
     description:
@@ -352,10 +391,9 @@ export class EventsController {
     audience_id: string,
     @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const resolvedAudienceId =
-      currentUser?.roles.includes("audience")
-        ? currentUser.userId
-        : audience_id;
+    const resolvedAudienceId = currentUser?.roles.includes("audience")
+      ? currentUser.userId
+      : audience_id;
     const output = await this.removeEventAttendeeUseCase.execute({
       establishment_id: id,
       event_id,
@@ -478,7 +516,8 @@ export class EventsController {
   @UseGuards(EstablishmentOwnershipGuard)
   @ApiOperation({
     summary: "Atualizar status do performer",
-    description: "Confirma ou cancela a participação de um músico/banda no evento.",
+    description:
+      "Confirma ou cancela a participação de um músico/banda no evento.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiParam({ name: "event_id", required: true, format: "uuid" })
@@ -488,10 +527,7 @@ export class EventsController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Param("event_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     event_id: string,
-    @Param(
-      "event_musician_id",
-      new ParseUUIDPipe({ errorHttpStatusCode: 422 }),
-    )
+    @Param("event_musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
     event_musician_id: string,
     @Body() dto: UpdateEventMusicianStatusDto,
   ) {

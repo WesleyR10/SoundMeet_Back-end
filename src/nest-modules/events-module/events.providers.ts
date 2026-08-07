@@ -3,6 +3,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ActivateEventUseCase } from "../../core/events/application/use-cases/activate-event/activate-event.use-case";
 import { AddEventAttendeeUseCase } from "../../core/events/application/use-cases/add-event-attendee/add-event-attendee.use-case";
 import { AddEventPerformerUseCase } from "../../core/events/application/use-cases/add-event-performer/add-event-performer.use-case";
+import { AutoFinishEventsUseCase } from "../../core/events/application/use-cases/auto-finish-events/auto-finish-events.use-case";
 import { CancelEventUseCase } from "../../core/events/application/use-cases/cancel-event/cancel-event.use-case";
 import { CreateEventUseCase } from "../../core/events/application/use-cases/create-event/create-event.use-case";
 import { DeleteEventUseCase } from "../../core/events/application/use-cases/delete-event/delete-event.use-case";
@@ -13,8 +14,8 @@ import { ListEventMusiciansUseCase } from "../../core/events/application/use-cas
 import { ListEventsUseCase } from "../../core/events/application/use-cases/list-events/list-events.use-case";
 import { RemoveEventAttendeeUseCase } from "../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
-import { UpdateEventMusicianStatusUseCase } from "../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import { UpdateEventUseCase } from "../../core/events/application/use-cases/update-event/update-event.use-case";
+import { UpdateEventMusicianStatusUseCase } from "../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import {
   IEventAttendeeRepository,
   IEventMusicianRepository,
@@ -90,6 +91,14 @@ export const USE_CASES = {
     provide: ListEventsUseCase,
     useFactory: (repo: IEventRepository) => {
       return new ListEventsUseCase(repo);
+    },
+    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+  },
+  // Bloco 9.4b — job de auto-finalização.
+  AUTO_FINISH_EVENTS_USE_CASE: {
+    provide: AutoFinishEventsUseCase,
+    useFactory: (repo: IEventRepository) => {
+      return new AutoFinishEventsUseCase(repo);
     },
     inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
   },

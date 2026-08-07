@@ -7,13 +7,17 @@ import { ICalendarReadModel } from "../../core/scheduling/application/gateways/c
 import { AcceptInquiryUseCase } from "../../core/scheduling/application/use-cases/accept-inquiry/accept-inquiry.use-case";
 import { AddUnavailabilityUseCase } from "../../core/scheduling/application/use-cases/add-unavailability/add-unavailability.use-case";
 import { CancelBookingUseCase } from "../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.use-case";
+import { CompleteConfirmedBookingsUseCase } from "../../core/scheduling/application/use-cases/complete-confirmed-bookings/complete-confirmed-bookings.use-case";
 import { ConfirmBookingUseCase } from "../../core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case";
 import { ConvertInquiryToBookingUseCase } from "../../core/scheduling/application/use-cases/convert-inquiry-to-booking/convert-inquiry-to-booking.use-case";
 import { CreateInquiryUseCase } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.use-case";
 import { ExpirePendingBookingsUseCase } from "../../core/scheduling/application/use-cases/expire-pending-bookings/expire-pending-bookings.use-case";
 import { GetAvailabilityUseCase } from "../../core/scheduling/application/use-cases/get-availability/get-availability.use-case";
+import { GetBookingUseCase } from "../../core/scheduling/application/use-cases/get-booking/get-booking.use-case";
 import { GetFreeBusyUseCase } from "../../core/scheduling/application/use-cases/get-free-busy/get-free-busy.use-case";
 import { GetMonthSlotsUseCase } from "../../core/scheduling/application/use-cases/get-month-slots/get-month-slots.use-case";
+import { ListBookingsUseCase } from "../../core/scheduling/application/use-cases/list-bookings/list-bookings.use-case";
+import { ListInquiriesUseCase } from "../../core/scheduling/application/use-cases/list-inquiries/list-inquiries.use-case";
 import { ProposeBookingUseCase } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.use-case";
 import { RejectInquiryUseCase } from "../../core/scheduling/application/use-cases/reject-inquiry/reject-inquiry.use-case";
 import { RemoveUnavailabilityUseCase } from "../../core/scheduling/application/use-cases/remove-unavailability/remove-unavailability.use-case";
@@ -33,6 +37,7 @@ import { LuxonDateTimeService } from "../../core/shared/infra/date-time/luxon-da
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { BookingEventsHandlers } from "./booking-events.handlers";
+import { CompleteConfirmedBookingsJob } from "./complete-confirmed-bookings.job";
 import { ExpirePendingBookingsJob } from "./expire-pending-bookings.job";
 
 export const REPOSITORIES = {
@@ -111,17 +116,46 @@ export const SERVICES = {
 };
 
 export const USE_CASES = {
+  // Bloco 9.2 — leitura de agenda. Só o repositório: o escopo por
+  // participante vem do JWT, resolvido no controller.
+  LIST_BOOKINGS_USE_CASE: {
+    provide: ListBookingsUseCase,
+    useFactory: (bookingRepo: IBookingRepository) => {
+      return new ListBookingsUseCase(bookingRepo);
+    },
+    inject: [REPOSITORIES.BOOKING_REPOSITORY.provide],
+  },
+  GET_BOOKING_USE_CASE: {
+    provide: GetBookingUseCase,
+    useFactory: (bookingRepo: IBookingRepository) => {
+      return new GetBookingUseCase(bookingRepo);
+    },
+    inject: [REPOSITORIES.BOOKING_REPOSITORY.provide],
+  },
+  LIST_INQUIRIES_USE_CASE: {
+    provide: ListInquiriesUseCase,
+    useFactory: (inquiryRepo: IInquiryRepository) => {
+      return new ListInquiriesUseCase(inquiryRepo);
+    },
+    inject: [REPOSITORIES.INQUIRY_REPOSITORY.provide],
+  },
   CREATE_INQUIRY_USE_CASE: {
     provide: CreateInquiryUseCase,
     useFactory: (
       inquiryRepo: IInquiryRepository,
       domainEventMediator: DomainEventMediator,
+      bandRepo: IBandRepository,
     ) => {
-      return new CreateInquiryUseCase(inquiryRepo, domainEventMediator);
+      return new CreateInquiryUseCase(
+        inquiryRepo,
+        domainEventMediator,
+        bandRepo,
+      );
     },
     inject: [
       REPOSITORIES.INQUIRY_REPOSITORY.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      REPOSITORIES.BAND_REPOSITORY.provide,
     ],
   },
   ACCEPT_INQUIRY_USE_CASE: {
@@ -130,13 +164,20 @@ export const USE_CASES = {
       inquiryRepo: IInquiryRepository,
       clock: IClock,
       domainEventMediator: DomainEventMediator,
+      bandRepo: IBandRepository,
     ) => {
-      return new AcceptInquiryUseCase(inquiryRepo, clock, domainEventMediator);
+      return new AcceptInquiryUseCase(
+        inquiryRepo,
+        clock,
+        domainEventMediator,
+        bandRepo,
+      );
     },
     inject: [
       REPOSITORIES.INQUIRY_REPOSITORY.provide,
       SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      REPOSITORIES.BAND_REPOSITORY.provide,
     ],
   },
   REJECT_INQUIRY_USE_CASE: {
@@ -145,13 +186,20 @@ export const USE_CASES = {
       inquiryRepo: IInquiryRepository,
       clock: IClock,
       domainEventMediator: DomainEventMediator,
+      bandRepo: IBandRepository,
     ) => {
-      return new RejectInquiryUseCase(inquiryRepo, clock, domainEventMediator);
+      return new RejectInquiryUseCase(
+        inquiryRepo,
+        clock,
+        domainEventMediator,
+        bandRepo,
+      );
     },
     inject: [
       REPOSITORIES.INQUIRY_REPOSITORY.provide,
       SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      REPOSITORIES.BAND_REPOSITORY.provide,
     ],
   },
   CONVERT_INQUIRY_TO_BOOKING_USE_CASE: {
@@ -162,6 +210,7 @@ export const USE_CASES = {
       clock: IClock,
       domainEventMediator: DomainEventMediator,
       configService: ConfigSchemaType,
+      bandRepo: IBandRepository,
     ) => {
       return new ConvertInquiryToBookingUseCase(
         inquiryRepo,
@@ -169,6 +218,7 @@ export const USE_CASES = {
         clock,
         domainEventMediator,
         configService.get<number>("BOOKING_DEFAULT_FREE_CANCELLATION_HOURS")!,
+        bandRepo,
       );
     },
     inject: [
@@ -177,6 +227,7 @@ export const USE_CASES = {
       SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
       ConfigService,
+      REPOSITORIES.BAND_REPOSITORY.provide,
     ],
   },
   PROPOSE_BOOKING_USE_CASE: {
@@ -244,13 +295,20 @@ export const USE_CASES = {
       bookingRepo: IBookingRepository,
       clock: IClock,
       domainEventMediator: DomainEventMediator,
+      bandRepo: IBandRepository,
     ) => {
-      return new CancelBookingUseCase(bookingRepo, clock, domainEventMediator);
+      return new CancelBookingUseCase(
+        bookingRepo,
+        clock,
+        domainEventMediator,
+        bandRepo,
+      );
     },
     inject: [
       REPOSITORIES.BOOKING_REPOSITORY.provide,
       SERVICES.CLOCK.provide,
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      REPOSITORIES.BAND_REPOSITORY.provide,
     ],
   },
   EXPIRE_PENDING_BOOKINGS_USE_CASE: {
@@ -259,6 +317,25 @@ export const USE_CASES = {
       return new ExpirePendingBookingsUseCase(bookingRepo);
     },
     inject: [REPOSITORIES.BOOKING_REPOSITORY.provide],
+  },
+  COMPLETE_CONFIRMED_BOOKINGS_USE_CASE: {
+    provide: CompleteConfirmedBookingsUseCase,
+    useFactory: (
+      bookingRepo: IBookingRepository,
+      domainEventMediator: DomainEventMediator,
+      configService: ConfigSchemaType,
+    ) => {
+      return new CompleteConfirmedBookingsUseCase(
+        bookingRepo,
+        domainEventMediator,
+        configService.get<number>("BOOKING_COMPLETION_DELAY_HOURS")!,
+      );
+    },
+    inject: [
+      REPOSITORIES.BOOKING_REPOSITORY.provide,
+      EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+      ConfigService,
+    ],
   },
   GET_FREE_BUSY_USE_CASE: {
     provide: GetFreeBusyUseCase,
@@ -328,6 +405,10 @@ export const JOBS = {
   EXPIRE_PENDING_BOOKINGS_JOB: {
     provide: ExpirePendingBookingsJob,
     useClass: ExpirePendingBookingsJob,
+  },
+  COMPLETE_CONFIRMED_BOOKINGS_JOB: {
+    provide: CompleteConfirmedBookingsJob,
+    useClass: CompleteConfirmedBookingsJob,
   },
 };
 

@@ -1,7 +1,10 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 
 import { BookingOutput } from "../../core/scheduling/application/use-cases/common/booking-output";
+import { PaginationOutput } from "../../core/shared/application/pagination-output";
 import { BookingStatusEnum } from "../../core/shared/domain/value-objects/booking-status.vo";
+import { CollectionPresenter } from "../shared-module/collection.presenter";
 
 export class BookingPresenter {
   id: string;
@@ -64,5 +67,16 @@ export class BookingPresenter {
     this.completed_at = output.completed_at;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
+  }
+}
+
+export class BookingCollectionPresenter extends CollectionPresenter {
+  @ApiProperty({ type: [BookingPresenter] })
+  data: BookingPresenter[];
+
+  constructor(output: PaginationOutput<BookingOutput>) {
+    const { items, ...paginationProps } = output;
+    super(paginationProps);
+    this.data = items.map((i) => new BookingPresenter(i));
   }
 }

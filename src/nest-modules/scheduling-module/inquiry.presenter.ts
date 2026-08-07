@@ -1,7 +1,10 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 
 import { InquiryOutput } from "../../core/scheduling/application/use-cases/common/inquiry-output";
+import { PaginationOutput } from "../../core/shared/application/pagination-output";
 import { InquiryStatusEnum } from "../../core/shared/domain/value-objects/inquiry-status.vo";
+import { CollectionPresenter } from "../shared-module/collection.presenter";
 
 export class InquiryPresenter {
   id: string;
@@ -52,5 +55,16 @@ export class InquiryPresenter {
     this.booking_id = output.booking_id;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
+  }
+}
+
+export class InquiryCollectionPresenter extends CollectionPresenter {
+  @ApiProperty({ type: [InquiryPresenter] })
+  data: InquiryPresenter[];
+
+  constructor(output: PaginationOutput<InquiryOutput>) {
+    const { items, ...paginationProps } = output;
+    super(paginationProps);
+    this.data = items.map((i) => new InquiryPresenter(i));
   }
 }

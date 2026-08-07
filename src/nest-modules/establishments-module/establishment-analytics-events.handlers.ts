@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 
 import { EstablishmentAnalytics } from "../../core/establishment/domain/establishment-analytics.read-model";
@@ -49,8 +49,21 @@ export class PrismaBookingLookupGateway implements IBookingLookupGateway {
   }
 }
 
+/**
+ * Escuta os eventos de domínio do scheduling (cross-module via EventEmitter2,
+ * mesmo precedente do google-calendar/notifications-module) e recalcula o
+ * analytics diário do estabelecimento.
+ *
+ * O DomainEventMediator usa emitAsync: qualquer erro aqui subiria para o
+ * ConfirmBooking/CancelBookingUseCase DEPOIS do booking já persistido — por
+ * isso todo erro é engolido e logado, nunca propagado.
+ */
 @Injectable()
 export class EstablishmentAnalyticsEventsHandlers {
+  private readonly logger = new Logger(
+    EstablishmentAnalyticsEventsHandlers.name,
+  );
+
   constructor(
     @Inject(BOOKING_LOOKUP_GATEWAY)
     private readonly bookingLookup: IBookingLookupGateway,
@@ -60,20 +73,53 @@ export class EstablishmentAnalyticsEventsHandlers {
 
   @OnEvent(BookingConfirmedEvent.name)
   async handleBookingConfirmed(event: BookingConfirmedEvent) {
-    await this.recalculateByBookingId(event.aggregate_id.id);
+    try {
+      await this.recalculateByBookingId(event.aggregate_id.id);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "establishment_analytics.recalculate_failed",
+          action: "booking_confirmed",
+          booking_id: event.aggregate_id.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   @OnEvent(BookingCancelledEvent.name)
   async handleBookingCancelled(event: BookingCancelledEvent) {
-    await this.recalculateByBookingId(
-      event.aggregate_id.id,
-      event.booking_start_at,
-    );
+    try {
+      await this.recalculateByBookingId(
+        event.aggregate_id.id,
+        event.booking_start_at,
+      );
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "establishment_analytics.recalculate_failed",
+          action: "booking_cancelled",
+          booking_id: event.aggregate_id.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   @OnEvent(BookingCompletedEvent.name)
   async handleBookingCompleted(event: BookingCompletedEvent) {
-    await this.recalculateByBookingId(event.aggregate_id.id);
+    try {
+      await this.recalculateByBookingId(event.aggregate_id.id);
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "establishment_analytics.recalculate_failed",
+          action: "booking_completed",
+          booking_id: event.aggregate_id.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   private async recalculateByBookingId(

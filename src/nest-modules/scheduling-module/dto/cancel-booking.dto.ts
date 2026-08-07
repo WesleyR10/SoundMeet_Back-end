@@ -5,7 +5,7 @@ import { CancelBookingInput } from "../../../core/scheduling/application/use-cas
 export class CancelBookingInputBody extends OmitType(CancelBookingInput, [
   "booking_id",
   "cancelled_by",
-  "requesting_user_id",
+  "requesting_participant_ids",
   "is_admin",
 ] as const) {}
 
