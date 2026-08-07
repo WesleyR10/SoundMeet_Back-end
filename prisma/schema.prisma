@@ -84,91 +84,98 @@ enum SubscriptionStatus {
 // ========================================
 
 model Musician {
-  id               String   @id @default(uuid())
-  email            String   @unique
-  name             String
-  stage_name       String?
-  bio              String?
-  avatar           String?
-  phone            String?  @unique
-  cpf              String?  @unique
-  genres           String[] @default([])
-  instruments      String[] @default([])
-  experience_years Int?
-  qr_code          String?  @unique
-  qr_foreground_color String?
-  qr_background_color String?
-  qr_logo_url         String?
-  qr_label            String?
-  push_token          String?
-  push_token_platform String?
-  rating           Float    @default(0)
-  total_ratings    Int      @default(0)
-  is_active        Boolean  @default(true)
-  is_verified      Boolean  @default(false)
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  name                   String
+  stage_name             String?
+  bio                    String?
+  avatar                 String?
+  phone                  String?   @unique
+  cpf                    String?   @unique
+  genres                 String[]  @default([])
+  instruments            String[]  @default([])
+  experience_years       Int?
+  qr_code                String?   @unique
+  qr_foreground_color    String?
+  qr_background_color    String?
+  qr_logo_url            String?
+  qr_label               String?
+  push_token             String?
+  push_token_platform    String?
+  rating                 Float     @default(0)
+  total_ratings          Int       @default(0)
+  is_active              Boolean   @default(true)
+  is_verified            Boolean   @default(false)
   // Consentimento explícito para aparecer em busca de estabelecimentos
   // (radar de contratação). null = ainda não decidiu — nunca default true,
   // decisão forçada no onboarding. Só true aparece em qualquer busca pública.
-  open_to_gigs     Boolean?
+  open_to_gigs           Boolean?
   email_verified_at      DateTime?
   email_pending          String?
+  // Legado (SM-016, texto puro, reversível) — substituído por
+  // email_token_hash (SHA-256, one-way). Mantido só para o backfill;
+  // remoção em migration futura (política: adicionar → backfill → remover).
   email_token            String?
+  // SHA-256 do token enviado por e-mail — nunca decifrado, só comparado no
+  // momento da verificação (mesma ideia de um token de reset de senha).
+  email_token_hash       String?
   email_token_expires_at DateTime?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
 
   // Relacionamentos
-  profile                  MusicianProfile?
-  bands                    BandMember[]
-  requests                 MusicRequest[]
-  tips                     Tip[]
-  events                   EventMusician[]
-  analytics                MusicianAnalytics[]
-  library                  MusicLibrary[]
-  interactions             UserInteraction[]
-  bookings                 Booking[]
-  inquiries                Inquiry[]
-  calendar_settings        MusicianCalendarSettings?
-  availability_rules       MusicianAvailabilityRule[]
-  unavailabilities         MusicianUnavailability[]
-  ai_audio_uploads         AiAudioUpload[]
-  ai_audio_separation_jobs AiAudioSeparationJob[]
-  ai_cifra_uploads         AiCifraUpload[]
-  ai_cifra_analysis_jobs   AiCifraAnalysisJob[]
-  synced_lyrics_bulk_jobs  SyncedLyricsBulkJob[]
-  wallet                   MusicianWallet?
-  transactions             Transaction[]
-  subscriptions            Subscription[]
-  repertoires              Repertoire[]
+  profile                     MusicianProfile?
+  bands                       BandMember[]
+  requests                    MusicRequest[]
+  tips                        Tip[]
+  events                      EventMusician[]
+  analytics                   MusicianAnalytics[]
+  library                     MusicLibrary[]
+  interactions                UserInteraction[]
+  bookings                    Booking[]
+  inquiries                   Inquiry[]
+  calendar_settings           MusicianCalendarSettings?
+  availability_rules          MusicianAvailabilityRule[]
+  unavailabilities            MusicianUnavailability[]
+  ai_audio_uploads            AiAudioUpload[]
+  ai_audio_separation_jobs    AiAudioSeparationJob[]
+  ai_cifra_uploads            AiCifraUpload[]
+  ai_cifra_analysis_jobs      AiCifraAnalysisJob[]
+  synced_lyrics_bulk_jobs     SyncedLyricsBulkJob[]
+  wallet                      MusicianWallet?
+  transactions                Transaction[]
+  subscriptions               Subscription[]
+  repertoires                 Repertoire[]
   google_calendar_integration GoogleCalendarIntegration?
+  personal_chord_sheets       PersonalChordSheet[]
 
   @@map("musicians")
 }
 
 model MusicianProfile {
-  id             String        @id @default(uuid())
-  musicianId     String        @unique
+  id                 String        @id @default(uuid())
+  musicianId         String        @unique
   // Legado (modelo único) — backfillado para os pares abaixo; remoção em
   // migration futura (política: adicionar → backfill → remover em separado)
-  price_model    String? // "per_event" | "per_hour"
-  price_min      Decimal?      @db.Decimal(12, 2)
-  price_max      Decimal?      @db.Decimal(12, 2)
-  price_currency CurrencyEnum? @default(BRL)
-  price_notes    String?
+  price_model        String? // "per_event" | "per_hour"
+  price_min          Decimal?      @db.Decimal(12, 2)
+  price_max          Decimal?      @db.Decimal(12, 2)
+  price_currency     CurrencyEnum? @default(BRL)
+  price_notes        String?
   // Uma faixa por modelo de cobrança — o músico pode precificar por hora E
   // por evento simultaneamente, com min/max/notas independentes
-  price_hour_min    Decimal? @db.Decimal(12, 2)
-  price_hour_max    Decimal? @db.Decimal(12, 2)
-  price_hour_notes  String?
-  price_event_min   Decimal? @db.Decimal(12, 2)
-  price_event_max   Decimal? @db.Decimal(12, 2)
-  price_event_notes String?
-  location       Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
+  price_hour_min     Decimal?      @db.Decimal(12, 2)
+  price_hour_max     Decimal?      @db.Decimal(12, 2)
+  price_hour_notes   String?
+  price_event_min    Decimal?      @db.Decimal(12, 2)
+  price_event_max    Decimal?      @db.Decimal(12, 2)
+  price_event_notes  String?
+  location           Json // {city: "São Paulo", state: "SP", coordinates: {lat: -23.5505, lng: -46.6333}}
   // Denormalizado do JSON `location` (latitude/longitude) pelo mapper a cada
   // save — pré-filtro indexável da busca por raio (7.13c), mesmo padrão de
   // EstablishmentProfile.location_lat/lng. Fonte de verdade segue o JSON.
-  location_lat   Float?
-  location_lng   Float?
+  location_lat       Float?
+  location_lng       Float?
   // Modo turnê (7.13d) — segundo ponto de busca, opcional e com expiração
   // automática, somado à base permanente (nunca a substitui). Mesmo padrão
   // de denormalização de location/location_lat/lng acima.
@@ -176,9 +183,9 @@ model MusicianProfile {
   touring_lat        Float?
   touring_lng        Float?
   touring_expires_at DateTime?
-  socialLinks    Json? // {instagram: "@musician", youtube: "channel"}
-  created_at     DateTime      @default(now())
-  updated_at     DateTime      @updatedAt
+  socialLinks        Json? // {instagram: "@musician", youtube: "channel"}
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
@@ -244,12 +251,14 @@ model BandAvailabilityRule {
 }
 
 model BandMember {
-  id         String   @id @default(uuid())
-  bandId     String
-  musicianId String
-  role       String // "leader", "member"
-  instrument String
-  joinedAt   DateTime @default(now())
+  id           String           @id @default(uuid())
+  bandId       String
+  musicianId   String
+  // Papel de decisão, não rótulo livre: só o líder aceita/recusa convite de
+  // evento e confirma/cancela booking em nome da banda.
+  role         BandMemberRole
+  instrument   String
+  joinedAt     DateTime         @default(now())
   // Fluxo de convite/aceite. Default `accepted` só serve para backfill de
   // linhas existentes (membros já adicionados antes deste fluxo existir);
   // membros novos sempre nascem `pending` via Band.inviteMember().
@@ -258,10 +267,23 @@ model BandMember {
 
   band     Band     @relation(fields: [bandId], references: [id], onDelete: Cascade)
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  // ⚠️ Existe também o índice parcial ÚNICO `band_members_one_accepted_leader`
+  // — `(bandId) WHERE role = 'leader' AND status = 'accepted'` — criado em
+  // 20260729103000_band_member_role_enum_and_single_leader. Prisma não sabe
+  // expressar índice parcial, então ele vive só no SQL: se algum `migrate dev`
+  // gerar um DROP INDEX dele, **remova esse DROP** e mantenha o índice. É ele
+  // que impede dois líderes em corrida entre duas requisições simultâneas.
 
   @@unique([bandId, musicianId])
   @@index([bandId, role])
   @@map("band_members")
+}
+
+// Fechado de propósito: era String livre e aceitava "Leader"/"vocalista", o
+// que fazia o líder perder as próprias decisões sem erro visível.
+enum BandMemberRole {
+  leader
+  member
 }
 
 enum BandMemberStatus {
@@ -306,12 +328,13 @@ model MusicLibrary {
   created_at                     DateTime  @default(now())
   updated_at                     DateTime  @updatedAt
 
-  duration_seconds               Int?
+  duration_seconds Int?
 
-  musician         Musician        @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  requests         MusicRequest[]
-  ai_cifra_uploads AiCifraUpload[]
-  repertoire_songs RepertoireSong[]
+  musician              Musician             @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  requests              MusicRequest[]
+  ai_cifra_uploads      AiCifraUpload[]
+  repertoire_songs      RepertoireSong[]
+  personal_chord_sheets PersonalChordSheet[]
 
   @@index([artist, title])
   @@index([lrc_hash])
@@ -341,7 +364,9 @@ model Establishment {
   is_verified            Boolean   @default(false)
   email_verified_at      DateTime?
   email_pending          String?
+  // Legado (SM-016) — ver comentário equivalente em Musician.email_token.
   email_token            String?
+  email_token_hash       String?
   email_token_expires_at DateTime?
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
@@ -369,12 +394,12 @@ model EstablishmentProfile {
   location_lng    Float?
   amenities       String[] @default([]) // ["sound_system", "stage", "parking"]
   preferredGenres String[] @default([])
-  operatingHours      Json?
-  priceRange          Json?
-  socialLinks         Json?
-  menu_pdfs           Json?
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
+  operatingHours  Json?
+  priceRange      Json?
+  socialLinks     Json?
+  menu_pdfs       Json?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
 
@@ -387,7 +412,7 @@ model EstablishmentProfile {
 }
 
 model Event {
-  id              String   @id @default(uuid())
+  id              String      @id @default(uuid())
   establishmentId String
   name            String
   description     String?
@@ -395,11 +420,11 @@ model Event {
   endTime         DateTime
   status          EventStatus @default(scheduled)
   maxCapacity     Int?
-  currentCapacity Int      @default(0)
-  isPublic        Boolean  @default(true)
-  coverCharge     Float?   @default(0)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  currentCapacity Int         @default(0)
+  isPublic        Boolean     @default(true)
+  coverCharge     Float?      @default(0)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
 
   establishment Establishment   @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   musicians     EventMusician[]
@@ -409,20 +434,26 @@ model Event {
   inquiries     Inquiry[]
   tips          Tip[]
 
+  /// Bloco 9.4b — o job de auto-finalização roda a cada 10 min filtrando
+  /// status + endTime. Sem este índice seria sequential scan recorrente.
+  @@index([status, endTime])
+  /// Bloco 9.4a/9.4d — listagem por estabelecimento (aninhada e atalho
+  /// `events/active`), sempre com visibilidade e ordenação por data.
+  @@index([establishmentId, status, startTime])
   @@map("events")
 }
 
 model EventMusician {
-  id         String    @id @default(uuid())
+  id         String              @id @default(uuid())
   eventId    String
   musicianId String?
   bandId     String?
-  fee        Decimal?  @db.Decimal(12, 2)
+  fee        Decimal?            @db.Decimal(12, 2)
   status     EventMusicianStatus @default(confirmed)
   startTime  DateTime?
   endTime    DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
+  created_at DateTime            @default(now())
+  updated_at DateTime            @updatedAt
 
   event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
@@ -432,32 +463,32 @@ model EventMusician {
 }
 
 model Booking {
-  id                      String    @id @default(uuid())
+  id                      String        @id @default(uuid())
   establishmentId         String
   eventId                 String?
   musicianId              String?
   bandId                  String?
   start_at                DateTime
   end_at                  DateTime
-  fee                     Decimal?  @db.Decimal(12, 2) // Custo da reserva
+  fee                     Decimal?      @db.Decimal(12, 2) // Custo da reserva
   status                  BookingStatus @default(pending)
   notes                   String? // Notas adicionais sobre a reserva
   cancelled_by            String? // "establishment" | "musician" | "band"
   cancellation_reason     String?
-  buffer_minutes          Int       @default(0)
+  buffer_minutes          Int           @default(0)
   expires_at              DateTime?
-  free_cancellation_hours Int       @default(72)
+  free_cancellation_hours Int           @default(72)
   confirmed_at            DateTime?
   cancelled_at            DateTime?
   completed_at            DateTime?
-  created_at              DateTime  @default(now())
-  updated_at              DateTime  @updatedAt
+  created_at              DateTime      @default(now())
+  updated_at              DateTime      @updatedAt
 
-  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
-  event         Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  musician      Musician?     @relation(fields: [musicianId], references: [id], onDelete: SetNull)
-  band          Band?         @relation(fields: [bandId], references: [id], onDelete: SetNull)
-  inquiry       Inquiry?      @relation("InquiryBooking")
+  establishment                Establishment              @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  event                        Event?                     @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  musician                     Musician?                  @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band                         Band?                      @relation(fields: [bandId], references: [id], onDelete: SetNull)
+  inquiry                      Inquiry?                   @relation("InquiryBooking")
   google_calendar_synced_event GoogleCalendarSyncedEvent?
 
   @@index([musicianId, start_at, end_at])
@@ -467,7 +498,7 @@ model Booking {
 }
 
 model Inquiry {
-  id               String    @id @default(uuid())
+  id               String        @id @default(uuid())
   establishmentId  String
   eventId          String?
   musicianId       String?
@@ -480,9 +511,9 @@ model Inquiry {
   rejected_at      DateTime?
   rejection_reason String?
   converted_at     DateTime?
-  bookingId        String?   @unique
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
+  bookingId        String?       @unique
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
 
   establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   event         Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
@@ -513,13 +544,13 @@ model Conversation {
 }
 
 model Message {
-  id              String       @id @default(uuid())
+  id              String    @id @default(uuid())
   conversation_id String
   sender_id       String
   sender_type     String
-  content         String       @db.Text
-  status          String       @default("sent")
-  created_at      DateTime     @default(now())
+  content         String    @db.Text
+  status          String    @default("sent")
+  created_at      DateTime  @default(now())
   read_at         DateTime?
 
   conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
@@ -651,29 +682,31 @@ model BandUnavailability {
 // ========================================
 
 model Audience {
-  id                    String   @id @default(uuid())
-  email                 String   @unique
-  name                  String
-  nickname              String?
-  avatar                String?
-  phone                 String?
-  points                Int      @default(0)
-  monthly_points        Int      @default(0)
-  level                 Int      @default(1)
-  last_points_update    DateTime @default(now())
-  favorite_genres       String[] @default([])
-  favorite_artists      String[] @default([])
-  favorite_instruments  String[] @default([])
-  preferred_languages   String[] @default(["pt-BR"])
-  location              Json? // {latitude, longitude, city, state} para descoberta por proximidade
-  social_links          Json? // Links para redes sociais
-  notification_settings Json? // Configurações de notificação
-  privacy_settings      Json? // Configurações de privacidade
-  discovery_settings    Json? // Configurações de descoberta musical
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  name                   String
+  nickname               String?
+  avatar                 String?
+  phone                  String?
+  points                 Int       @default(0)
+  monthly_points         Int       @default(0)
+  level                  Int       @default(1)
+  last_points_update     DateTime  @default(now())
+  favorite_genres        String[]  @default([])
+  favorite_artists       String[]  @default([])
+  favorite_instruments   String[]  @default([])
+  preferred_languages    String[]  @default(["pt-BR"])
+  location               Json? // {latitude, longitude, city, state} para descoberta por proximidade
+  social_links           Json? // Links para redes sociais
+  notification_settings  Json? // Configurações de notificação
+  privacy_settings       Json? // Configurações de privacidade
+  discovery_settings     Json? // Configurações de descoberta musical
   is_active              Boolean   @default(true)
   email_verified_at      DateTime?
   email_pending          String?
+  // Legado (SM-016) — ver comentário equivalente em Musician.email_token.
   email_token            String?
+  email_token_hash       String?
   email_token_expires_at DateTime?
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
@@ -893,23 +926,29 @@ model Ranking {
 // ========================================
 
 model Tip {
-  id            String      @id @default(uuid())
-  audienceId    String
-  musicianId    String?
-  bandId        String?
-  eventId       String?
-  amount        Decimal     @db.Decimal(12, 2)
-  currency      CurrencyEnum @default(BRL)
-  message       String?
-  paymentMethod String // "pix", "credit_card", "wallet"
-  status        TipStatus   @default(pending)
-  transactionId String?
-  pixKey        String?
-  pixKeyType    String?
-  isAnonymous   Boolean     @default(false)
-  showInWall    Boolean     @default(true)
-  created_at    DateTime    @default(now())
-  updated_at    DateTime    @updatedAt
+  id               String       @id @default(uuid())
+  audienceId       String
+  musicianId       String?
+  bandId           String?
+  eventId          String?
+  amount           Decimal      @db.Decimal(12, 2)
+  currency         CurrencyEnum @default(BRL)
+  message          String?
+  paymentMethod    String // "pix", "credit_card", "wallet"
+  status           TipStatus    @default(pending)
+  transactionId    String?
+  // Legado (SM-016, texto puro) — substituído pelas 3 colunas *Ciphertext/
+  // *Iv/*AuthTag (AES-256-GCM). Mantido só para o backfill; remoção em
+  // migration futura (política: adicionar → backfill → remover em separado).
+  pixKey           String?
+  pixKeyCiphertext String?
+  pixKeyIv         String?
+  pixKeyAuthTag    String?
+  pixKeyType       String?
+  isAnonymous      Boolean      @default(false)
+  showInWall       Boolean      @default(true)
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
 
   audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Restrict)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
@@ -935,7 +974,7 @@ model Transaction {
   currency      CurrencyEnum      @default(BRL)
   status        TransactionStatus @default(pending)
   paymentMethod String
-  externalId    String? // ID do provedor de pagamento
+  externalId    String?           @unique // ID do provedor de pagamento — UNIQUE impede lançar duas vezes o mesmo pagamento/transferência (NULLs não colidem no Postgres)
   metadata      Json?
   created_at    DateTime          @default(now())
   updated_at    DateTime          @updatedAt
@@ -947,27 +986,55 @@ model Transaction {
   @@index([userId])
   @@index([musicianId])
   @@index([bandId])
-  @@index([externalId])
   @@map("transactions")
 }
 
 model MusicianWallet {
-  id             String       @id @default(uuid())
-  musicianId     String       @unique
-  balance        Decimal      @default(0) @db.Decimal(12, 2)
-  totalEarned    Decimal      @default(0) @db.Decimal(12, 2)
-  totalWithdrawn Decimal      @default(0) @db.Decimal(12, 2)
-  currency       CurrencyEnum @default(BRL)
-  pixKey         String?
-  pixKeyType     String?
-  bankAccount    Json? // Dados bancários
-  is_active      Boolean      @default(true)
-  created_at     DateTime     @default(now())
-  updated_at     DateTime     @updatedAt
+  id                    String       @id @default(uuid())
+  musicianId            String       @unique
+  balance               Decimal      @default(0) @db.Decimal(12, 2)
+  totalEarned           Decimal      @default(0) @db.Decimal(12, 2)
+  totalWithdrawn        Decimal      @default(0) @db.Decimal(12, 2)
+  currency              CurrencyEnum @default(BRL)
+  // Legado (SM-016, texto puro) — substituído pelas colunas *Ciphertext/*Iv/
+  // *AuthTag (AES-256-GCM). Mantido só para o backfill; remoção em migration
+  // futura (política: adicionar → backfill → remover em separado).
+  pixKey                String?
+  pixKeyCiphertext      String?
+  pixKeyIv              String?
+  pixKeyAuthTag         String?
+  pixKeyType            String?
+  bankAccount           Json? // Dados bancários — legado, ver acima
+  bankAccountCiphertext String?
+  bankAccountIv         String?
+  bankAccountAuthTag    String?
+  is_active             Boolean      @default(true)
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
   @@map("musician_wallets")
+}
+
+/// Ledger de idempotência de eventos externos (webhooks de gateway).
+/// Fonte de verdade DURÁVEL: `eventKey` UNIQUE transforma "já processei este
+/// evento?" numa decisão atômica do Postgres. Redis não serve aqui — reinício
+/// ou evicção apagariam a marca e uma reentrega creditaria a gorjeta de novo.
+/// `status` é operacional (não é máquina de estado de domínio) → String.
+model ProcessedEvent {
+  id           String    @id @default(uuid())
+  eventKey     String    @unique
+  scope        String
+  status       String    @default("processing")
+  attempts     Int       @default(0)
+  last_error   String?
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@index([scope, status])
+  @@map("processed_events")
 }
 
 // ========================================
@@ -1119,19 +1186,23 @@ model SyncedLyricsBulkJob {
 // ========================================
 
 model Subscription {
-  id               String             @id @default(uuid())
-  musician_id      String?
-  establishment_id String?
-  plan_tier        String
-  persona          String // "musician" | "establishment"
-  billing_cycle    String             @default("monthly") // "monthly" | "annual"
-  status           SubscriptionStatus @default(active)
-  started_at       DateTime           @default(now())
-  expires_at       DateTime?
-  trial_ends_at    DateTime?
-  cancelled_at     DateTime?
-  created_at       DateTime           @default(now())
-  updated_at       DateTime           @updatedAt
+  id                      String             @id @default(uuid())
+  musician_id             String?
+  establishment_id        String?
+  plan_tier               String
+  persona                 String // "musician" | "establishment"
+  billing_cycle           String             @default("monthly") // "monthly" | "annual"
+  status                  SubscriptionStatus @default(active)
+  started_at              DateTime           @default(now())
+  expires_at              DateTime?
+  trial_ends_at           DateTime?
+  cancelled_at            DateTime?
+  // Vínculo com o gateway de cobrança recorrente (Asaas) — null em
+  // assinaturas criadas manualmente/seed ou anteriores ao checkout HTTP
+  gateway_customer_id     String?
+  gateway_subscription_id String?            @unique
+  created_at              DateTime           @default(now())
+  updated_at              DateTime           @updatedAt
 
   musician      Musician?      @relation(fields: [musician_id], references: [id], onDelete: Cascade)
   establishment Establishment? @relation(fields: [establishment_id], references: [id], onDelete: Cascade)
@@ -1207,18 +1278,18 @@ model Campaign {
 // ========================================
 
 model Repertoire {
-  id                     String   @id @default(uuid())
+  id                     String    @id @default(uuid())
   musician_id            String
-  name                   String   @db.VarChar(255)
-  share_token            String?  @unique
+  name                   String    @db.VarChar(255)
+  share_token            String?   @unique
   share_token_expires_at DateTime?
-  is_shared              Boolean  @default(false)
-  created_at             DateTime @default(now())
-  updated_at             DateTime @updatedAt
+  is_shared              Boolean   @default(false)
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
 
-  musician  Musician            @relation(fields: [musician_id], references: [id], onDelete: Cascade)
-  songs     RepertoireSong[]
-  invitees  RepertoireInvitee[]
+  musician Musician            @relation(fields: [musician_id], references: [id], onDelete: Cascade)
+  songs    RepertoireSong[]
+  invitees RepertoireInvitee[]
 
   @@index([musician_id])
   @@map("repertoires")
@@ -1252,4 +1323,103 @@ model RepertoireInvitee {
   @@unique([repertoire_id, musician_id])
   @@index([musician_id])
   @@map("repertoire_invitees")
+}
+
+// ========================================
+// DOMÍNIO PERSONAL CHORD SHEET — CIFRA PESSOAL
+// ========================================
+
+/// Versão pessoal que o músico tem de uma cifra gerada pela IA.
+/// Guarda O QUE ELE MUDOU (overlay), não uma cópia: a cifra original em
+/// music_library.chord_sheet permanece imutável e continua servida a todos.
+model PersonalChordSheet {
+  id               String @id @default(uuid())
+  musician_id      String
+  music_library_id String
+
+  /// Cópia de MusicLibrary.chord_sheet_version no fork. ADVISORY: não detecta
+  /// re-análise da IA (updateChords não bumpa a versão) — ver base_fingerprint.
+  base_version Int @default(0)
+
+  /// sha256 hex do timeline normalizado de acordes — o sinal REAL de que a IA
+  /// re-analisou a música e há reconciliação a fazer.
+  base_fingerprint String @db.VarChar(64)
+
+  /// CHORD_SHEET_FINGERPRINT_VERSION vigente no fork. Distingue "a IA mudou"
+  /// de "nosso normalizador mudou": só o primeiro caso avisa o músico.
+  base_pipeline_version Int @default(1)
+
+  /// ChordEdit[] — operações ancoradas por (at_ms, símbolo), nunca por índice.
+  edits Json?
+  /// ChordSheetViewSettings — tom, capotraste, complexidade, instrumento.
+  view  Json?
+  notes String? @db.Text
+
+  /// "private" | "band" | "community" — String, não enum: é escopo de produto
+  /// em evolução, não máquina de estado de domínio.
+  share_scope String    @default("private")
+  shared_at   DateTime?
+
+  /// "clean" | "base_updated"
+  reconcile_status String @default("clean")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  musician      Musician     @relation(fields: [musician_id], references: [id], onDelete: Cascade)
+  music_library MusicLibrary @relation(fields: [music_library_id], references: [id], onDelete: Cascade)
+
+  /// "No máximo 1 fork por música por músico" garantido NO BANCO — dois POSTs
+  /// simultâneos furam qualquer checagem feita só na aplicação.
+  @@unique([musician_id, music_library_id])
+  @@index([musician_id, updated_at])
+  @@index([music_library_id, share_scope])
+  @@index([share_scope, shared_at])
+  @@map("personal_chord_sheets")
+}
+
+// ========================================
+// DOMÍNIO REVIEW (Bloco 9.3)
+// ========================================
+
+/// Ledger de avaliações — fonte de verdade.
+///
+/// `Musician.rating`/`total_ratings` e `Establishment.rating`/`total_ratings`
+/// continuam existindo como **projeção** (média incremental para leitura
+/// barata), no mesmo par que gamificação já usa: UserScore (ledger) x
+/// UserPoints (projeção). Sem este ledger não há como impedir que a mesma
+/// pessoa avalie cem vezes, listar comentários, nem recalcular a média.
+///
+/// `target_*` e `author_*` são polimórficos (músico/estabelecimento/fã), então
+/// não têm FK — mesmo precedente de `UserScore.reference_id`. A integridade é
+/// garantida na aplicação, que só grava depois de carregar o alvo.
+model Review {
+  id String @id @default(uuid())
+
+  /// "musician" | "establishment"
+  target_type String
+  target_id   String
+
+  /// "audience" | "musician" | "establishment"
+  author_type String
+  author_id   String
+
+  /// Estrela inteira de 1 a 5 (mesma convenção de RequestFeedback.rating).
+  rating  Int
+  comment String? @db.Text
+
+  /// Prova do encontro: "event" (fã presente) | "booking" (show concluído).
+  /// É o que torna rating farming inviável.
+  context_type String
+  context_id   String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  /// "Uma avaliação por autor, por alvo, por contexto" garantido NO BANCO —
+  /// dois POSTs simultâneos furam qualquer checagem feita só na aplicação.
+  @@unique([target_type, target_id, author_id, context_id])
+  @@index([target_type, target_id, created_at])
+  @@index([author_id, created_at])
+  @@map("reviews")
 }

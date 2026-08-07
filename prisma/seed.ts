@@ -26,7 +26,7 @@ import { resolve } from "node:path";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-import axios from "axios";
+import axios, { type AxiosInstance } from "axios";
 
 import { AudiencePrismaRepository } from "../src/core/audience/infra/db/prisma/audience-prisma.repository";
 import { Audience, AudienceId } from "../src/core/audience/domain/audience.aggregate";
@@ -61,6 +61,14 @@ import { Band } from "../src/core/musician/domain/band.aggregate";
 import { Musician, MusicianId } from "../src/core/musician/domain/musician.aggregate";
 import { BandPrismaRepository } from "../src/core/musician/infra/db/prisma/band-prisma.repository";
 import { MusicianPrismaRepository } from "../src/core/musician/infra/db/prisma/musician-prisma.repository";
+import {
+  CHORD_SHEET_FINGERPRINT_VERSION,
+  computeChordSheetBaseFingerprint,
+} from "../src/core/personal-chord-sheet/application/services/chord-sheet-fingerprint";
+import { PersonalChordSheet } from "../src/core/personal-chord-sheet/domain/personal-chord-sheet.aggregate";
+import { ChordEdit } from "../src/core/personal-chord-sheet/domain/value-objects/chord-edit.vo";
+import { ChordSheetViewSettings } from "../src/core/personal-chord-sheet/domain/value-objects/chord-sheet-view-settings.vo";
+import { PersonalChordSheetPrismaRepository } from "../src/core/personal-chord-sheet/infra/db/prisma/personal-chord-sheet-prisma.repository";
 import { MusicianWallet } from "../src/core/payment/domain/musician-wallet.aggregate";
 import { Tip } from "../src/core/payment/domain/tip.aggregate";
 import { Transaction } from "../src/core/payment/domain/transaction.aggregate";
@@ -95,6 +103,10 @@ import { Address } from "../src/core/shared/domain/value-objects/address.vo";
 import { Money } from "../src/core/shared/domain/value-objects/money.vo";
 import { Location } from "../src/core/shared/domain/value-objects/location.vo";
 import { PriceRange } from "../src/core/shared/domain/value-objects/price-range.vo";
+import { AesGcmEncryptionService } from "../src/core/shared/infra/crypto/aes-gcm-encryption.service";
+import { GetChordSheetForMusicLibraryUseCase } from "../src/core/synced-lyrics/application/use-cases/get-chord-sheet-for-music-library/get-chord-sheet-for-music-library.use-case";
+import { LrcParser } from "../src/core/synced-lyrics/domain/value-objects/lrc.vo";
+import { ChordSheetPrismaReadModel } from "../src/core/synced-lyrics/infra/db/prisma/chord-sheet-prisma.read-model";
 
 // ── bootstrap ────────────────────────────────────────────────────────────────
 
@@ -142,6 +154,9 @@ async function reset() {
   await prisma.repertoireInvitee.deleteMany();
   await prisma.repertoireSong.deleteMany();
   await prisma.repertoire.deleteMany();
+  // Antes de music_library: a FK cascateia, mas apagar explicitamente mantém
+  // a ordem legível e falha alto se o cascade mudar em alguma migration.
+  await prisma.personalChordSheet.deleteMany();
   await prisma.musicLibrary.deleteMany();
   await prisma.badge.deleteMany();
   await prisma.bandMember.deleteMany();
@@ -176,6 +191,74 @@ function cnpjFromBase(base12: string): string {
   return `${base12}${d1}${d2}`;
 }
 
+// Timeline no MESMO espaço de coordenadas que o GET .../chord-sheet consome
+// ({symbol, startMs, endMs}). Derivar do BPM em vez de cravar ms na mão mantém
+// acorde e letra alinhados quando a progressão muda.
+function buildChordTimeline(opts: {
+  progression: string[];
+  bpm: number;
+  bars: number;
+  beatsPerChord?: number;
+  startMs?: number;
+}): { symbol: string; startMs: number; endMs: number; confidence: number }[] {
+  const msPerChord = Math.round(
+    (60000 / opts.bpm) * (opts.beatsPerChord ?? 4),
+  );
+  const timeline: {
+    symbol: string;
+    startMs: number;
+    endMs: number;
+    confidence: number;
+  }[] = [];
+  let cursor = opts.startMs ?? 0;
+  for (let bar = 0; bar < opts.bars; bar++) {
+    timeline.push({
+      symbol: opts.progression[bar % opts.progression.length],
+      startMs: cursor,
+      endMs: cursor + msPerChord,
+      // Confiança alta e fixa: o seed simula uma análise já revisada, não a
+      // incerteza do modelo (que oscila entre execuções).
+      confidence: 0.93,
+      });
+    cursor += msPerChord;
+  }
+  return timeline;
+}
+
+// Seções (intro/verso/refrão) sobre a timeline — a UI usa para os badges de
+// transição. Divide em 3 blocos de acordes; o último vai até o fim da música.
+function buildSections(
+  timeline: { startMs: number; endMs: number }[],
+  durationMs: number,
+): { label: string; startMs: number; endMs: number; confidence: number }[] {
+  if (timeline.length === 0) return [];
+  const labels = ["Intro", "Verso", "Refrão"];
+  const perSection = Math.ceil(timeline.length / labels.length);
+  return labels.map((label, index) => {
+    const slice = timeline.slice(index * perSection, (index + 1) * perSection);
+    const first = slice[0] ?? timeline[timeline.length - 1];
+    const last = slice[slice.length - 1] ?? first;
+    return {
+      label,
+      startMs: first.startMs,
+      endMs: index === labels.length - 1 ? durationMs : last.endMs,
+      confidence: 0.88,
+    };
+  });
+}
+
+// LRC cru no formato que o provedor real entrega — o LrcParser normaliza.
+function buildLrc(lines: [number, string][]): string {
+  return lines
+    .map(([seconds, text]) => {
+      const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+      const ss = String(Math.floor(seconds % 60)).padStart(2, "0");
+      const cs = String(Math.round((seconds % 1) * 100)).padStart(2, "0");
+      return `[${mm}:${ss}.${cs}]${text}`;
+    })
+    .join("\n");
+}
+
 const daysFromNow = (days: number, hour = 20) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -193,13 +276,10 @@ type KeycloakSeedUser = {
   role: "musician" | "audience";
 };
 
-// Cria os usuários e retorna o sub gerado por e-mail — o Keycloak (22+) ignora
-// id explícito tanto no POST /users quanto no partialImport, então o fluxo é o
-// mesmo do RegisterUseCase: cria no realm primeiro e o sub vira o id do
-// aggregate. Usa o admin do master (mesmos defaults do scripts/keycloak-sync.mjs).
-async function seedKeycloakUsers(
-  users: KeycloakSeedUser[],
-): Promise<Map<string, string>> {
+// Cliente admin do realm. Extraído de seedKeycloakUsers porque o vínculo de
+// banda (band_ids, ver seedBandClaims) também precisa dele — sem esse claim o
+// líder recebe 403 do BandOwnershipGuard na própria banda.
+async function createKeycloakAdminClient(): Promise<AxiosInstance> {
   const baseUrl = loadEnvValue("KEYCLOAK_URL", "http://localhost:8080").replace(/\/$/, "");
   const realm = loadEnvValue("KEYCLOAK_REALM", "soundmeet");
   const adminRealm = loadEnvValue("KEYCLOAK_ADMIN_REALM", "master");
@@ -215,12 +295,53 @@ async function seedKeycloakUsers(
     { timeout: 5000 },
   );
 
-  const admin = axios.create({
+  return axios.create({
     baseURL: `${baseUrl}/admin/realms/${realm}`,
     headers: { Authorization: `Bearer ${token.access_token}` },
     timeout: 5000,
   });
+}
 
+/**
+ * Acrescenta um valor a um atributo multivalorado do usuário (read-modify-write
+ * — o Keycloak não tem append), igual ao KeycloakAdminGateway.addClaimValue.
+ *
+ * Estabelecimento e banda têm UUID próprio, distinto do `sub` do JWT: é o claim
+ * que liga a conta ao agregado. O seed insere as bandas pelo repositório, então
+ * ninguém escreve esse claim por ele — sem esta chamada, João loga, vê a banda
+ * na lista e leva 403 em toda rota de líder.
+ */
+async function addKeycloakClaimValue(
+  admin: AxiosInstance,
+  userId: string,
+  attribute: "establishment_ids" | "band_ids",
+  value: string,
+): Promise<void> {
+  const { data: user } = await admin.get(`/users/${userId}`);
+  const attributes: Record<string, unknown> = user.attributes ?? {};
+  // O Keycloak devolve string[], mas um valor gravado à mão pela console vem
+  // como string crua — os dois formatos são normalizados (igual ao gateway).
+  const raw: unknown = attributes[attribute];
+  const current = Array.isArray(raw)
+    ? raw.filter((v): v is string => typeof v === "string")
+    : typeof raw === "string" && raw.length > 0
+      ? [raw]
+      : [];
+  if (current.includes(value)) return;
+
+  await admin.put(`/users/${userId}`, {
+    attributes: { ...attributes, [attribute]: [...current, value] },
+  });
+}
+
+// Cria os usuários e retorna o sub gerado por e-mail — o Keycloak (22+) ignora
+// id explícito tanto no POST /users quanto no partialImport, então o fluxo é o
+// mesmo do RegisterUseCase: cria no realm primeiro e o sub vira o id do
+// aggregate. Usa o admin do master (mesmos defaults do scripts/keycloak-sync.mjs).
+async function seedKeycloakUsers(
+  admin: AxiosInstance,
+  users: KeycloakSeedUser[],
+): Promise<Map<string, string>> {
   const subs = new Map<string, string>();
   for (const user of users) {
     // Remove usuário anterior com o mesmo e-mail — o seed regenera os aggregates
@@ -265,8 +386,19 @@ async function seedKeycloakUsers(
 async function main() {
   if (process.argv.includes("--reset")) await reset();
 
+  // SM-016: pixKey de tip/wallet é gravado cifrado (AES-256-GCM) pelos mappers.
+  // Precisa ser a MESMA chave que a app usa em runtime — cifrar o seed com
+  // outra deixaria a chave PIX ilegível na tela da carteira.
+  const encryption = new AesGcmEncryptionService(
+    loadEnvValue("TOKEN_ENCRYPTION_KEY"),
+  );
+
   const musicianRepo = new MusicianPrismaRepository(prisma);
-  const walletRepo = new MusicianWalletPrismaRepository(prisma);
+  const walletRepo = new MusicianWalletPrismaRepository(
+    prisma,
+    undefined,
+    encryption,
+  );
   const subscriptionRepo = new SubscriptionPrismaRepository(prisma);
   const establishmentRepo = new EstablishmentPrismaRepository(prisma);
   const audienceRepo = new AudiencePrismaRepository(prisma);
@@ -275,7 +407,7 @@ async function main() {
   const bookingRepo = new BookingPrismaRepository(prisma);
   const inquiryRepo = new InquiryPrismaRepository(prisma);
   const requestRepo = new RequestPrismaRepository(prisma);
-  const tipRepo = new TipPrismaRepository(prisma);
+  const tipRepo = new TipPrismaRepository(prisma, undefined, encryption);
   const conversationRepo = new ConversationPrismaRepository(prisma);
   const messageRepo = new MessagePrismaRepository(prisma);
   const eventMusicianRepo = new EventMusicianPrismaRepository(prisma);
@@ -290,12 +422,20 @@ async function main() {
   const userPointsRepo = new UserPointsPrismaRepository(prisma);
   const userInteractionRepo = new UserInteractionPrismaRepository(prisma);
   const bandRepo = new BandPrismaRepository(prisma);
+  const personalChordSheetRepo = new PersonalChordSheetPrismaRepository(prisma);
+  // Mesmo caminho da app: a cifra que o Play Mode mostra sai daqui, e é dela
+  // que o fingerprint do fork é calculado (nunca do Json cru de music_library).
+  const getChordSheet = new GetChordSheetForMusicLibraryUseCase(
+    new ChordSheetPrismaReadModel(prisma),
+  );
 
   // ── 0. Usuários Keycloak de teste (sub gerado vira o id do aggregate) ─────
   console.log("🔑 Usuários Keycloak de teste…");
   let keycloakSubs = new Map<string, string>();
+  let keycloakAdmin: AxiosInstance | null = null;
   try {
-    keycloakSubs = await seedKeycloakUsers([
+    keycloakAdmin = await createKeycloakAdminClient();
+    keycloakSubs = await seedKeycloakUsers(keycloakAdmin, [
       { email: "musico1@seed-soundmeet.com", name: "João Violão", role: "musician" },
       { email: "fa1@seed-soundmeet.com", name: "Ana Fã", role: "audience" },
     ]);
@@ -303,6 +443,7 @@ async function main() {
     const message = axios.isAxiosError(error)
       ? `${error.response?.status ?? error.code}: ${JSON.stringify(error.response?.data ?? "")}`
       : (error as Error).message;
+    keycloakAdmin = null;
     console.warn(`   ⚠️ Falha ao criar usuários no Keycloak (${message}).`);
     console.warn("   Suba o Keycloak e rode o seed de novo com --reset para criar os logins de teste.");
   }
@@ -392,6 +533,15 @@ async function main() {
       .withMusicianId(musician.musician_id)
       .build();
     wallet.updatePixKey(spec.email, "email");
+    // Só o João tem extrato no seed (gorjetas da seção 9 + transações da 14).
+    // Carteira zerada com extrato cheio é o tipo de incoerência que faz perder
+    // tempo achando que a tela de carteira está quebrada. Líquidos = bruto − 9%
+    // (taxa do tier FREE): 25 → 22,75 e 50 → 45,50; saldo final R$ 8,25.
+    if (spec.email === "musico1@seed-soundmeet.com") {
+      wallet.receiveFunds(22.75);
+      wallet.receiveFunds(45.5);
+      wallet.withdrawFunds(60);
+    }
     await walletRepo.insert(wallet);
 
     // Assinatura (só tiers pagos — FREE não tem linha de subscription)
@@ -797,7 +947,9 @@ async function main() {
     { type: TransactionType.TIP, amount: 25, fee: 2.25, status: TransactionStatus.COMPLETED, fan: fan1 },
     { type: TransactionType.TIP, amount: 50, fee: 4.5, status: TransactionStatus.COMPLETED, fan: fan2 },
     { type: TransactionType.WITHDRAWAL, amount: 60, fee: 0, status: TransactionStatus.COMPLETED, fan: null },
-    { type: TransactionType.WITHDRAWAL, amount: 40, fee: 0, status: TransactionStatus.PENDING, fan: null },
+    // 5 e não 40: o saldo do João depois do saque concluído é R$ 8,25 — um
+    // saque pendente maior que o saldo não existiria na app.
+    { type: TransactionType.WITHDRAWAL, amount: 5, fee: 0, status: TransactionStatus.PENDING, fan: null },
   ];
   for (const spec of transactionSpecs) {
     const transaction = Transaction.fake().aTransaction()
@@ -813,14 +965,98 @@ async function main() {
   }
 
   // ── 15. Biblioteca musical + repertórios (Play Mode / setlists) ────────────
+  //
+  // `sheet` preenche chords + LRC + seções: é o que o GET .../chord-sheet lê
+  // (nunca a coluna chord_sheet, que é o blob materializado). Sem isso o Play
+  // Mode abre a música com a cifra vazia — foi o estado do seed até aqui.
+  // Duas músicas ficam SEM `sheet` de propósito ("Tempo Perdido", "Águas de
+  // Março"): é o caso real de música na biblioteca ainda não analisada pela IA.
   console.log("📚 Biblioteca e repertórios…");
   const librarySpecs = [
-    { musician: m1, title: "Evidências", artist: "Chitãozinho & Xororó", genre: "Sertanejo", key: "G", bpm: 132 },
-    { musician: m1, title: "Wonderwall", artist: "Oasis", genre: "Rock", key: "F#m", bpm: 87 },
-    { musician: m1, title: "Garota de Ipanema", artist: "Tom Jobim", genre: "Bossa Nova", key: "F", bpm: 120 },
+    {
+      musician: m1, title: "Evidências", artist: "Chitãozinho & Xororó",
+      genre: "Sertanejo", key: "G", bpm: 132,
+      sheet: {
+        duration: 208,
+        progression: ["G", "Em", "C", "D"],
+        bars: 24,
+        lyrics: [
+          [8, "Quando a noite chega e o bar enche de gente"],
+          [12.5, "Alguém pede a música de sempre"],
+          [17, "E o violão começa a responder"],
+          [22, "Refrão que todo mundo sabe cantar"],
+          [27, "Mais alto, mais alto agora"],
+          [32, "Até a última mesa acompanhar"],
+        ] as [number, string][],
+      },
+    },
+    {
+      musician: m1, title: "Wonderwall", artist: "Oasis",
+      genre: "Rock", key: "F#m", bpm: 87,
+      sheet: {
+        duration: 259,
+        progression: ["F#m", "A", "E", "B"],
+        bars: 20,
+        lyrics: [
+          [10, "A batida entra devagar"],
+          [16, "E a casa inteira reconhece"],
+          [22, "Todo mundo canta esse trecho"],
+          [28, "Com a mão no ar e sem pressa"],
+          [34, "Depois o refrão volta de novo"],
+        ] as [number, string][],
+      },
+    },
+    {
+      musician: m1, title: "Garota de Ipanema", artist: "Tom Jobim",
+      genre: "Bossa Nova", key: "F", bpm: 120,
+      sheet: {
+        duration: 191,
+        progression: ["F7M", "G7", "Gm7", "F7M"],
+        bars: 16,
+        lyrics: [
+          [6, "A bossa entra leve na primeira mesa"],
+          [11, "O baixo desenha o caminho"],
+          [16, "E a melodia atravessa o salão"],
+          [21, "Ninguém precisa levantar a voz"],
+        ] as [number, string][],
+      },
+    },
     { musician: m1, title: "Tempo Perdido", artist: "Legião Urbana", genre: "Rock", key: "D", bpm: 122 },
-    { musician: musicians[2], title: "Fly Me to the Moon", artist: "Frank Sinatra", genre: "Jazz", key: "Am", bpm: 116 },
+    {
+      musician: musicians[2], title: "Fly Me to the Moon", artist: "Frank Sinatra",
+      genre: "Jazz", key: "Am", bpm: 116,
+      sheet: {
+        duration: 148,
+        progression: ["Am7", "Dm7", "G7", "C7M"],
+        bars: 16,
+        lyrics: [
+          [5, "O piano abre o standard sozinho"],
+          [10, "A cozinha entra no segundo compasso"],
+          [15, "E o tema se apresenta inteiro"],
+          [20, "Antes de abrir espaço pro solo"],
+        ] as [number, string][],
+      },
+    },
     { musician: musicians[2], title: "Águas de Março", artist: "Elis Regina", genre: "MPB", key: "Bb", bpm: 108 },
+    // Mesma música do João, na biblioteca do Carlos e com UM acorde diferente
+    // (Bb7 no lugar do Gm7). É o cenário de importação da comunidade: as duas
+    // análises divergem, então o import reancora as edições e devolve conflito
+    // de verdade para a ConflictsReviewSheet do app.
+    {
+      musician: musicians[2], title: "Garota de Ipanema", artist: "Tom Jobim",
+      genre: "Bossa Nova", key: "F", bpm: 120,
+      sheet: {
+        duration: 191,
+        progression: ["F7M", "G7", "Bb7", "F7M"],
+        bars: 16,
+        lyrics: [
+          [6, "A bossa entra leve na primeira mesa"],
+          [11, "O baixo desenha o caminho"],
+          [16, "E a melodia atravessa o salão"],
+          [21, "Ninguém precisa levantar a voz"],
+        ] as [number, string][],
+      },
+    },
   ];
   const libraryItems: MusicLibrary[] = [];
   for (const spec of librarySpecs) {
@@ -833,9 +1069,49 @@ async function main() {
       .withBpm(spec.bpm)
       .withDifficulty(3)
       .build();
+
+    if (spec.sheet) {
+      const timeline = buildChordTimeline({
+        progression: spec.sheet.progression,
+        bpm: spec.bpm,
+        bars: spec.sheet.bars,
+      });
+      item.updateChords({ timeline });
+      item.updateStructureSegments(
+        buildSections(timeline, spec.sheet.duration * 1000),
+      );
+      item.changeDurationSeconds(spec.sheet.duration);
+
+      // Passa pelo LrcParser em vez de montar o normalized na mão: é o mesmo
+      // caminho do provedor real, então o shape nunca diverge do que o
+      // GET .../chord-sheet sabe consumir.
+      const parsed = LrcParser.parse({
+        raw: buildLrc(spec.sheet.lyrics),
+        provider: "seed",
+      });
+      if (parsed.isFail()) {
+        throw new Error(`LRC inválido no seed (${spec.title}): ${parsed.error.message}`);
+      }
+      item.updateLrc({
+        lrc_raw: parsed.ok.raw,
+        lrc_normalized: parsed.ok.normalized as unknown as Record<string, unknown>,
+        lrc_provider: parsed.ok.provider,
+        lrc_hash: parsed.ok.hash,
+        lrc_quality_flags: parsed.ok.quality.flags,
+        lrc_coverage_ms: parsed.ok.quality.coverage_ms,
+        lrc_has_word_timestamps: parsed.ok.quality.has_word_timestamps,
+        lrc_last_synced_at: new Date(),
+      });
+    }
+
     await musicLibraryRepo.insert(item);
     libraryItems.push(item);
   }
+
+  const libraryOf = (musician: Musician, title: string) =>
+    libraryItems.find(
+      (i) => i.musician_id.id === musician.musician_id.id && i.title === title,
+    )!;
 
   // m1 é FREE (máx. 1 repertório / 20 músicas) — 1 setlist dentro do limite;
   // m3 é PRO (ilimitado) — 1 setlist de jazz.
@@ -845,8 +1121,12 @@ async function main() {
   }
   await repertoireRepo.insert(repertoireM1);
 
+  // Filtro por dono em vez de slice por índice: a lista cresceu e um índice
+  // cravado colocaria música do João no setlist de jazz do Carlos.
   const repertoireM3 = Repertoire.create({ musician_id: musicians[2].musician_id.id, name: "Noite de Jazz" });
-  for (const item of libraryItems.slice(4)) {
+  for (const item of libraryItems.filter(
+    (i) => i.musician_id.id === musicians[2].musician_id.id,
+  )) {
     repertoireM3.addSong(RepertoireSong.create({ music_library_id: item.music_library_id.id }));
   }
   await repertoireRepo.insert(repertoireM3);
@@ -914,12 +1194,150 @@ async function main() {
     .build();
   await bandRepo.insert(bandJoao);
 
+  // Vínculo conta ↔ banda. O CreateBandUseCase escreve `band_ids` no Keycloak;
+  // o seed insere pelo repositório, então precisa escrever por conta própria —
+  // sem isto o João vê a banda na lista e leva 403 do BandOwnershipGuard em
+  // toda rota de líder (convidar membro, agenda, split de gorjeta).
+  if (keycloakAdmin) {
+    const joaoSub = keycloakSubs.get(m1.email.value);
+    if (joaoSub) {
+      try {
+        await addKeycloakClaimValue(
+          keycloakAdmin,
+          joaoSub,
+          "band_ids",
+          bandJoao.band_id.id,
+        );
+        console.log("   🔗 claim band_ids do João vinculado à Blues Duo.");
+      } catch (error) {
+        console.warn(
+          `   ⚠️ Falha ao vincular band_ids do João (${(error as Error).message}). ` +
+            "As rotas de líder da Blues Duo vão responder 403 até isso ser corrigido.",
+        );
+      }
+    }
+  }
+
+  // ── 18. Cifras pessoais (Bloco 8) — overlay de edições, nunca cópia ────────
+  //
+  // João é FREE (máx. 3 forks): o seed deixa 2, então dá pra criar mais 1 no
+  // app e a tentativa seguinte cai no paywall — os dois lados do gate testáveis
+  // sem mexer no banco.
+  console.log("🎼 Cifras pessoais…");
+
+  // Fingerprint SEMPRE do timeline pós-buildChords, pelo mesmo use-case da app.
+  const fingerprintOf = async (musician: Musician, item: MusicLibrary) => {
+    const base = await getChordSheet.execute({
+      musician_id: musician.musician_id.id,
+      music_library_id: item.music_library_id.id,
+    });
+    return {
+      timeline: base.chords?.timeline ?? [],
+      fingerprint: computeChordSheetBaseFingerprint(base.chords?.timeline ?? []),
+    };
+  };
+
+  // 1) Wonderwall — privada, com edições, e ancorada numa análise ANTIGA
+  //    (fingerprint de um timeline sem o primeiro acorde) + reconcile_status
+  //    "base_updated". É o cenário que acende o ReconcileBadge e abre a
+  //    ConflictsReviewSheet: "você editou, a IA re-analisou, revise".
+  const wonderwall = libraryOf(m1, "Wonderwall");
+  const wonderwallBase = await fingerprintOf(m1, wonderwall);
+  const wonderwallSheet = PersonalChordSheet.create({
+    musician_id: m1.musician_id.id,
+    music_library_id: wonderwall.music_library_id.id,
+    base_fingerprint: computeChordSheetBaseFingerprint(
+      wonderwallBase.timeline.slice(1),
+    ),
+    base_pipeline_version: CHORD_SHEET_FINGERPRINT_VERSION,
+  });
+  // Âncoras derivadas do timeline real — cravar ms na mão faria a edição
+  // "não casar" com nenhum acorde e nascer conflitada por engano.
+  if (wonderwallBase.timeline.length >= 4) {
+    const target = wonderwallBase.timeline[2];
+    wonderwallSheet.addEdits([
+      ChordEdit.replaceChord({
+        at_ms: target.startMs,
+        from: target.symbol,
+        to: "E/G#",
+      }),
+      ChordEdit.annotate({
+        at_ms: wonderwallBase.timeline[0].startMs,
+        text: "Entrar só com o violão, banda entra no refrão.",
+      }),
+    ]);
+  }
+  wonderwallSheet.changeView(
+    ChordSheetViewSettings.create({
+      capo_fret: 2,
+      transpose_semitones: -1,
+      chord_complexity: "simple",
+      instrument: "guitar",
+      scroll_speed: 1.25,
+    }),
+  );
+  wonderwallSheet.changeNotes("Tom mais confortável com capotraste na 2ª casa.");
+  wonderwallSheet.markBaseUpdated();
+  await personalChordSheetRepo.insert(wonderwallSheet);
+
+  // 2) Evidências — compartilhada na comunidade pelo próprio João: alimenta a
+  //    aba "minhas cifras compartilhadas" e a listagem pública.
+  const evidencias = libraryOf(m1, "Evidências");
+  const evidenciasBase = await fingerprintOf(m1, evidencias);
+  const evidenciasSheet = PersonalChordSheet.create({
+    musician_id: m1.musician_id.id,
+    music_library_id: evidencias.music_library_id.id,
+    base_fingerprint: evidenciasBase.fingerprint,
+    base_pipeline_version: CHORD_SHEET_FINGERPRINT_VERSION,
+  });
+  if (evidenciasBase.timeline.length >= 2) {
+    evidenciasSheet.addEdit(
+      ChordEdit.relabelSection({
+        section_start_ms: evidenciasBase.timeline[0].startMs,
+        label: "Intro (só voz)",
+      }),
+    );
+  }
+  evidenciasSheet.changeNotes("Versão que eu toco no Bar do Zé.");
+  evidenciasSheet.share("community");
+  await personalChordSheetRepo.insert(evidenciasSheet);
+
+  // 3) Garota de Ipanema do CARLOS, compartilhada na comunidade. O João tem a
+  //    própria linha da mesma música, com um acorde diferente na análise — é o
+  //    fork que ele importa pra ver `base_differs` e conflito de verdade.
+  const ipanemaCarlos = libraryOf(musicians[2], "Garota de Ipanema");
+  const ipanemaBase = await fingerprintOf(musicians[2], ipanemaCarlos);
+  const ipanemaSheet = PersonalChordSheet.create({
+    musician_id: musicians[2].musician_id.id,
+    music_library_id: ipanemaCarlos.music_library_id.id,
+    base_fingerprint: ipanemaBase.fingerprint,
+    base_pipeline_version: CHORD_SHEET_FINGERPRINT_VERSION,
+  });
+  if (ipanemaBase.timeline.length >= 3) {
+    ipanemaSheet.addEdits([
+      ChordEdit.replaceChord({
+        at_ms: ipanemaBase.timeline[1].startMs,
+        from: ipanemaBase.timeline[1].symbol,
+        to: "G7(13)",
+      }),
+      ChordEdit.annotate({
+        at_ms: ipanemaBase.timeline[2].startMs,
+        text: "Aqui eu faço a substituição do Jobim.",
+      }),
+    ]);
+  }
+  ipanemaSheet.changeNotes("Harmonia de bossa mais próxima do original.");
+  ipanemaSheet.share("community");
+  await personalChordSheetRepo.insert(ipanemaSheet);
+
   console.log("\n✅ Seed concluído!");
   console.log(`   Músicos:          ${musicians.map((m) => `${m.stage_name} <${m.email.value}> (${m.musician_id.id})`).join("\n                     ")}`);
   console.log("   Opt-in de radar:  João=true, Maria=false, Carlos=null (ainda não decidiu)");
   console.log(`   Estabelecimentos: ${establishments.map((e) => e.name).join(", ")}`);
   console.log("   Bandas:           Carlão Trio (líder Carlos, open_to_gigs=true, com endereço) · Blues Duo (líder João, open_to_gigs=null, Maria pending / Carlos declined)");
   console.log(`   Fãs:              ${fan1.email.value}, ${fan2.email.value}`);
+  console.log("   Cifras (Play Mode): Evidências, Wonderwall e Garota de Ipanema com acordes + letra sincronizada; Tempo Perdido e Águas de Março sem análise (caso 'ainda não processada')");
+  console.log("   Cifras pessoais:  João 2/3 (Wonderwall privada c/ edições + base_updated · Evidências na comunidade) · Carlos: Garota de Ipanema na comunidade, pronta pro João importar");
   if (keycloakSubs.size > 0) {
     console.log("   🔑 Logins de teste (POST /api/v1/auth/login):");
     console.log(`      músico: ${m1.email.value} / ${KEYCLOAK_SEED_PASSWORD}`);
