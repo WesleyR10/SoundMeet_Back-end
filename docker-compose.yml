@@ -35,7 +35,7 @@ services:
       - KEYCLOAK_VERIFY_AUDIENCE=false
       - AI_CIFRA_ANALYSIS_HTTP_BASE_URL=http://ai-cifra-worker-gpu:8000
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
-      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v22_phase2
+      - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v23_continuacao
       - AI_CIFRA_SIMPMUSIC_YTDLP_BIN=yt-dlp
       - AI_CIFRA_MUSIFY_PIPED_BASE_URL=https://api.piped.private.coffee
       - AI_CIFRA_MUSIFY_PIPED_TIMEOUT_MS=10000
@@ -295,7 +295,19 @@ services:
     ports:
       - "8002:8000"
     volumes:
+      # `:ro` protege os checkpoints de treino de serem sobrescritos pelo
+      # worker — isso é deliberado e fica.
       - ./ai-cifra-mir-worker/artifacts:/app/artifacts:ro
+      # 🔴 EXCEÇÃO: o cache de stems do Demucs precisa de ESCRITA.
+      #
+      # Com o volume inteiro em `:ro`, toda análise falhava ao gravar o cache
+      # (`[Errno 30] Read-only file system` em artifacts/stems_cache/demucs/)
+      # e refazia a separação do zero — inclusive para uma música já analisada
+      # antes. Foi boa parte dos 3–12 min por faixa medidos em 24/ago.
+      #
+      # Montagem filha sobrepõe a do pai para este caminho: os checkpoints
+      # seguem protegidos, só o cache fica gravável.
+      - ./ai-cifra-mir-worker/artifacts/stems_cache:/app/artifacts/stems_cache:rw
       - /root/.cache/huggingface:/root/.cache/huggingface
     environment:
       - AI_CIFRA_STORAGE_PROVIDER=minio
