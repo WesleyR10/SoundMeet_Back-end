@@ -411,6 +411,40 @@ Diferencas-chave em relacao ao `/auth/register`:
 
 O mobile trata o caso "login social sem role" numa store transiente (nunca grava em `auth.store` com roles vazias) ate o usuario escolher o papel e este endpoint responder com sucesso.
 
+## Usuarios de teste criados pelo seed
+
+`npm run seed -- --reset` cria **14 usuarios no Keycloak**, todos com a mesma senha.
+
+> **Senha: `Seed@123`** — constante `KEYCLOAK_SEED_PASSWORD` em `prisma/seed.ts`.
+
+| Persona | E-mails | Papel de realm | Observacao |
+|---|---|---|---|
+| Musicos | `musico1@` … `musico8@seed-soundmeet.com` | `musician` | O `sub` do Keycloak **vira o id do aggregate**, igual ao `RegisterUseCase`. `musico1` (Joao) e o mais completo: carteira com extrato, banda, cifras pessoais, shows |
+| Fas | `fa1@` e `fa2@seed-soundmeet.com` | `audience` | Mesmo tratamento: `sub` = `audience_id` |
+| Estabelecimentos | `bar1@` `rest1@` `club1@` `bar2@seed-soundmeet.com` | `establishment` | 🔴 O `sub` **NAO** e o id do estabelecimento — ele tem UUID proprio, e o seed escreve o claim `establishment_ids` apos criar o aggregate |
+
+Todos no dominio `@seed-soundmeet.com`, deterministico por desenho.
+
+### Duas coisas que quebram sem aviso
+
+🔴 **Sem Keycloak de pe, o seed conclui mesmo assim** — em modo degradado: ids aleatorios, nenhum
+claim escrito, e a ultima linha do log avisa. Nao e falha silenciosa, mas e facil de nao ler. Se o
+app responder 403 em toda rota de escrita depois de um seed, foi isso.
+
+🔴 **O seed APAGA o usuario anterior com o mesmo e-mail** antes de recriar. E proposital: o
+aggregate e regerado a cada `--reset` e o `sub` antigo deixaria de casar com o novo id nos ownership
+guards. Consequencia pratica: **todo `--reset` invalida as sessoes abertas no app** — refaca o login
+depois de semear.
+
+### Por que o estabelecimento e diferente
+
+Musico e fa herdam o `sub` como id do aggregate. Estabelecimento nao: uma conta pode operar mais de
+uma casa, e por isso a autorizacao vem do claim `establishment_ids` (ver "Multi-tenancy e
+permissionamento contextual"). O `LoginUseCase` resolve a persona por e-mail; quem autoriza a
+escrita e o `EstablishmentOwnershipGuard` lendo o claim.
+
+---
+
 ## Evolucao futura
 
 Quando o produto evoluir para B2B/enterprise, reavaliar:
