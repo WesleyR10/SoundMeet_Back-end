@@ -29,6 +29,29 @@
 
 ---
 
+## Cachê de show em custódia (F1.3a)
+
+| | **Free** | **Essencial** | **Pro** |
+|---|---|---|---|
+| **Taxa plataforma (cachê)** | **10%** | **10%** | **10%** |
+| **Liberação após o show** | D+5 | D+2 | D+2 |
+
+Duas taxas distintas de propósito: gorjeta e cachê liquidam em gateways diferentes (Mercado Pago
+vs Asaas) e em tickets de ordem de grandeza diferente (R$5–60 vs R$200–5.000). Hoje a do cachê é
+plana, mas `booking_fee_percentage` está em `plan-features.config.ts` como qualquer outra —
+diferenciá-la por tier é editar um número.
+
+> **A liberação não é gate, é prazo.** O FREE recebe; recebe depois. Reter dinheiro alheio como
+> alavanca de upgrade não é uma opção quando o valor está em custódia — a diferença é vender uma
+> vantagem, não criar um refém.
+
+🔴 **Reajustar a taxa não alcança show já contratado.** A comissão é congelada em
+`BookingEscrow.create`, e a cláusula do contrato remete ao percentual "vigente na data de emissão
+deste instrumento" — a âncora que impede a mudança de virar cláusula potestativa. Em troca, a UI
+**tem** que informar o número ao músico antes do aceite, porque é o que a cláusula pressupõe.
+
+---
+
 ## Features por tier
 
 | Feature | **Free** | **Essencial** | **Pro** |
@@ -133,13 +156,16 @@ src/core/plans/domain/plan-features.config.ts → MUSICIAN_PLAN_FEATURES
 | Billing anual | ✅ Concluído — `BillingCycle` no aggregate + pricing config + gateway Asaas | 4D.8 |
 | Progress bar de saque (UX) | ✅ Concluído — `WithdrawProgressBar` no mobile (Bloco 5.5) | 4D.7 |
 | **Banner generation (templates)** | ⏳ Pendente — o **gate já existe** (`assertMusicianCanGenerateBanner` em `plan-check.service.ts`), falta a feature que o chamaria | 4D.5 |
-| ⚠️ `api_access` | **Flag existe, nunca é lida** — só aparece na união de tipos de `plan-check.service.ts`. Não há noção de API key no código | — |
-| ⚠️ `white_label` | **Flag existe, nunca é lida** — idem | — |
+| `realtime_analytics` | ✅ **Virou gate real (16/ago/2026)** — `assertMusicianFeature` em `GetMusicianAnalyticsUseCase`; FREE recebe **402** e a `AnalyticsScreen` do app mostra o caminho de upgrade em vez de "tentar novamente". Era **soft gate**: o use-case só reportava a flag e entregava ao FREE os mesmos números do PRO | 9.7 |
+| 🔜 `api_access` | **"Em breve" declarado (16/ago/2026)** — segue no catálogo, listada em `coming_soon` do `GET /plans`; a UI mostra badge "Em breve". Gatear é **erro de compilação** (`Exclude<>` na união de `assertMusicianFeature`) enquanto não houver API key de verdade | — |
+| 🔜 `white_label` | **"Em breve" declarado (16/ago/2026)** — idem | — |
 
-> **Auditoria de gates (06/ago/2026).** Dos 18 campos de `MusicianPlanFeatures`, **13 são realmente
-> aplicados** (repertórios, músicas por repertório, QR custom, membros de banda, split automático,
-> compartilhamento e convite de repertório, cifras pessoais, comunidade, taxa de gorjeta, mínimo e
-> prazo de saque). `banner_generation_per_month` tem gate pronto sem feature. `music_library_access`
+> **Auditoria de gates (06/ago/2026; revisada em 21/ago/2026).** Dos **20** campos de
+> `MusicianPlanFeatures`, **15 são realmente aplicados** (repertórios, músicas por repertório, QR
+> custom, membros de banda, split automático, compartilhamento e convite de repertório, cifras
+> pessoais, comunidade, taxa de gorjeta, mínimo e prazo de saque, e — desde 21/ago/2026 — **taxa do
+> cachê** e **prazo de liberação da custódia**, ambos lidos por `CreateBookingEscrowUseCase` e
+> `ProcessDueEscrowReleasesUseCase`). `banner_generation_per_month` tem gate pronto sem feature. `music_library_access`
 > é `true` em todos os tiers por decisão de produto. `tuner_noise_filter` é aplicado no cliente
 > (mobile), por desenho. Os problemas reais são os 3 marcados com ⚠️ acima.
 > **O lado do estabelecimento está bem pior** — ver [establishment-plans.md](establishment-plans.md).

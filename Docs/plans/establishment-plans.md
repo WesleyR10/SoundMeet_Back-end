@@ -120,10 +120,10 @@ src/core/plans/domain/plan-features.config.ts → ESTABLISHMENT_PLAN_FEATURES
 | Cardápio PDF (upload + R2) | ✅ Concluído — `POST/DELETE /establishments/:id/menu-pdf`, magic-byte check, 5MB | 7.7 |
 | **Horário de funcionamento — UX** | ⏳ Pendente — domínio 100% pronto; falta o formulário do dono. **Sem UI em nenhuma plataforma**, então `operating_hours` é `null` na prática e o badge "Aberto agora" nunca acende | W1 |
 | **Banner generation (templates)** | ⏳ Pendente | 4D.5 |
-| **⚠️ `advanced_analytics`** | ⏳ **Flag existe, nunca é lida.** Está em `EstablishmentPlanFeatures` (`false`/`true`/`true`) mas **nenhum use-case chama o gate** — hoje o Free tem o mesmo analytics do Pro. Falta o `assertEstablishmentFeature` + UI/export CSV-PDF | W4 |
-| **⚠️ `max_qr_codes` (1 / 3 / ∞)** | ⏳ **Flag existe, nunca é lida** — e o domínio **não suporta múltiplos QR**: `Establishment.qr_code` é um campo único e `generateQRCode()` sobrescreve. Vender "3 QR codes" no Growth exige mudança de agregado, não só um gate | — |
-| **⚠️ `api_access`** | ⏳ **Flag existe, nunca é lida** — não há nenhuma noção de API key/acesso programático no código | — |
-| **⚠️ Calendário: "1 evento ativo" no Free** | ⏳ **Não existe nem como flag.** A tabela de preços acima promete o limite, mas não há campo em `EstablishmentPlanFeatures` nem gate — qualquer tier cria eventos sem limite | — |
+| **`advanced_analytics`** | ✅ **Concluído (16/ago/2026)** — `assertEstablishmentFeature` em `ListEstablishmentAnalyticsUseCase`; FREE recebe **402** e o dashboard mostra `AnalyticsPlanGateNotice` com caminho de upgrade. Export CSV/PDF segue fora de escopo | 9.7 |
+| **`max_qr_codes` (1 / 3 / ∞)** | ✅ **Removido do catálogo (16/ago/2026)** — decisão: não vender o que o domínio não faz. `Establishment.qr_code` é campo único e `generateQRCode()` sobrescreve; múltiplos QR volta como **feature** (agregado próprio com rótulo por ambiente), nunca como gate | 9.7 |
+| **`api_access`** | 🔜 **"Em breve" declarado (16/ago/2026)** — segue no catálogo, agora listada em `coming_soon` do `GET /plans`, e a UI renderiza badge "Em breve" em vez de ✓/✗. Gatear a flag é **erro de compilação** (`Exclude<>` na união de `assertEstablishmentFeature`) enquanto não existir API key de verdade | — |
+| **Calendário: "1 evento ativo" no Free** | ⏸️ **Decidido não aplicar (16/ago/2026)** — os eventos de estabelecimentos FREE são o inventário que alimenta a `/agenda` pública (W5). Limitar agora reduz o conteúdo do funil de aquisição justamente enquanto ele precisa encher. A promessa sai da tabela de preços; revisitar quando houver oferta sobrando | — |
 | **🔴 Cadastro de estabelecimento** | ⏳ **Bloqueador** — não existe caminho para criar a primeira conta | 9.1 |
 | **🔴 Listagem de bookings/inquiries** | ⏳ **Bloqueador** — o estabelecimento não vê as próprias contratações | 9.2 |
 | **Dashboard web (UI de tudo acima)** | ⏳ `soundmeet-web` não existe | [roadmap-web.md](../roadmap-web.md) |

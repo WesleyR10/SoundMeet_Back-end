@@ -1,8 +1,48 @@
 # Decisões de Arquitetura de Pagamentos — SoundMeet
 
-**Sessão:** 2026-06-22  
+**Sessão:** 2026-06-22 (gateway da gorjeta redecidido em 19/ago/2026; Iugu removida em 21/ago/2026)  
 **Blocos relacionados:** Roadmap 1.6 e 1.7  
-**Status:** Decisões core finalizadas — próximo passo: implementação dos adapters
+**Status:** Decisões core finalizadas. Gorjeta = Mercado Pago. Cachê/assinatura/saque = Asaas.
+
+---
+
+> 🔴 **LEIA ANTES: [payment-gateway-research-2026-08.md](payment-gateway-research-2026-08.md)**
+> (19/ago/2026). **Não usar Iugu nem Woovi/OpenPix.** A Iugu não liberou a conta. A Woovi foi
+> descartada por motivo regulatório (subconta = saldo virtual na conta da plataforma). Trocar a
+> gorjeta pelo Asaas **também não é inócuo**: a taxa PIX dele é **R$1,99 FIXOS**, e num ticket de
+> R$5–60 o ponto de equilíbrio vai para **R$22 (FREE) / R$40 (PRO)**. O Mercado Pago cobra **0,99%
+> sem piso**, a cobrança nasce na conta do músico (OAuth + `marketplace_fee`), e a plataforma nunca
+> detém o recurso. Roteamento é **por vértice, nunca por valor**.
+
+## ⚖️ Por que o dinheiro NUNCA passa pela conta da SoundMeet
+
+Vale explicitar, porque é a pergunta que sempre volta: *"não dá para receber na nossa conta e
+repassar automático?"*
+
+**Não, e o problema não é o tempo de retenção — é a titularidade no caminho.** Receber recurso de
+terceiro e depois transferir, ainda que em segundos, é a descrição da atividade de **subadquirente /
+facilitador de pagamento**, que torna a plataforma participante de arranjo de pagamento sujeita ao
+BACEN (Circular 3.815/2016).
+
+E há o risco concreto, não só o formal: pelo art. 12 da Lei 12.865/2013, recursos em conta de
+pagamento **não se confundem com o patrimônio da instituição** e não respondem por obrigações dela.
+Se o dinheiro do músico transitasse pela nossa conta, ele ficaria exposto a penhora numa ação contra
+a SoundMeet, a bloqueio judicial e à nossa eventual falência.
+
+Por isso os dois vértices usam a mesma estrutura, com provedores diferentes:
+
+| Vértice | Onde o dinheiro cai | Como cobramos |
+|---|---|---|
+| **Gorjeta** | Conta Mercado Pago **do músico** (cobrança criada com o token dele) | `application_fee` no split |
+| **Cachê** | **Subconta Asaas do músico**, bloqueada em custódia | comissão retida na liberação |
+
+Em nenhum dos dois há repasse — há **divisão na liquidação**. É também o que as cláusulas
+`papel_da_plataforma.com_custodia` e `custodia_liberacao`, já assináveis, **afirmam**: um extrato
+mostrando o dinheiro passando por nós tornaria falso um contrato assinado.
+
+🔴 **Pendente de confirmação jurídica** — as perguntas estão em
+[contract/legal-checklist.md](contract/legal-checklist.md) §10, nas seções "Antes do escrow" e
+"Antes da gorjeta em produção".
 
 ---
 
@@ -44,37 +84,44 @@ Este modelo resolve:
 ### Padrão: Interface + Adapters por vértice
 
 ```
-IPixGateway (interface de domínio — já existe)
-  ├── IuguGatewayAdapter      → gorjetas (MVP)
-  ├── AsaasGatewayAdapter     → cachê + escrow + assinaturas + saques
-  └── [futuro] OpenPixAdapter → otimização gorjetas >R$62,50 quando houver volume
+IPixGateway (interface de domínio)
+  ├── MercadoPagoPixGateway   → gorjetas (0,99% sem piso, conta do músico via OAuth)
+  └── PixGatewayMock          → fallback de desenvolvimento
+
+IBookingEscrowGateway / ISubaccountGateway / IPixWithdrawGateway
+  └── Asaas*Adapter           → cachê + escrow + assinaturas + saques
 ```
 
 `PaymentService` roteia por tipo de transação:
-- `tip_payment`            → `IuguGatewayAdapter`
+- `tip_payment`            → `MercadoPagoPixGateway`
 - `booking_payment`        → `AsaasGatewayAdapter`
 - `subscription_payment`   → `AsaasGatewayAdapter`
 - `musician_withdrawal`    → `AsaasGatewayAdapter` (PIX out da subconta)
 
-### Crossover de custo Iugu vs OpenPix (referência futura)
-
-| Gorjeta | Iugu (0,99%) | OpenPix (0,80%, mín R$0,50) | Melhor |
-|---------|-------------|------------------------------|--------|
-| R$ 5 | R$ 0,05 | R$ 0,50 | **Iugu** |
-| R$ 20 | R$ 0,20 | R$ 0,50 | **Iugu** |
-| R$ 51 | R$ 0,50 | R$ 0,50 | Empate |
-| R$ 62,50 | R$ 0,62 | R$ 0,50 | **OpenPix** |
-| R$ 100 | R$ 0,99 | R$ 0,80 | **OpenPix** |
-
-**Crossover real: R$ 62,50.** Para MVP, Iugu cobre a maioria das gorjetas (R$ 5–60). OpenPix entra como otimização futura via adapter adicional sem refatoração de domínio.
+Não há adapter Iugu nem OpenPix no código, e não vai haver: a Iugu não liberou a conta; a Woovi/
+OpenPix foi descartada porque a "subconta" é saldo virtual na conta da plataforma (caminho
+regulatório recusado). Não reabrir.
 
 ---
 
 ## Decisões por Vértice
 
-### Gorjetas ✅
+### Gorjetas ✅ *(gateway redecidido em 19/ago/2026)*
 
-- **Gateway:** Iugu (0,99%, sem mínimo fixo)
+- **Gateway: Mercado Pago** — 0,99% **sem piso**, dinheiro na hora. O Asaas **não serve aqui**: a
+  taxa que era R$0,99 fixos quando ele foi escolhido virou **R$1,99**, e taxa fixa sobre ticket de
+  R$5–60 dá prejuízo abaixo de R$22 (plano FREE)
+- **A cobrança é criada na conta DO MÚSICO** (OAuth, `POST /v1/orders`) e a comissão sai por
+  `marketplace_fee` — a plataforma nunca detém recurso de terceiro, mesma postura da subconta Asaas
+- ⚠️ **Não rotear por VALOR.** O cruzamento MP × Asaas é R$201; o ticket é R$5–100, e acima disso a
+  economia é de centavos — contra onboarding dobrado e dois saldos em dois lugares
+- 🔴 **A Woovi/OpenPix foi descartada apesar de ser a mais barata:** a "subconta" dela é **saldo
+  virtual dentro da conta da plataforma** (a doc é literal: *"transações de split para sub contas são
+  transações virtuais"*), sem KYC do beneficiário. É o caminho (i) recusado abaixo, e tornaria falsa
+  a cláusula `papel_da_plataforma.com_custodia`
+- **Consequência de produto:** gorjeta não tem "saque pela plataforma" — o músico saca no próprio MP,
+  e a carteira do app vira **extrato** nessa parte. O saldo sacável pela SoundMeet passa a ser só o
+  cachê liberado da custódia
 - **Método:** PIX QR Code gerado pela plataforma (não chave pessoal do músico)
 - **Split:** no recebimento — comissão (3-8% conforme plano) já separada automaticamente
 - **Banda:** gorjeta vai para o dono da banda no MVP — ele distribui manualmente
@@ -111,6 +158,19 @@ IPixGateway (interface de domínio — já existe)
 
 **Gateway:** Asaas (único BR com conta escrow formal via API)
 
+**No contrato** *(alinhado em 15/ago/2026)*: este fluxo está redigido nas cláusulas
+`cache_pagamento.com_custodia` e `custodia_liberacao` — pagamento integral antecipado, custódia em
+instituição de pagamento, liberação condicionada ao registro da apresentação e ao decurso do prazo
+de contestação, com **liberação automática** se o estabelecimento não se manifestar. A redação
+anterior descrevia um **sinal parcial**, que nunca foi o modelo acordado aqui.
+
+⚠️ **Os números desta seção não entram no texto das cláusulas** — nem o percentual da comissão, nem
+D+2/D+5, nem as 48h, nem as 24h. As cláusulas remetem ao que foi "informado às partes e vigente na
+data de emissão deste instrumento". É o que permite reajustar taxa e prazo sem abrir `show-v2`, e a
+âncora de data é o que impede a mudança alcançar um show já assinado. Mudar qualquer número aqui,
+portanto, **não** exige tocar no catálogo de cláusulas — mas exige que a UI de fato informe o valor
+ao músico antes do aceite, porque é essa informação que a cláusula pressupõe.
+
 ### Assinaturas ✅
 
 - **Default:** Cartão de crédito recorrente (débito automático mensal)
@@ -142,13 +202,13 @@ IPixGateway (interface de domínio — já existe)
 
 ### Camadas de proteção implementadas
 
-1. **Contrato digital no booking** — aceite com IP + timestamp + dados completos (data, horário, valor, músico, local). Gerado como PDF e enviado ao estabelecimento.
+1. **Contrato digital no booking** ✅ *(Bloco 10, ago/2026)* — emitido automaticamente no `BookingConfirmedEvent`, com dados completos (data, horário, duração, valor, músico/banda, local e Ficha Técnica como anexo). Assinatura das duas partes com **conta autenticada + aceite explícito + IP + timestamp + user-agent + hash SHA-256** do conteúdo congelado, e página pública de verificação por código. PDF disponível por rota autorizada. ⚠️ O **envio por e-mail com o PDF anexo ainda não existe** — ver camada 4. Detalhe em [contract/contract-digital.md](contract/contract-digital.md).
 
 2. **Statement descriptor configurado no gateway** — fatura do estabelecimento mostra `"SoundMeet - [Nome Músico] DD/MM"` em vez de código genérico. Elimina 80% dos "não reconheço" antes de virar disputa.
 
 3. **Check-in do músico + scan do estabelecimento** — prova documental de execução do serviço (já planejado no domínio).
 
-4. **E-mail de confirmação** enviado ao e-mail corporativo do estabelecimento após pagamento — trail documental independente.
+4. **E-mail com o contrato e o hash** ✅ *(15/ago/2026)* — enviado às duas partes na emissão e quando a segunda assinatura fecha o contrato, com o **PDF anexo** e o resumo SHA-256 no corpo. Trail documental independente: fica na caixa de cada parte, fora do nosso storage e do nosso banco. Reenvio manual em `POST /contracts/:id/document/send`. ⚠️ O e-mail de confirmação **de pagamento** segue pendente — depende do escrow.
 
 5. **Reserva de chargeback** — reter parte da comissão (10%) por 45 dias como buffer. Para shows >R$500, avaliar "Seguro de Transação" Asaas (2% sobre valor).
 
@@ -168,25 +228,85 @@ Com essas evidências, vitória na disputa é praticamente garantida para o cen�
 
 | Risco | Impacto | Mitigação |
 |-------|---------|-----------|
-| Custo escrow Asaas em escala | R$9,90/músico/mês com escrow → R$10k/mês com 1k músicos | Habilitar escrow só para músicos com cachê ativo; negociar enterprise antes de 300 músicos |
-| Crossover gorjeta OpenPix | Iugu levemente mais caro para gorjetas >R$62,50 | `OpenPixAdapter` já previsto na interface; adicionar quando justificar o volume |
-| Reforma tributária 2027 | LC 214/2025: split fiscal IBS/CBS obrigatório | Confirmar suporte com Asaas/Iugu no contrato |
+| Custo escrow Asaas em escala | ✅ **confirmado na documentação (19/ago/2026):** R$99,90/mês na conta principal **+ R$9,90 por subconta habilitada** → R$10k/mês com 1k músicos | Habilitar escrow só para músicos com booking ativo e desabilitar depois — ⚠️ desabilitar **libera todos os valores ainda sob garantia**, então a ordem importa. Negociar enterprise antes de 300 músicos |
+| Reforma tributária 2027 | LC 214/2025: split fiscal IBS/CBS obrigatório | Confirmar suporte com Asaas/Mercado Pago no contrato |
 | Fraude real (cartão roubado) | Raro em B2B, mas possível | KYC estabelecimento obrigatório; limite de valor sem verificação extra |
+
+---
+
+## 🟡 DECIDIDO, AGUARDANDO CONFIRMAÇÃO JURÍDICA — onde o dinheiro do cachê fica custodiado
+
+> **Bloqueia o deploy do escrow (F1.3a). Não deixe ser decidida por omissão no dia do deploy.**
+> Registrada em 15/ago/2026 durante o Bloco 10 (contrato digital), a pedido explícito do usuário:
+> *"aplique a porta, porém documente para saber que antes do deploy tenho que tomar essa decisão"*.
+>
+> **Encaminhada em 15/ago/2026:** a decisão de produto é o **caminho (ii)** — subconta em
+> instituição de pagamento, *"pois perante a lei é a forma correta"*. O texto do contrato já foi
+> reescrito para ele e **afirma** que o valor custodiado não integra o patrimônio da plataforma.
+> Isso torna a escolha vinculante: ligar `uses_escrow: true` pelo caminho (i) transformaria uma
+> cláusula assinada em declaração falsa. Falta a confirmação jurídica e o KYC do Asaas.
+>
+> **Reforço registrado em 15/ago/2026:** a cláusula `papel_da_plataforma.com_custodia` passou a
+> dizer que a **remuneração da plataforma só é devida na liberação** — show não realizado, nenhuma
+> comissão devida. Somado ao fato de o valor não transitar pelo patrimônio da SoundMeet, é o
+> argumento mais forte contra a tese de responsabilidade solidária ("a plataforma lucrou com o
+> negócio"): ela só ganha se o serviço foi efetivamente prestado.
+
+O domínio (`BookingEscrow` + `held_balance`) é **idêntico nos dois caminhos** — só o adapter muda.
+O que **não** pode acontecer é o adapter ser escolhido por conveniência técnica na véspera.
+
+> ✅ **Atualização (19/ago/2026):** o domínio saiu. `BookingEscrow` (agregado + 3 camadas de
+> repositório), `MusicianWallet.held_balance`, `Booking.checkIn()`/`dispute()`,
+> `IBookingEscrowGateway`/`ISubaccountGateway`, `AsaasEscrowAdapter`/`AsaasSubaccountAdapter`,
+> `ReleaseBookingEscrowUseCase`, `ProcessDueEscrowReleasesUseCase` e `EscrowReleaseJob` existem e
+> estão testados. `uses_escrow` no contrato vem de `ESCROW_ENABLED` + `ESCROW_CUSTODIAN_LEGAL_NAME`,
+> e **nenhum corpo de cláusula mudou** — os 38 snapshots seguem intactos, como previsto.
+> Falta a fatia HTTP (check-in, contestação, criação de subconta), os webhooks e o `int-spec`.
+>
+> ⚠️ **Correção de registro (15/ago/2026), preservada:** uma versão anterior desta seção afirmava
+> que "a fatia do contrato modelou `IBookingEscrowGateway` com um fake". **Isso nunca existiu** — o
+> que havia até 19/ago era só a redação do contrato, pronta e testada, esperando o domínio.
+
+| Caminho | O que é | A favor | Contra |
+|---|---|---|---|
+| **(i) Ledger interno** | `held_balance` na `MusicianWallet`, dinheiro parado na conta Asaas da SoundMeet, saque pelo `AsaasGatewayAdapter` que já existe | Funciona **hoje**, sem depender do F1.0 nem de aprovação de terceiro | 🔴 É **custódia de recursos de terceiros** — atividade regulada. Risco jurídico real, não técnico |
+| **(ii) Subconta Asaas por músico** | F1.0: subconta + split, dinheiro na instituição de pagamento e não na conta da plataforma | Postura regulatória correta; a plataforma nunca detém recurso alheio | Depende de enquadramento e KYC aprovados pelo Asaas — trava por tempo que não depende de você |
+
+**Estado do F1.0 (verificado no código em 15/ago/2026):** não implementado. Grep em `src/` e
+`prisma/` devolve zero ocorrências de `asaas_wallet_id` ou `subaccount`; o único wallet id existente
+é o `ASAAS_WALLET_ID` da plataforma (`config.schema.ts:168`). Ele era declarado pré-requisito do
+F1.3 e não é — o contrato foi entregue sem ele.
+
+**Encaminhamento sugerido:** levar a pergunta junto com a revisão jurídica do contrato — está na
+§10 de [contract/legal-checklist.md](contract/legal-checklist.md), na seção "Antes do escrow". A
+resposta muda qual adapter implementar, não o domínio.
 
 ---
 
 ## Próximos Passos — Blocos 1.6 e 1.7
 
 ### Pré-implementação (decisões operacionais)
-- [ ] Abrir conta Iugu sandbox — validar multisplit e subconta
+- [x] Gateway da gorjeta: **Mercado Pago** (ago/2026). Não reabrir Iugu nem Woovi — ver
+      [payment-gateway-research-2026-08.md](payment-gateway-research-2026-08.md)
+- [ ] 🔴 **Confirmar que a conta Asaas é PJ** — conta pessoa física **não cria subconta**, e sem
+      subconta não há F1.0 nem escrow
+- [ ] 🔴 **Dimensionar o piloto pelo período de avaliação do Asaas:** 60 dias com no máximo
+      **10 subcontas** e **R$2.000 em cobranças por subconta**
 - [ ] Abrir conta Asaas sandbox — validar `POST /v3/accounts/{id}/escrow` e liberação via API
 - [ ] Definir kill fee do estabelecimento (sugestão: 30% do cachê)
 - [ ] Definir KYC mínimo: o que o músico precisa fornecer para habilitar subconta (CPF + banco)
 
 ### Implementação
-- [ ] `IuguGatewayAdapter` — gorjetas (PIX QR + split + webhook `payment_received`)
-- [ ] `AsaasGatewayAdapter` — cachê (escrow), assinaturas (recorrência cartão + PIX sob demanda), saque (PIX out)
-- [ ] Webhook de confirmação PIX + idempotência (Bloco 1.7)
-- [ ] `EscrowReleaseJob` — scheduler D+2/D+5 que verifica check-in + ausência de disputa e chama API de liberação
+- [x] ~~`MercadoPagoPixGateway` — gorjetas~~ — ✅ 19/ago/2026 (OAuth + webhook); 21/ago/2026 passou
+      a criar a cobrança na **Orders API** (`POST /v1/orders` + `marketplace_fee`). O Payments API
+      (`POST /v1/payments`) recusa as credenciais `APP_USR-` de teste da aplicação
+- [x] ~~`AsaasGatewayAdapter` — cachê (escrow)~~ — ✅ 19/ago/2026: `AsaasEscrowAdapter` +
+      `AsaasSubaccountAdapter`, atrás de portas próprias. Assinatura e saque já existiam
+- [~] Webhook de confirmação PIX + idempotência (Bloco 1.7) — gorjeta no MP já tem
+      `MercadoPagoWebhookController`. No Asaas faltam os handlers de escrow
+      (`PAYMENT_RECEIVED` / liberação)
+- [x] ~~`EscrowReleaseJob`~~ — ✅ 19/ago/2026, horário. Confere check-in **e** ausência de
+      contestação, com o prazo por plano (`escrow_release_days`: D+2 pago / D+5 FREE) contado do
+      **fim do show**. Uma custódia problemática não derruba a varredura das outras
 - [ ] Statement descriptor configurado em todos os gateways
-- [ ] Contrato digital gerado no booking (PDF com IP + timestamp do aceite)
+- [x] ~~Contrato digital gerado no booking (PDF com IP + timestamp do aceite)~~ — ✅ Bloco 10 (ago/2026), com hash de integridade e verificação pública além do previsto aqui
