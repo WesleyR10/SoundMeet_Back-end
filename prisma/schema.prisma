@@ -51,6 +51,17 @@ enum InquiryStatus {
   expired
 }
 
+/// Máquina de estado do contrato digital (F1.3b).
+/// `annulled` e não `void` porque `void` é palavra reservada em TypeScript.
+/// Não há `draft`: a emissão é automática no BookingConfirmedEvent e nasce
+/// completa — estado sem produtor vira coluna morta.
+enum ContractStatus {
+  issued
+  partially_signed
+  signed
+  annulled
+}
+
 enum TipStatus {
   pending
   completed
@@ -63,6 +74,18 @@ enum TransactionStatus {
   completed
   failed
   refunded
+}
+
+/// Estado da custódia do cachê. Máquina de estados de DOMÍNIO, por isso enum e
+/// não String — a regra do projeto reserva String para status operacional de
+/// worker, que é telemetria evolutiva. Aqui cada transição tem consequência
+/// financeira e precisa que o banco recuse o valor inválido.
+enum BookingEscrowStatus {
+  pending
+  held
+  released
+  refunded
+  disputed
 }
 
 enum MusicRequestStatus {
@@ -92,6 +115,8 @@ model Musician {
   avatar                 String?
   phone                  String?   @unique
   cpf                    String?   @unique
+  // CNPJ do MEI. Opcional e fora do cadastro: entra em configurações do perfil.
+  cnpj                   String?   @unique
   genres                 String[]  @default([])
   instruments            String[]  @default([])
   experience_years       Int?
@@ -148,6 +173,9 @@ model Musician {
   repertoires                 Repertoire[]
   google_calendar_integration GoogleCalendarIntegration?
   personal_chord_sheets       PersonalChordSheet[]
+  contracts                   Contract[]
+  booking_escrows             BookingEscrow[]
+  performances                Performance[]
 
   @@map("musicians")
 }
@@ -229,6 +257,8 @@ model Band {
   availability_rules BandAvailabilityRule[]
   unavailabilities   BandUnavailability[]
   transactions       Transaction[]
+  contracts          Contract[]
+  performances       Performance[]
 
   @@index([location_lat, location_lng])
   @@map("bands")
@@ -330,14 +360,35 @@ model MusicLibrary {
 
   duration_seconds Int?
 
+  /// [Spotify] Faixa correspondente no catálogo do Spotify, resolvida a partir
+  /// de título + artista + DURAÇÃO da gravação que o músico analisou. A duração
+  /// é o que separa estúdio de ao vivo, remaster e remix — mesmo sinal e mesma
+  /// fórmula que `synced-lyrics` usa para escolher a LRC certa.
+  ///
+  /// Ver `Docs/AI-musician/spotify-track-matching.md`.
+  spotifyTrackId    String?
+  /// 0..1 — quanto o candidato casou. Guardado porque o custo de errar é
+  /// diferente por caminho: abrir no Spotify tolera score médio (o fã vê e
+  /// julga); escrever na biblioteca dele, não.
+  spotifyMatchScore Float?
+  /// Quando procuramos pela última vez. Preenchido COM `spotifyTrackId` nulo
+  /// significa "procuramos e não achamos" — negative cache, mesma política do
+  /// LRCLIB. Sem isso, música fora do catálogo seria reconsultada para sempre.
+  spotifyCheckedAt  DateTime?
+
   musician              Musician             @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   requests              MusicRequest[]
   ai_cifra_uploads      AiCifraUpload[]
+  ai_audio_uploads      AiAudioUpload[]
   repertoire_songs      RepertoireSong[]
   personal_chord_sheets PersonalChordSheet[]
+  performed_songs       PerformedSong[]
 
   @@index([artist, title])
   @@index([lrc_hash])
+  /// O job de backfill varre por "nunca procurado" — sem índice parcial isso
+  /// seria sequential scan recorrente na tabela que mais cresce.
+  @@index([spotifyCheckedAt])
   @@map("music_library")
 }
 
@@ -346,14 +397,17 @@ model MusicLibrary {
 // ========================================
 
 model Establishment {
-  id          String  @id @default(uuid())
-  email       String  @unique
-  name        String
-  description String?
-  avatar      String?
-  cnpj        String? @unique
-  phone       String?
-  website     String?
+  id                            String  @id @default(uuid())
+  email                         String  @unique
+  name                          String
+  description                   String?
+  avatar                        String?
+  cnpj                          String? @unique
+  // Quem assina pela PJ. Coletado em configurações do perfil, não no cadastro.
+  legal_representative_name     String?
+  legal_representative_document String?
+  phone                         String?
+  website                       String?
 
   establishment_type String
   qr_code            String? @unique
@@ -380,6 +434,8 @@ model Establishment {
   rankings      Ranking[]
   subscriptions Subscription[]
   campaigns     Campaign[]
+  contracts     Contract[]
+  performances  Performance[]
 
   @@map("establishments")
 }
@@ -395,6 +451,7 @@ model EstablishmentProfile {
   amenities       String[] @default([]) // ["sound_system", "stage", "parking"]
   preferredGenres String[] @default([])
   operatingHours  Json?
+  stageTechSpec   Json? // Ficha técnica do palco (A3) — StageTechSpec VO
   priceRange      Json?
   socialLinks     Json?
   menu_pdfs       Json?
@@ -433,6 +490,7 @@ model Event {
   bookings      Booking[]
   inquiries     Inquiry[]
   tips          Tip[]
+  performances  Performance[]
 
   /// Bloco 9.4b — o job de auto-finalização roda a cada 10 min filtrando
   /// status + endTime. Sem este índice seria sequential scan recorrente.
@@ -473,6 +531,10 @@ model Booking {
   fee                     Decimal?      @db.Decimal(12, 2) // Custo da reserva
   status                  BookingStatus @default(pending)
   notes                   String? // Notas adicionais sobre a reserva
+  // Quem originou a proposta. Nullable porque bookings anteriores a este campo
+  // não têm como saber — o consumidor trata null como "não registrado" e age de
+  // forma conservadora (ver booking-lifecycle no soundmeet-web).
+  proposed_by             String? // "establishment" | "musician" | "band"
   cancelled_by            String? // "establishment" | "musician" | "band"
   cancellation_reason     String?
   buffer_minutes          Int           @default(0)
@@ -481,6 +543,15 @@ model Booking {
   confirmed_at            DateTime?
   cancelled_at            DateTime?
   completed_at            DateTime?
+  /// Registro da apresentação pelo artista ("check-in"). É a prova de execução
+  /// do serviço — vale contra chargeback mesmo sem escrow (camada 3), e é a
+  /// primeira das duas condições que liberam a custódia.
+  checked_in_at           DateTime?
+  checked_in_by           String? // "musician" | "band"
+  /// Contestação do estabelecimento dentro da janela. Congela a liberação
+  /// automática e manda o caso para mediação.
+  disputed_at             DateTime?
+  dispute_reason          String?
   created_at              DateTime      @default(now())
   updated_at              DateTime      @updatedAt
 
@@ -490,6 +561,8 @@ model Booking {
   band                         Band?                      @relation(fields: [bandId], references: [id], onDelete: SetNull)
   inquiry                      Inquiry?                   @relation("InquiryBooking")
   google_calendar_synced_event GoogleCalendarSyncedEvent?
+  contracts                    Contract[]
+  escrow                       BookingEscrow?
 
   @@index([musicianId, start_at, end_at])
   @@index([bandId, start_at, end_at])
@@ -722,8 +795,41 @@ model Audience {
   scores         UserScore[]
   rankings       Ranking[]
   transactions   Transaction[]
+  spotify_link   AudienceSpotifyLink?
 
   @@map("audiences")
+}
+
+/// Vínculo OAuth da conta Spotify de um fã — "gostei ao vivo, salva pra mim".
+///
+/// Tabela própria, e não colunas em `audiences`, pelo mesmo motivo de
+/// `MusicianWallet` guardar os tokens do Mercado Pago fora de `Musician`: token
+/// de terceiro tem ciclo de vida próprio (expira, renova, é revogado) e quase
+/// nunca é lido junto do perfil.
+model AudienceSpotifyLink {
+  id                     String   @id @default(uuid())
+  audienceId             String   @unique
+  /// Id da conta no provedor. Único: uma conta Spotify não se vincula a dois
+  /// fãs — seria salvar música de estranhos na biblioteca de alguém.
+  spotifyUserId          String   @unique
+  /// 🔴 Tokens cifrados em repouso (AES-256-GCM, infra de SM-016). O
+  /// access_token ESCREVE na biblioteca do fã.
+  accessTokenCiphertext  String
+  accessTokenIv          String
+  accessTokenAuthTag     String
+  /// Sem o refresh o vínculo morre em ~1h e o fã reautorizaria a cada música.
+  refreshTokenCiphertext String
+  refreshTokenIv         String
+  refreshTokenAuthTag    String
+  /// Quando o access_token expira. O job de renovação varre por esta coluna.
+  expiresAt              DateTime
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("audience_spotify_links")
 }
 
 model EventAttendee {
@@ -779,12 +885,13 @@ model MusicRequest {
   created_at      DateTime           @default(now())
   updated_at      DateTime           @updatedAt
 
-  event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  audience Audience         @relation(fields: [audienceId], references: [id], onDelete: Cascade)
-  musician Musician         @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  library  MusicLibrary?    @relation(fields: [libraryId], references: [id], onDelete: SetNull)
-  votes    RequestVote[]
-  feedback RequestFeedback?
+  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  audience        Audience         @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  musician        Musician         @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  library         MusicLibrary?    @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+  votes           RequestVote[]
+  feedback        RequestFeedback?
+  performed_songs PerformedSong[]
 
   @@index([audienceId, created_at])
   @@index([musicianId, created_at])
@@ -975,6 +1082,18 @@ model Transaction {
   status        TransactionStatus @default(pending)
   paymentMethod String
   externalId    String?           @unique // ID do provedor de pagamento — UNIQUE impede lançar duas vezes o mesmo pagamento/transferência (NULLs não colidem no Postgres)
+  /// Chave de idempotência do CLIENTE (header `Idempotency-Key`), distinta do
+  /// `externalId`, que é do PROVEDOR e só existe depois da chamada.
+  ///
+  /// 🔴 É o que impede o duplo clique de virar dois saques. O lock da carteira
+  /// serializa a corrida e o saldo barra o segundo débito quando não há fundo
+  /// para os dois — mas com saldo suficiente os dois saques passariam, cada um
+  /// legítimo isoladamente, e o músico veria sair o dobro do que pediu.
+  /// UNIQUE porque a garantia tem de vir do banco: checar antes e inserir
+  /// depois reabre exatamente a janela que este campo existe para fechar.
+  /// Nullable — chamadores internos (job, webhook) não têm cliente para gerar
+  /// chave, e NULLs não colidem no Postgres.
+  idempotencyKey String?          @unique
   metadata      Json?
   created_at    DateTime          @default(now())
   updated_at    DateTime          @updatedAt
@@ -990,31 +1109,116 @@ model Transaction {
 }
 
 model MusicianWallet {
-  id                    String       @id @default(uuid())
-  musicianId            String       @unique
-  balance               Decimal      @default(0) @db.Decimal(12, 2)
-  totalEarned           Decimal      @default(0) @db.Decimal(12, 2)
-  totalWithdrawn        Decimal      @default(0) @db.Decimal(12, 2)
-  currency              CurrencyEnum @default(BRL)
+  id                       String       @id @default(uuid())
+  musicianId               String       @unique
+  balance                  Decimal      @default(0) @db.Decimal(12, 2)
+  totalEarned              Decimal      @default(0) @db.Decimal(12, 2)
+  totalWithdrawn           Decimal      @default(0) @db.Decimal(12, 2)
+  currency                 CurrencyEnum @default(BRL)
   // Legado (SM-016, texto puro) — substituído pelas colunas *Ciphertext/*Iv/
   // *AuthTag (AES-256-GCM). Mantido só para o backfill; remoção em migration
   // futura (política: adicionar → backfill → remover em separado).
-  pixKey                String?
-  pixKeyCiphertext      String?
-  pixKeyIv              String?
-  pixKeyAuthTag         String?
-  pixKeyType            String?
-  bankAccount           Json? // Dados bancários — legado, ver acima
-  bankAccountCiphertext String?
-  bankAccountIv         String?
-  bankAccountAuthTag    String?
-  is_active             Boolean      @default(true)
-  created_at            DateTime     @default(now())
-  updated_at            DateTime     @updatedAt
+  pixKey                   String?
+  pixKeyCiphertext         String?
+  pixKeyIv                 String?
+  pixKeyAuthTag            String?
+  pixKeyType               String?
+  bankAccount              Json? // Dados bancários — legado, ver acima
+  bankAccountCiphertext    String?
+  bankAccountIv            String?
+  bankAccountAuthTag       String?
+  /// Cachê sob custódia — recebido, ainda NÃO liberado. Fica fora de `balance`
+  /// de propósito: dinheiro em custódia não é sacável, e somá-lo ao saldo faria
+  /// o app prometer um saque que o gateway recusaria.
+  heldBalance              Decimal      @default(0) @db.Decimal(12, 2)
+  /// Subconta do músico na instituição de pagamento (F1.0). `walletId` do Asaas.
+  asaasWalletId            String?      @unique
+  /// 🔴 A `apiKey` da subconta só existe NO MOMENTO DA CRIAÇÃO e não pode ser
+  /// recuperada depois. Cifrada em repouso (AES-256-GCM), mesma infra de SM-016
+  /// que já protege chave PIX e conta bancária — nunca em coluna clara.
+  asaasApiKeyCiphertext    String?
+  asaasApiKeyIv            String?
+  asaasApiKeyAuthTag       String?
+  /// Status da subconta no provedor. String, não enum: é vocabulário DELE, e
+  /// muda sem nos avisar (mesma regra dos status de worker).
+  asaasAccountStatus       String?
+  /// ─── Vínculo Mercado Pago (gorjeta) ───────────────────────────────────
+  /// O MP é o gateway da GORJETA porque cobra 0,99% sem piso — a taxa fixa do
+  /// Asaas (R$1,99) torna deficitária toda gorjeta abaixo de R$22. Aqui o
+  /// músico usa a CONTA DELE, vinculada por OAuth: o dinheiro nunca passa pelo
+  /// patrimônio da plataforma, mesma postura regulatória da subconta Asaas.
+  mpUserId                 String?      @unique
+  /// 🔴 Tokens OAuth cifrados em repouso (AES-256-GCM, infra de SM-016). O
+  /// access_token move dinheiro na conta do músico.
+  mpAccessTokenCiphertext  String?
+  mpAccessTokenIv          String?
+  mpAccessTokenAuthTag     String?
+  /// Sem o refresh_token o vínculo morre em 180 dias e o músico precisa
+  /// reautorizar na mão — por isso ele é tão sensível quanto o access.
+  mpRefreshTokenCiphertext String?
+  mpRefreshTokenIv         String?
+  mpRefreshTokenAuthTag    String?
+  /// Quando o access_token expira. O job de renovação varre por esta coluna.
+  mpTokenExpiresAt         DateTime?
+  /// Conta Escrow habilitada nesta subconta. Custa R$9,90/mês por subconta, e
+  /// desabilitar LIBERA tudo que ainda está sob garantia — por isso o
+  /// liga/desliga é decisão de domínio, não configuração global.
+  escrowEnabled            Boolean      @default(false)
+  is_active                Boolean      @default(true)
+  created_at               DateTime     @default(now())
+  updated_at               DateTime     @updatedAt
 
   musician Musician @relation(fields: [musicianId], references: [id], onDelete: Cascade)
 
   @@map("musician_wallets")
+}
+
+/// Custódia do cachê de um show (F1.3a).
+///
+/// O dinheiro **não transita pelo patrimônio da SoundMeet** — fica na subconta
+/// do músico na instituição de pagamento, bloqueado. É o que a cláusula
+/// `papel_da_plataforma.com_custodia` do contrato AFIRMA, e por isso o caminho
+/// (i) "ledger interno com o dinheiro na conta da plataforma" foi recusado:
+/// ligá-lo transformaria cláusula assinada em declaração falsa.
+///
+/// `bookingId @unique` é a barreira de idempotência: webhook reentregue ou
+/// dupla confirmação não criam segunda custódia.
+model BookingEscrow {
+  id             String              @id @default(uuid())
+  bookingId      String              @unique
+  musicianId     String?
+  /// Valor BRUTO recebido do estabelecimento.
+  amount         Decimal             @db.Decimal(12, 2)
+  /// Comissão da plataforma. 🔴 Só é devida NA LIBERAÇÃO — show não realizado,
+  /// nenhuma comissão. É o argumento mais forte contra responsabilidade
+  /// solidária, e está escrito na cláusula.
+  platformFee    Decimal             @default(0) @db.Decimal(12, 2)
+  /// O que o músico recebe (amount − platformFee).
+  netAmount      Decimal             @db.Decimal(12, 2)
+  currency       CurrencyEnum        @default(BRL)
+  status         BookingEscrowStatus @default(pending)
+  /// Id da cobrança/garantia no provedor. UNIQUE impede lançar duas vezes o
+  /// mesmo pagamento (NULLs não colidem no Postgres) — mesmo padrão de
+  /// `Transaction.externalId`.
+  externalId     String?             @unique
+  /// Quando a liberação automática do provedor vence (`daysToExpire`).
+  /// Guardado porque o job precisa saber se ainda dá tempo de liberar antes.
+  expiresAt      DateTime?
+  heldAt         DateTime?
+  releasedAt     DateTime?
+  refundedAt     DateTime?
+  /// Por que foi devolvido ou congelado. Obrigatório nas duas transições, para
+  /// que um estorno nunca fique sem justificativa no histórico.
+  resolutionNote String?
+  created_at     DateTime            @default(now())
+  updated_at     DateTime            @updatedAt
+
+  booking  Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+
+  @@index([status, expiresAt])
+  @@index([musicianId])
+  @@map("booking_escrows")
 }
 
 /// Ledger de idempotência de eventos externos (webhooks de gateway).
@@ -1044,6 +1248,11 @@ model ProcessedEvent {
 model AiAudioUpload {
   id                  String   @id @default(uuid())
   musicianId          String
+  /// Música da biblioteca que originou este áudio, quando o Modo Ensaio pediu
+  /// a separação a partir do repertório. Espelha `AiCifraUpload.musicLibraryId`
+  /// — é este elo que permite mostrar a cifra do ChordFormer ao lado dos stems.
+  /// Null quando o músico subiu um arquivo solto.
+  musicLibraryId      String?
   original_filename   String
   content_type        String
   file_size           Int
@@ -1059,10 +1268,12 @@ model AiAudioUpload {
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
-  musician Musician               @relation(fields: [musicianId], references: [id], onDelete: Cascade)
-  jobs     AiAudioSeparationJob[]
+  musician     Musician               @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  musicLibrary MusicLibrary?          @relation(fields: [musicLibraryId], references: [id], onDelete: SetNull)
+  jobs         AiAudioSeparationJob[]
 
   @@index([musicianId, status, created_at])
+  @@index([musicLibraryId])
   @@map("ai_audio_uploads")
 }
 
@@ -1080,6 +1291,17 @@ model AiAudioSeparationJob {
   error_message    String?
   started_at       DateTime?
   finished_at      DateTime?
+  /// 🔴 Quando os stems desta separação devem ser APAGADOS do storage.
+  ///
+  /// O ai-cifra nunca retém a gravação: apaga o objeto no instante em que a
+  /// análise conclui, guardando só o dado derivado (a cifra). Stem não é dado
+  /// derivado no mesmo sentido — stem É a gravação, separada. Reter os quatro
+  /// por tempo indeterminado seria uma postura de direito autoral diferente da
+  /// que o resto do projeto escolheu, então a retenção aqui é curta e
+  /// explícita, varrida por `PurgeExpiredAiAudioStemsUseCase`.
+  ///
+  /// Null enquanto o job não concluiu — não há o que expirar.
+  stems_expire_at  DateTime?
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
 
@@ -1088,6 +1310,9 @@ model AiAudioSeparationJob {
   outputs  AiAudioSeparationOutput[]
 
   @@index([musicianId, status, created_at])
+  /// A varredura de expiração busca exatamente por isto; sem índice seria
+  /// sequential scan de hora em hora na tabela de jobs.
+  @@index([status, stems_expire_at])
   @@map("ai_audio_separation_jobs")
 }
 
@@ -1422,4 +1647,169 @@ model Review {
   @@index([target_type, target_id, created_at])
   @@index([author_id, created_at])
   @@map("reviews")
+}
+
+/// Contrato digital de apresentação musical (F1.3b).
+///
+/// A linha guarda um SNAPSHOT CONGELADO: `parties`, `clauses` e `variables` são
+/// o texto e os dados exatamente como as partes assinaram, não referências ao
+/// estado atual dos agregados. Se o bar mudar de endereço depois, o contrato
+/// assinado continua dizendo o que dizia — documento que muda sozinho não prova
+/// nada.
+///
+/// As FKs são deliberadas nas duas direções: `Restrict` em booking e
+/// establishment (não se apaga aquilo de que existe contrato) e `SetNull` em
+/// musician/band (apagamento de conta por LGPD zera o ponteiro, e o snapshot
+/// preserva a prova).
+model Contract {
+  id String @id @default(uuid())
+
+  bookingId       String
+  establishmentId String
+  musicianId      String?
+  bandId          String?
+
+  /// Aditivo é contrato novo com revisão maior, nunca edição do anterior.
+  revision Int @default(1)
+
+  /// Versão IMUTÁVEL do template. Redação nova = versão nova.
+  template_version String
+
+  status ContractStatus @default(issued)
+
+  /// Qualificação congelada das duas partes (ContractParty).
+  parties    Json
+  /// Cláusulas já renderizadas, na ordem do documento (RenderedClause[]).
+  clauses    Json
+  /// Variáveis resolvidas e formatadas (ContractVariables).
+  variables  Json
+  /// Trilha de aceites (ContractSignature[]), com IP, procedência e user-agent.
+  signatures Json @default("[]")
+
+  /// SHA-256 da serialização canônica do conteúdo — nunca dos bytes do PDF,
+  /// que carregam metadados voláteis e não são determinísticos.
+  content_hash String
+
+  /// Código público curto para conferência por terceiro.
+  verification_code String @unique
+
+  /// Chaves no storage PRIVADO. Não há URL pública para contrato: o download
+  /// passa por rota autorizada que faz stream do objeto.
+  document_key    String?
+  certificate_key String?
+
+  issued_at    DateTime
+  signed_at    DateTime?
+  annulled_at  DateTime?
+  annul_reason String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  musician      Musician?     @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band          Band?         @relation(fields: [bandId], references: [id], onDelete: SetNull)
+
+  /// Um contrato vigente por booking, garantido NO BANCO — duas entregas
+  /// simultâneas do BookingConfirmedEvent furam qualquer checagem feita só na
+  /// aplicação.
+  @@unique([bookingId, revision])
+  @@index([establishmentId, status, created_at])
+  @@index([musicianId, status, created_at])
+  @@index([bandId, status, created_at])
+  @@map("contracts")
+}
+
+// ========================================
+// DOMÍNIO PERFORMANCE — APRESENTAÇÃO AO VIVO
+// ========================================
+
+/// Registro de execução ao vivo (F0) — a primitiva que faltava para o sistema
+/// saber o que o músico TOCOU, e não apenas o que ele sabe tocar.
+///
+/// Ver `Docs/performance/live-performance.md`. Três read models dependem desta
+/// tabela: relatório pós-show (F6), currículo verificado (F4) e setlist
+/// inteligente (F5).
+///
+/// 🔴 O set é aberto EXPLICITAMENTE pelo músico. Sem set aberto o Play Mode
+/// continua privado — registro automático transformaria ensaio em histórico
+/// público e envenenaria os três read models com repetição de estudo.
+model Performance {
+  id              String            @id @default(uuid())
+  eventId         String
+  establishmentId String
+  /// Quem OPERA o set — é este id que o MusicianOwnershipGuard autoriza.
+  /// Num show de banda é o dono do celular que está rodando o app.
+  musicianId      String
+  /// Em nome de quem se toca, quando é banda. Não substitui `musicianId`.
+  bandId          String?
+  /// Enum, e não String: é máquina de estado de DOMÍNIO (live -> ended), não
+  /// telemetria evolutiva de worker — a regra do projeto separa os dois casos.
+  status          PerformanceStatus @default(live)
+  startedAt       DateTime          @default(now())
+  endedAt         DateTime?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  event         Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  establishment Establishment   @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  musician      Musician        @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  band          Band?           @relation(fields: [bandId], references: [id], onDelete: SetNull)
+  songs         PerformedSong[]
+
+  /// ⚠️ Existe também o índice parcial ÚNICO
+  /// `performances_one_live_per_event_musician` —
+  /// `(eventId, musicianId) WHERE status = 'live'` — criado em
+  /// 20260821200000_add_performance. Prisma não sabe expressar índice parcial,
+  /// então ele vive só no SQL: se algum `migrate dev` gerar um DROP INDEX dele,
+  /// **remova esse DROP** e mantenha o índice. É ele que impede dois sets ao
+  /// vivo simultâneos — que dariam "tocando agora" ambíguo para o fã.
+  @@index([musicianId, startedAt])
+  @@index([establishmentId, startedAt])
+  @@index([eventId, status])
+  @@map("performances")
+}
+
+enum PerformanceStatus {
+  live
+  ended
+}
+
+/// Uma música executada dentro de um set. Entidade embutida do agregado
+/// `Performance` — mesmo padrão de `RepertoireSong`.
+model PerformedSong {
+  id             String    @id @default(uuid())
+  performanceId  String
+  /// Ponteiro para a biblioteca, quando a música veio de lá. É o que o F5
+  /// cruza. Null quando o músico tocou algo que não está cadastrado.
+  libraryId      String?
+  /// Preenchido quando a execução atende a um pedido do público.
+  requestId      String?
+  /// 🔴 SNAPSHOT, não referência. Renomear a música na biblioteca não pode
+  /// reescrever o histórico do show — e é ESTE par que o fã vê no palco.
+  title          String
+  artist         String
+  /// Faixa no Spotify, copiada de `music_library` no momento da execução.
+  /// Snapshot pelo mesmo motivo de title/artist, e por um segundo: a leitura
+  /// do fã é POLLING de 20s — resolver por join a cada consulta multiplicaria
+  /// a carga pelo número de pessoas na casa.
+  spotifyTrackId String?
+  position       Int
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  created_at     DateTime  @default(now())
+
+  performance Performance   @relation(fields: [performanceId], references: [id], onDelete: Cascade)
+  library     MusicLibrary? @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+  request     MusicRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  /// Tocar o mesmo PEDIDO duas vezes contaria dobrado no relatório e no
+  /// ranking do setlist. Música repetida sem pedido continua permitida — bis
+  /// existe.
+  @@unique([performanceId, requestId])
+  @@unique([performanceId, position])
+  @@index([performanceId, position])
+  @@index([libraryId])
+  @@map("performed_songs")
 }
