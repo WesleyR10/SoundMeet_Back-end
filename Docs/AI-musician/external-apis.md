@@ -29,6 +29,18 @@ Ver implementação em [chord-sheet.md](chord-sheet.md).
 | [Scales-Chords](https://www.scales-chords.com) | Diagramas + sons embed |
 | [ChordMini](https://chordmini.me) | Reconhecimento de acordes em áudio (referência técnica) |
 
+## Spotify
+
+| Uso | Fluxo | Teto |
+|-----|-------|------|
+| **Casar a música com a faixa** (título+artista+duração) | Client Credentials — token de aplicação | Só rate limit; **sem** teto de usuários |
+| **Salvar na biblioteca do fã** | OAuth do fã (`user-library-modify`) | **5 usuários** em Development Mode |
+
+🔴 Extended Quota exige pessoa jurídica e **250k MAU**, então o caminho padrão
+hoje é **deep link** (`open.spotify.com/track/{id}`), que não usa API. Detalhes,
+fórmula de escolha de versão e o que está descontinuado (`preview_url`,
+`audio-features`) em [spotify-track-matching.md](spotify-track-matching.md).
+
 ## Estratégia SoundMeet
 
 1. **Cifras** — pipeline próprio (`ai-cifra-module` + worker MIR).
