@@ -32,7 +32,34 @@ RUN rm -f src/metadata.ts && npm run build && npm prune --omit=dev
 
 # Estágio de produção
 FROM node:20-alpine AS production
-RUN apk add --no-cache libc6-compat yt-dlp
+
+# yt-dlp vem do release OFICIAL, não do apk.
+#
+# 🔴 O pacote do Alpine fica meses atrás do upstream. Em 24/ago/2026 ele
+# entregava a build de 17/mar — cinco meses velha — e o YouTube recusava
+# TODO download com 403: a URL assinada liberava só os primeiros ~512KB e
+# recusava o resto, mesmo re-resolvendo a URL a cada bloco. Não era rate
+# limit, não era bloqueio de IP, não era música de gravadora; era o extrator
+# velho. A build de 19/ago usa o player client `visionos`, que ainda passa, e
+# baixou o mesmo arquivo inteiro em 5s.
+#
+# O extrator do YouTube é alvo móvel: esta dependência PRECISA vir da fonte,
+# senão o pipeline de IA musical morre inteiro sem nenhum erro no nosso código.
+# Zipapp em vez do binário Linux porque este estágio é Alpine (musl) e o
+# binário oficial é compilado contra glibc.
+#
+# `latest` por padrão é deliberado — versão velha aqui não degrada, quebra.
+# Para build reproduzível, passe --build-arg YT_DLP_VERSION=2026.08.19.
+ARG YT_DLP_VERSION=latest
+RUN apk add --no-cache libc6-compat python3 ca-certificates \
+    && if [ "$YT_DLP_VERSION" = "latest" ]; then \
+         YT_DLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"; \
+       else \
+         YT_DLP_URL="https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp"; \
+       fi \
+    && wget -qO /usr/local/bin/yt-dlp "$YT_DLP_URL" \
+    && chmod +rx /usr/local/bin/yt-dlp \
+    && /usr/local/bin/yt-dlp --version
 WORKDIR /app
 
 # Criar usuário não-root

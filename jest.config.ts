@@ -204,6 +204,20 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)sx?$': '@swc/jest',
   },
+  /*
+   * `@react-pdf/*` é publicado só em ESM (`main` aponta para um arquivo com
+   * `import`). O Node 22 carrega isso por `require()` nativamente, então a
+   * aplicação roda sem ajuste nenhum — mas o registry de módulos do Jest é CJS
+   * e engasga com `Cannot use import statement outside a module`.
+   *
+   * Exceção cirúrgica ao ignore padrão para que o `@swc/jest` transpile o
+   * escopo, em vez de mockar o renderizador nos testes: gerar um PDF de mentira
+   * não provaria nada sobre a única dependência nova desta fatia.
+   */
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@react-pdf|color|color-string|color-name|is-arrayish|simple-swizzle|parse-css-color|yoga-layout|restructure|queue|media-engine|hyphen|fontkit|dfa|clone|tiny-inflate|unicode-trie|unicode-properties|abs-svg-path|normalize-svg-path|parse-svg-path|svg-arc-to-cubic-bezier|cross-fetch)/)',
+    '\\.pnp\\.[^\\/]+$',
+  ],
   moduleNameMapper: {
     '^@core/(.*)$': '<rootDir>/core/$1',
   },
