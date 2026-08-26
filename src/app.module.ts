@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { SentryModule } from "@sentry/nestjs/setup";
 
 import { HealthController } from "./health.controller";
@@ -17,6 +17,7 @@ import {
   EnvConfig,
 } from "./nest-modules/config-module/config.schema";
 import { ConfigModuleRoot } from "./nest-modules/config-module/config-module.module";
+import { ContractModule } from "./nest-modules/contract-module/contract.module";
 import { DatabaseModule } from "./nest-modules/database-module/database.module";
 import { EstablishmentsModule } from "./nest-modules/establishments-module/establishments.module";
 import { EventModule } from "./nest-modules/events-module/events.module";
@@ -28,6 +29,7 @@ import { MusicianAnalyticsModule } from "./nest-modules/musician-analytics-modul
 import { MusiciansModule } from "./nest-modules/musicians-module/musicians.module";
 import { NotificationsModule } from "./nest-modules/notifications-module/notifications.module";
 import { PaymentModule } from "./nest-modules/payment-module/payment.module";
+import { PerformanceModule } from "./nest-modules/performance-module/performance.module";
 import { PersonalChordSheetModule } from "./nest-modules/personal-chord-sheet-module/personal-chord-sheet.module";
 import { PlansModule } from "./nest-modules/plans-module/plans.module";
 import { RabbitmqModule } from "./nest-modules/rabbitmq-module/rabbitmq.module";
@@ -35,6 +37,7 @@ import { RepertoireModule } from "./nest-modules/repertoire-module/repertoire.mo
 import { RequestsModule } from "./nest-modules/requests-module/requests.module";
 import { ReviewsModule } from "./nest-modules/reviews-module/reviews.module";
 import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.module";
+import { UserThrottlerGuard } from "./nest-modules/shared-module/guards/user-throttler.guard";
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
 
 const normalizeTransport = (value: string | undefined, fallback: string) =>
@@ -89,6 +92,8 @@ const shouldRegisterRabbitmqHandlers =
     CampaignModule,
     RepertoireModule,
     ReviewsModule,
+    PerformanceModule,
+    ContractModule,
     PersonalChordSheetModule,
     AiAudioModule,
     AiCifraModule,
@@ -107,6 +112,13 @@ const shouldRegisterRabbitmqHandlers =
     // Domain modules removed
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  /*
+   * `UserThrottlerGuard` no lugar do `ThrottlerGuard` padrão: o tracker passa a
+   * ser o `sub` do JWT, com fallback para IP em rota anônima. Sem isso, o
+   * `soundmeet-web` — onde todo tráfego sai do IP do BFF — compartilhava um
+   * único balde de RATE_LIMIT_MAX entre todos os operadores do painel. Ver o
+   * cabeçalho do guard.
+   */
+  providers: [{ provide: APP_GUARD, useClass: UserThrottlerGuard }],
 })
 export class AppModule {}
