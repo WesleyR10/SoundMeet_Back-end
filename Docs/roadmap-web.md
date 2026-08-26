@@ -9,7 +9,8 @@
 > 1. **Destravar o backend primeiro, depois o web.**
 > 2. **Escopo do web v1 = completo** (conta/perfil/cardápio/horários · eventos · contratação+chat · analytics/campanhas/assinatura).
 > 3. **Stack:** Next.js + Tailwind + Aceternity **como ponto de partida, não como destino** — direção visual autoral, ousada, sem cara de template gerado por IA.
-> 4. **Gorjeta PIX real (Iugu) fica para depois** — foco total no estabelecimento.
+> 4. **Gorjeta PIX é Mercado Pago** (músico vincula a conta no app). O web do estabelecimento não
+>    tem — e não deve ter — UI de vínculo MP.
 
 ---
 
@@ -434,7 +435,37 @@ Registradas aqui porque nasceram do código, não de brainstorm:
 - Suíte: **333 suítes / 2876 testes** ✅
 
 
-### 9.7 — 🔴 Features vendidas nos planos que nenhum gate aplica *(achado na Fase 0)*
+### 9.7 — ✅ Features vendidas nos planos que nenhum gate aplicava *(resolvido em 16/ago/2026)*
+
+> **Decisões tomadas com o usuário (16/ago/2026), feature a feature.** As quatro respostas estão
+> implementadas; o quadro abaixo descreve o estado ANTES, preservado porque explica por que cada
+> escolha foi feita.
+>
+> | Flag | Decisão | O que foi feito |
+> |---|---|---|
+> | `advanced_analytics` · `realtime_analytics` | **Aplicar o gate, 402 no endpoint inteiro** | `assertEstablishmentFeature`/`assertMusicianFeature` nos dois use-cases de analytics. Escolhido sabendo que quebra duas telas vivas — por isso a fatia inclui os estados de paywall no web (`AnalyticsPlanGateNotice`) e no mobile (`isPlanLimitError` + CTA "Ver planos"), entregues junto |
+> | `max_qr_codes` (1/3/∞) | **Remover a promessa** | Fora de `EstablishmentPlanFeatures` e dos 3 tiers. Múltiplos QR volta como feature (agregado próprio), nunca como gate — `Establishment.qr_code` é campo único |
+> | "1 evento ativo no Free" | **Não aplicar agora** | Os eventos de estabelecimento FREE são o inventário que alimenta a `/agenda` pública do W5; estrangular isso mataria o funil de aquisição recém-construído. Revisitar quando houver oferta sobrando |
+> | `api_access` (×2) · `white_label` | **Manter como "em breve"** | Continuam no catálogo, agora declaradas em `coming_soon` no `GET /plans`. As UIs renderizam badge "Em breve" em vez de ✓/✗ — e o `Exclude<>` nas uniões de `assertMusicianFeature`/`assertEstablishmentFeature` torna **erro de compilação** gatear uma capacidade que não existe |
+>
+> **Dois achados durante a implementação, não previstos no plano:**
+> 1. **`ListEstablishmentAnalyticsUseCase` devolvia o analytics de todos os estabelecimentos** se
+>    chamado sem `filter.establishment_id` — era campo opcional do filtro. O controller sempre o
+>    fixava, então nunca vazou por HTTP, mas o buraco estava no use-case. Virou parâmetro
+>    obrigatório de topo que **sobrescreve** o filtro (precedente do 9.6c), o que também é o que
+>    permite ao gate resolver o plano. O teste que esperava `filter: null` com entrada inválida foi
+>    **reescrito com o motivo no corpo** — ele codificava a busca sem escopo.
+> 2. **Um teste provava a promessa quebrada.** `"FREE: realtime_available=false"` e `"não lança erro
+>    para músico FREE"` documentavam com precisão que o FREE recebia os mesmos números do PRO. Foram
+>    invertidos, não deletados.
+>
+> **Gates:** backend **354 suítes / 3308 testes** · web **88 arquivos / 817 testes** · mobile
+> **10 suítes / 137 testes** · `tsc` limpo nos três · lint limpo no backend e no web.
+
+<details>
+<summary>Estado anterior (jun–ago/2026) — por que este bloco existiu</summary>
+
+
 
 **Como foi achado:** ao corrigir a tabela de "features pendentes" do estabelecimento, conferi
 campo a campo o `plan-features.config.ts` contra os call-sites reais de `assertMusicianFeature` /
@@ -464,18 +495,20 @@ campo a campo o `plan-features.config.ts` contra os call-sites reais de `assertM
 que pagar Growth recebe quase a mesma coisa que tinha de graça. É receita perdida e exposição a
 reclamação legítima.
 
-- [ ] **9.7a** Decidir, feature a feature: **aplicar o gate** ou **remover a promessa** da tabela de
-      preços. As duas respostas são válidas; o que não pode continuar é a divergência silenciosa.
-- [ ] **9.7b** Implementar as decisões seguindo o padrão dos dois gates que já funcionam.
-- [ ] **9.7c** Teste por gate (padrão 4C.8): FREE bloqueado (`PlanLimitExceededError` → 402), tier
-      pago liberado, assinatura cancelada volta ao FREE.
-- [ ] **9.7d** ✅ Auditoria do lado do músico — **feita**, resultado na tabela acima.
+- [x] **9.7a** Decidir, feature a feature: **aplicar o gate** ou **remover a promessa** da tabela de
+      preços. Decidido com o usuário em 16/ago/2026 — ver a tabela de decisões no topo deste bloco.
+- [x] **9.7b** Implementar as decisões seguindo o padrão dos dois gates que já funcionam
+      (`CreateCampaignUseCase` foi o molde).
+- [x] **9.7c** Teste por gate (padrão 4C.8): FREE bloqueado (`PlanLimitExceededError` → 402), tier
+      pago liberado, assinatura cancelada volta ao FREE — nos dois lados, mais um teste no
+      **controller** do músico (a fronteira HTTP, onde o 9.7 mostrou que os testes não chegam).
+- [x] **9.7d** ✅ Auditoria do lado do músico — **feita**, resultado na tabela abaixo.
 
-> ⚠️ **Cuidado ao "corrigir" o analytics:** transformar o soft gate em 402 **quebra a
-> `AnalyticsScreen` do mobile para todo músico FREE**, que hoje funciona. É decisão de produto com
-> impacto em tela viva, não um bug a consertar sem avisar.
->
-> **Timing:** resolver antes da fatia W4.
+> ⚠️ **O aviso abaixo era real e a decisão foi tomada sabendo dele:** transformar o soft gate em 402
+> **quebra a `AnalyticsScreen` do mobile para todo músico FREE**, que até então funcionava. Por isso
+> a fatia não terminou no backend — os dois estados de paywall (web e mobile) fazem parte dela.
+
+</details>
 
 ---
 
@@ -670,15 +703,13 @@ Isso é raro e o produto quase não capitaliza:
 aquisição que só o SoundMeet consegue mandar, porque só ele tem os dois lados.
 
 **M5. Não abra a terceira plataforma sem fechar o ciclo do dinheiro.**
-Você decidiu (e eu respeito) deixar o gateway de gorjeta para depois. Registrando o risco
-explicitamente para não sumir: a receita principal do produto (9%/7%/5%) roda em
-`PixGatewayMock` — **nenhum real de verdade jamais circulou**. Quanto mais superfície for construída
-antes disso, maior o retrabalho se o modelo de split/subconta precisar mudar. Sugestão de meio-termo
-sem sair do foco: abrir a conta Iugu sandbox **agora** (é burocracia, não código) para que o adapter
-seja escrito depois já contra a API real.
+A receita principal do produto (9%/7%/5%) hoje passa pelo Mercado Pago (`MercadoPagoPixGateway`).
+O risco que resta não é "ainda está no mock": é o vínculo OAuth do músico (`CLIENT_SECRET` +
+redirect HTTPS) e a prova ponta a ponta webhook → gorjeta `completed`. Sem isso, a cobrança nasce
+e fica `pending` para sempre.
 
 **M6. Uma verdade desconfortável sobre o mobile.**
-São ~36.200 linhas em 47 telas, e os blocos 3, 4.9, 5, 6, 7, 7.11, 8, 9 e 11 estão todos marcados
+São ~47.200 linhas em 56 telas (recontado em 22/ago/2026), e os blocos 3, 4.9, 5, 6, 7, 7.11, 8, 9 e 11 estão todos marcados
 `[~]` com a mesma frase: *"falta confirmação manual em device"*. Push notification nunca foi vista
 chegando num aparelho. Um dia de teste com dois aparelhos reais e o backend real vale mais, em
 informação, do que uma semana de features novas — e provavelmente encontra 10 bugs que hoje estão
@@ -747,10 +778,16 @@ invisíveis. Não precisa bloquear o web; precisa acontecer antes de qualquer us
 **Bloco 9 (backend)**
 ```bash
 cd soundmeet-backend
-npm test                       # baseline atual: 315 suítes / 2700 testes
+npm test                       # baseline atual: 387 suítes / 3622 testes (22/ago/2026)
 npm run test:e2e               # int-specs (controller + Postgres)
 npx tsc --noEmit
-npm run seed -- --reset        # base de teste com 4 estabelecimentos geolocalizados
+npx prisma migrate deploy      # ⚠️ ANTES do seed. `deploy`, nunca `dev`: o dev faz diff
+                               # do schema e não enxerga índice parcial, então pode gerar
+                               # DROP de performances_one_live_per_event_musician e de
+                               # band_members_one_accepted_leader (vivem só no SQL).
+npm run seed -- --reset        # 52 dos 56 modelos; 14 logins (senha Seed@123) se o
+                               # Keycloak estiver de pé. Ver o cabeçalho de prisma/seed.ts
+                               # para os 4 modelos deixados de fora e o porquê.
 ```
 Critério de pronto do Bloco 9, ponta a ponta via Swagger (`http://localhost:3000/api/docs`):
 1. `POST /auth/register-establishment` → 201 com tokens;
@@ -775,8 +812,17 @@ com Lighthouse ≥ 90 em Performance e Acessibilidade nas páginas públicas, e
 
 ## 10. Próxima tarefa
 
-> **9.1a — `RegisterEstablishmentUseCase`.**
-> Sem ele, nada do web tem usuário.
+> ⚠️ **Este bloco apontava para "9.1a — `RegisterEstablishmentUseCase`" muito depois de o 9.1a estar
+> concluído** (06/ago/2026). Corrigido em 19/ago/2026.
+
+> ~~**1. Aplicar as migrations pendentes.**~~ ✅ feito em 19/ago/2026 — 38 migrations, schema em dia.
+>
+> **1. Decidir o gateway da gorjeta** — ver
+> [payment-gateway-research-2026-08.md](payment-gateway-research-2026-08.md). A taxa fixa do Asaas
+> torna deficitária toda gorjeta abaixo de R$22, e isso bloqueia a receita principal do produto.
+>
+> **2. Fatia HTTP do escrow (F1.3a):** ✅ check-in e contestação entregues em 19/ago. Faltam a
+> criação da subconta (F1.0) por HTTP e os webhooks de `PAYMENT_RECEIVED`/escrow.
 
 ---
 

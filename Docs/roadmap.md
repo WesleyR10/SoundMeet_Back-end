@@ -39,8 +39,122 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 - [x] **1.3** Endpoints: `GET /musicians/:id/wallet`, `POST /musicians/:id/wallet/withdraw` (WithdrawToPix)
 - [x] **1.4** Registrar `PaymentModule` em `app.module.ts`
 - [x] **1.5** Testes de integração dos endpoints (happy path + validação 422)
-- [~] **1.6** Substituir `PixGatewayMock` por gateway PIX real (adapter + env vars) — `AsaasGatewayAdapter` implementado (saques PIX out via `POST /v3/transfers`); gorjetas ainda usam `PixGatewayMock` (aguardando chaves Iugu)
-- [~] **1.7** Webhook/callback de confirmação PIX + idempotência — `AsaasWebhookController` (`POST /webhooks/asaas`) com `TRANSFER_DONE`/`TRANSFER_FAILED` + `processOnce`; handler de gorjeta `PAYMENT_RECEIVED` pendente (Iugu)
+- [~] **1.6** Substituir `PixGatewayMock` por gateway PIX real (adapter + env vars) — 🟡 **gorjeta
+      redecidida e implementada em 19/ago/2026.**
+  - **Gateway da gorjeta virou o Mercado Pago**, não o Asaas. Quando o Asaas foi escolhido a taxa PIX
+    era **R$0,99 fixos**; hoje é **R$1,99**, e taxa fixa sobre ticket de R$5–60 inverte a economia:
+    no plano FREE (9%) o ponto de equilíbrio vai para **R$22**, então toda gorjeta de bar dá
+    prejuízo. O MP cobra **0,99% sem piso**. A Iugu nunca liberou a conta
+  - **Roteamento é POR VÉRTICE, nunca por valor.** O cruzamento MP × Asaas é R$201 e o ticket é
+    R$5–100 — rotear por valor economizaria centavos ao custo de onboarding dobrado (dois KYC no
+    momento da monetização) e dois saldos em dois lugares
+  - 🔴 **A Woovi era a mais barata e foi descartada por um motivo REGULATÓRIO, não comercial:** a
+    "subconta" dela é **saldo virtual dentro da conta da plataforma** — a doc é literal (*"transações
+    de split para sub contas são transações virtuais... somente será debitado no momento do saque"*),
+    e não exige KYC do beneficiário. É exatamente o caminho (i) recusado em
+    `payment-gateway-decisions.md`, e tornaria falsa a cláusula `papel_da_plataforma.com_custodia`
+  - **Implementado:** `MercadoPagoPixGateway` (cobrança criada na conta DO músico via OAuth, comissão
+    por `marketplace_fee` na Orders API), vínculo OAuth cifrado em repouso na `MusicianWallet` (`mpUserId` +
+    access/refresh tokens, infra de SM-016), `WalletMercadoPagoAccountResolver`, e o roteamento no
+    provider `PixGateway` com fallback para o mock — nunca para o Asaas, porque cair em silêncio num
+    gateway que perde dinheiro por transação é pior que cair num mock que grita
+  - **`splitAmountInCents` virou util compartilhado** entre gorjeta e cachê: 9% de R$333,33 em ponto
+    flutuante dá 29,999700000000004 e o `Money` recusa
+  - **Vínculo OAuth completo (19/ago/2026):** `POST /musicians/:id/mercadopago/connect` (URL de
+    autorização com `state` **assinado**), callback `@Public()` em **controller separado**
+    (`MercadoPagoCallbackController` — a armadilha do `@Public()` solto já registrada no contrato),
+    `DELETE /musicians/:id/mercadopago`, e `RefreshMercadoPagoTokensJob` diário com **15 dias de
+    folga** sobre os 180 do token
+  - **`OAuthStateService` virou compartilhado** (`core/shared/infra/crypto/`), com o Google Calendar
+    migrado junto — duas cópias de uma verificação de assinatura divergiriam na primeira correção
+    que só uma recebesse. O `purpose` (`mp_connect` × `gcal_connect`) é o que impede um `state`
+    emitido no fluxo de agenda de ser aceito no fluxo que vincula conta que **recebe dinheiro**
+  - **Webhook `payment.updated`** (`POST /webhooks/mercadopago`): valida `x-signature` (HMAC com
+    manifesto `id;request-id;ts`, comparação constant-time, **fail-closed** sem segredo), resolve
+    `user_id` → carteira → token do músico, e **lê o valor da API** — nunca do corpo, senão qualquer
+    POST confirmaria gorjeta de R$1.000. Idempotente pelo ledger `ProcessedEvent`
+  - 🔴 **`marketplace_fee` = percentual do plano MENOS a taxa do gateway.** No marketplace do MP a
+    taxa dele sai do bruto **antes** da nossa comissão — pedir os 9% cheios debitaria 9,99% do
+    músico num plano que anuncia 9%. A tabela promete "(1% gateway incluso)", e agora o código
+    cumpre: em R$20, `marketplace_fee` = R$1,60 e o total retido é exatamente R$1,80
+  - ⚠️ **Correção (19/ago/2026): NÃO falta "UI de vínculo no web".** O `soundmeet-web` é exclusivo do
+    persona **estabelecimento** (decisão de produto — o `CLAUDE.md` dele é explícito, e o
+    `/dashboard` inteiro é do dono do bar). Vincular Mercado Pago é ação do **músico**, que não tem
+    área autenticada no web; o `/musico/[slug]` é só perfil público SSR. Construir isso ali exigiria
+    criar um dashboard de músico deliberadamente excluído do produto
+  - 🔴 **Duas correções feitas em 20/ago/2026, achadas ao revisar se "o pagamento está correto":**
+    - **Crédito duplo.** `ConfirmTipPaymentUseCase` fazia `wallet.receiveFunds()` sempre. Com o
+      split do MP o dinheiro **já está** na conta do músico — creditar `balance` criava saldo
+      sacável de valor que a plataforma nunca recebeu, e o saque sai do `AsaasGatewayAdapter`, ou
+      seja, **do nosso caixa**. Um músico com R$1.000 em gorjetas sacaria R$1.000 nossos. Agora o
+      input exige `settlement: "beneficiary" | "platform"` (obrigatório, sem default — o `tsc`
+      forçou os 3 chamadores a declarar), e `"beneficiary"` usa
+      `MusicianWallet.recordExternalEarning()`, que cresce `total_earned` **sem tocar `balance`**
+    - **Gorjeta de banda quebrada.** `beneficiary_musician_id` ia `input.musician_id ?? null`, que
+      é `null` em gorjeta de banda → o adapter recusava **toda** gorjeta de banda. O comentário
+      prometia "liquida na conta do líder" e o código não entregava. `SendTipUseCase` ganhou
+      `bandRepo` e resolve o líder (`resolveBeneficiary`) — banda não tem conta no provedor, o
+      vínculo OAuth é sempre de uma pessoa. A **divisão** entre integrantes segue na confirmação
+
+#### Depois de pegar as chaves da API do Mercado Pago
+
+> Credenciais em [mercadopago.com.br/developers](https://www.mercadopago.com.br/developers) →
+> "Suas integrações" → criar aplicação com modelo **Marketplace**. Saem na hora, sem aprovação
+> comercial — foi esse o critério que a Iugu não atendeu.
+
+- [x] **MP.1a** `MERCADOPAGO_CLIENT_ID`, `MERCADOPAGO_PLATFORM_ACCESS_TOKEN` e
+      `MERCADOPAGO_PUBLIC_KEY` preenchidos em `envs/.env` (20/ago/2026, credenciais de teste). A
+      Public Key não tem consumidor hoje — só serviria para tokenizar CARTÃO no cliente, e a
+      gorjeta é PIX puro, criado 100% no backend
+- [ ] **MP.1b** Faltam `MERCADOPAGO_CLIENT_SECRET` (em "Suas integrações" → a aplicação →
+      Credenciais de teste, **abaixo** do Client ID — não confundir com o Access Token) e
+      `MERCADOPAGO_WEBHOOK_SECRET` (só existe depois do MP.2). ⚠️ Sem o webhook secret o controller
+      recusa **todo** webhook (fail-closed) — sintoma: gorjeta eternamente `pending`, log
+      `mercadopago.webhook.rejected / secret_not_configured`
+- [ ] **MP.1c** Cadastrar `MERCADOPAGO_REDIRECT_URI` em "Suas integrações" → a aplicação → Detalhes
+      → URLs de redirecionamento. 🔴 O MP exige **HTTPS** ali — `http://localhost:3000/...` não vai
+      nem salvar no painel. Para testar o vínculo em sandbox local, expor o backend com um túnel
+      (ngrok/Cloudflare Tunnel) e cadastrar a URL HTTPS do túnel como redirect_uri **e** atualizar
+      `MERCADOPAGO_REDIRECT_URI` no `.env` para o mesmo valor — tem que bater exatamente, o MP
+      rejeita na troca do `code` se divergir
+- [ ] **MP.2** Registrar a URL de webhook no painel do MP (Webhooks → Configurar notificações)
+      apontando para `POST /api/v1/webhooks/mercadopago`, evento **`payment`**. Também exige HTTPS —
+      mesmo túnel do MP.1c serve para isso em ambiente local. Recomendam URL de teste separada da de
+      produção
+- [x] **MP.3** 🔴 **Bug real encontrado e corrigido em 20/ago/2026** — o comentário em
+      `mercadopago-oauth.gateway.ts` já dizia que faltava `offline_access` e o parâmetro nunca
+      chegou a existir em `buildAuthorizationUrl`: nenhum músico conseguiria vincular a conta
+      (`toTokens` falha alto sem `refresh_token`, então TODO vínculo quebraria no `exchangeCode`).
+      Corrigido com `scope: "offline_access"` no `URLSearchParams`; zero testes cobriam esse
+      adapter, então o bug não aparecia em nenhuma suíte — `mercadopago-oauth.adapter.spec.ts`
+      criado, cobrindo URL, troca de código, refresh e leitura de pagamento
+- [ ] **MP.4** Fluxo ponta a ponta em sandbox: conectar conta → gorjeta → webhook → gorjeta
+      `completed`. **Conferir na conta de teste do músico que o valor caiu lá**, e na nossa que
+      entrou só o `marketplace_fee` — é a prova de que o dinheiro não passa pela plataforma
+- [ ] **MP.5** Validar a conta da taxa com valor real: gorjeta de R$20 no plano FREE deve dar
+      `marketplace_fee` **R$1,60** e total retido do músico **R$1,80 (9%)**. Se der R$1,80 de
+      `marketplace_fee`, o "1% gateway incluso" da tabela de preços virou mentira
+- [ ] **MP.6** Testar **gorjeta de banda** — é o caminho que estava quebrado até 20/ago e o único
+      que depende de resolver o líder
+- [ ] 🟡 **MP.6a** (achado em 20/ago, decisão de produto pendente, não é bug de código) Na gorjeta de
+      banda via MP, o valor inteiro cai **só na conta do líder** — banda não tem conta própria no
+      provedor. `ConfirmTipPaymentUseCase.confirm` mesmo assim roda `recordExternalEarning(share)`
+      para **cada** integrante, como se cada um tivesse recebido dinheiro externo de verdade. O
+      resultado é um `held`/`total_earned` por integrante que não corresponde a nenhum PIX real
+      recebido por ele — é o líder quem tem de repassar manualmente. Sob o modelo antigo
+      (`settlement: "platform"`) isso era inofensivo porque a plataforma de fato detinha o valor e
+      podia honrar o saque de cada um; sob o split do MP não há essa garantia. Decidir: (a) manter
+      como está e deixar claro na UI que é "sua parte a cobrar do líder", (b) só registrar o
+      `recordExternalEarning` para o próprio líder e mostrar aos demais membros um aviso separado,
+      ou (c) bloquear gorjeta de banda no MP até existir um mecanismo de repasse
+- [ ] **MP.7** Testar **músico sem conta vinculada**: a gorjeta deve falhar com
+      `MercadoPagoAccountNotLinkedError` (mensagem acionável), não com erro genérico
+- [ ] **MP.8** Confirmar a renovação do token: adiantar `mpTokenExpiresAt` no banco para dentro dos
+      15 dias de folga e rodar o `RefreshMercadoPagoTokensJob`
+- [ ] 🔴 **MP.9** Levar ao advogado as perguntas de
+      [contract/legal-checklist.md](contract/legal-checklist.md) §10 "Antes da gorjeta em produção"
+      — enquadramento do split, limiar de volume e natureza da comissão
+- [~] **1.7** Webhook/callback de confirmação PIX + idempotência — gorjeta: `MercadoPagoWebhookController` (`POST /webhooks/mercadopago`) com `x-signature` fail-closed + `processOnce`. Asaas: `AsaasWebhookController` (`POST /webhooks/asaas`) com `TRANSFER_DONE`/`TRANSFER_FAILED`; handler de escrow `PAYMENT_RECEIVED` ainda pendente
 - [x] **1.8** Evento de domínio `TipCompleted` → handler gamificação (pontos por gorjeta) — `PaymentEventsHandlers` com `processOnce()`, `DomainEventMediator` injetado no use case, `TipCompletedIntegrationEvent` publicado no exchange `soundmeet.events`
 
 **Referência:** core em `src/core/payment/`, regras em [business-rules.md](business-rules.md).
@@ -211,6 +325,25 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
   - **`duration_mismatch`** — `pickBestLyrics` (auto-sync) não pontuava duração ao escolher entre candidatos LRCLIB, diferente do endpoint irmão de busca manual; podia casar letra de versão errada da música sem penalidade. Agora usa a mesma fórmula de bucket dos dois lados; divergência `>12s` vira `quality_flag`. **Débito fechado (jul/2026, 3ª rodada):** `MusicLibrary.duration_seconds` nunca era escrito por nenhum use-case do pipeline — adicionado `MusicLibrary.changeDurationSeconds()` (aggregate) + campo em `UpdateMusicLibraryInput` + repasse de `result.artifacts.duration_seconds` (já devolvido pelo worker em `/v1` e `/v2/analyze`) nos dois caminhos de conclusão de análise (`ProcessAiCifraAnalysisJobUseCase`/`CompleteAiCifraAnalysisJobUseCase`, mesmo padrão de `chords`/`bpm`/`key`). Testes de regressão em ambos + `music-library.aggregate.spec.ts`.
   - **Config de deploy do v22 corrigida** — `envs/.env.example` apontava `/v1/analyze` (legado) enquanto `docker-compose.yml` raiz já apontava `/v2/analyze`; `ai-cifra-mir-worker/docker-compose.yml` (compose standalone do worker) também corrigido + comentário apontando o compose raiz como fonte de verdade. `AI_CIFRA_ENABLE_V12` (nunca lido em `main.py`) removido dos dois profiles do compose raiz.
   - **🔴 Bug crítico achado e corrigido (revisão pós-implementação, a pedido do usuário):** `ProcessAiCifraAnalysisJobUseCase` — o caminho SÍNCRONO de conclusão de análise, usado por padrão via `AI_CIFRA_PROCESSING_TRANSPORT=http` (valor default em `envs/.env.example`) — **nunca chamava `UpdateMusicLibraryUseCase`**, ao contrário do que o item 6.5 (acima) parecia ter corrigido "de vez": 6.5 só emendou o caminho irmão (`CompleteAiCifraAnalysisJobUseCase`, usado no modo webhook/RabbitMQ). Resultado prático: no transporte padrão, terminar uma análise de cifra podia nunca escrever `bpm/key/chords/structure_segments` em `MusicLibrary` — e `GET .../chord-sheet` lê direto de lá, não do job. Corrigido espelhando a mesma ponte best-effort no caminho síncrono; teste de regressão em `process-ai-cifra-analysis-job.use-case.spec.ts` prova a gravação. **Precedente:** já é a terceira vez que um "fix" documentado como concluído (6.5) na verdade só cobria metade dos dois caminhos de conclusão gêmeos deste módulo — vale conferir os dois sempre que mexer em qualquer coisa pós-análise aqui.
+
+- [ ] **6.8** **Fusão cifra↔áudio estilo DECIBEL (CifraClub) — trilha de PRODUTO, não de benchmark** (levantado 08/ago/2026 a pedido do usuário, durante o treino do ChordFormer v24). Referência: [DECIBEL, arXiv:2002.09748](https://arxiv.org/pdf/2002.09748) e a [versão TISMIR](https://transactions.ismir.net/articles/10.5334/tismir.81). Detalhamento completo e ressalvas em `ai-cifra-mir-worker/Docs/research/2026-07-estado-da-arte-e-roadmap.md` §R7.
+
+  **O que é:** alinhar a cifra (sequência de acordes sem tempo) da *mesma* música ao áudio e **fundir** com a saída do ChordFormer. É **pós-processamento puro** — o paper afirma que os subsistemas de MIDI/tab não têm treino. **Não afeta nenhum treino em andamento**; entra no `eval_mir_eval.py` e no serviço de inferência (`/v2/analyze`).
+
+  **Por que aqui e não no worker de pesquisa:** o ganho real é de produto. Em produção, músico brasileiro pedindo música brasileira → o CifraClub tem a cifra daquela música exata. É o repertório que nenhum dataset acadêmico cobre e onde o modelo é mais fraco.
+
+  ⚠️ **Não esperar o "+13,6pp" do paper.** Esse número é sobre um método **fraco** (67,2%→80,8% WCSR); o método já forte (87,3%) ganhou **+0,5pp**, e o paper diz explicitamente que métodos fortes melhoram menos. Nosso modelo está na faixa forte (majmin 81,26). O DECIBEL também foi avaliado em **majmin**, e nosso gargalo é **sevenths** — não testado por eles. **Estimativa realista: +0,5 a +2pp.**
+
+  **Ordem de implementação sugerida (barato → caro):**
+  1. **Priors simbólicos brasileiros** (não exige áudio, alinhamento nem treino): alimentar `chordonomicon_transitions.json`/`chordonomicon_genre_priors.json` com as **800 progressões** já em disco (`artifacts/datasets/cifraclub/cifraclub_progressions.json`: `title`, `artist`, `key`, `chords_sequence`). Os priors são hoje o **maior ganho isolado em extensões** da tabela de ablação (**+1,8pp sevenths**), e o Chordonomicon é anglocêntrico. Consumido por `--crf-use-data-priors` (treino) e `--priors` (eval/inferência).
+  2. **Fusão por música no `/v2/analyze`**: quando existir cifra do CifraClub para o `music_library` item, alinhar e fundir. O alinhamento é o núcleo difícil (o DECIBEL usa *jump alignment*, não DTW simples).
+
+  **Pré-requisitos e bloqueios já verificados (08/ago/2026):**
+  - `cifraclub_progressions.json` tem **800 músicas brasileiras** — formato certo, repertório certo para o produto.
+  - **Não serve para o benchmark das 244**: o test set é 100% Chords1217 (pop anglófono do MSD), sobreposição ~zero. Medir no repertório brasileiro, nunca nas 244.
+  - O Chords1217 **não tem título/artista** (só TrackID do MSD, ex. `TRWBQZI149E386757B`) — usar DECIBEL no benchmark exigiria antes resolver TrackID → título/artista via metadados do MSD.
+  - Existe **1 único `.mid`** no projeto; o DECIBEL usou 3,85 MIDI + ~8 tabs por música. O caminho viável aqui é só o de tabs/cifras.
+  - **Adicionar as 800 ao treino NÃO funciona**: `chords_sequence` não tem tempo nem áudio, e treino frame-level exige os dois.
 
 ---
 
@@ -394,18 +527,530 @@ reaplicadas sobre a análise nova e as que não ancoram viram conflito explícit
 
 ---
 
+## ⚠️ Bloco 9.7 — Defeitos de fronteira HTTP (09/ago/2026) ✅
+
+Encontrados ao implementar o **W2 do web** (eventos), batendo no container real com `curl`. Os três
+já estão corrigidos. **O que importa aqui não são os três bugs — é o padrão:** todos sobreviveram a
+uma suíte de 2876 testes verdes porque **todo teste do backend monta o input em memória**
+(`new Date()`, `SearchParams.create({ filter })`) e pula a fronteira HTTP, que é exatamente onde os
+três moram.
+
+- [x] **9.7a — `@Type(() => Date)` faltando nos inputs de evento.** `CreateEventInput`,
+      `UpdateEventInput` e `AddEventPerformerDto` tinham `@IsDate()` sem `@Type`. Como o
+      `ValidationPipe` global não usa `enableImplicitConversion`, `POST /establishments/:id/events`
+      respondia **422 "start_at must be a Date instance" para qualquer corpo** — criar evento pela
+      API era impossível. Mesmo bug do 7.17 (`/gamification/leaderboard`), e o `scheduling` já
+      tinha a correção com comentário (`search-bookings.dto.ts:72`).
+      Regressão: `events-module/dto/__tests__/event-date-coercion.dto.spec.ts`.
+
+- [x] **9.7b — `EventMusician.fee` (Decimal) não convertido no mapper.** A coluna é
+      `Decimal? @db.Decimal(12,2)`, o `EventMusicianModel` declara `number | null` e o repositório
+      passa `as any` — o compilador nunca viu. O `Decimal` chegava ao agregado, o `@IsNumber()`
+      recusava e o `toEntity` lançava `LoadEntityError`: **um** performer com cachê gravado
+      transformava `GET .../performers` num 422 permanente para o line-up inteiro. Corrigido com a
+      mesma linha que `booking-model-mapper.ts:64` já fazia certo. (`Event.coverCharge` escapou por
+      acidente — é `Float?`, não `Decimal`.)
+
+- [x] **9.7c — 🔴 `app.set("query parser", "extended")` (Express 5).** O mais grave. O Express 5
+      trocou o parser padrão para `"simple"`, que não monta objeto aninhado; `?filter[status]=x`
+      virava a chave literal `"filter[status]"`, o `filter` do DTO ficava `undefined` e o
+      `whitelist: true` descartava. **Toda busca com filtro da API devolvia a lista inteira, com
+      HTTP 200 e sem nenhum erro** — musicians, events, bookings, inquiries, establishments.
+      Medido: `filter[status]=cancelled` devolvia o evento `active`; `filter[name]=zzz` devolvia
+      todos os músicos. O pior caso é a **busca por raio** (7.13b/c): `filter[lat]/[lng]/[radius_km]`
+      descartado significa devolver o país em vez do bairro.
+
+- [x] **9.7d — Swagger de `SearchEventsDto` anunciava campos de `sort` inexistentes.** O enum
+      listava `start_at` e `updated_at`; os aceitos são os nomes de COLUNA do Prisma
+      (`sortableFields`), e campo fora da lista lança `InvalidArgumentError` → 422, sem fallback.
+      Quem seguisse o Swagger tomava 422. Enum corrigido e as três listas do módulo documentadas no
+      próprio DTO.
+
+### Pendências abertas descobertas junto (não corrigidas — precisam de decisão)
+
+- [x] **`POST /auth/login` recusa conta de estabelecimento** — resolvido (F1.1, ago/2026).
+      `LoginUseCase.resolveProfile` procurava só em `musicianRepo` e `audienceRepo`; sem aggregate
+      local lançava `UnauthorizedError`, e a resposta era **401 "Credenciais inválidas"** com
+      credenciais válidas. Agora consulta `establishmentRepo.findByEmail` **por último** (musician
+      e audience são o caminho quente) e devolve `role: "establishment"`.
+      - **`profile_id` é o UUID do agregado, não o `sub`** — a igualdade `id == sub` não vale nesta
+        persona. Novo tipo `LoginRole = RegisterRole | "establishment"` em `login.output.ts`;
+        `RegisterRole` ficou intocado de propósito, porque estabelecimento não entra por
+        `POST /auth/register`.
+      - **Por que não devolvemos a lista de unidades:** `establishments.email` é `@unique` e **não
+        existe vínculo usuário↔estabelecimento no banco** — a relação vive só no claim
+        `establishment_ids`. O login resolve exatamente a unidade cujo email foi usado; a lista
+        completa o cliente lê do próprio `access_token`.
+      - **Impacto no mobile:** `applyTokenSession` só distingue musician de audience e gravaria o id
+        do estabelecimento como `audienceId`, corrompendo a sessão em silêncio. `useLogin` passou a
+        barrar `role === "establishment"` com mensagem apontando o painel web.
+      - `AddRoleUseCase` **continua binário** musician/audience (item 9.1c) — assume a invariante
+        `aggregate.id == sub`, que não vale para estabelecimento.
+
+- [x] **Rate limit global por IP atrás de um BFF** — resolvido. `UserThrottlerGuard`
+      (`shared-module/guards/user-throttler.guard.ts`) substitui o `ThrottlerGuard` padrão como
+      `APP_GUARD` (`app.module.ts:120`): o tracker passa a ser `user:<sub>` do JWT, com fallback
+      para IP em rota anônima. Antes, como todo o `soundmeet-web` sai do IP do BFF, os
+      `RATE_LIMIT_MAX ?? 100`/60s valiam para **o painel inteiro somado** — ~15 page views/minuto
+      esgotavam a cota e todo mundo passava a 429 ao mesmo tempo.
+  - **Escolhido `sub` e não `X-Forwarded-For`:** `trust proxy` exige saber **quantos** proxies
+    existem na frente, e o número muda entre compose, load balancer e CDN. Com `n` alto demais o
+    cliente escolhe o próprio IP aparente escrevendo o header — um mecanismo de defesa cuja
+    configuração correta depende da topologia vai estar errado em algum ambiente.
+  - **A assinatura é verificada de verdade**, e isso não estava no plano: o desenho original aceitava
+    decodificar o token sem verificar, com o custo explícito de "quem forjar `sub` ganha baldes
+    novos". Não foi preciso pagar — o `AuthModule` é `@Global()` e exporta o `AuthJwtVerifier`, que
+    já mantém o JWKS em cache, então verificar aqui é criptografia local sem round-trip. Para ganhar
+    balde novo agora é preciso um token **válido**.
+  - ⚠️ **Nunca lança daqui.** Token ausente, expirado ou de outro emissor cai em IP em silêncio —
+    um 401 vindo do rate limiter mataria toda rota `@Public()` que recebe um Bearer velho por tabela.
+    Testes em `shared-module/__tests__/user-throttler.guard.spec.ts`.
+
+---
+
+## Bloco 10 — Contrato Digital de Show 📄
+
+> Todo show confirmado gera automaticamente um contrato adaptado àquele artista, àquele local e
+> àquele valor; as duas partes assinam eletronicamente pelo canal que já usam (web para o bar, app
+> para o músico); o documento fica congelado, com hash de integridade e página pública de
+> verificação.
+
+Chamado **F1.3(b)** no plano de fases do produto. A ordem foi **invertida de propósito**: o plano
+original mandava fazer o escrow primeiro e o contrato como camada de cima. O contrato não toca em
+dinheiro, então entrega valor sozinho (prova documental contra chargeback — camada 1 de
+[payment-gateway-decisions.md](payment-gateway-decisions.md), anti-calote, profissionalização da
+negociação) com risco regulatório zero, enquanto **escrow sem contrato assinado é a pior combinação
+possível**: custódia de recursos de terceiros sem documento probatório.
+
+> ⚠️ **Correção de premissa registrada:** o **F1.0** (subconta/wallet Asaas por músico) **não está
+> implementado** — grep em `src/` e `prisma/` devolve zero ocorrências de `asaas_wallet_id` ou
+> `subaccount`; o único wallet id existente é o `ASAAS_WALLET_ID` da plataforma
+> (`config.schema.ts:168`). Ele era declarado pré-requisito do F1.3 e não é.
+
+#### Decisões tomadas
+| Decisão | Escolha |
+|---|---|
+| Ordem | Contrato primeiro; escrow (F1.3a) vira bloco próprio |
+| Custódia do escrow | **Mecanismo real decidido no deploy** 🔴 — a porta `IBookingEscrowGateway` foi planejada e **não** chegou a ser escrita; o contrato foi entregue sem ela (verificado em 15/ago/2026) |
+| Assinatura | Própria (aceite + trilha + hash), atrás de `IContractSignatureProvider` |
+| Gatilho | Emitido no `BookingConfirmedEvent`; **não bloqueia** o show |
+| Catálogo de cláusulas | **Código, não banco** — ver abaixo |
+
+#### Por que o catálogo é código e não banco
+O desenho original previa `ContractClause`/`ClauseVariant`/`ContractTemplate` como agregados com
+repositório. Foi recusado: quem edita texto de cláusula é a SoundMeet com advogado, e texto jurídico
+precisa ser enviado **atomicamente com o código que resolve suas variáveis**. Em banco, nasceria um
+CRUD administrativo que ninguém usa, toda correção de redação viraria migration, e seria possível
+alterar texto legal em produção sem revisão. Em código, **revisão jurídica = code review**, o teste
+de snapshot trava a redação, e `body` é função pura de variáveis tipadas — variável renomeada é erro
+de compilação. O único agregado persistido é `Contract`, que guarda o snapshot já renderizado.
+
+#### 10A — Domínio e catálogo ✅ *(B1)*
+- [x] **10A.1** Agregado `Contract` **imutável por construção** — não existe mutador de conteúdo, só de status e assinatura. 4 VOs (`ContractParty`, `ContractSignature`, `ContractVariables`, `RenderedClause`)
+- [x] **10A.2** `IContractRepository` (interface + in-memory + Prisma) **com o override de `SearchParams.filter`** — sem ele o repositório devolveria contrato de todos os estabelecimentos
+- [x] **10A.3** Catálogo de **23 cláusulas / 38 variantes** em 8 arquivos por categoria, cada cláusula com `legal_note`
+- [x] **10A.4** Tetos legais como invariante validada, não só redigida: multa ≤ 100% do cachê (CC art. 412), exclusividade dentro do cap de km/dias (CF art. 5º, XIII)
+- [x] **10A.5** Testes do catálogo: 1728 contextos, Proxy comparando `consumes` nos dois sentidos, snapshot por variante, nenhuma variante inalcançável (com a exceção documentada de `tributos.contratante_pf`)
+
+#### 10B — Persistência, renderização e HTTP ✅ *(B2)*
+- [x] **10B.1** Migration `20260815120000_add_contracts` + `enum ContractStatus`; FK `Restrict` em booking/establishment e `SetNull` em musician/band
+- [x] **10B.2** Mapper que **recalcula o `content_hash` na carga** e recusa contrato adulterado no banco
+- [x] **10B.3** Três portas: `IContractRenderer`, `IContractStorage`, `IContractSignatureProvider`
+- [x] **10B.4** `ReactPdfContractRenderer` — o teste gera PDF de verdade, com acentuação. O risco declarado (`@react-pdf/renderer` × CommonJS) **não se materializou no runtime** (Node 22 faz `require(esm)` nativo) mas materializou no Jest; resolvido com `transformIgnorePatterns` cirúrgico
+- [x] **10B.5** Storage privado — **`IContractStorage` não tem `getPublicUrl`**, e isso é a feature: sem função que produza URL pública, vazar contrato fica impossível por construção
+- [x] **10B.6** 7 use-cases (issue, sign, get, get-document, list, verify, annul) + `ContractIssuanceHandler` no `BookingConfirmedEvent`
+- [x] **10B.7** `contract-module` com 2 controllers (autenticado + verificação pública isolada), presenter, DTOs, providers, envs, registro no `app.module.ts`, `int-spec` das rotas
+  - ⚠️ **Correção (19/ago/2026):** este item dizia "int-spec das 7 rotas" e **não era verdade** — o
+    arquivo cobria 5 grupos; `POST /contracts/issue` e `POST /contracts/:id/annul` não tinham um
+    único teste. E a rota sem teste era exatamente a que estava sem autorização (ver 10E). Cobertas
+    agora, mais um spec de DTO na fronteira do `ValidationPipe`
+
+##### Três correções de desenho feitas durante a implementação
+- 🔴 **Fabricação de CPF.** `buildContractor` derivava o documento do representante legal dos 11 primeiros dígitos do CNPJ, porque `ContractParty` exigia representante para PJ. É falsificar documento num instrumento que existe para provar fatos, e o erro passaria despercebido até alguém conferir. Corrigido na raiz: representante opcional, `signer_document` nullable, e a âncora de identidade passou a ser `signer_user_id`
+- **Integrantes da banda iam por UUID** — `contratado_integrantes` recebia `member.musician_id.id`, então a formação sairia como lista de UUIDs. Passou a resolver nomes por `findByIds`
+- **`RenderedClause` preservava as quebras do arquivo-fonte**, produzindo parágrafos esfarrapados no PDF. Passou a refluir: linha em branco separa parágrafo, quebra interna vira espaço
+
+#### 10C — Qualificação real das partes ✅ *(15/ago/2026)*
+> Nasceu de duas perguntas do usuário sobre a B2: *"isso está dentro da lei? além disso não deveria
+> ser flexível?"* e *"o correto seria pedir o CPF do representante legal"*. As duas pegaram
+> limitações reais.
+
+- [x] **10C.1** `Musician.cnpj` (MEI) — migration aditiva `20260815160000_add_musician_cnpj`, agregado, mapper, fake builder, `findByCnpj` nas três camadas de repositório, `update-musician` com checagem de duplicidade (`@unique` estouraria P2002 → 500), DTO e presenter
+  - **Fora de `MusicianCreateCommand` de propósito** — o cadastro continua sendo de pessoa física; o CNPJ entra em configurações do perfil. A regra está no sistema de tipos, não só em comentário: um patch que tentou passar `cnpj` na criação foi recusado pelo `tsc`
+  - **PII:** sai por `MusicianPresenter` (dono/admin), **nunca** por `PublicMusicianPresenter` — mesmo tratamento de email/telefone, com teste que trava
+- [x] **10C.2** Eixo `contracted_is_company` no `ClauseContext` + terceira variante `tributos.contratado_pj`. **Não é simetria decorativa:** a retenção previdenciária alcança o contribuinte individual (art. 4º da Lei 10.666/2003), e MEI é pessoa jurídica — sem a variante, o contrato mandaria o bar fazer retenção indevida. As duas variantes antigas passaram a declarar `contracted_is_company: false` para não colidir (aplicabilidade não-exclusiva escolhe a primeira, em silêncio)
+- [x] **10C.3** `collectMissingQualification` aceita **CPF OU CNPJ** do músico — o MEI que só cadastrou o CNPJ está qualificado
+- [x] **10C.4** `Establishment.legal_representative_name` + `_document` — migration aditiva `20260815170000_add_establishment_legal_representative`, agregado com `changeLegalRepresentative` (CPF sem nome é recusado; nome sem CPF é aceito), mapper, fake builder, use-case, DTO, presenter
+  - **PII:** `GET /establishments/:id` é `@Public()`. O CNPJ é registro público e sai inteiro; o CPF do representante sai **mascarado** (`529.***.**7-25`) — o bastante para o dono conferir na tela, nada para colher CPF alheio. O valor íntegro só circula dentro do servidor, na emissão
+- [x] **10C.5** `buildContractor` passa a preencher o representante real; nova pendência `contratante.representante_legal` (exige nome **e** CPF — meia qualificação é o papel fraco que a fatia conserta)
+- [x] **10C.6** UIs de configuração: campo de CNPJ MEI no perfil do músico (mobile, seção Identidade, com máscara e validação) e nome + CPF do representante no perfil do estabelecimento (web). **Nenhum dos dois entra em cadastro/signup**
+- [x] **10C.7** Gates: backend **351 suítes / 3250 testes** · mobile 9/132 · web 88 arquivos/816 testes · `tsc` e lint limpos nos três
+
+#### 10D — Documentação ✅ *(B5)*
+- [x] **10D.1** [contract/contract-digital.md](contract/contract-digital.md) — arquitetura do subsistema
+- [x] **10D.2** [contract/legal-checklist.md](contract/legal-checklist.md) — **o documento que vai ao advogado**, com as perguntas abertas em formato de checklist
+- [x] **10D.3** Seção "Domínio Contract" em [business-rules.md](business-rules.md)
+- [x] **10D.4** Aviso 🔴 da decisão pendente de custódia em [payment-gateway-decisions.md](payment-gateway-decisions.md)
+- [x] **10D.5** Este bloco + `CLAUDE.md` dos três projetos + índice em [README.md](README.md)
+
+#### 10E — Correções de segurança da emissão ✅ *(19/ago/2026)*
+
+> Achadas numa auditoria do bloco inteiro pedida pelo usuário, lendo o código contra os docs. A
+> suíte estava verde (355 suítes / 3321 testes) e o `tsc` limpo — **nada disto aparecia em teste**,
+> pelo mesmo motivo do 9.7: a rota com o defeito não tinha teste nenhum, e o item 10B.7 afirmava
+> que tinha.
+
+- [x] **10E.1 🔴 `POST /contracts/issue` não tinha autorização nenhuma.** O controller repassava o
+      DTO cru (`issueUseCase.execute(dto)`) e `IssueContractInput` não carregava identidade do
+      requisitante. O `GetContractUseCase` chamado logo depois protegia só a **leitura** — quando os
+      efeitos já tinham acontecido. Três consequências, todas antes do 403:
+  - qualquer usuário autenticado com um `booking_id` fazia nascer contrato **alheio**: PDF no
+    storage, `ContractIssuedEvent` publicado e `ContractDeliveryHandler` mandando o documento — com
+    CPF, CNPJ, endereço e cachê — por e-mail às duas partes;
+  - o ramo `{ issued: false, missing: [...] }` retornava **antes** de qualquer checagem, virando um
+    oráculo do estado cadastral alheio (`contratado.cpf`, `contratante.representante_legal`);
+  - o ramo de idempotência devolvia o `ContractOutput` de terceiros direto do use-case.
+- [x] **10E.2 A identidade virou campo obrigatório e nulável**, não opcional:
+      `requesting_participant_ids: string[] | null` **sem default**. `null` é o caminho do sistema
+      (`ContractIssuanceHandler`), declarado em código. Opcional é o que deixou a rota nascer sem
+      autorização; obrigatório força cada novo chamador a decidir, e o `tsc` cobra — foi assim que a
+      correção encontrou sozinha os 26 call-sites do spec. Mesma lição de `is_owner` no
+      `personal-chord-sheet`.
+- [x] **10E.3 Fail-closed sobre lista vazia.** `assertNegotiationViewer` **pula** a checagem quando
+      o ator não tem identidade nenhuma — convenção dos jobs internos de scheduling. Aqui isso seria
+      fail-open para todo token sem claim utilizável, então a lista vazia é barrada antes de chamar o
+      helper.
+- [x] **10E.4 `tone`/`outdoor`/`exclusivity_requested` saíram da rota HTTP.** A decisão de produto
+      da B3 já dizia "retentativa só com `booking_id`", e o `soundmeet-web` obedecia — **só o backend
+      discordava**. `IssueContractDto` virou `OmitType`, e um spec roda o `ValidationPipe` real
+      (mesmas opções de `applyGlobalConfig`) provando o descarte: o controller faz `...dto`, então
+      whitelist é o que separa o corpo da regra.
+- [x] **10E.5 `requesting_user_id` obrigatório na assinatura.** `sign-contract` e
+      `request-signature-challenge` faziam `input.requesting_user_id ?? ""`: a **âncora de identidade
+      da assinatura** degradava para string vazia em silêncio, no exato documento que existe para
+      provar quem assinou — e a chave do desafio (que inclui o signatário) virava um balde
+      compartilhado entre pessoas diferentes do mesmo papel.
+- [x] **10E.6 Código de assinatura passou a HMAC.** Era `createHash("sha256")` puro sobre 6 dígitos:
+      1 milhão de possibilidades, quebrável por tabela pré-computada — quem vazasse o Redis leria os
+      códigos vivos. Agora `createHmac` com `CONTRACT_CHALLENGE_SECRET` (Joi exige ≥32 chars em
+      produção). Teste prova que um provider com outro segredo recusa o mesmo código.
+- [x] **10E.7 `@Throttle` 5/60s no `POST /:id/sign/challenge`.** Cada pedido invalida o anterior e
+      escreve na caixa de entrada de alguém; repetido, impede a própria parte de assinar.
+
+**Referência de teste:** `issue-contract.use-case.spec.ts` (8 casos de autorização, incluindo "recusa
+sem criar contrato, subir PDF ou renderizar"), `contracts.controller.int-spec.ts` (issue + annul) e
+`contract-module/dto/__tests__/issue-contract.dto.spec.ts` (fronteira do pipe).
+
+#### Armadilhas registradas (não repetir)
+- **Autorizar na saída não é autorizar.** `POST /contracts/issue` filtrava o resultado e parecia
+  seguro; o contrato alheio já tinha nascido, o PDF já estava no storage e o e-mail já tinha saído.
+  Em rota que escreve, a checagem vem **antes do primeiro efeito**, não antes do `return`
+- **Campo de autorização opcional é campo esquecido.** Se `requesting_participant_ids` fosse `?:`,
+  o chamador novo simplesmente não o passaria e nada acusaria. Obrigatório-e-nulável transforma a
+  omissão em erro de compilação
+- **Nunca fabricar documento.** Nem CPF derivado de CNPJ, nem razão social inventada, nem endereço chutado. Quando o dado não existe, o documento diz que não existe, ou a emissão vira pendência. É a única falha deste subsistema que ninguém percebe até alguém conferir
+- **Aplicabilidade não-exclusiva escolhe a primeira variante, sem erro.** Toda variante nova precisa fechar os eixos que as irmãs abrem
+- **Ordem de rota quebra em silêncio:** `@Get(":contract_id")` depois de `@Get()` e antes dos `@Post`. E a rota `@Public()` mora em controller separado — um `@Public()` solto num controller com `@UseGuards` expõe rota autenticada sem querer
+- **`IContractStorage` sem `getPublicUrl` é decisão, não esquecimento.** Não adicionar
+
+#### Pendente
+- [ ] 🔴 **Revisão por advogado** — gate para o primeiro contrato em produção. `legal-checklist.md` §10 é a lista de perguntas
+- [x] **B3 — Web ✅ (16/ago/2026):** feature `contract` completa em `soundmeet-web` — 5 Route Handlers
+      de BFF, lista `/dashboard/contratos` com filtro de status, detalhe com `ContractDocument` em
+      HTML nativo (índice de cláusulas com scroll-spy, snapshot como fonte e PDF como derivado),
+      assinatura, downloads, reenvio de e-mail, pendência acionável de qualificação e página pública
+      `/contrato/[codigo]`. Gates: `tsc` e lint limpos, **93 arquivos / 867 testes** (eram 88/817).
+  - ⚠️ **A assinatura é de DOIS passos, e o briefing da B3 dizia um.** `challenge_code` é
+    `@IsNotEmpty()` em `SignContractInput` — sem ele o backend recusa. A UI pede o código, mostra o
+    destino mascarado e o vencimento, e **não trava o botão em ter um desafio vivo na sessão**: o
+    código vale 10 min no servidor e sobrevive a um reload, enquanto pedir outro invalida o que a
+    pessoa acabou de receber.
+  - **Decisões de produto tomadas com o usuário:** item próprio no menu (contrato tem ciclo de vida
+    independente do booking) · retentativa de emissão só com `booking_id`, sem expor `tone`/`outdoor`/
+    `exclusivity_requested` (exclusividade é opt-in com tetos legais e não cabe num botão de "tentar
+    de novo") · nota discreta de que a assinatura vale como prova escrita e **não** é título
+    executivo, ao lado do aceite.
+  - **Achado durante a implementação:** as chaves de `missing` se dividem entre o que o
+    estabelecimento resolve (`contratante.*`) e o que só o artista resolve (`contratado.*`). A UI
+    separa as duas listas — mandar o dono do bar "corrigir" o CPF do músico é enviá-lo a uma tela que
+    não existe. Chave desconhecida aparece com o nome cru e **não** habilita a retentativa.
+  - 🔴 **Ver a pendência do Anexo I registrada abaixo** — nasceu desta fatia.
+- [x] **B4 — Mobile ✅ (19/ago/2026):** feature `contract` em `soundmeet-mobile` — FSD completa
+      (domain/application/infrastructure/ui), `ContractListScreen` + `ContractDetailScreen`,
+      `ContractSignSheet` de dois passos e Anexo I reusando `StageTechSpecSection`. Gates: `tsc`
+      limpo, `expo config` resolve, **11 suítes / 158 testes** (eram 10/137). Entradas: tile
+      "Contratos" no `QuickAccessGrid` e linha no `ProfileMenuGroups`, ambas em `colors.accent.violet`
+      (contrato é continuação da negociação, mesma cor de Propostas e Agenda).
+  - **O contrato É a tela do show**, como desenhado: `GET /scheduling/bookings` continua sem chamador
+    em `src/`, e `ContractShowSummary` mostra data, dia da semana, horário, duração, endereço e
+    cachê — todos com o texto **pronto do backend**, nunca reformatado, porque refazer a formatação
+    no cliente criaria uma segunda verdade sobre documento congelado.
+  - **Sem badge de "aguardando você" nas entradas**, e isso é a regra e não esquecimento: a contagem
+    viria de `features/contract` e a regra de ouro do FSD proíbe `features/musician` importar de
+    outra feature. Mesmo precedente já registrado no tile de Propostas. O hook
+    `usePendingContractCount` existe e é usado **dentro** da própria feature (o filtro "Aguardando
+    você (n)" da lista).
+  - **"Baixar" é receber por e-mail** (`POST /contracts/:id/document/send`). `expo-file-system` não
+    está instalado, o documento carrega CPF/CNPJ/endereço/cachê, e a caixa de entrada persiste fora
+    do telefone — que é exatamente o valor probatório que a camada 4 de anti-chargeback busca. Os
+    três desfechos são distinguidos (`describeContractDelivery`): PDF inexistente **não** sugere
+    "tente de novo", que mandaria a pessoa insistir para sempre.
+  - 🔴 **Defeito pego na auto-revisão:** a trava "role até o fim para assinar" usava só `onScroll` —
+    e conteúdo que **cabe** na tela nunca dispara `onScroll`, então um contrato curto tornava a
+    assinatura impossível de liberar. Corrigido medindo viewport (`onLayout`) e conteúdo
+    (`onContentSizeChange`) e reavaliando em **ambos**: os dois callbacks não têm ordem garantida, e
+    medir só num deixaria o caso em que ele chega primeiro sem reconferência.
+  - **Contrato anulado mostra o motivo.** `annul_reason` é obrigatório na rota justamente para isto:
+    ver só "Anulado" não diz se o show caiu, se o cachê estava errado ou se vem outro no lugar.
+- [x] 🔴 **Anexo I fora do `content_hash` — corrigido em 16/ago/2026** *(achado durante a B3)*.
+      O Anexo I **existia** no PDF (`StageTechSpecAnnex`, nome em inglês — por isso um grep por
+      "Anexo" não o encontrava), mas chegava por um campo próprio da porta do renderer
+      (`ContractRenderInput.stage_tech_spec`), lido do **perfil vivo** do estabelecimento. Ou seja:
+      ficava **fora do snapshot e fora do hash**. Duas emissões do mesmo contrato com a ficha
+      editada entre elas produziam documentos diferentes com o **mesmo** `content_hash` — enquanto
+      `estrutura_tecnica.com_anexo` transforma *"item declarado no Anexo I"* em inadimplemento. A
+      única parte do documento fora da verificação de integridade era justamente a que cria
+      obrigação. E a B3 não conseguia renderizá-lo, porque o dado não estava no snapshot que
+      `GET /contracts/:id` devolve.
+  - **Correção:** `ficha_tecnica_anexo?: StageTechSpecJSON` em `ContractVariables`, congelado na
+    emissão sob a **mesma condição** que escolhe a variante da cláusula (`has_stage_tech_spec`). O
+    campo `stage_tech_spec` **saiu da porta do renderer** — duas fontes para o mesmo conteúdo é o
+    que permitiu a divergência; agora o PDF lê de `variables`, como o web.
+  - **Não precisou de `show-v2`.** Nenhum corpo de cláusula mudou (os 38 snapshots seguem intactos),
+    e contrato antigo renderiza igual.
+  - 🔴 **A invariante que torna isso seguro:** a chave é **ausente**, nunca `null`.
+    `JSON.stringify` omite `undefined` e inclui `null`, e `ContractModelMapper.toEntity` **recalcula
+    o hash na carga** e recusa contrato divergente — um `null` faria todo contrato já assinado parar
+    de carregar com `LoadEntityError`. O construtor do VO apaga a chave para qualquer valor que não
+    seja objeto, e `contract-variables.vo.spec.ts` trava isso com um teste dedicado (incluindo o caso
+    `null` e o caso array).
+  - Paridade de rótulos entre PDF e painel travada por teste nos **dois** projetos.
+- [ ] ~~**E-mails** de contrato emitido/assinado com PDF anexo~~ — ✅ **já existe** (verificado em
+      16/ago/2026): `ContractDeliveryHandler` + `POST /contracts/:id/document/send`, com PDF anexo e
+      hash no corpo. Este item estava desatualizado; `payment-gateway-decisions.md` já registrava a
+      camada 4 como concluída em 15/ago
+- [~] **F1.3(a) — Escrow.** 🟡 **Domínio, portas, adapters e job entregues em 19/ago/2026;
+      falta a fatia HTTP e a criação da subconta (F1.0) em produção.**
+
+  **O que existe agora:**
+  - `BookingEscrow` — agregado como máquina de estados (`pending → held → released | refunded |
+    disputed`), com repositório nas três camadas e o **override de `SearchParams.filter`** (sem ele
+    o repositório devolveria a custódia de todos os músicos: valor de cachê, comissão e a
+    referência da cobrança no provedor)
+  - `MusicianWallet.held_balance` + `holdFunds`/`releaseHeldFunds`/`refundHeldFunds`, e a subconta
+    (`asaas_wallet_id` + `apiKey` **cifrada** na infra de SM-016)
+  - `Booking.checkIn()` e `Booking.dispute()` — o registro da apresentação vale por si como camada 3
+    de prova contra chargeback, com ou sem escrow
+  - Portas `IBookingEscrowGateway` / `ISubaccountGateway` + `AsaasEscrowAdapter` /
+    `AsaasSubaccountAdapter`
+  - `ReleaseBookingEscrowUseCase`, `ProcessDueEscrowReleasesUseCase` e `EscrowReleaseJob` (horário)
+  - `escrow_release_days` no catálogo de planos: **D+2 pago / D+5 FREE**. É prazo, não gate —
+    ninguém é bloqueado, o FREE só recebe depois
+  - `uses_escrow` no contrato passou a vir da config (`ESCROW_ENABLED` +
+    `ESCROW_CUSTODIAN_LEGAL_NAME`). **Nenhum corpo de cláusula mudou** — os 38 snapshots seguem
+    intactos, como previsto
+
+  **Cinco decisões que valem registro:**
+  - 🔴 **O dinheiro não é da plataforma, e o código reflete isso.** `held_balance` é ESPELHO do que
+    está bloqueado na subconta do músico, não um saldo lógico numa conta nossa. O caminho (i) de
+    `payment-gateway-decisions.md` foi recusado porque a cláusula `papel_da_plataforma.com_custodia`
+    **afirma** que o valor não integra o patrimônio da SoundMeet — ligá-lo por ali transformaria
+    cláusula assinada em declaração falsa.
+  - **A comissão só vira receita na liberação.** `platform_fee` é congelada na criação mas não é
+    receita até `released`. Show não realizado, nenhuma comissão — é o argumento mais forte contra
+    responsabilidade solidária, e está escrito na cláusula.
+  - **A ordem provedor → custódia → carteira não é arbitrária.** Marcar como liberado antes de o
+    provedor confirmar deixaria o app anunciando um saldo que o gateway recusa a sacar. Teste
+    dedicado prova que a falha do provedor não move nada.
+  - **Divisão em CENTAVOS INTEIROS** (`BookingEscrow.splitAmount`): `amount.subtract(fee)` em ponto
+    flutuante produz `1111.1000000000001` e o `Money` recusa — o agregado nascia inválido para uma
+    combinação comum de cachê e percentual. Também é o que garante
+    `platform_fee + net_amount === amount` exatamente; centavo perdido em arredondamento é centavo
+    que ninguém recebe.
+  - **Liberar exige check-in E ausência de contestação.** Só por prazo entregaria o cachê de um show
+    que ninguém confirmou ter acontecido; com contestação aberta seria decidir a disputa por
+    omissão. O prazo conta do **fim do show**, não da retenção — o pagamento é antecipado.
+
+  **Armadilha nova registrada:** `ClassValidatorFields` repassa `fields` como `groups` do
+  class-validator. Passar nomes de PROPRIEDADE ali derruba toda a metadata e o validador responde
+  *"an unknown value was passed to the validate function"* — parece erro de tipo, é de configuração,
+  e faz **todo** agregado nascer inválido. Sempre `[]` quando não há campos, como `TipValidator`.
+
+  **Fatia HTTP — parte 1 entregue (19/ago/2026):**
+  - `POST /scheduling/bookings/:id/check-in` — as **duas partes** podem registrar. Em muita casa
+    quem tem o app aberto no fim da noite é o dono, e um check-in feito pela contraparte é prova
+    ainda mais forte a favor do artista. Corpo vazio: a hora é do **servidor**, porque aceitar
+    `checked_in_at` do cliente permitiria registrar um show de ontem como se fosse de hoje
+  - `POST /scheduling/bookings/:id/dispute` — 🔴 **só o CONTRATANTE.** Contestar é dizer "o serviço
+    não foi entregue"; deixar o artista fazer isso seria deixá-lo travar o próprio pagamento. A
+    checagem **não** usa `assertNegotiationParticipant` (que aceita qualquer lado) e é fail-closed
+    sobre lista de identidades vazia
+  - `int-spec` na fronteira HTTP (`booking-check-in.int-spec.ts`): prova que o papel vem do TOKEN,
+    que o `checked_in_by` sai `band` no show de banda **exigindo o líder**, e que o músico toma 403
+    ao tentar contestar — sem gravar nada
+  - `SchedulingModule` não conhece `payment`: marcar o booking já bloqueia a liberação automática,
+    porque `ProcessDueEscrowReleasesUseCase` confere `booking.isDisputed`. Congelar o agregado
+    `BookingEscrow` é ato da mediação, que é humana por desenho
+
+  **Falta:** criação da subconta por HTTP (F1.0), webhooks de `PAYMENT_RECEIVED`/escrow no
+  `AsaasWebhookController`, e a UI. E o ⚠️ **período de avaliação do Asaas** (60 dias, máx. 10
+  subcontas e R$2.000 por subconta) define o tamanho do piloto — ver
+  [payment-gateway-research-2026-08.md](payment-gateway-research-2026-08.md)
+- [ ] Auditoria de vocabulário de emprego nas telas; prazo de retenção; banda com CNPJ próprio; endereço estruturado do músico
+
+**Referência:** [contract/contract-digital.md](contract/contract-digital.md) · `src/core/contract/`
+
+---
+
+## Bloco 10B — Fechamento do escrow, avaliação no mobile e ponte Spotify ✅ *(21/ago/2026)*
+
+> **Registrado retroativamente em 22/ago/2026.** As três features foram entregues em 21/ago sem
+> passar pelos docs canônicos — só a taxa entrou em `plans/musician-plans.md`. Enquanto isso durou,
+> a regra "verifique `business-rules.md` antes de assumir que algo existe" dava **falso negativo**
+> nestes três pontos. Detalhe das regras em [business-rules.md](business-rules.md).
+
+### 10B.1 — Escrow: fatia HTTP e webhooks ✅
+
+- [x] `CreateBookingEscrowUseCase` no `BookingConfirmedEvent`; ordem persistir → cobrar → referenciar
+- [x] `findChargeByReference` antes de criar — sem isso a retomada emitia um **segundo PIX**
+- [x] Branch `escrow:` no `AsaasWebhookController`, avaliado antes do caminho de gorjeta
+- [x] `markHeld`/`release` dentro de `UnitOfWork` — a falha entre os dois updates deixava
+      `held_balance` errado **permanentemente**, porque a reexecução retornava cedo
+- [x] `GET /musicians/:id/wallet/escrow` (extrato somente-leitura). **Sem rota de reter/liberar**
+- [x] `booking_fee_percentage` centralizado em `plan-features.config.ts`
+
+### 10B.2 — Músico avalia o estabelecimento (mobile) ✅
+
+- [x] `ContractReviewAction` na tela de contrato — o músico não tem lista de bookings no app
+- [x] Só com booking `completed`; **show de banda não oferece a ação** (nenhum integrante passa na
+      checagem de autoria do backend, nem o líder — o CTA aparecia e falhava sempre)
+
+### 10B.3 — Ponte Spotify do fã ✅
+
+- [x] `AudienceSpotifyLink` (agregado satélite), tokens cifrados, `state` HMAC com `purpose`,
+      callback em controller separado, job de renovação a cada 30 min, escopo `user-library-modify`
+- [x] **Buscar e salvar são dois atos** — o fã confirma capa e álbum antes de salvar
+- [x] Migration `20260821190000_add_audience_spotify_link`
+
+**Pendente:** `SPOTIFY_REDIRECT_URI` no `.env` real e teste do OAuth em device.
+
+---
+
+## Bloco 11 — Apresentação ao vivo 🎤 *(22/ago/2026)*
+
+Nasceu de uma validação, não do catálogo: perguntado se o fã via "Salvar no Spotify" da música
+que o artista estava tocando, o rastreamento mostrou que **o sistema não sabia o que era tocado**.
+O `SaveToSpotifyAction` só existia na tela de sucesso do pedido, com texto digitado pelo próprio
+fã; `PlayModeScreen` avançava de música sem tocar a rede; `PATCH /requests/:id/played` existia sem
+nenhum chamador. A mesma lacuna bloqueava dois itens do catálogo — A5 (setlist inteligente) e
+B1 (relatório pós-show) — e derrubava a afirmação de `roadmap-web.md:722` de que "100% dos dados"
+do relatório já existiam: `repertoire` é o que se sabe tocar, não o que se tocou.
+
+### 11.1 — Primitiva: o set ao vivo (F0) ✅
+
+- [x] Domínio `src/core/performance/` — agregado `Performance` + entidade embutida `PerformedSong`,
+      6 invariantes (uma música por vez, set fechado não recebe música, `position` do agregado,
+      um set `live` por evento+músico via índice parcial, pedido não repetido, duração nunca
+      negativa)
+- [x] `PerformanceEligibilityService` — abrir set exige escalação em `EventMusician`
+- [x] Repositórios in-memory + Prisma, migration `20260821200000_add_performance`
+- [x] `performance-module` com 3 controllers e handler de `SongStartedEvent` que fecha o ciclo do
+      `markAsPlayed`
+- [x] Mobile: `LiveSetControl` na tela Ao Vivo, Play Mode transmitindo **só com set aberto**, store
+      persistido em `expo-secure-store`
+
+### 11.2 — Tocando agora para o fã ✅
+
+- [x] `GET /performances/live` + `NowPlayingCard` no perfil público, com "Salvar no meu Spotify"
+      recebendo o par vindo do palco. Polling de 20s (decisão registrada; socket exigiria room de
+      evento no gateway)
+
+### 11.3 — Currículo verificado (F4) ✅
+
+- [x] `GET /musicians/:id/resume` — derivado, nunca declarado; sem cachê no output
+- [x] Mobile: `MyResumeScreen` (músico) + `VerifiedResumeSection` (perfil público do fã)
+
+### 11.4 — Setlist inteligente por local (F5) ✅
+
+- [x] `GET /musicians/:id/setlist-suggestions?establishment_id=` com `evidence` por sugestão
+- [x] Mobile: `SetlistSuggestionsScreen`, alcançável do card do show aberto
+
+### 11.5 — Relatório pós-show (F6) ✅
+
+- [x] `GET /performances/:performance_id/report` + `PerformanceReportScreen` e
+      `PerformanceHistoryScreen`
+
+### 11.6 — Card compartilhável do pós-show (B1) ✅ *(22/ago/2026)*
+
+- [x] `establishment_name` no output de `GET /performances/:id/report` — único campo novo no
+      backend; precedente de `get-musician-resume`
+- [x] Mobile: `ShowRecapCard` (imagem capturável) + `ShowRecapSection` (preview + opt-in de
+      gorjeta + ações), dentro de `PerformanceReportScreen`
+- [x] `qrShare.ts` → `imageShare.ts` e novo `useCardShare` genérico em `shared/hooks/` — a mecânica
+      de captura/trava/pulso era idêntica; `useQRCardShare` virou wrapper de 8 linhas e
+      `QRCodeContent.tsx` não foi tocado
+- [x] 🔴 Gorjeta **opt-in, padrão desligado**; `tips_during_song` fora do card em qualquer caso;
+      set sem música não oferece compartilhamento. Ver `business-rules.md` §"Card compartilhável"
+- [x] Preferência do toggle lembrada por músico (`recap-preferences.storage.ts`) — o card também
+      serve de arquivo pessoal, não só de post. Restauração só LIGA; default e falha caem em `false`
+
+### Pendente
+
+- [ ] Push para o fã em vez de polling
+- [ ] Wrapped anual do fã (B2) — agregação do mesmo dado
+- [ ] Encerramento automático de set esquecido aberto
+- [ ] Confirmação em device físico (mesma ressalva de todos os blocos do mobile)
+
+**Referência:** [performance/live-performance.md](performance/live-performance.md) ·
+`src/core/performance/`
+
+---
+
+## Bloco 12 — Modo Ensaio (S3) 🎧 *(22/ago/2026)*
+
+O `ai-audio-module` estava completo e com **zero UI** desde sempre. Esta fatia deu produto a ele.
+
+- [x] **Migration `20260822180000_add_practice_mode_stems`** — `AiAudioUpload.musicLibraryId`
+      (espelha `AiCifraUpload`) + `AiAudioSeparationJob.stems_expire_at` + índices. Ambas nullable,
+      sem backfill.
+- [x] 🔴 **Política de retenção dos stems** — `PurgeExpiredAiAudioStemsUseCase` + job horário +
+      `AI_AUDIO_STEMS_RETENTION_HOURS` (default 72h) + `deleteObject` na porta de storage. Stem é a
+      gravação, separada: reter indefinidamente era postura de direito autoral divergente da do
+      ai-cifra, que apaga o áudio ao concluir. Status `expired` distinto de `failed`.
+- [x] `POST /musicians/:id/ai-audio/practice/separations` — separa a partir da **biblioteca**,
+      re-resolvendo a fonte pelo resolver do `ai-cifra` (o áudio original não existe mais)
+- [x] Mobile: `PracticeModeScreen` + `usePracticeStems` (4 players com líder fixo e correção de
+      deriva) + `usePracticeScrollSync` (cifra rolando pela posição real do áudio) + mesa com
+      mute/solo + transporte com meia-velocidade e pitch preservado
+- [x] `usePlayModeAutoScroll` **não foi tocado** — o caminho de palco fica isolado
+- [ ] 🔴 **Gate jurídico** — a retenção curta reduz a exposição, não a elimina. Entrar na mesma
+      lista de perguntas ao advogado de `contract/legal-checklist.md`
+- [ ] Loop A/B de trecho — o controle que mais falta num modo de ensaio de verdade
+- [ ] Confirmação em device físico — **com peso maior aqui**: a qualidade da sincronia entre os
+      quatro players É a feature, e só o aparelho responde
+- [ ] Camada canônica de `music_library` antes de escalar — hoje cada músico paga GPU pela mesma
+      música
+
+**Referência:** [AI-musician/practice-mode.md](AI-musician/practice-mode.md)
+
+---
+
 ## Observações técnicas (não esquecer)
 
 | Observação                                      | Onde impacta                                         | Bloco   |
 | ----------------------------------------------- | ---------------------------------------------------- | ------- |
-| ~~`payment-module` bloqueia fluxo produção~~    | ✅ HTTP completo; gorjeta PIX ainda mock (Iugu)      | 1       |
+| **Teste não atravessa HTTP** — os 3 bugs do 9.7 passaram por 2876 testes verdes | Todo DTO com `@IsDate`/filtro aninhado          | 9.7     |
+| ~~Filtro aninhado descartado (Express 5)~~      | ✅ resolvido — `query parser: extended` em `main.ts` | 9.7c    |
+| ~~`POST /auth/login` 401 para estabelecimento~~ | ✅ resolvido — `resolveProfile` consulta establishment | 9.7/F1.1 |
+| ~~Rate limit global por IP atrás do BFF~~       | ✅ resolvido — `UserThrottlerGuard` rastreia por `sub` do JWT | 9.7     |
+| ~~`payment-module` bloqueia fluxo produção~~    | ✅ HTTP completo; gorjeta PIX no Mercado Pago        | 1       |
 | ~~QR vulnerável — qualquer string passa~~       | ✅ resolvido — parser `soundmeet://`, UUID, match    | 2       |
 | ~~Scan sem transação → inconsistência~~         | ✅ resolvido — UoW atômico (`update` + `insert`)     | 2.5     |
 | ~~`ai-audio-module` órfão~~                     | ✅ resolvido — registrado em `app.module.ts`          | 3.1     |
 | ~~Bulk/ai-cifra sem auth consistente~~          | ✅ resolvido — `InternalTokenGuard` + `@SkipThrottle` | 4       |
 | ~~Multi-roles sem ownership completo~~          | ✅ resolvido — guards aplicados, testes cobertos     | 4B      |
 | Saque PIX (Asaas real)                          | ~ `AsaasGatewayAdapter` ativo; webhook TRANSFER_DONE ok | 1.6/1.7 |
-| Gorjeta PIX ainda mock                          | `PixGatewayMock` — aguardando chaves Iugu            | 1.6     |
+| Gorjeta PIX                                     | ✅ `MercadoPagoPixGateway` (Orders API); mock só sem env | 1.6     |
 
 ---
 
@@ -416,11 +1061,11 @@ reaplicadas sobre a análise nova e as que não ancoram viram conflito explícit
 | Perfil + QR (geração)      | ✅                                                   |
 | Validação QR (parse/UUID)  | ✅ Bloco 2 completo (UoW atômico + testes com UUID real) |
 | Pedidos musicais           | ✅                                                   |
-| Saque PIX músico           | ~ `AsaasGatewayAdapter` ativo; gorjetas aguardam Iugu |
+| Saque PIX músico           | ~ `AsaasGatewayAdapter` ativo; gorjeta no Mercado Pago |
 | Gamificação (domínio)      | ✅                                                   |
 | Folha de cifra / IA        | ✅ sync/bulk/materialização (6.1–6.3); ~ tuning Demucs (6.4) |
 | Auth Keycloak              | ✅ JWT validado, guards aplicados, ownership completo (4B.1–4B.6), rate limit global |
-| Feature Gating (planos)    | ~ **parcial (revisto 06/ago/2026)** — músico: 13 de 18 flags aplicadas de fato; estabelecimento: **só 2 de 6** (`promotional_campaigns`, `multi_establishment`). `advanced_analytics`, `api_access`, `max_qr_codes`, `white_label` existem no config e **nunca são lidas**; o limite "1 evento ativo no Free" não existe nem como flag. Ver Bloco 9.7 e [plans/establishment-plans.md](plans/establishment-plans.md) |
+| Feature Gating (planos)    | ✅ **resolvido em 16/ago/2026** — `advanced_analytics` e `realtime_analytics` viraram gate real (402 no endpoint, com paywall no web e no mobile); `max_qr_codes` saiu do catálogo (o domínio nunca suportou); `api_access`/`white_label` viraram `coming_soon` no `GET /plans`, com `Exclude<>` impedindo gatear capacidade inexistente; limite de eventos no FREE **não** aplicado por decisão de produto (protege o inventário da `/agenda` pública). Ver §9.7 de [roadmap-web.md](roadmap-web.md) |
 | Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — sem UI de preenchimento em nenhuma plataforma; fatia W1 de [roadmap-web.md](roadmap-web.md) |
 | Dashboard estabelecimento  | ~ parcial                                            |
 | Chat integrado             | ✅ Bloco 7.1 completo (Conversation/Message, gateway `/chat`, push, 15 testes) **(corrigido jul/2026 — tabela estava desatualizada frente ao Bloco 7.1 acima)** |

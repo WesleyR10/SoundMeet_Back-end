@@ -14,8 +14,23 @@ Backend em **NestJS + DDD + Clean Architecture + Hexagonal**, ORM **Prisma/Postg
 | [monetization.md](monetization.md)                   | Receita, planos e preços                            | Decisões de produto/monetização     |
 | [roadmap.md](roadmap.md)                             | Estado atual + próximos passos                      | Planejar sprints                    |
 | [qr-code.md](qr-code.md)                             | Spec do QR (perfil + validação de scan)             | Implementar/ajustar QR              |
+| [payment-gateway-decisions.md](payment-gateway-decisions.md) | Gateways, escrow, chargeback — arquitetura decidida | Mexer em pagamento ou ligar o escrow |
+| [payment-gateway-research-2026-08.md](payment-gateway-research-2026-08.md) | 🔴 **A taxa PIX do Asaas é FIXA (R$1,99)** e torna deficitária toda gorjeta abaixo de R$22. Comparativo com Woovi/Mercado Pago/Efí/Pagar.me, restrições operacionais do Asaas e a recomendação de rotear por vértice | **Antes** de escolher gateway ou escrever o F1.0 |
 | [auth/keycloak.md](auth/keycloak.md)                 | Realm, clients, roles, groups e claims Keycloak     | Configurar autenticação/autorização |
 | [workflow/git-workflow.md](workflow/git-workflow.md) | Git Flow + Conventional Commits                     | Commits e branches                  |
+
+### Contrato digital de show ([contract/](contract/contract-digital.md))
+
+| Documento                                                | Escopo                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------ |
+| [contract-digital.md](contract/contract-digital.md)      | **Fonte única** — arquitetura do subsistema `contract`        |
+| [legal-checklist.md](contract/legal-checklist.md)        | 🔴 O documento que vai ao advogado — **gate para produção**   |
+
+### Apresentação ao vivo ([performance/](performance/live-performance.md))
+
+| Documento                                                     | Escopo                                                      |
+| ------------------------------------------------------------- | ----------------------------------------------------------- |
+| [live-performance.md](performance/live-performance.md)        | **Fonte única** — set ao vivo, currículo verificado, setlist inteligente e relatório pós-show |
 
 ### Subsistema de IA musical ([AI-musician/](AI-musician/README.md))
 
@@ -25,10 +40,11 @@ Backend em **NestJS + DDD + Clean Architecture + Hexagonal**, ORM **Prisma/Postg
 | [chord-sheet.md](AI-musician/chord-sheet.md)             | **Fonte única** — folha de cifra (LRC + acordes) |
 | [external-apis.md](AI-musician/external-apis.md)         | Letras LRC e metadados complementares            |
 | [audio-separation.md](AI-musician/audio-separation.md)   | Tuning Demucs (segment/overlap)                  |
+| [spotify-track-matching.md](AI-musician/spotify-track-matching.md) | **Fonte única** — como a música vira link do Spotify (escolha da versão) |
 
 ## Domínios (`src/core`)
 
-`musician` · `establishment` · `audience` · `request` · `gamification` · `payment` · `scheduling` · `events` · `music-library` · `synced-lyrics` · `ai-audio` · `ai-cifra` · `shared`
+`musician` · `establishment` · `audience` · `request` · `gamification` · `payment` · `scheduling` · `events` · `music-library` · `synced-lyrics` · `ai-audio` · `ai-cifra` · `contract` · `personal-chord-sheet` · `performance` · `review` · `shared`
 
 ## Configuração Cursor (monorepo)
 

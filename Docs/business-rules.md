@@ -241,6 +241,24 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
        Código: audience.aggregate.ts ([13]).  
        Regra: `validate` utiliza `AudienceValidatorFactory`; erros geram `EntityValidationError` conforme padrão da camada de domínio.
 
+- [x] 🔴 **O registro é o ÚNICO caminho de nascimento de um Audience** (SM-021, 26/ago/2026)  
+       Código: `register.use-case.ts`; `audiences.controller.ts` (pela ausência).  
+       Regras:
+  - **`POST /audiences` não existe** — a rota era `@Public()` e foi removida junto
+    com o `CreateAudienceUseCase`, o input e o DTO.
+  - O motivo não é só a rota estar aberta: o use-case criava o agregado com **UUID
+    aleatório**, enquanto o canônico faz `new AudienceId(externalId)` — o `sub` do
+    Keycloak. O resultado era perfil órfão: gente que não loga, não é dona de
+    e-mail nenhum e ocupa banco. Qualquer automação podia despejá-los à vontade.
+  - **Restringir a `admin` não resolveria.** Uma capacidade que só sabe produzir
+    agregado violando a invariante de identidade do sistema não fica melhor com
+    autorização — fica mais discreta. Ver a nota de identidade: músico e público
+    usam o `sub` como id; estabelecimento e banda têm UUID próprio.
+  - Regressão em `audiences.controller.spec.ts`: uma varredura da metadata do Nest
+    afirma que nenhuma rota do controller é `@Public()` e que não há `POST` na raiz
+    do recurso — porque o risco real não é restaurarem o método com o mesmo nome, é
+    alguém adicionar um `@Post()` novo sem saber por que ele não existia.
+
 **Gamificação por Audience (pontos e níveis)**
 
 - [x] Pontuação por ações do público (scan, pedidos, acertos, gorjetas, social, etc.)  
@@ -316,6 +334,31 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
   - Campos principais: `audience_id`, `musician_id`, `song_title`, `artist`, mensagem opcional, flags e metadados.
   - `status` inicial é `pending`.
   - Datas: `created_at`, `responded_at`.
+
+- [x] **`CreateRequestUseCase` exige presença comprovada, via `CanMakeRequestPolicy`**
+       (`core/request/domain/policies/can-make-request.policy.ts`) — não documentado antes de
+       14/ago/2026, achado por teste real contra o backend (não por leitura de DTO, que marca
+       `event_id` como opcional):
+  - `MusicianMustBePerformerPolicy`: `event_id`+`musician_id` precisa ter uma linha `EventMusician`
+    com `status != cancelled` (`eventRepo.isMusicianPerformer`).
+  - `AudienceMustBeAttendeePolicy`: o audience precisa ter `EventAttendee.is_active = true` para
+    aquele evento (`eventRepo.isAudienceAttendee`) — ou seja, precisa ter passado por
+    `POST /audiences/:id/attend-event` (ou `POST /establishments/:id/events/:event_id/attendees`)
+    ANTES do pedido. Não existe endpoint de consulta de status para o audience saber se já é
+    attendee — só tentar e tratar o 422 (`EntityValidationError`, mensagens concatenadas de todas
+    as policies que falharem, ex.: `"Musician is not a performer in this event, Audience is not an
+    active attendee in this event"`).
+  - `EventMustBeActivePolicy`, `DailyRequestLimitPolicy`, `NoPendingRequestForMusicianPolicy`,
+    `AntiSpamSimilarRecentRequestPolicy` completam a policy chain (`CanMakeRequestPolicy`).
+  - 🔴 **Bug corrigido em 14/ago/2026** — `EventPrismaRepository.addAttendee`/`removeAttendee`
+    (raw SQL de `current_capacity`) tinham DOIS erros que faziam `POST /audiences/:id/attend-event`
+    responder 500 sempre, para qualquer chamador: (1) `${event_id.id}::uuid` — `Event.id` é `String`
+    sem `@db.Uuid()` no schema, ou seja, é `text` no Postgres, e o cast produzia
+    `operator does not exist: text = uuid`; (2) `current_capacity`/`max_capacity` em snake_case sem
+    aspas — as colunas reais são `"currentCapacity"`/`"maxCapacity"` (camelCase, sem `@map` no
+    schema), então o Postgres respondia `column "max_capacity" does not exist`. Sem o check-in
+    funcionando, `AudienceMustBeAttendeePolicy` nunca passava — o fluxo de pedido de música estava
+    quebrado ponta a ponta para qualquer client (web, mobile), não só para uma integração nova.
 
 - [x] Aceitar e rejeitar pedidos com validações de estado  
        Código: request.aggregate.ts ([17]) (`accept`, `reject`).  
@@ -415,6 +458,67 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
   - Verifica saldo suficiente em `MusicianWallet`.
   - Deduz o valor, cria `Transaction` de tipo `WITHDRAWAL` e retorna saldo atualizado.
 
+- [x] 🔴 **Saque é RESERVA → PROVEDOR, nunca o contrário** (SM-023, 26/ago/2026)  
+       Código: `withdraw-to-pix.use-case.ts`, `refund-failed-withdraw.use-case.ts`.  
+       Regras:
+  - **A ordem é o oposto da custódia.** Em `ReleaseBookingEscrowUseCase` o provedor
+    vem primeiro (o dinheiro já está lá, nosso registro é espelho). No saque a
+    transferência **cria** o fato e quem autoriza é o saldo que só nós conhecemos:
+    o débito é persistido **antes** da chamada. Chamar o provedor antes de
+    persistir deixava a janela inteira da chamada HTTP com o saldo antigo visível
+    — dois saques simultâneos de R$110 sobre R$200 emitiam **duas transferências
+    reais** e gravavam **um só débito**.
+  - **Três barreiras, nenhuma substitui a outra:** o lock da carteira
+    (`findByMusicianIdForUpdate`, `SELECT ... FOR UPDATE`) serializa execuções
+    concorrentes; o saldo barra o segundo saque quando não há fundo para os dois;
+    e a chave de idempotência do cliente (header `Idempotency-Key`, coluna
+    `transactions.idempotencyKey` UNIQUE) cobre o duplo clique — o caso em que os
+    dois pedidos são um só e o saldo sobra para ambos.
+  - **O `insert` do lançamento vem ANTES do `update` da carteira.** As duas
+    escritas estão na mesma transação, mas depender do rollback para não debitar
+    é depender de uma garantia que some se alguém injetar um repositório sem
+    UnitOfWork. Nesta ordem a colisão do UNIQUE aborta antes de tocar o saldo.
+  - **Reenvio com a mesma chave e valor diferente é recusado** (`ConflictError`),
+    e o re-despacho usa a chave PIX que a **reserva** registrou, não a do corpo
+    atual: o dinheiro vai para onde o saque original mandou.
+  - 🔴 **Recusa e silêncio do provedor não são a mesma coisa.** Só
+    `PixWithdrawRejectedError` (400/401/403/422 — o provedor recusou
+    conclusivamente) estorna. Timeout, 5xx e erro de rede **não** estornam: a
+    transferência pode ter sido processada com a resposta perdida no caminho, e
+    devolver o saldo aí reabriria o duplo pagamento pela porta dos fundos. O
+    desempate é `findTransferByExternalReference` sobre a referência que nós
+    mesmos geramos (`external_reference = transaction_id`); sem resposta, a
+    transação fica `pending` para o webhook resolver.
+
+- [x] 🔴 **`TRANSFER_FAILED` devolve o dinheiro à carteira** (SM-023, 26/ago/2026)  
+       Código: `refund-failed-withdraw.use-case.ts`, `asaas-webhook.controller.ts`.  
+       Regras:
+  - Até 26/ago/2026 o webhook marcava a transação `failed` e **deixava o saldo
+    debitado**: o provedor recusava, o dinheiro não chegava na conta do músico e
+    também não voltava para a dele aqui — sumia, sem erro em lugar nenhum.
+  - `refundWithdrawal` desfaz `withdrawFunds` por inteiro: devolve `balance` **e**
+    reverte `total_withdrawn`, que é o número que o músico confere contra o
+    próprio banco.
+  - Idempotência dupla: `processOnce` barra a reentrega do evento; o `pending`
+    conferido **sob o lock da carteira** barra a colisão com o caminho de recusa
+    do próprio saque. Transação já `completed` nunca é estornada — seria devolver
+    saldo sacável de dinheiro que já está com o músico.
+
+- [x] 🔴 **Aritmética monetária de `MusicianWallet` é em CENTAVOS INTEIROS** (26/ago/2026)  
+       Código: `musician-wallet.aggregate.ts`.  
+       Regras:
+  - `Money.add`/`subtract` operam em ponto flutuante e o `Money` recusa mais de
+    duas casas decimais — a imprecisão não degrada o valor, ela **lança**.
+    `150.30 - 110` dá `40.30000000000001` e derrubava o saque inteiro com
+    `InvalidMoneyError`. Saldo com centavos é o caso **normal** (gorjetas e cachês
+    somados), não a exceção.
+  - Vale para `receiveFunds`, `withdrawFunds`, `refundWithdrawal`,
+    `recordExternalEarning`, `holdFunds`, `releaseHeldFunds` e `refundHeldFunds`.
+    Mesma razão de `BookingEscrow.splitAmount`.
+  - ⚠️ **O `Money` VO em si continua somando em ponto flutuante** — o mesmo
+    defeito de classe existe em todo agregado que faz `add`/`subtract`. Corrigido
+    aqui porque é onde o saque vive; a correção geral está em aberto.
+
 **Monetização e planos**
 
 - [x] Planos de assinatura para músicos e estabelecimentos (valores, limites, taxas diferenciadas) **(corrigido 06/ago/2026 — o texto anterior dizia que "ainda não há agregados de plano, cobrança recorrente ou lógica de pricing", o que estava desatualizado desde jun/2026)**  
@@ -425,9 +529,82 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
   - Taxas diferenciadas de gorjeta (9%/7%/5%) e config de saque por tier já aplicadas em `WithdrawToPixUseCase`.
   - ⚠️ **Enforcement é grant-at-action:** o gate é cobrado no momento da ação, nunca revalidado na leitura. Quem faz downgrade mantém o que já concedeu (link compartilhado, convite). Detalhado em [plans/musician-plans.md](plans/musician-plans.md#️-enforcement-de-gates-ação-vs-leitura-ler-antes-de-mexer-em-qualquer-gate-de-plano).
 
-- [~] Gorjeta com gateway PIX real — **é o único vértice de pagamento ainda mockado.** `send-tip` usa `PixGatewayMock`, aguardando chaves da Iugu. Saque (`AsaasGatewayAdapter`) e assinatura (`AsaasSubscriptionGateway`) já são reais. Ver [payment-gateway-decisions.md](payment-gateway-decisions.md).
+- [x] Gorjeta com gateway PIX real — **Mercado Pago** (`MercadoPagoPixGateway`, Orders API). Sem `MERCADOPAGO_API_URL` o fallback é o `PixGatewayMock` (dev). Saque (`AsaasGatewayAdapter`) e assinatura (`AsaasSubscriptionGateway`) continuam no Asaas. Ver [payment-gateway-decisions.md](payment-gateway-decisions.md).
 
 ---
+
+### Gorjeta — Mercado Pago *(19/ago/2026)*
+- [x] 🔴 **A gorjeta cai DIRETO na conta do músico.** A cobrança é criada na conta dele (OAuth, `POST /v1/orders`) e a comissão sai por `marketplace_fee` — a plataforma nunca detém esse dinheiro. Consequência: **gorjeta não tem saque pela SoundMeet**; ele saca no próprio Mercado Pago, e a carteira do app mostra a gorjeta como **extrato**.
+- [x] **Sem conta vinculada o músico não recebe gorjeta** — não há para onde o valor ir. Por isso a UI trata o estado desconectado como aviso, não como sugestão.
+- [x] 🔴 **`marketplace_fee` = percentual do plano MENOS a taxa do gateway.** No marketplace do MP a taxa dele sai do bruto **antes** da nossa comissão; pedir os 9% cheios debitaria 9,99% do músico num plano que anuncia 9%. A tabela de preços promete "(1% gateway incluso)" e o código cumpre: em R$20, `marketplace_fee` = R$1,60 e o total retido é R$1,80.
+- [x] 🔴 **Gorjeta liquidada na conta do músico NÃO credita saldo sacável.** `ConfirmTipPaymentUseCase` exige `settlement: "beneficiary" | "platform"` (obrigatório, sem default); `"beneficiary"` chama `MusicianWallet.recordExternalEarning()`, que cresce `total_earned` **sem tocar `balance`**. Creditar `balance` criaria saldo sacável de dinheiro que a plataforma nunca recebeu — e o saque sai do caixa dela.
+- [x] **Gorjeta de banda liquida na conta do LÍDER** (`SendTipUseCase.resolveBeneficiary`): banda não tem conta no provedor, o vínculo OAuth é sempre de uma pessoa. A **divisão** entre os integrantes continua na confirmação, sobre o registro — não no provedor.
+- [x] **Comissão calculada em centavos** (`splitAmountInCents`) — 9% de R$333,33 em ponto flutuante dá 29,999700000000004, e o provedor recusaria (ou aceitaria com um centavo errado).
+- [x] **Gorjeta de banda liquida na conta do LÍDER.** Banda não tem conta no provedor; `beneficiary_musician_id` vai nulo quando só há `band_id`. Mesma decisão de `buildContracted` no contrato.
+- [x] **O `state` do OAuth é assinado (HMAC) e tem `purpose` próprio.** O callback chega pelo navegador sem Bearer token — sem a assinatura, qualquer um vincularia a própria conta de pagamento ao músico de outra pessoa; sem o `purpose`, um `state` do fluxo de agenda serviria aqui.
+- [x] **O webhook lê o valor da API, nunca do corpo** (`x-signature` validada, fail-closed sem segredo, idempotente pelo `ProcessedEvent`). Confiar no corpo deixaria qualquer POST confirmar uma gorjeta de R$1.000.
+- [x] **Token renovado com 15 dias de folga** sobre os 180. Deixar vencer custa reautorização manual — que o músico descobriria quando uma gorjeta falhasse, no palco.
+
+### Custódia do cachê (escrow — F1.3a) *(19/ago/2026)*
+- [x] 🔴 **O valor custodiado NÃO transita pelo patrimônio da plataforma.** Fica bloqueado na subconta do músico na instituição de pagamento; `MusicianWallet.held_balance` é **espelho**, não fonte. É o que a cláusula `papel_da_plataforma.com_custodia` afirma — o caminho do "saldo lógico numa conta nossa" foi recusado porque transformaria cláusula assinada em declaração falsa, além de ser custódia de recursos de terceiros (atividade regulada).
+- [x] **Custódia não é saldo.** `held_balance` fica **fora** de `balance`: dinheiro retido não é sacável, e somá-lo faria o app oferecer um saque que o gateway recusaria.
+- [x] **A comissão só é devida NA LIBERAÇÃO.** `platform_fee` é congelada na criação da custódia, mas só vira receita em `released`. Show não realizado, nenhuma comissão — é o argumento mais forte contra a tese de responsabilidade solidária, e a cláusula o afirma.
+- [x] **`total_earned` só cresce na liberação** — é o momento em que o serviço foi prestado. Creditar na retenção anunciaria um ganho estornável.
+- [x] **Estorno nunca passa pelo saldo:** o dinheiro nunca foi do músico, então `refundHeldFunds` só reduz o retido. Transitar por `balance` deixaria rastro de um ganho que não existiu.
+- [x] **Liberar exige DUAS condições:** check-in registrado **e** ausência de contestação na janela. Só por prazo entregaria o cachê de um show que ninguém confirmou; com contestação aberta seria decidir a disputa por omissão (a mediação é humana de propósito).
+- [x] **O prazo conta do FIM DO SHOW**, não da retenção — o pagamento é antecipado, e contar da retenção liberaria antes de o show acontecer para quem pagou cedo. **D+2 no plano pago, D+5 no FREE** (`escrow_release_days`). É prazo, não gate: ninguém é bloqueado.
+- [x] **Divisão em centavos inteiros** (`splitAmount`), garantindo `platform_fee + net_amount === amount` exatamente. Centavo perdido em arredondamento é centavo que ninguém recebe.
+- [x] **Ordem obrigatória na liberação:** provedor → custódia → carteira. Marcar antes de o provedor confirmar anunciaria um saldo que o gateway recusa a sacar.
+- [x] **Idempotente ponta a ponta:** `bookingId` é `@unique`, `markHeld` com a mesma referência é no-op, `release` repetido é no-op. Job e webhook podem chegar os dois — pagar duas vezes o mesmo show não é uma opção.
+- [x] 🔴 **A `apiKey` da subconta é cifrada em repouso** (infra de SM-016) e **nunca sai em `toJSON`**. Ela move dinheiro dentro da subconta, e o provedor só a entrega uma vez, na criação — perder é ter de recriar a subconta.
+- [x] **Desabilitar a Conta Escrow LIBERA tudo que está sob garantia**, então o agregado recusa desabilitar com saldo retido: seria trocar R$9,90/mês por um pagamento antecipado de shows que talvez não tenham acontecido.
+
+#### Fatia HTTP e webhooks *(21/ago/2026)*
+
+> Documentado retroativamente em 22/ago/2026 — o código foi entregue em 21/ago sem passar por
+> aqui, e a seção anterior ainda dizia "faltam as rotas HTTP e os webhooks".
+
+- [x] **A criação é disparada por evento, não por rota.** `CreateBookingEscrowUseCase` roda no
+      `BookingConfirmedEvent` — o mesmo que emite o contrato. Não existe "criar custódia" por HTTP:
+      custódia sem show confirmado não tem o que garantir.
+- [x] **Ordem de criação: persistir `pending` → cobrar no provedor → gravar a referência.** O
+      `externalReference` da cobrança é o próprio `escrow_id`, então o registro precisa existir
+      antes da cobrança — senão o webhook do pagamento chega antes daquilo que ele referencia.
+      Falhar no meio deixa uma custódia `pending` sem cobrança: reexecutável e inofensiva, porque
+      ninguém foi cobrado. O inverso deixaria dinheiro bloqueado sem registro local para liberar.
+- [x] 🔴 **`findChargeByReference` antes de criar.** Entre o provedor aceitar a cobrança e nós
+      gravarmos o `external_id` existe uma janela; sem essa consulta, uma reexecução emitiria um
+      **segundo PIX** para o mesmo show.
+- [x] **`GET /musicians/:id/wallet/escrow`** é a **única** rota da feature — extrato somente-leitura,
+      com `MusicianOwnershipGuard`. A referência da cobrança no provedor não é exposta.
+- [x] 🔴 **Não existe rota para reter, liberar ou estornar.** Quem retém é o webhook (o único que
+      sabe que o dinheiro entrou); quem libera é o job (depois de conferir check-in e prazo). Expor
+      liberação por HTTP transformaria as salvaguardas do `ReleaseBookingEscrowUseCase` em
+      formalidade — bastaria chamar a rota.
+- [x] **Branch de escrow no `AsaasWebhookController`**, identificado pelo prefixo `escrow:` no
+      `externalReference` e avaliado **antes** do caminho de gorjeta (que trata qualquer referência
+      restante como UUID de tip).
+- [x] 🔴 **O valor vem do NOSSO registro, nunca do corpo do webhook.** `MarkBookingEscrowHeldUseCase`
+      retém o `net_amount` congelado na criação; `payment.value` não é lido. Confiar no corpo
+      deixaria um POST forjado inflar o `held_balance` de qualquer músico.
+- [x] **Custódia e carteira mudam dentro de `UnitOfWork`** (`markHeld` e `release`). Sem transação,
+      uma falha entre os dois updates deixava `held_balance` errado **permanentemente** — a
+      reexecução retornava cedo por idempotência e nunca corrigia.
+- [x] **Guarda de estado antes de chamar o provedor**, e custódia em mediação não sai pela liberação
+      automática. `expires_at: null` (garantia inativa) vira log de erro, não silêncio.
+- [x] **`booking_fee_percentage` mora em `plan-features.config.ts`**, ao lado de
+      `tip_fee_percentage` — 10% nos três tiers hoje, variável por tier sem tocar código de domínio.
+
+### Check-in da apresentação *(19/ago/2026)*
+- [x] **Vale por si como prova de execução do serviço** (camada 3 contra chargeback), com ou sem escrow.
+- [x] **A hora é do SERVIDOR**, nunca do corpo — este registro existe para provar *quando* algo aconteceu.
+- [x] Só em booking **confirmado**, e **não antes do início do show** (declarar fato futuro não prova nada). Depois do fim é aceito: o músico registra ao descer do palco.
+- [x] **O estabelecimento também pode registrar** — é a contraparte confirmando, prova ainda mais forte a favor do artista. O campo `checked_in_by` guarda qual lado declarou.
+- [x] Idempotente: o primeiro registro é o que vale. Sobrescrever permitiria "ajustar" o horário do fato depois.
+- [x] **A contestação NÃO exige check-in prévio** — "o artista não apareceu" é justamente a contestação em que ele não existe.
+- [x] 🔴 **Só o CONTRATANTE contesta** (`POST /scheduling/bookings/:id/dispute`, `@Roles("establishment","admin")`). Contestar é dizer "o serviço não foi entregue como combinado" — deixar o artista fazer isso seria deixá-lo travar o próprio pagamento. A checagem **não** é `assertNegotiationParticipant` (que aceita qualquer lado) e é fail-closed sobre lista de identidades vazia.
+- [x] **`POST /scheduling/bookings/:id/check-in` aceita as duas partes**, e `checked_in_by` registra qual lado declarou (`band` quando o show é de banda, exigindo o líder).
+- [x] **`scheduling` não conhece `payment`.** Marcar o booking já basta para bloquear a liberação automática (`ProcessDueEscrowReleasesUseCase` confere `booking.isDisputed`); congelar o agregado `BookingEscrow` é ato da mediação.
 
 ## Domínio Gamification (Pontos, Badges, Rankings)
 
@@ -517,6 +694,26 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 - [ ] Moderação/denúncia de avaliação — não implementado.
 - [ ] `EstablishmentRatedEvent` segue sem ouvinte (evento morto, anterior a este bloco).
 
+### UI do músico avaliando o estabelecimento *(21/ago/2026)*
+
+> Documentado retroativamente em 22/ago/2026. Fecha o gap apontado na auditoria de 21/ago: o
+> backend estava completo desde 07/ago e o web já tinha a tela do estabelecimento avaliar o
+> músico; **o mobile só exibia rating, sem forma de enviar**.
+
+- [x] **A ação mora na tela do CONTRATO** (`ContractReviewAction`), não numa tela de booking. O
+      músico não tem lista de bookings no app — `GET /scheduling/bookings` continua sem chamador em
+      `src/` —, e o contrato já é a tela do show.
+- [x] **Só aparece com o booking `completed`.** `confirmed` não conta, nem com a data já passada:
+      é o único status que o backend aceita como prova de vínculo, e a promoção
+      `confirmed → completed` é do job horário. A ação surge sozinha em até uma hora após o show.
+- [x] 🔴 **Show de banda não oferece a ação, e isso não é caso de borda.** O backend deriva o autor
+      do JWT e exige que ele seja parte da reserva; em show de banda a parte é o `band_id`, então
+      **nenhum integrante passa — nem o líder**. O CTA aparecia e falhava 100% das vezes; hoje
+      `canReviewEstablishment` o esconde. Avaliação em nome da banda depende de o backend aceitar o
+      integrante como autor, e enquanto não aceita a UI não finge que aceita.
+- [x] **Comentário é opcional** — exigir texto derruba a taxa de resposta, e a nota sozinha já move
+      a média que ordena a busca do dashboard de contratação.
+
 ---
 
 ## Domínio Personal Chord Sheet (Cifra Pessoal e Comunidade)
@@ -573,6 +770,320 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 ---
 
+## Domínio Contract (Contrato Digital de Show)
+
+> Todo show confirmado gera automaticamente um contrato adaptado àquele artista, àquele local e
+> àquele valor. O documento é **congelado** na emissão, tem hash de integridade e página pública de
+> verificação. A plataforma **não é parte**.
+>
+> Arquitetura: [contract/contract-digital.md](contract/contract-digital.md) · Revisão jurídica:
+> [contract/legal-checklist.md](contract/legal-checklist.md)
+
+### Catálogo de cláusulas
+- [x] **O catálogo é código, não banco.** 23 cláusulas (18 obrigatórias, 5 opcionais) em 38 variantes, em `src/core/contract/domain/catalog/clauses/`. Revisão jurídica vira **code review**, e um teste de snapshot por variante impede que redação mude em silêncio no CI.
+- [x] `body` é **função pura de variáveis tipadas**, não template com `{{}}` — variável renomeada é erro de compilação, e não existe classe de bug de escaping.
+- [x] Toda cláusula declara `legal_note` com a âncora legal e o motivo de existir. São 22 notas, no próprio arquivo.
+- [x] O `consumes` declarado por variante é comparado com o que o corpo realmente lê, **nos dois sentidos**, via Proxy no teste — `consumes` não envelhece.
+- [x] **1728 contextos** varridos no teste: toda cláusula obrigatória resolve em todos, e nenhum texto sai com `undefined`, `NaN` ou `[object Object]`.
+- [x] ⚠️ **Aplicabilidade tem que ser mutuamente exclusiva** dentro da mesma cláusula e do mesmo tom. `selectVariant` faz `filter` e pega a primeira — duas variantes que casam no mesmo contexto não dão erro, dão a *primeira*, em silêncio.
+- [x] `conduta` só existe no tom rigoroso (regra de conduta detalhada aproxima a relação de subordinação) e há teste provando que **não vaza** para contrato de tom formal.
+- [x] `camarim_alimentacao` só entra acima de R$ 500 de cachê — cláusula que ninguém cumpre enfraquece o documento inteiro.
+
+### Tetos legais como invariante de código
+- [x] Multa de cancelamento **≤ 100% do cachê** (CC art. 412; art. 413 permite redução judicial). Validado em `ContractVariables`, não só escrito: multa acima disso é cláusula nula, e cláusula nula é pior que cláusula ausente.
+- [x] Exclusividade com **teto duro de km e de dias** (`assertExclusivityWithinLegalCap`) — restrição à liberdade profissional (CF art. 5º, XIII) só se sustenta limitada em tempo, espaço e atividade. Opcional e ausente por padrão.
+- [x] Uso de imagem sempre com finalidade, prazo e território preenchidos (CC art. 20).
+- [x] Foro = **comarca do local do show** (CPC art. 63), nunca a sede da plataforma, que não é parte.
+- [x] A janela de cancelamento gratuito vem de `Booking.free_cancellation_hours`, **nunca** de constante do catálogo.
+
+### Emissão
+- [x] Reativa: `ContractIssuanceHandler` escuta `BookingConfirmedEvent`. **Não bloqueia o show** — o booking vai a `confirmed` com ou sem contrato.
+- [x] `ContractModule` é **nó-folha**: `scheduling` não conhece `contract`.
+- [x] **Idempotente** — evento reentregue não cria segundo contrato.
+- [x] **Qualificação incompleta não emite contrato torto:** o use-case devolve `{ issued: false, missing: [...] }` com chaves estáveis (`contratante.cnpj`, `contratante.representante_legal`, `contratado.cpf`, `booking.cache`, …) e a UI monta a frase, porque é ela que sabe para onde mandar o usuário corrigir. `POST /contracts/issue` é a retentativa.
+- [x] 🔴 **Só quem é parte do show emite** *(19/ago/2026)* — checado **antes do primeiro efeito**, e não sobre o resultado. `requesting_participant_ids` é obrigatório e nulável no input: `null` é o caminho do sistema (`ContractIssuanceHandler`), declarado em código, e lista vazia é recusada em vez de pular a checagem. Vale para os dois ramos: emitir de fato **e** consultar a pendência de qualificação, que de outro modo seria um oráculo do estado cadastral alheio. Membro de banda não-líder **pode** disparar (`assertNegotiationViewer`): emitir é retentativa, não ato vinculante — quem se obriga é quem assina.
+- [x] **A retentativa manual carrega só o `booking_id`.** `tone`, `outdoor` e `exclusivity_requested` existem no input mas saem do DTO HTTP por `OmitType`: exclusividade é opt-in com tetos legais e não cabe num botão de "tentar de novo", e o tom escolhe a redação que a **outra** parte vai assinar. Quem os preenche é a emissão automática.
+- [x] 🔴 **Nenhum documento é jamais fabricado.** O CPF do representante legal **não** é derivado do CNPJ (uma versão anterior compunha com os 11 primeiros dígitos) — vem do cadastro, ou o contrato não é emitido. Endereço que o músico nunca informou sai como "não informado" em vez de inventado.
+- [x] Natureza das partes é **derivada, nunca fixa**: `contractor_is_company` de `establishment.cnpj !== null`, `contracted_is_company` de `musician.cnpj !== null`. No dia em que o cadastro aceitar estabelecimento PF, a cláusula de tributos escolhe sozinha a redação certa — muda o cadastro, não o contrato.
+- [x] **Músico MEI é qualificado como pessoa jurídica**, com o CNPJ no papel — é o que faz o contrato bater com a nota que ele emite. `legal_name` continua sendo o nome civil: a razão social do MEI *é* o nome da pessoa.
+- [x] **Banda contrata pelo líder pessoa física**, mesmo que ele tenha MEI: o MEI é dele, não da banda, e faturar o cachê inteiro pelo CNPJ pessoal cria um repasse que nenhuma cláusula descreve e pode estourar o teto do MEI.
+- [x] Integrantes vão **nomeados** no objeto (`findByIds`, `stage_name ?? name`) — "contratei o Trio Maré" sem dizer quem toca é o que permite trocar a banda inteira no dia.
+- [x] Retenção previdenciária **não** se aplica a contratado MEI (art. 4º da Lei 10.666/2003 alcança o contribuinte individual) — variante própria de `tributos`, senão o contrato mandaria o bar fazer retenção indevida.
+- [x] O cachê é declarado **BRUTO**, com o líquido e o comprovante de retenção descritos. Sem isso o contrato dizia "R$ 1.500" e a cláusula de tributos dizia "o contratante reterá" — ninguém sabia quanto o músico recebia.
+
+### Imutabilidade e integridade
+- [x] O agregado é **imutável por construção** — não existe mutador de conteúdo, só de status e assinatura.
+- [x] O contrato guarda o **snapshot congelado das cláusulas já renderizadas**. O catálogo só é consultado para *construir*; um contrato de 2026 renderiza igual para sempre.
+- [x] O mapper **recalcula o `content_hash` na carga** e recusa contrato adulterado no banco (`LoadEntityError`). Sem isso, publicar o hash na página de verificação seria decoração.
+- [x] FKs: `Restrict` em booking/establishment, `SetNull` em musician/band — apagamento por LGPD zera o ponteiro e **o snapshot preserva a prova**.
+- [x] Status como enum Prisma (`issued` → `partially_signed` → `signed`, `annulled` como saída lateral) — é máquina de estado de domínio.
+
+### Assinatura
+- [x] Própria, atrás de `IContractSignatureProvider`. Válida entre as partes pela **MP 2.200-2/2001, art. 10, §2º**, que exige admissão expressa — daí a cláusula `assinatura_eletronica` ser obrigatória e sem variante.
+- [x] Trilha: conta autenticada pelo Keycloak, aceite explícito, timestamp do servidor, IP, user-agent e hash.
+- [x] **A âncora de identidade é `signer_user_id`, não o documento do cadastro.** O cadastro diz quem *deveria* assinar; a trilha diz quem assinou. *(19/ago/2026)* O campo passou a ser **obrigatório** no input: os dois use-cases faziam `?? ""` e a âncora degradava para string vazia em silêncio — no exato documento que existe para provar quem assinou, e com a chave do desafio (que inclui o signatário) virando balde compartilhado entre pessoas do mesmo papel.
+- [x] **Segundo fator por código de uso único** enviado ao e-mail **congelado** da parte — a conta autenticada prova que alguém com a senha entrou, não quem. O código nunca volta na resposta HTTP: ela traz só o destino mascarado e o vencimento. 10 min de validade, 5 tentativas, uso único, e pedir outro invalida o anterior.
+- [x] **O código é guardado como HMAC com segredo do servidor** (`CONTRACT_CHALLENGE_SECRET`, ≥32 chars exigidos em produção), não como hash puro *(19/ago/2026)*: 6 dígitos são 1 milhão de possibilidades, e um SHA-256 sem chave se converte nos códigos vivos por tabela pré-computada assim que o cache vaza. Comparação em tempo constante. `POST /:id/sign/challenge` tem `@Throttle` próprio de 5/60s — cada pedido escreve na caixa de entrada de alguém e mata o código anterior.
+- [x] Papel derivado do JWT, nunca do corpo. Em banda, **só o líder assina**; membro **lê** sem ser líder.
+- [x] Segunda assinatura do mesmo lado → **422**; quem não é parte → **403**; `annul` de contrato assinado → **422** (e só admin).
+- [x] O documento **declara que não é título executivo** (CPC art. 784, III) e que é prova escrita apta a ação monitória (CPC art. 700). Prometer o contrário na UI seria falso.
+
+### Acesso e privacidade
+- [x] 🔑 **`IContractStorage` não tem `getPublicUrl`, e isso é a feature.** O documento carrega CPF, CNPJ, endereço e cachê; sem função que produza URL pública, vazar contrato por engano fica impossível por construção. A leitura é `GET /contracts/:id/document`, autorizada e por stream.
+- [x] `GET /contracts` é escopado pelo token (OR contra os três lados), **fail-closed**.
+- [x] A verificação pública (`GET /contracts/verify/:code`, `@Public()`) devolve o mínimo — código, status, hash, data do show — com os nomes **mascarados** (`"Ana Ribeiro"` → `"Ana R."`).
+- [x] A rota pública mora em **controller separado**: um `@Public()` solto num controller com `@UseGuards` é a receita de expor rota autenticada sem querer.
+- [x] `SearchParams.filter` com override na subclasse — sem ele o repositório monta `where: {}` e devolve contrato de todos os estabelecimentos.
+
+### Pendente
+- [ ] **Revisão por advogado** antes do primeiro contrato em produção — [contract/legal-checklist.md](contract/legal-checklist.md) é o artefato dessa conversa. É gate, não sugestão.
+- [ ] `CONTRACT_ISSUER_LEGAL_NAME` e `CONTRACT_ISSUER_DOCUMENT` ainda são placeholder.
+- [ ] **UI web** (painel na contratação, assinatura, download, página pública) — Bloco 10, fatia B3.
+- [ ] **UI mobile** (lista, detalhe, assinatura, Anexo I) — Bloco 10, fatia B4.
+- [ ] **E-mails** de contrato emitido/assinado com PDF anexo — camada 4 de proteção contra chargeback.
+- [ ] Auditoria de **vocabulário de emprego** nas telas existentes ("escala", "jornada", "turno") — prova contra o próprio produto num litígio de vínculo.
+- [ ] Prazo de retenção do contrato e da trilha — hoje indefinido.
+- [ ] Banda com **CNPJ próprio**; endereço estruturado do músico.
+
+---
+
+## Ponte Spotify (fã salva o que ouviu) *(21/ago/2026)*
+
+> Documentado retroativamente em 22/ago/2026. Vive em `src/core/audience/` (agregado satélite
+> `AudienceSpotifyLink`), não em domínio próprio — mesmo lugar e mesmo motivo de
+> `MusicianWallet` guardar os tokens do Mercado Pago fora de `Musician`.
+
+### Vínculo da conta
+
+- [x] **Agregado satélite, tabela própria** (`audience_spotify_links`): token de terceiro tem ciclo
+      de vida próprio (expira em ~1h, é renovado por job, é revogado) e quase nunca é lido junto do
+      perfil.
+- [x] 🔴 **Os dois tokens são cifrados em repouso** (AES-256-GCM, infra de SM-016) e **nunca saem em
+      `toJSON`**. O `access_token` **escreve** na biblioteca do fã: vazá-lo num dump é dar a
+      terceiros o direito de mexer na conta dele.
+- [x] **`state` HMAC com `purpose` próprio**, compartilhando o `OAuthStateService` com o Mercado
+      Pago e o Google Calendar — um `state` de agenda nunca vincula uma conta de música, e
+      vice-versa.
+- [x] **Callback em controller separado e `@Public()`** — um `@Public()` solto numa classe com
+      `@UseGuards` expõe rota autenticada sem querer.
+- [x] **Uma conta Spotify não se vincula a dois fãs** (unique em `spotifyUserId`): seria salvar
+      música de estranhos na biblioteca de alguém.
+- [x] **Job de renovação a cada 30 min**, varrendo por `expiresAt`. Sem o refresh, o vínculo morre
+      em uma hora e o fã reautorizaria a cada música.
+- [x] **Escopo mínimo: `user-library-modify`.** Nada de leitura de playlist ou histórico — cada
+      escopo extra aparece na tela de consentimento, derruba a taxa de autorização, e seria coletar
+      dado que a feature não usa.
+- [x] **Desconectar é idempotente**: desconectar quem já está desconectado devolve o mesmo estado,
+      não erro numa ação que deu certo.
+
+### Buscar e salvar são DOIS atos
+
+- [x] 🔴 **`POST .../spotify/tracks/search` procura e NÃO salva.** Casar título+artista com o
+      catálogo é ambíguo por natureza — cover, ao vivo, remaster, tributo e homônimo competem pelo
+      mesmo texto. Salvar direto acertaria na maioria das vezes e, na minoria, poria silenciosamente
+      a faixa errada na biblioteca de alguém: erro que a pessoa só descobre depois e que queima a
+      feature inteira.
+- [x] **`POST .../spotify/tracks` recebe o `track_id`**, nunca título e artista — para não recriar a
+      adivinhação exatamente no ponto em que ela vira escrita na conta de outra pessoa.
+- [x] **A busca usa qualificadores `track:` e `artist:`**, com `market: BR`. Sem eles, o nome do
+      artista em texto livre casa com faixas que apenas o citam no título (tributos, participações)
+      e a "melhor" resposta vira a errada.
+- [x] **"Não vinculado" e "não encontrado" são ESTADOS, não exceções** — a UI mostra caminhos
+      diferentes para cada um, e lançar erro obrigaria o cliente a inspecionar mensagem para decidir
+      o que exibir.
+- [x] **`:id` é sempre o FÃ**, nunca sub-recurso; a faixa viaja no corpo. Um `:id` de outra coisa
+      colidiria no `AudienceOwnershipGuard`.
+
+### Casamento da faixa — qual VERSÃO da música *(22/ago/2026)*
+
+> Arquitetura completa em
+> [AI-musician/spotify-track-matching.md](AI-musician/spotify-track-matching.md).
+
+- [x] **A faixa é resolvida na MATERIALIZAÇÃO da análise**, logo após o update que
+      grava `duration_seconds` e antes do alinhamento da letra. Não sob demanda: no
+      palco cobraria latência e multiplicaria a chamada pelo número de fãs na casa.
+- [x] 🔴 **A duração da gravação analisada é o que separa as versões.** Mesma escada
+      de buckets que o `synced-lyrics` usa (`≤2s→1.0, ≤6s→0.8, ≤12s→0.6, senão 0.3`),
+      e pelo mesmo incidente: casar sem pontuar duração pega "radio edit vs. ao vivo
+      estendido".
+- [x] **A duração pesa mais aqui que no LRCLIB** (0.40 vs 0.10): o Spotify devolve
+      título e artista limpos, que casam **inclusive entre versões diferentes** — ali
+      eles param de discriminar.
+- [x] 🔴 **Artista é eliminatório, não ponderado.** Só com peso, título + duração
+      perfeitos passariam do piso com artista zerado, e o cover de banda tributo
+      venceria o original.
+- [x] **Dois pisos, porque o custo do erro é assimétrico:** 0.62 para gravar o link,
+      0.90 para escrever na biblioteca do fã sem confirmação.
+- [x] **Negative cache de 30 dias**; falha de rede **não** grava `checked_at` —
+      "indisponível" não é "não existe".
+- [x] `PerformedSong.spotifyTrackId` é **snapshot** — a leitura do fã é polling.
+- [x] Música vinda de **pedido** ou texto livre não recebe link: não tem duração
+      analisada, e adivinhar só com texto é o erro que a duração evita.
+- [x] **Tom e andamento não entram**, embora o MIR os conheça: `/audio-features` foi
+      descontinuado em 27/nov/2024 e responde 403.
+
+### O botão abre o Spotify — e o motivo é a quota *(22/ago/2026)*
+
+- [x] 🔴 **`PUT /v1/me/tracks` atende 5 usuários.** Development Mode limita a 5
+      autorizados e exige Premium do dono; Extended Quota exige **pessoa jurídica e
+      250k MAU**. Salvar in-app existe e funciona, mas serve a beta testers.
+- [x] **O caminho padrão é deep link** (`open.spotify.com/track/{id}`): não usa API,
+      funciona para todos, abre a faixa certa e a reprodução conta como stream para o
+      artista.
+- [x] 🔴 **Resolver a faixa NÃO passa pelo teto** — `SpotifyCatalogAdapter` usa
+      **Client Credentials**, sem usuário. Por isso é porta separada de
+      `ISpotifyLibraryGateway`. Quando a quota vier, o `spotify_track_id` já está lá e
+      só o botão muda.
+- [ ] **Sem prévia de 30s:** `preview_url` foi descontinuado para apps novos e vem
+      sempre `null`. A confirmação é visual. Não reintroduzir.
+- [ ] Decisão de 22/ago/2026: Extended Quota, confirmação do músico e playlist do
+      show ficam para depois.
+
+### Onde aparece
+
+- [x] Conectar: `SpotifyLinkCard` no perfil do fã. **Nunca no meio do show** — virar CTA de
+      integração na hora do pedido transformaria a tela em funil.
+- [x] Salvar: tela de sucesso do pedido de música **e** (desde 22/ago) o `NowPlayingCard` do perfil
+      público, com o par vindo do palco. Ver a seção de Performance abaixo.
+- [ ] **Só o FÃ tem vínculo.** O músico não conecta Spotify — a feature é "salve o que você ouviu",
+      não catálogo do artista.
+
+---
+
+## Domínio Performance (Apresentação ao Vivo) *(22/ago/2026)*
+
+Arquitetura completa em [performance/live-performance.md](performance/live-performance.md).
+A primitiva que faltava para o sistema saber o que o músico **tocou**, e não só o que ele sabe
+tocar — três read models dependem dela.
+
+### O set ao vivo
+
+- [x] O músico **abre o set explicitamente** (`POST /performances`). Sem set aberto, o Play Mode
+      continua privado: registro automático transformaria ensaio em histórico público e
+      envenenaria os três read models com repetição de estudo.
+- [x] Abrir um set exige estar **escalado no evento** (`EventMusician`) — ownership do JWT prova
+      quem é a pessoa, não que ela está no palco. Sem isso, qualquer músico autenticado
+      transmitiria "tocando agora" em bar alheio.
+- [x] O `establishment_id` é **derivado do evento**, nunca aceito do cliente — é por local que o
+      currículo e o setlist inteligente agregam.
+- [x] Evento cancelado ou encerrado **não recebe set novo**.
+- [x] **Uma música tocando por vez**: `startSong` fecha a anterior automaticamente. Garantido no
+      agregado, não no chamador.
+- [x] **Um set `live` por (evento, músico)** — índice parcial único no banco
+      (`performances_one_live_per_event_musician`), não checagem de aplicação.
+- [x] Abrir um set já aberto é **idempotente** (devolve o que está no ar); encerrar duas vezes
+      também. Retry com rede ruim no palco é o caso normal, não erro do usuário.
+- [x] `position` é atribuída pelo agregado; `ended_at` nunca é anterior a `started_at`.
+- [x] O mesmo **pedido** não é registrado duas vezes no set. Música repetida sem pedido é
+      permitida — bis existe.
+- [x] `title`/`artist` do `PerformedSong` são **snapshot**: renomear na biblioteca não reescreve o
+      histórico, e é este par que o fã manda ao Spotify.
+- [x] Tocar um pedido marca o pedido como **tocado**, via handler de `SongStartedEvent` com
+      idempotência por chave — fecha o ciclo de `PATCH /requests/:id/played`, que existia sem
+      chamador.
+
+### Tocando agora (público)
+
+- [x] `GET /performances/live?musician_id=&event_id=` devolve **uma música**, nunca o set inteiro:
+      o repertório é o diferencial que o músico monta.
+- [x] Sem set aberto responde `is_live: false`, **não 404** — intervalo é estado legítimo.
+- [x] Consumido pelo `NowPlayingCard` no perfil público do músico (mobile), com "Salvar no meu
+      Spotify" recebendo o par vindo do palco. Leitura por polling de 20s, não socket.
+
+### Relatório pós-show (F6)
+
+- [x] `GET /performances/:performance_id/report` — músicas, pedidos, gorjetas, público.
+- [x] Só para set **encerrado**: relatório de show em andamento é número que muda enquanto se olha.
+- [x] Só gorjeta `completed` entra, e só a destinada **àquele** artista (evento tem mais de um).
+- [x] Gorjeta por música é **heurística de horário**, rotulada como tal no próprio payload
+      (`tips_attribution_note`) — não se afirma causalidade que o dado não sustenta.
+- [x] `establishment_name` sai no output para o card compartilhável; `null` quando a casa foi
+      removida — a UI omite a linha, nunca escreve "Local desconhecido".
+
+### Card compartilhável do pós-show (B1) — 22/ago/2026
+
+- [x] `ShowRecapSection` + `ShowRecapCard` no mobile, dentro da tela de relatório: o post é
+      **subproduto** de o músico ter mantido o set aberto, não trabalho extra depois do show.
+- [x] 🔴 **Gorjeta é opt-in e o padrão é não mostrar.** O total é a renda do músico naquela noite;
+      publicá-lo por padrão transformaria "compartilhar o show" em "divulgar quanto ganhei" num
+      toque que parece inofensivo. Mesmo princípio que mantém `Booking.fee` fora do currículo (F4).
+      O toggle só aparece quando houve gorjeta. A escolha é **lembrada por músico**
+      (`recap-preferences.storage.ts`, `expo-secure-store`), porque o card também tem uso
+      informativo/arquivo pessoal — mas a leitura só liga, nunca desliga: enquanto o disco não
+      responde o estado é `false`, e falha de leitura cai no lado que não publica renda. Desligar
+      **apaga** a chave em vez de gravar `0` — "desligou" e "nunca ligou" ficam indistinguíveis.
+- [x] **`tips_during_song` nunca entra no card**, nem com o opt-in ligado. No relatório a estimativa
+      viaja com a ressalva (`tips_attribution_note`); num card sem espaço para ela, viraria
+      afirmação — que é justamente o que o backend recusa a fazer.
+- [x] Set encerrado **sem nenhuma música** não oferece compartilhamento (`songs_count > 0`):
+      é um show que não aconteceu, e o botão seria um convite a se expor à toa.
+- [x] Sem imagem remota no card — `<Image>` resolve assíncrono e o `ViewShot` não espera o load,
+      então a captura sairia com buraco no lugar da foto (armadilha já tratada em `QRShareCard` com
+      `Image.prefetch`; aqui é evitada por construção).
+- [x] Nenhuma URL no rodapé: não há domínio público configurado no app, e um link inventado num
+      card que vai ao Instagram é promessa quebrada para quem tocar nele. Só o wordmark.
+
+### Modo Ensaio — separação de stems (S3) — 22/ago/2026
+
+Domínio `src/core/ai-audio/` (já existia) + `PracticeSeparationController` +
+`PracticeModeScreen` no mobile. Ver `Docs/AI-musician/practice-mode.md`.
+
+- [x] `POST /musicians/:id/ai-audio/practice/separations` — separa uma música **da biblioteca**.
+      O app **não envia arquivo**: o backend re-resolve o áudio pelo provider, espelhando
+      `ai-cifra/uploads/from-provider/analyses`.
+- [x] 🔴 **Os stems têm prazo de retenção e isso é a decisão que molda a feature.** O `ai-cifra`
+      nunca retém a gravação — apaga o objeto no instante em que a análise conclui e guarda só a
+      cifra. **Stem é a gravação, separada**, não um dado derivado como uma folha de acordes; reter
+      os quatro por tempo indeterminado seria uma postura de direito autoral diferente da que o
+      resto do projeto escolheu, além de storage sem teto. `PurgeExpiredAiAudioStemsUseCase` varre
+      de hora em hora (`AI_AUDIO_STEMS_RETENTION_HOURS`, default 72h).
+- [x] **`expired` é status próprio, nunca `failed`.** A separação deu certo; o que venceu foi o
+      prazo. Sem essa distinção o job ficaria `completed` com URLs que respondem 404 — a pior
+      resposta possível para quem abriu o app para ensaiar. O agregado guarda o registro; só o
+      áudio some.
+- [x] **Ordem obrigatória: storage primeiro, banco depois.** Marcar `expired` antes de apagar
+      deixaria objeto órfão no bucket se o processo morresse no meio — invisível, cobrado, e sem
+      nada apontando para ele. Falha ao apagar não interrompe o lote, mas impede marcar o job.
+- [x] `AiAudioUpload.musicLibraryId` espelha `AiCifraUpload.musicLibraryId` — é este elo que
+      permite mostrar a cifra ao lado dos stems. Sem ele a separação é arquivo solto.
+- [x] **A posse da música é checada no use-case**, comparando `song.musician_id` com o
+      `:musician_id` do path: o guard prova quem é o usuário, nunca de quem é a música.
+- [x] Música sem `source`/`source_id` de YouTube responde **422 acionável** — não se inventa busca
+      por título+artista, que traria outra gravação (ao vivo, cover, remaster).
+
+### Currículo verificado (F4)
+
+- [x] `GET /musicians/:id/resume` — **derivado, nunca declarado**. O músico não escreve nada: é o
+      que o separa da bio.
+- [x] Cada número tem prova: `Booking.completed_at`, `checked_in_at`, `EventAttendee`, `Review`,
+      `PerformedSong`. Shows de banda contam (bandas onde é membro aceito).
+- [x] Público alcançado é contado **distinto por pessoa**, não soma de presenças — o mesmo fã em
+      cinco shows é uma pessoa.
+- [x] 🔴 **Nenhum valor de cachê sai daqui**, e não é filtragem de presenter: o campo não existe no
+      output. A rota é lida pelo público.
+- [ ] `distinct_songs_performed` começa em zero: shows anteriores a este subsistema não têm
+      `PerformedSong`. Os demais itens são retroativos.
+
+### Setlist inteligente (F5)
+
+- [x] `GET /musicians/:id/setlist-suggestions?establishment_id=` — ranqueia por evidência **daquela
+      casa**, não por popularidade geral.
+- [x] Toda sugestão carrega `evidence` (origem + contagem): sugestão sem evidência exibível é
+      palpite, e o músico precisa poder discordar do motivo.
+- [x] `evidence_count: 0` significa "ainda não sabemos nada deste local" — a UI diz isso em vez de
+      fingir insight.
+- [x] Pesos em constante nomeada, legível em code review. Sem modelo, sem score opaco.
+
+### Pendente
+
+- [ ] Push para o fã (hoje polling de 20s — decisão consciente, ver §2 do doc do subsistema).
+- [ ] Wrapped anual do fã (B2) — é a agregação do mesmo dado; decidido fazer o pós-show do músico
+      primeiro.
+- [ ] Sugestão por **faixa de horário** dentro do local — volume de dado por faixa ainda seria ruído.
+- [ ] Encerramento automático de set esquecido aberto (hoje depende do músico ou do app restaurar).
+
+---
+
 ## Funcionalidades Planejadas Ainda Não Implementadas
 
 Além dos pontos marcados como `[ ]` e `[~]` acima, os seguintes blocos de funcionalidades do documento de visão **ainda não possuem implementação direta** no backend atual:
@@ -589,6 +1100,70 @@ Além dos pontos marcados como `[ ]` e `[~]` acima, os seguintes blocos de funci
 - Gestão detalhada de planos pagos (músicos, estabelecimentos, marketplace) com billing recorrente
 
 Esses itens estão descritos em [features.md](features.md) ([1]), e o código atual fornece boa parte da base de domínio (QR codes, pedidos, gorjetas, gamificação, rankings). Porém ainda serão necessários novos agregados, use-cases e integrações de infraestrutura para chegar à visão completa da plataforma.
+
+---
+
+## Superfície HTTP e container (SM-020) *(26/ago/2026)*
+
+Código: `src/nest-modules/shared-module/security/http-security.policy.ts`, `main.ts`,
+`docker-compose.prod.yml`, `docker/rabbitmq-delayed/Dockerfile`.
+
+- [x] 🔴 **A allowlist de CORS vem do ambiente, e produção não tem default.**
+  A lista era literal no `main.ts` e continha `http://localhost:3000/3001/8080` em
+  **todos** os ambientes, com `credentials: true` — uma página servida do localhost
+  da máquina de um usuário logado podia chamar a API de produção com as credenciais
+  dele. Uma allowlist que sempre contém localhost não é allowlist.
+  `CORS_ALLOWED_ORIGINS` é obrigatória em produção (o Joi recusa o boot) porque
+  qualquer palpite nosso seria permissivo demais ou quebraria o front.
+
+- [x] **Swagger desligado por padrão em produção** (`SWAGGER_ENABLED`).
+  `/api/docs` publicava o contrato completo da API, com `persistAuthorization`
+  guardando o token no `localStorage` de quem abrisse a página. O default inverte
+  por ambiente porque o custo do engano é assimétrico: esquecer de ligar em dev
+  custa uma variável, esquecer de desligar em produção publica o mapa.
+
+- [x] **Helmet aplicado pela aplicação, não pelo proxy.** Delegar ao proxy é apostar
+  numa configuração que vive fora do repositório, que ninguém revisa junto com o
+  código e que some no primeiro staging sem proxy. A CSP é `default-src 'none'` —
+  uma API JSON não carrega recurso nenhum — e o `'unsafe-inline'` que o Swagger UI
+  exige está **amarrado ao interruptor dele**, em vez de valer permanentemente.
+
+- [x] **A política mora em módulo testável, não no `bootstrap()`.** As três decisões
+  (quem chama, se o contrato é público, o que o navegador executa) foram extraídas
+  para `resolveHttpSecurityPolicy`, função pura com 13 testes. `bootstrap()` é o
+  único ponto do sistema que nenhum teste alcança — péssimo endereço para essas
+  regras.
+
+- [x] **Workers de IA deixaram de rodar como root.** `ai-cifra-mir-worker` e
+  `soundmeet-audio-separation` rodam como `worker` (uid 1001). Eles decodificam áudio
+  de origem externa com FFmpeg e bibliotecas nativas — exatamente onde um arquivo
+  malformado vira execução arbitrária. O `Dockerfile` do backend **já** era non-root.
+
+- [x] 🔴 **O plugin do RabbitMQ passou a ter checksum.** `ADD <url>` não verifica
+  nada: release substituído, conta comprometida ou proxy hostil entregavam um
+  plugin adulterado que o broker carregava em silêncio — e um plugin do RabbitMQ vê
+  toda mensagem do sistema. Agora o SHA-256 é conferido e o build **falha** se não
+  bater.
+
+- [x] **`docker-compose.prod.yml` novo, com o compose de desenvolvimento intacto.**
+  Imagens por digest, `read_only`, `cap_drop: ALL`, `no-new-privileges`, nenhuma
+  porta de banco publicada e nenhuma senha com default (`${VAR:?}` recusa subir).
+  Endurecer o compose de dev tornaria o ambiente de trabalho hostil sem tornar a
+  produção segura — produção não roda a partir dele.
+  - ⚠️ `/tmp` do `app` é **volume, não tmpfs**: os uploads de áudio passam inteiros
+    por `os.tmpdir()`, e um tmpfs colocaria centenas de MB na RAM do host.
+  - ⚠️ **Pendente de validação:** o smoke test no rodapé do arquivo não foi
+    executado. `read_only` é a mudança com maior chance de quebrar um caminho de
+    escrita não mapeado.
+  - Os workers de GPU **não** estão nesse compose: em produção vivem em host próprio
+    (um por placa de 8GB). O endurecimento deles está nos Dockerfiles.
+  - 🔴 **O Keycloak também não** — ele já tem compose próprio
+    (`infra/keycloak/docker-compose.prod.yml`, SM-014), com decisões deliberadas e
+    diferentes: digest **em variável** (a versão migra 22→26 na Fase 4c, e fixar 22
+    congelaria a migração), `KC_PROXY_HEADERS` em vez do obsoleto `KC_PROXY`, porta
+    não publicada e banco externo. Declarar o serviço nos dois lugares não daria
+    erro — daria dois arquivos discordando sobre como subir o provedor de
+    identidade, e o deploy seguiria o que alguém abrisse primeiro.
 
 [1]: features.md
 [2]: ../src/core/musician/domain/musician.aggregate.ts
