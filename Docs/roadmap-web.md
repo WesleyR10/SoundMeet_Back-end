@@ -311,6 +311,10 @@ Ordem de execução. Estimativa realista para dev solo: **8 a 12 dias**.
       given"* que **codificava o vazamento**. Foi reescrito, não deletado, com o motivo no corpo.
 - [x] **9.4e** Leaderboard identificável — **já estava implementado** (`findTopUsersWithProfile` +
       `nickname`/`avatar` no output e no presenter). Nenhum código novo.
+      `GET /audiences/public-profiles?ids=` **nunca foi implementado e não deve ser**: custaria duas
+      chamadas e uma superfície pública nova a defender pelo mesmo resultado que um `include` resolve
+      num SQL só. Registro completo — incluindo a fronteira de PII da rota `@Public()` — em
+      `roadmap.md` 7.16 e em `business-rules.md` → "Leaderboard com identidade exibível".
 - **Testes:** 22 novos (10 de visibilidade, 6 do job, 6 do batch). Suíte: **331 / 2858** ✅
 
 ---
@@ -745,7 +749,7 @@ invisíveis. Não precisa bloquear o web; precisa acontecer antes de qualquer us
 |---|---|---|
 | **Pedir música / dar gorjeta pelo navegador** (W5) | Endpoints prontos | Médio · **remove a maior fricção do produto** |
 | **Avaliar músico e local** | Agregado pronto, sem rota (9.3) | Médio |
-| **Leaderboard com nome e rosto** | Hoje é anônimo → gamificação inerte (9.4e) | Baixo |
+| **Leaderboard com nome e rosto** | ✅ Entregue no backend (7.16b) — a rota já traz `nickname`/`avatar`; falta só consumir numa tela web | Baixo |
 | **"Meu ano em shows"** (Wrapped) — timeline dos shows que você foi, artistas descobertos, quanto apoiou | `UserInteraction` já grava tudo | Médio · **altíssima viralidade** |
 | **Missão de compartilhamento social** (7.11) | Especificado, não implementado | Médio |
 
