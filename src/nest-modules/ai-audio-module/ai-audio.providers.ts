@@ -11,14 +11,17 @@ import { CreateAiAudioUploadUseCase } from "../../core/ai-audio/application/use-
 import { FailAiAudioSeparationJobUseCase } from "../../core/ai-audio/application/use-cases/fail-ai-audio-separation-job/fail-ai-audio-separation-job.use-case";
 import { GetAiAudioSeparationJobUseCase } from "../../core/ai-audio/application/use-cases/get-ai-audio-separation-job/get-ai-audio-separation-job.use-case";
 import { ProcessAiAudioSeparationJobUseCase } from "../../core/ai-audio/application/use-cases/process-ai-audio-separation-job/process-ai-audio-separation-job.use-case";
+import { PurgeExpiredAiAudioStemsUseCase } from "../../core/ai-audio/application/use-cases/purge-expired-ai-audio-stems/purge-expired-ai-audio-stems.use-case";
 import { RequestAiAudioSeparationUseCase } from "../../core/ai-audio/application/use-cases/request-ai-audio-separation/request-ai-audio-separation.use-case";
 import { UpdateAiAudioSeparationJobProgressUseCase } from "../../core/ai-audio/application/use-cases/update-ai-audio-separation-job-progress/update-ai-audio-separation-job-progress.use-case";
 import { IAiAudioSeparationJobRepository } from "../../core/ai-audio/domain/ai-audio-separation-job.repository";
 import { IAiAudioUploadRepository } from "../../core/ai-audio/domain/ai-audio-upload.repository";
+import { DEFAULT_STEMS_RETENTION_HOURS } from "../../core/ai-audio/domain/stems-retention";
 import { AiAudioSeparationJobPrismaRepository } from "../../core/ai-audio/infra/db/prisma/ai-audio-separation-job-prisma.repository";
 import { AiAudioUploadPrismaRepository } from "../../core/ai-audio/infra/db/prisma/ai-audio-upload-prisma.repository";
 import { AiAudioSeparationHttpClient } from "../../core/ai-audio/infra/http/ai-audio-separation-http.client";
 import { S3AiAudioStorage } from "../../core/ai-audio/infra/storage/s3-ai-audio.storage";
+import { EnvConfig } from "../config-module/config.schema";
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import {
@@ -26,6 +29,7 @@ import {
   AiAudioRabbitmqDispatcher,
   AiAudioSeparationDispatcher,
 } from "./ai-audio.dispatcher";
+import { PurgeExpiredAiAudioStemsJob } from "./purge-expired-ai-audio-stems.job";
 
 const DEFAULT_ALLOWED_MODEL_IDS = [
   "htdemucs_4stems",
@@ -145,6 +149,7 @@ export const INFRA_PROVIDERS = {
         baseURL,
         timeoutMs,
         path,
+        workerToken: configService.get<string>("AI_WORKER_TOKEN"),
       });
     },
     inject: [ConfigService],
@@ -204,6 +209,17 @@ export const INFRA_PROVIDERS = {
     inject: [ProcessAiAudioSeparationJobUseCase, ModuleRef, ConfigService],
   },
 };
+
+/**
+ * Horas de retenção dos stems. Default no domínio, não aqui — a política é de
+ * negócio (stem é a gravação, separada), e o env só permite afrouxar/apertar.
+ */
+function stemsRetentionHours(configService: ConfigService<EnvConfig>): number {
+  return Number(
+    configService.get("AI_AUDIO_STEMS_RETENTION_HOURS") ??
+      DEFAULT_STEMS_RETENTION_HOURS,
+  );
+}
 
 export const USE_CASES = {
   CREATE_AI_AUDIO_UPLOAD_USE_CASE: {
@@ -270,17 +286,20 @@ export const USE_CASES = {
       uploadRepo: IAiAudioUploadRepository,
       jobRepo: IAiAudioSeparationJobRepository,
       client: IAiAudioSeparationClient,
+      configService: ConfigService<EnvConfig>,
     ) => {
       return new ProcessAiAudioSeparationJobUseCase(
         uploadRepo,
         jobRepo,
         client,
+        stemsRetentionHours(configService),
       );
     },
     inject: [
       REPOSITORIES.AI_AUDIO_UPLOAD_REPOSITORY.provide,
       REPOSITORIES.AI_AUDIO_SEPARATION_JOB_REPOSITORY.provide,
       INFRA_PROVIDERS.AI_AUDIO_SEPARATION_CLIENT.provide,
+      ConfigService,
     ],
   },
   COMPLETE_AI_AUDIO_SEPARATION_JOB_USE_CASE: {
@@ -288,12 +307,18 @@ export const USE_CASES = {
     useFactory: (
       uploadRepo: IAiAudioUploadRepository,
       jobRepo: IAiAudioSeparationJobRepository,
+      configService: ConfigService<EnvConfig>,
     ) => {
-      return new CompleteAiAudioSeparationJobUseCase(uploadRepo, jobRepo);
+      return new CompleteAiAudioSeparationJobUseCase(
+        uploadRepo,
+        jobRepo,
+        stemsRetentionHours(configService),
+      );
     },
     inject: [
       REPOSITORIES.AI_AUDIO_UPLOAD_REPOSITORY.provide,
       REPOSITORIES.AI_AUDIO_SEPARATION_JOB_REPOSITORY.provide,
+      ConfigService,
     ],
   },
   FAIL_AI_AUDIO_SEPARATION_JOB_USE_CASE: {
@@ -322,6 +347,19 @@ export const USE_CASES = {
       INFRA_PROVIDERS.AI_AUDIO_STORAGE.provide,
     ],
   },
+  PURGE_EXPIRED_AI_AUDIO_STEMS_USE_CASE: {
+    provide: PurgeExpiredAiAudioStemsUseCase,
+    useFactory: (
+      jobRepo: IAiAudioSeparationJobRepository,
+      storage: IAiAudioStorage,
+    ) => {
+      return new PurgeExpiredAiAudioStemsUseCase(jobRepo, storage);
+    },
+    inject: [
+      REPOSITORIES.AI_AUDIO_SEPARATION_JOB_REPOSITORY.provide,
+      INFRA_PROVIDERS.AI_AUDIO_STORAGE.provide,
+    ],
+  },
   UPDATE_AI_AUDIO_SEPARATION_JOB_PROGRESS_USE_CASE: {
     provide: UpdateAiAudioSeparationJobProgressUseCase,
     useFactory: (jobRepo: IAiAudioSeparationJobRepository) => {
@@ -331,8 +369,13 @@ export const USE_CASES = {
   },
 };
 
+export const JOBS = {
+  PURGE_EXPIRED_AI_AUDIO_STEMS_JOB: PurgeExpiredAiAudioStemsJob,
+};
+
 export const AI_AUDIO_PROVIDERS = {
   REPOSITORIES,
   INFRA_PROVIDERS,
   USE_CASES,
+  JOBS,
 };

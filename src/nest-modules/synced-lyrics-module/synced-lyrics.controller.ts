@@ -19,6 +19,7 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { SkipThrottle } from "@nestjs/throttler";
 import { Response } from "express";
 
 import { DownloadSyncedLyricsForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/download-synced-lyrics-for-music-library/download-synced-lyrics-for-music-library.use-case";
@@ -30,11 +31,9 @@ import { MaterializeRenderableChordSheetsUseCase } from "../../core/synced-lyric
 import { SearchSyncedLyricsUseCase } from "../../core/synced-lyrics/application/use-cases/search-synced-lyrics/search-synced-lyrics.use-case";
 import { SyncSyncedLyricsForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/sync-synced-lyrics-for-music-library/sync-synced-lyrics-for-music-library.use-case";
 import { UpsertSyncedLyricsForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/upsert-synced-lyrics-for-music-library/upsert-synced-lyrics-for-music-library.use-case";
-import { SkipThrottle } from "@nestjs/throttler";
-
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   InternalToken,
@@ -330,7 +329,8 @@ export class SyncedLyricsController {
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Download do LRC da MusicLibrary",
-    description: "Retorna o arquivo .lrc (text/plain) para download. Músico só pode baixar letras da sua própria biblioteca.",
+    description:
+      "Retorna o arquivo .lrc (text/plain) para download. Músico só pode baixar letras da sua própria biblioteca.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiQuery({ name: "musician_id", required: true, type: String })

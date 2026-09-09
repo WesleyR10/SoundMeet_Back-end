@@ -24,7 +24,11 @@ import { AiCifraUploadsController } from "./ai-cifra-uploads.controller";
       ? [RabbitmqModule.forFeature()]
       : []),
   ],
-  controllers: [AiCifraController, AiCifraUploadsController, AiCifraSearchController],
+  controllers: [
+    AiCifraController,
+    AiCifraUploadsController,
+    AiCifraSearchController,
+  ],
   providers: [
     ...Object.values(AI_CIFRA_PROVIDERS.REPOSITORIES),
     ...Object.values(AI_CIFRA_PROVIDERS.INFRA_PROVIDERS),
@@ -42,6 +46,14 @@ import { AiCifraUploadsController } from "./ai-cifra-uploads.controller";
   exports: [
     AI_CIFRA_PROVIDERS.REPOSITORIES.AI_CIFRA_UPLOAD_REPOSITORY.provide,
     AI_CIFRA_PROVIDERS.REPOSITORIES.AI_CIFRA_ANALYSIS_JOB_REPOSITORY.provide,
+    // Consumido pelo `ai-audio` no Modo Ensaio: a música da biblioteca não tem
+    // áudio guardado (o ai-cifra apaga o objeto assim que a análise conclui),
+    // então a separação precisa re-resolver a fonte pelo mesmo caminho. Exportar
+    // o resolver evita duplicar a cadeia SimpMusic/yt-dlp → Musify/Piped num
+    // segundo módulo — a regra do projeto é não duplicar lógica entre os três
+    // módulos de IA.
+    AI_CIFRA_PROVIDERS.USE_CASES.RESOLVE_AI_CIFRA_AUDIO_CANDIDATES_USE_CASE
+      .provide,
   ],
 })
 export class AiCifraModule {}

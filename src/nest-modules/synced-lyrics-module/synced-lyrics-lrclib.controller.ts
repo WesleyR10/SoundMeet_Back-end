@@ -16,12 +16,11 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { SkipThrottle } from "@nestjs/throttler";
 
 import { GetSyncedLyricsBulkJobUseCase } from "../../core/synced-lyrics/application/use-cases/get-synced-lyrics-bulk-job/get-synced-lyrics-bulk-job.use-case";
 import { MatchSyncedLyricsOnLrclibUseCase } from "../../core/synced-lyrics/application/use-cases/match-synced-lyrics-on-lrclib/match-synced-lyrics-on-lrclib.use-case";
 import { RequestSyncedLyricsBulkSyncUseCase } from "../../core/synced-lyrics/application/use-cases/request-synced-lyrics-bulk-sync/request-synced-lyrics-bulk-sync.use-case";
-import { SkipThrottle } from "@nestjs/throttler";
-
 import {
   AuthGuard,
   InternalToken,
@@ -51,12 +50,37 @@ export class SyncedLyricsLrclibController {
   @Inject(GetSyncedLyricsBulkJobUseCase)
   private getBulkJobUseCase: GetSyncedLyricsBulkJobUseCase;
 
+  /*
+   * SM-026 — esta rota era anônima POR OMISSÃO, não por decisão.
+   *
+   * Quando o defeito foi encontrado não existia `AuthGuard` global: uma rota
+   * sem `@UseGuards(AuthGuard)` nascia pública, e esta não tinha nem os guards
+   * nem um `@Public()` que registrasse a escolha. Todas as outras rotas dos
+   * dois controllers do módulo exigem `musician`/`admin`, o que mostra que a
+   * ausência aqui foi esquecimento.
+   *
+   * ⚠️ Desde o AUTH-2 (29/ago/2026) o `AuthGuard` É `APP_GUARD` global e o
+   * default inverteu — hoje uma rota nasce FECHADA e quem quiser anonimato
+   * escreve `@Public()`. O `@UseGuards(AuthGuard, RolesGuard)` abaixo continua
+   * porque é ele que traz o `RolesGuard`; o guard global torna a omissão
+   * impossível, não redundante.
+   *
+   * O efeito prático: qualquer cliente anônimo podia automatizar buscas contra
+   * a LRCLIB — API pública gratuita de terceiro — usando o nosso egress, o
+   * nosso cache e a nossa reputação de IP. O cache de 6h não continha o abuso,
+   * porque a chave inclui `artist`/`title`/`durationMs` e variar a consulta
+   * força miss. Nenhum cliente (mobile ou web) chama esta rota: o contrato
+   * fica sendo privado, como o do resto do módulo.
+   */
   @Get("search")
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles("musician", "admin")
   @ApiOperation({
     summary: "Buscar correspondências na LRCLIB",
     description:
-      "Retorna candidatos de LRCLIB para um par (artist, title), com score e meta de cache.",
+      "Retorna candidatos de LRCLIB para um par (artist, title), com score e meta de cache. Exige autenticação (musician/admin) — a rota consome uma API externa de terceiro.",
   })
+  @ApiResponse({ status: 401, description: "Sem token." })
   @ApiQuery({ name: "artist", required: true, type: String })
   @ApiQuery({ name: "title", required: true, type: String })
   @ApiQuery({ name: "durationMs", required: false, type: Number })

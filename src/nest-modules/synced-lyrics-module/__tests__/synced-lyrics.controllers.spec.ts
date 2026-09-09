@@ -1,3 +1,6 @@
+import { GUARDS_METADATA } from "@nestjs/common/constants";
+
+import { IS_PUBLIC_KEY, ROLES_KEY } from "../../auth-module/auth.decorators";
 import { SyncedLyricsController } from "../synced-lyrics.controller";
 import {
   LrcLibMatchPresenter,
@@ -257,6 +260,70 @@ describe("SyncedLyrics Controllers Unit Tests", () => {
       });
       expect(requested).toBeInstanceOf(SyncedLyricsBulkJobPresenter);
       expect(found.status).toBe("processing");
+    });
+
+    /*
+     * SM-026 — regressão sobre a metadata do Nest, não sobre o comportamento.
+     *
+     * `GET /synced-lyrics/search` ficou anônima por OMISSÃO: não existe
+     * `AuthGuard` global (o único `APP_GUARD` é o `UserThrottlerGuard`), então
+     * rota sem `@UseGuards(AuthGuard)` é pública, e a ausência não produz erro
+     * nenhum — nem de compilação, nem de teste. Uma rota nova adicionada aqui
+     * herdaria exatamente o mesmo silêncio.
+     *
+     * Por isso o teste varre TODOS os handlers do controller em vez de checar
+     * só o `search`: o risco real não é alguém remover o guard desta rota, é
+     * alguém acrescentar outra sem ele.
+     */
+    describe("superfície de autenticação (SM-026)", () => {
+      const HANDLERS = ["search", "requestBulkSync", "getBulkJob"] as const;
+
+      function guardsOf(handler: (typeof HANDLERS)[number]): string[] {
+        const classGuards =
+          Reflect.getMetadata(GUARDS_METADATA, SyncedLyricsLrclibController) ??
+          [];
+        const methodGuards =
+          Reflect.getMetadata(
+            GUARDS_METADATA,
+            SyncedLyricsLrclibController.prototype[handler],
+          ) ?? [];
+
+        return [...classGuards, ...methodGuards].map(
+          (guard: any) => guard?.name ?? String(guard),
+        );
+      }
+
+      it("exige AuthGuard e RolesGuard em toda rota do controller", () => {
+        for (const handler of HANDLERS) {
+          expect(guardsOf(handler)).toEqual(
+            expect.arrayContaining(["AuthGuard", "RolesGuard"]),
+          );
+        }
+      });
+
+      it("não tem nenhuma rota @Public()", () => {
+        expect(
+          Reflect.getMetadata(IS_PUBLIC_KEY, SyncedLyricsLrclibController),
+        ).toBeFalsy();
+
+        for (const handler of HANDLERS) {
+          expect(
+            Reflect.getMetadata(
+              IS_PUBLIC_KEY,
+              SyncedLyricsLrclibController.prototype[handler],
+            ),
+          ).toBeFalsy();
+        }
+      });
+
+      it("restringe a busca na LRCLIB a musician/admin", () => {
+        expect(
+          Reflect.getMetadata(
+            ROLES_KEY,
+            SyncedLyricsLrclibController.prototype.search,
+          ),
+        ).toEqual(["musician", "admin"]);
+      });
     });
   });
 });

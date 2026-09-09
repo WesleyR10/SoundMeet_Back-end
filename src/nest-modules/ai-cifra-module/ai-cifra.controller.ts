@@ -15,21 +15,21 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { SkipThrottle } from "@nestjs/throttler";
 
 import { CompleteAiCifraAnalysisJobUseCase } from "../../core/ai-cifra/application/use-cases/complete-ai-cifra-analysis-job/complete-ai-cifra-analysis-job.use-case";
 import { FailAiCifraAnalysisJobUseCase } from "../../core/ai-cifra/application/use-cases/fail-ai-cifra-analysis-job/fail-ai-cifra-analysis-job.use-case";
 import { GetAiCifraAnalysisJobUseCase } from "../../core/ai-cifra/application/use-cases/get-ai-cifra-analysis-job/get-ai-cifra-analysis-job.use-case";
 import { RequestAiCifraAnalysisUseCase } from "../../core/ai-cifra/application/use-cases/request-ai-cifra-analysis/request-ai-cifra-analysis.use-case";
 import { UpdateAiCifraAnalysisJobProgressUseCase } from "../../core/ai-cifra/application/use-cases/update-ai-cifra-analysis-job-progress/update-ai-cifra-analysis-job-progress.use-case";
-import { SkipThrottle } from "@nestjs/throttler";
-
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   InternalToken,
   InternalTokenGuard,
+  Public,
   Roles,
   RolesGuard,
 } from "../auth-module";
@@ -88,7 +88,8 @@ export class AiCifraController {
   @Roles("musician", "admin")
   @ApiOperation({
     summary: "Consultar status da análise de cifra",
-    description: "Retorna o job com status e resultado (quando concluído). Músico só pode consultar os próprios jobs.",
+    description:
+      "Retorna o job com status e resultado (quando concluído). Músico só pode consultar os próprios jobs.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: AiCifraAnalysisJobPresenter })
@@ -105,8 +106,19 @@ export class AiCifraController {
     return new AiCifraAnalysisJobPresenter(output);
   }
 
+  /*
+   * 🔴 `@Public()` nas três rotas `internal/` abaixo NÃO significa abertas —
+   * significa "sem JWT de usuário". Quem chama é o worker MIR, que tem o
+   * `x-ai-cifra-progress-token` e não tem sessão de ninguém. O
+   * `InternalTokenGuard` continua sendo a autenticação real, e é fail-closed.
+   *
+   * Sem o decorator elas quebram desde AUTH-2: o `AuthGuard` global roda antes
+   * dos guards de controller e exigiria um Bearer que o worker não tem — a
+   * análise de cifra nunca mais concluiria, com 401 no lugar do progresso.
+   */
   @Post("internal/analyses/:id/progress")
   @SkipThrottle()
+  @Public()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_CIFRA_PROGRESS_TOKEN",
@@ -130,6 +142,7 @@ export class AiCifraController {
 
   @Post("internal/analyses/:id/complete")
   @SkipThrottle()
+  @Public()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_CIFRA_PROGRESS_TOKEN",
@@ -154,6 +167,7 @@ export class AiCifraController {
 
   @Post("internal/analyses/:id/fail")
   @SkipThrottle()
+  @Public()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_CIFRA_PROGRESS_TOKEN",

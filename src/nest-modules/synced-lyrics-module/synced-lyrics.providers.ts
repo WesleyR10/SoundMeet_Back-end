@@ -320,7 +320,10 @@ export const USE_CASES = {
   },
   ALIGN_SYNCED_LYRICS_WORD_TIMESTAMPS_USE_CASE: {
     provide: AlignSyncedLyricsWordTimestampsUseCase,
-    useFactory: (repo: ISyncedLyricsRepository, client: ILyricsAlignmentClient) => {
+    useFactory: (
+      repo: ISyncedLyricsRepository,
+      client: ILyricsAlignmentClient,
+    ) => {
       return new AlignSyncedLyricsWordTimestampsUseCase(repo, client);
     },
     inject: [

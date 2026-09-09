@@ -27,6 +27,7 @@ import { AiCifraAnalysisHttpClient } from "../../core/ai-cifra/infra/http/ai-cif
 import { MusicLibraryOwnershipChecker } from "../../core/ai-cifra/infra/ownership/music-library-ownership.checker";
 import { S3AiCifraStorage } from "../../core/ai-cifra/infra/storage/s3-ai-cifra.storage";
 import { GetMusicLibraryUseCase } from "../../core/music-library/application/use-cases/get-music-library/get-music-library.use-case";
+import { ResolveSpotifyTrackUseCase } from "../../core/music-library/application/use-cases/resolve-spotify-track/resolve-spotify-track.use-case";
 import { UpdateMusicLibraryUseCase } from "../../core/music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import { AlignSyncedLyricsWordTimestampsUseCase } from "../../core/synced-lyrics/application/use-cases/align-synced-lyrics-word-timestamps/align-synced-lyrics-word-timestamps.use-case";
 import { ConfigSchemaType } from "../config-module/config.schema";
@@ -47,6 +48,7 @@ const DEFAULT_ALLOWED_MODEL_IDS = [
   "chordformer_v21_phase2b",
   "chordformer_v22_phase2",
   "chordformer_v22_phase2b",
+  "chordformer_v23_continuacao",
 ] as const;
 
 export const REPOSITORIES = {
@@ -159,6 +161,7 @@ export const INFRA_PROVIDERS = {
         baseURL,
         timeoutMs,
         path,
+        workerToken: configService.get<string>("AI_WORKER_TOKEN"),
       });
     },
     inject: [ConfigService],
@@ -375,6 +378,7 @@ export const USE_CASES = {
       storage: IAiCifraStorage,
       updateMusicLibraryUseCase: UpdateMusicLibraryUseCase,
       alignSyncedLyricsUseCase: AlignSyncedLyricsWordTimestampsUseCase,
+      resolveSpotifyTrackUseCase: ResolveSpotifyTrackUseCase,
     ) => {
       return new CompleteAiCifraAnalysisJobUseCase(
         uploadRepo,
@@ -382,6 +386,7 @@ export const USE_CASES = {
         storage,
         updateMusicLibraryUseCase,
         alignSyncedLyricsUseCase,
+        resolveSpotifyTrackUseCase,
       );
     },
     inject: [
@@ -390,6 +395,7 @@ export const USE_CASES = {
       INFRA_PROVIDERS.AI_CIFRA_STORAGE.provide,
       UpdateMusicLibraryUseCase,
       AlignSyncedLyricsWordTimestampsUseCase,
+      ResolveSpotifyTrackUseCase,
     ],
   },
   FAIL_AI_CIFRA_ANALYSIS_JOB_USE_CASE: {

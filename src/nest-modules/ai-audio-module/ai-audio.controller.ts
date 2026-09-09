@@ -15,19 +15,19 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { SkipThrottle } from "@nestjs/throttler";
 
 import { GetAiAudioSeparationJobUseCase } from "../../core/ai-audio/application/use-cases/get-ai-audio-separation-job/get-ai-audio-separation-job.use-case";
 import { RequestAiAudioSeparationUseCase } from "../../core/ai-audio/application/use-cases/request-ai-audio-separation/request-ai-audio-separation.use-case";
 import { UpdateAiAudioSeparationJobProgressUseCase } from "../../core/ai-audio/application/use-cases/update-ai-audio-separation-job-progress/update-ai-audio-separation-job-progress.use-case";
-import { SkipThrottle } from "@nestjs/throttler";
-
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   InternalToken,
   InternalTokenGuard,
+  Public,
   Roles,
   RolesGuard,
 } from "../auth-module";
@@ -96,8 +96,20 @@ export class AiAudioController {
     return new AiAudioSeparationJobPresenter(output);
   }
 
+  /*
+   * 🔴 `@Public()` aqui NÃO significa aberta — significa "sem JWT de usuário".
+   * Quem chama é o worker de separação, que tem o `x-ai-audio-progress-token` e
+   * não tem sessão de ninguém. O `InternalTokenGuard` continua sendo a
+   * autenticação real desta rota, e é fail-closed (sem o token configurado,
+   * 403).
+   *
+   * Sem este decorator a rota quebra desde AUTH-2: o `AuthGuard` global roda
+   * antes dos guards de controller e exigiria um Bearer que o worker não tem —
+   * a pipeline de IA pararia de reportar progresso, em silêncio, com 401.
+   */
   @Post("internal/separations/:id/progress")
   @SkipThrottle()
+  @Public()
   @UseGuards(InternalTokenGuard)
   @InternalToken({
     envKey: "AI_AUDIO_PROGRESS_TOKEN",

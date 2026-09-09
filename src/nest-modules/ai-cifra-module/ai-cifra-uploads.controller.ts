@@ -41,6 +41,7 @@ import {
 } from "../auth-module";
 import { MusicianOwnershipGuard } from "../auth-module/ownership/musician-ownership.guard";
 import { MusicLibraryCatalogService } from "../music-library-module/music-library.service";
+import { detectFileMime } from "../shared-module/upload/detect-file-mime";
 import {
   AiCifraAnalysisJobPresenter,
   AiCifraUploadPresenter,
@@ -120,11 +121,20 @@ export class AiCifraUploadsController {
       ? file.path
       : join(tmpdir(), `${Date.now()}-${randomUUID()}`);
     try {
+      /*
+       * 🔴 UPL-1: `content_type` vem dos BYTES, nunca de `file.mimetype`.
+       * Mesmo motivo do ai-audio — o mimetype do multer é afirmação do cliente.
+       * Aqui o custo de confiar era maior: o objeto vai para o worker MIR na
+       * GPU. `CreateAiCifraUploadUseCase` já aplicava
+       * `AI_CIFRA_ALLOWED_MIME_TYPES`; agora ela incide sobre o conteúdo real.
+       */
+      const detectedMime = await detectFileMime(tmpPath);
+
       const output = await this.createUploadUseCase.execute({
         musician_id,
         music_library_id: normalizedMusicLibraryId ?? null,
         original_filename: file.originalname,
-        content_type: file.mimetype,
+        content_type: detectedMime ?? "",
         file_size: file.size,
         data: createReadStream(tmpPath),
       });

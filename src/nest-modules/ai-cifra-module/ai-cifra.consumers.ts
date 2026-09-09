@@ -14,6 +14,22 @@ import { RabbitmqConsumeErrorFilter } from "../rabbitmq-module/rabbitmq-consume-
 import { AI_CIFRA_RABBITMQ } from "./rabbitmq/ai-cifra.rabbitmq";
 
 @UseFilters(RabbitmqConsumeErrorFilter)
+/*
+ * ⚠️ INP-1 — exceção DELIBERADA: os `ValidationPipe` deste arquivo (e dos
+ * consumers de ai-audio, synced-lyrics e google-calendar) NÃO usam
+ * `forbidNonWhitelisted`, ao contrário do pipe global de HTTP
+ * (`global-config.ts`).
+ *
+ * O motivo é assimetria de ameaça e de custo. No HTTP, campo extra vem de um
+ * cliente que pode ser hostil, e recusar é detecção barata. Aqui a mensagem vem
+ * de um worker nosso: ligar a recusa significaria que, no dia em que alguém
+ * acrescentar um campo de telemetria ao payload do worker, TODAS as mensagens
+ * passariam a falhar em produção — trocaríamos uma detecção que não interessa
+ * por uma quebra que interessa muito. O `whitelist` continua descartando o
+ * excedente, então o efeito de mass-assignment segue bloqueado.
+ *
+ * Se um dia um produtor de mensagem deixar de ser nosso, esta decisão muda.
+ */
 @Injectable()
 export class AiCifraAnalysisRequestedConsumer {
   constructor(private moduleRef: ModuleRef) {}

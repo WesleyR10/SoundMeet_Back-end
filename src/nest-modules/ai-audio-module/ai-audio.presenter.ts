@@ -7,6 +7,7 @@ import { AiAudioUploadOutput } from "../../core/ai-audio/application/use-cases/c
 export class AiAudioUploadPresenter {
   id: string;
   musician_id: string;
+  music_library_id: string | null;
   original_filename: string;
   content_type: string;
   file_size: number;
@@ -22,6 +23,7 @@ export class AiAudioUploadPresenter {
   constructor(output: AiAudioUploadOutput) {
     this.id = output.id;
     this.musician_id = output.musician_id;
+    this.music_library_id = output.music_library_id;
     this.original_filename = output.original_filename;
     this.content_type = output.content_type;
     this.file_size = output.file_size;
@@ -77,6 +79,15 @@ export class AiAudioSeparationJobPresenter {
     ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
   )
   finished_at: Date | null;
+  @ApiProperty({
+    nullable: true,
+    description:
+      "Quando os stems saem do storage. Stem é a gravação separada, não um dado derivado como a cifra — a retenção é curta de propósito. Vencido, o job vira `expired` e basta pedir a separação de novo.",
+  })
+  @Transform(
+    ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
+  )
+  stems_expire_at: Date | null;
   @ApiProperty({ type: () => AiAudioSeparationOutputPresenter, isArray: true })
   outputs: AiAudioSeparationOutputPresenter[];
   @Transform(({ value }: { value: Date }) => value.toISOString())
@@ -98,6 +109,7 @@ export class AiAudioSeparationJobPresenter {
     this.error_message = output.error_message;
     this.started_at = output.started_at;
     this.finished_at = output.finished_at;
+    this.stems_expire_at = output.stems_expire_at;
 
     this.outputs = output.outputs.map(
       (o) => new AiAudioSeparationOutputPresenter(o),
