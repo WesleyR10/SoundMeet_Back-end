@@ -2,7 +2,6 @@ import { Test } from "@nestjs/testing";
 
 import { AudienceInMemoryRepository } from "../../../core/audience/infra/db/in-memory/audience-in-memory.repository";
 import { AddRoleUseCase } from "../../../core/auth/application/use-cases/add-role/add-role.use-case";
-import { LoginUseCase } from "../../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../../core/auth/application/use-cases/register/register.use-case";
 import { RegisterEstablishmentUseCase } from "../../../core/auth/application/use-cases/register-establishment/register-establishment.use-case";
 import { SocialSignupUseCase } from "../../../core/auth/application/use-cases/social-signup/social-signup.use-case";
@@ -81,11 +80,6 @@ describe("AuthController register() Integration Tests", () => {
               claimsWriter,
               emailIssuer,
             ),
-        },
-        {
-          provide: LoginUseCase,
-          useFactory: () =>
-            new LoginUseCase(musicianRepo, audienceRepo, identityGateway),
         },
         {
           provide: SocialSignupUseCase,
@@ -173,16 +167,15 @@ describe("AuthController register() Integration Tests", () => {
       return Object.assign(dto, overrides);
     }
 
-    it("creates the establishment and returns tokens", async () => {
+    it("cria o estabelecimento e devolve SÓ o establishment_id", async () => {
       const output = await controller.registerEstablishment(
         buildEstablishmentDto(),
       );
 
-      expect(output).toMatchObject({
-        access_token: "access-token",
-        role: "establishment",
-        needs_token_refresh: true,
-      });
+      // 🔴 AUTH-1: `toEqual` e não `toMatchObject` — é o `toEqual` que fica
+      // vermelho se alguém devolver tokens daqui de novo. O cadastro não
+      // autentica; quem cadastra segue para o Authorization Code + PKCE.
+      expect(output).toEqual({ establishment_id: expect.any(String) });
       expect(establishmentRepo.items).toHaveLength(1);
     });
 

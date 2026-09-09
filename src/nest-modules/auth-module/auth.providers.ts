@@ -2,7 +2,6 @@ import { ConfigService } from "@nestjs/config";
 
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
 import { AddRoleUseCase } from "../../core/auth/application/use-cases/add-role/add-role.use-case";
-import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
 import { RegisterUseCase } from "../../core/auth/application/use-cases/register/register.use-case";
 import { RegisterEstablishmentUseCase } from "../../core/auth/application/use-cases/register-establishment/register-establishment.use-case";
 import { SocialSignupUseCase } from "../../core/auth/application/use-cases/social-signup/social-signup.use-case";
@@ -59,7 +58,12 @@ export const AUTH_GATEWAYS = {
         realm: config.get<string>("KEYCLOAK_REALM")!,
         clientId: config.get<string>("KEYCLOAK_CLIENT_ID")!,
         clientSecret: config.get<string>("KEYCLOAK_CLIENT_SECRET")!,
-        mobileClientId: config.get<string>("KEYCLOAK_MOBILE_CLIENT_ID")!,
+        registrationClientId: config.get<string>(
+          "KEYCLOAK_REGISTRATION_CLIENT_ID",
+        )!,
+        registrationClientSecret: config.get<string>(
+          "KEYCLOAK_REGISTRATION_CLIENT_SECRET",
+        )!,
       }),
     inject: [ConfigService],
   },
@@ -124,19 +128,6 @@ export const AUTH_USE_CASES = {
       IDENTITY_PROVIDER_GATEWAY,
       IDENTITY_CLAIMS_WRITER,
       VerifyEmailService,
-    ],
-  },
-  LOGIN_USE_CASE: {
-    provide: LoginUseCase,
-    useFactory: (
-      musicianRepo: MusicianPrismaRepository,
-      audienceRepo: AudiencePrismaRepository,
-      identityGateway: KeycloakAdminGateway,
-    ) => new LoginUseCase(musicianRepo, audienceRepo, identityGateway),
-    inject: [
-      MusicianPrismaRepository,
-      AudiencePrismaRepository,
-      IDENTITY_PROVIDER_GATEWAY,
     ],
   },
   SOCIAL_SIGNUP_USE_CASE: {

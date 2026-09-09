@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
+import { timingSafeEqual } from "crypto";
 import { Request } from "express";
 
 import { EnvConfig } from "../config-module/config.schema";
@@ -45,10 +46,37 @@ export class InternalTokenGuard implements CanActivate {
     const received = request.headers[metadata.headerName.toLowerCase()];
     const token = Array.isArray(received) ? received[0] : received;
 
-    if (token !== expected) {
+    if (!safeEqual(token, expected)) {
       throw new ForbiddenException();
     }
 
     return true;
   }
+}
+
+/*
+ * Comparação em tempo constante, alinhando este guard aos webhooks de pagamento
+ * (Asaas/Mercado Pago) e aos workers de IA (`hmac.compare_digest`), que já
+ * comparavam assim. O `!==` anterior sai no primeiro byte diferente, e a
+ * diferença de tempo vaza o prefixo correto — o que transforma adivinhar um
+ * token de 32 bytes de impossível em ~32 rodadas de medição.
+ *
+ * O comprimento continua vazando (é inevitável: `timingSafeEqual` exige buffers
+ * do mesmo tamanho, e comparar tamanhos diferentes lança). Saber o TAMANHO de um
+ * token aleatório não ajuda quem tenta adivinhá-lo; saber o PREFIXO ajuda, e é
+ * isso que fechamos aqui.
+ */
+function safeEqual(received: string | undefined, expected: string): boolean {
+  if (typeof received !== "string") {
+    return false;
+  }
+
+  const a = Buffer.from(received, "utf8");
+  const b = Buffer.from(expected, "utf8");
+
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return timingSafeEqual(a, b);
 }

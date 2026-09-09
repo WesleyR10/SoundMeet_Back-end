@@ -110,4 +110,126 @@ describe("VerifyEmailService (SM-016 email token hash)", () => {
       );
     });
   });
+  describe("peek — consulta sem consumir", () => {
+    /*
+     * 🔴 A razão de `peek` existir. Gmail, Outlook Safe Links e antivírus
+     * corporativo fazem GET de prefetch em todo link que chega por e-mail. Com
+     * a confirmação num GET, o scanner CONSOME o token de uso único antes do
+     * usuário clicar, e o link legítimo passa a responder "inválido" — falha
+     * intermitente, que não reproduz na máquina de quem desenvolve.
+     *
+     * Este teste fixa a propriedade que impede isso: `peek` não escreve NADA.
+     */
+    it("não escreve nada no banco", async () => {
+      prisma.musician.findFirst.mockResolvedValue({
+        id: "musician-id-1",
+        email_pending: null,
+        email_token_expires_at: new Date(Date.now() + 3600_000),
+      });
+
+      const result = await service.peek("token-valido");
+
+      expect(result).toEqual({ status: "valid" });
+      expect(prisma.musician.update).not.toHaveBeenCalled();
+      expect(prisma.establishment.update).not.toHaveBeenCalled();
+      expect(prisma.audience.update).not.toHaveBeenCalled();
+    });
+
+    it("é idempotente — duas consultas devolvem o mesmo, sem gastar o token", async () => {
+      prisma.musician.findFirst.mockResolvedValue({
+        id: "musician-id-1",
+        email_pending: null,
+        email_token_expires_at: new Date(Date.now() + 3600_000),
+      });
+
+      expect(await service.peek("t")).toEqual({ status: "valid" });
+      expect(await service.peek("t")).toEqual({ status: "valid" });
+      expect(prisma.musician.update).not.toHaveBeenCalled();
+    });
+
+    it("distingue expirado de inválido — a UI oferece reenvio nos dois, com textos diferentes", async () => {
+      prisma.musician.findFirst.mockResolvedValue({
+        id: "musician-id-1",
+        email_pending: null,
+        email_token_expires_at: new Date(Date.now() - 1000),
+      });
+      expect(await service.peek("expirado")).toEqual({ status: "expired" });
+
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue(null);
+      expect(await service.peek("sumiu")).toEqual({ status: "invalid" });
+    });
+
+    it("token vazio é inválido sem ir ao banco", async () => {
+      expect(await service.peek("")).toEqual({ status: "invalid" });
+      expect(prisma.musician.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resend", () => {
+    /*
+     * 🔴 A rota é `@Public()` e anônima. Responder diferente para e-mail
+     * existente e inexistente a transformaria num verificador de quem tem
+     * cadastro no SoundMeet — dá para varrer uma lista inteira de endereços.
+     */
+    it("responde a MESMA mensagem para conta existente e inexistente", async () => {
+      prisma.musician.findFirst.mockResolvedValue({ id: "m1" });
+      prisma.musician.update.mockResolvedValue({ name: "F", email: "f@x.com" });
+      const found = await service.resend("f@x.com");
+
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue(null);
+      const notFound = await service.resend("ninguem@x.com");
+
+      expect(found.message).toBe(notFound.message);
+    });
+
+    it("não envia e-mail nenhum quando não há conta pendente", async () => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue(null);
+
+      await service.resend("ninguem@x.com");
+
+      expect(mailService.sendEmailVerification).not.toHaveBeenCalled();
+    });
+
+    it("só procura contas NÃO verificadas — reemitir para conta confirmada invalidaria o estado à toa", async () => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue(null);
+
+      await service.resend("alguem@x.com");
+
+      expect(prisma.musician.findFirst.mock.calls[0][0].where).toEqual({
+        email: "alguem@x.com",
+        email_verified_at: null,
+      });
+    });
+
+    it("normaliza o endereço antes de procurar", async () => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue(null);
+
+      await service.resend("  Fulano@Example.COM  ");
+
+      expect(prisma.musician.findFirst.mock.calls[0][0].where.email).toBe(
+        "fulano@example.com",
+      );
+    });
+
+    it("cobre os três perfis, não só músico", async () => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue({ id: "a1" });
+      prisma.audience.update.mockResolvedValue({ name: "F", email: "f@x.com" });
+
+      await service.resend("f@x.com");
+
+      expect(mailService.sendEmailVerification).toHaveBeenCalledTimes(1);
+    });
+  });
 });

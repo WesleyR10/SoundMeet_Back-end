@@ -42,7 +42,8 @@ describe("AuthModule — Smoke Test (DI wiring)", () => {
                 KEYCLOAK_REALM: "soundmeet",
                 KEYCLOAK_CLIENT_ID: "soundmeet-api",
                 KEYCLOAK_CLIENT_SECRET: "test-secret",
-                KEYCLOAK_MOBILE_CLIENT_ID: "soundmeet-mobile",
+                KEYCLOAK_REGISTRATION_CLIENT_ID: "soundmeet-registration",
+                KEYCLOAK_REGISTRATION_CLIENT_SECRET: "test-secret",
               };
               return defaults[key];
             }),
