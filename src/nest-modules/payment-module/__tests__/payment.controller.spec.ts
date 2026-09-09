@@ -66,6 +66,9 @@ describe("PaymentController", () => {
 
     expect(useCase.execute).toHaveBeenCalledWith({
       tip_id: tipId,
+      // Confirmação manual pressupõe valor na conta da plataforma — é o único
+      // caso em que faz sentido confirmar à mão.
+      settlement: "platform",
       payment: {
         amount: 100,
         fee: 5,
@@ -89,6 +92,8 @@ describe("PaymentController", () => {
       pix_key: "pix@example.com",
       bank_account: null,
       is_active: true,
+      held_balance: 0,
+      mp_linked: false,
       min_withdrawal_amount_brl: 110,
       withdrawal_days: 5,
       created_at: now,
@@ -117,14 +122,48 @@ describe("PaymentController", () => {
 
     const presenter = await controller.withdrawToPix(musicianId, {
       amount: 50,
-      pix_key: { key: "pix@example.com", type: "email" },
     });
 
     expect(useCase.execute).toHaveBeenCalledWith({
       musician_id: musicianId,
       amount: 50,
-      pix_key: { key: "pix@example.com", type: "email" },
+      idempotency_key: null,
     });
     expect(presenter).toStrictEqual(new WithdrawToPixPresenter(output));
   });
+
+  // SM-023 — a chave chega por header, e chega ao use-case. Um header presente
+  // mas em branco tem de virar `null`: string vazia gravada na coluna UNIQUE
+  // faria o PRIMEIRO saque em branco bloquear todos os outros.
+  it.each([
+    ["req-abc", "req-abc"],
+    ["  req-abc  ", "req-abc"],
+    ["   ", null],
+    [undefined, null],
+  ])(
+    "repassa o header Idempotency-Key %p como %p",
+    async (header, expected) => {
+      const musicianId = "11111111-1111-4111-8111-111111111111";
+      const useCase = {
+        execute: jest.fn().mockResolvedValue({
+          transaction_id: "22222222-2222-4222-8222-222222222222",
+          wallet_balance: 50,
+          status: "pending",
+          min_withdrawal_amount_brl: 110,
+          withdrawal_days: 5,
+        }),
+      };
+      (controller as any).withdrawToPixUseCase = useCase;
+
+      await controller.withdrawToPix(
+        musicianId,
+        { amount: 50 },
+        header as string | undefined,
+      );
+
+      expect(useCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ idempotency_key: expected }),
+      );
+    },
+  );
 });

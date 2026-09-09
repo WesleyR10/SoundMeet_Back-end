@@ -4,12 +4,12 @@ import { OnEvent } from "@nestjs/event-emitter";
 import { AddPointsInput } from "../../core/gamification/application/use-cases/add-points/add-points.input";
 import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
 import { PointsSourceEnum } from "../../core/gamification/domain/value-objects/points-source.vo";
-import { IMessageBroker } from "../../core/shared/application/message-broker.interface";
 import {
   TipCompletedEvent,
   TipCompletedIntegrationEvent,
 } from "../../core/payment/domain/events/tip-completed.event";
 import { TipFailedEvent } from "../../core/payment/domain/events/tip-failed.event";
+import { IMessageBroker } from "../../core/shared/application/message-broker.interface";
 import { PaymentEventProcessingService } from "./payment-event-processing.service";
 
 @Injectable()

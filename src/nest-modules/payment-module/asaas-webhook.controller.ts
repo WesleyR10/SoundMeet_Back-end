@@ -13,7 +13,10 @@ import { ConfigService } from "@nestjs/config";
 import { ApiExcludeController } from "@nestjs/swagger";
 import { timingSafeEqual } from "crypto";
 
+import { parseEscrowReference } from "../../core/payment/application/use-cases/common/booking-escrow-external-reference";
 import { ConfirmTipPaymentUseCase } from "../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
+import { MarkBookingEscrowHeldUseCase } from "../../core/payment/application/use-cases/mark-booking-escrow-held/mark-booking-escrow-held.use-case";
+import { RefundFailedWithdrawUseCase } from "../../core/payment/application/use-cases/refund-failed-withdraw/refund-failed-withdraw.use-case";
 import { ITransactionRepository } from "../../core/payment/domain/repositories";
 import { PaymentMethod } from "../../core/payment/domain/tip-enums";
 import { TransactionStatus } from "../../core/payment/domain/transaction-enums";
@@ -37,6 +40,10 @@ export class AsaasWebhookController {
     private readonly confirmTipPaymentUseCase: ConfirmTipPaymentUseCase,
     @Inject(ActivateSubscriptionFromPaymentUseCase)
     private readonly activateSubscriptionUseCase: ActivateSubscriptionFromPaymentUseCase,
+    @Inject(MarkBookingEscrowHeldUseCase)
+    private readonly markEscrowHeldUseCase: MarkBookingEscrowHeldUseCase,
+    @Inject(RefundFailedWithdrawUseCase)
+    private readonly refundFailedWithdrawUseCase: RefundFailedWithdrawUseCase,
     @Inject("TransactionRepository")
     private readonly txRepo: ITransactionRepository,
     private readonly eventProcessing: PaymentEventProcessingService,
@@ -115,6 +122,15 @@ export class AsaasWebhookController {
       return;
     }
 
+    // Cachê de show em custódia (F1.3a) — prefixo "escrow:" no
+    // externalReference. Precisa vir ANTES do caminho de gorjeta, que trata
+    // qualquer referência restante como UUID de tip.
+    const escrowId = parseEscrowReference(payment.externalReference);
+    if (escrowId) {
+      await this.handleEscrowPayment(body, escrowId);
+      return;
+    }
+
     if (!payment.externalReference) {
       // SM-016: nunca logar o payload inteiro do webhook (pode conter dados
       // do pagador) — só os campos não sensíveis, igual aos outros branches
@@ -135,6 +151,13 @@ export class AsaasWebhookController {
     await this.eventProcessing.processOnce(idempotencyKey, () =>
       this.confirmTipPaymentUseCase.execute({
         tip_id: tipId,
+        /*
+         * Caminho legado: no Asaas a gorjeta entrava na conta da PLATAFORMA, que
+         * passava a dever ao músico. Desde 19/ago/2026 a gorjeta roda no
+         * Mercado Pago (liquidação direta), mas este handler continua correto
+         * para cobranças antigas.
+         */
+        settlement: "platform",
         payment: {
           amount: payment.value,
           fee: payment.value - payment.netValue,
@@ -144,6 +167,63 @@ export class AsaasWebhookController {
         },
       }),
     );
+  }
+
+  /**
+   * O estabelecimento pagou o cachê: a custódia passa a `held`.
+   *
+   * 🔴 **O valor vem do NOSSO registro, nunca do corpo do webhook.** O
+   * `MarkBookingEscrowHeldUseCase` retém o `net_amount` já congelado na criação
+   * da custódia — `payment.value` não é lido aqui de propósito. Confiar no
+   * corpo deixaria um POST forjado inflar o `held_balance` de qualquer músico,
+   * que é a mesma razão pela qual o webhook do Mercado Pago consulta a API em
+   * vez de acreditar na notificação.
+   *
+   * A idempotência é dupla: `processOnce` barra a reentrega do mesmo evento, e
+   * `markHeld` com a mesma referência é no-op no agregado — porque webhook
+   * duplicado é o caso normal, não a exceção.
+   */
+  private async handleEscrowPayment(
+    body: AsaasWebhookBody,
+    escrowId: string,
+  ): Promise<void> {
+    const payment = body.payment!;
+    const idempotencyKey = `asaas:escrow_payment:${payment.id}`;
+
+    await this.eventProcessing.processOnce(idempotencyKey, async () => {
+      try {
+        const result = await this.markEscrowHeldUseCase.execute({
+          escrow_id: escrowId,
+          external_id: payment.id,
+        });
+
+        this.logger.log(
+          JSON.stringify({
+            event: result.changed
+              ? "asaas.webhook.escrow_held"
+              : "asaas.webhook.escrow_already_held",
+            payment_id: payment.id,
+            escrow_id: result.escrow_id,
+          }),
+        );
+      } catch (error) {
+        /*
+         * Custódia inexistente é o caso preocupante: houve uma cobrança paga
+         * apontando para um registro que não existe aqui. Fica em `error`
+         * porque é dinheiro real bloqueado sem ninguém para liberar — precisa
+         * de intervenção, não de retry silencioso.
+         */
+        this.logger.error(
+          JSON.stringify({
+            event: "asaas.webhook.escrow_held.failed",
+            payment_id: payment.id,
+            escrow_id: escrowId,
+            message: error instanceof Error ? error.message : "unknown",
+          }),
+        );
+        throw error;
+      }
+    });
   }
 
   private async handleSubscriptionPayment(
@@ -211,6 +291,22 @@ export class AsaasWebhookController {
     });
   }
 
+  /**
+   * A transferência não saiu: a transação falha **e o valor volta à carteira**.
+   *
+   * 🔴 Até 26/ago/2026 este handler só marcava `failed`. O saldo continuava
+   * debitado de um saque que o provedor recusou: o dinheiro não chegava na
+   * conta do músico e também não voltava para a dele aqui — sumia, sem erro em
+   * lugar nenhum, deixando como única pista um lançamento `failed` que ninguém
+   * correlaciona com o saldo. O estorno é a outra metade do débito que
+   * `WithdrawToPixUseCase` faz na reserva.
+   *
+   * A idempotência é dupla, e as duas camadas cobrem coisas diferentes:
+   * `processOnce` barra a reentrega do mesmo evento; o `pending` conferido sob
+   * o lock da carteira, dentro do use-case, barra a colisão com o caminho de
+   * recusa do próprio saque — que pode estar estornando a mesma transação
+   * neste instante.
+   */
   private async handleTransferFailed(body: AsaasWebhookBody): Promise<void> {
     const transfer = body.transfer;
     if (!transfer) {
@@ -229,15 +325,20 @@ export class AsaasWebhookController {
         return;
       }
 
-      tx.fail();
-      await this.txRepo.update(tx);
+      const result = await this.refundFailedWithdrawUseCase.execute({
+        transaction_id: tx.transaction_id.id,
+        reason: transfer.failReason ?? "Transferência recusada pelo provedor",
+      });
 
       this.logger.warn(
         JSON.stringify({
-          event: "asaas.webhook.transfer_failed",
+          event: result.changed
+            ? "asaas.webhook.transfer_failed"
+            : "asaas.webhook.transfer_failed_already_settled",
           transfer_id: transfer.id,
           transaction_id: tx.transaction_id.id,
           reason: transfer.failReason,
+          wallet_balance: result.wallet_balance,
         }),
       );
     });

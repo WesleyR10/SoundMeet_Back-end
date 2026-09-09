@@ -1,14 +1,16 @@
+import { FakeEmailVerificationChecker } from "@core/shared/infra/email-verification/fake-email-verification.checker";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memory/band-in-memory.repository";
 import { ConfirmTipPaymentUseCase } from "../../../core/payment/application/use-cases/confirm-tip-payment/confirm-tip-payment.use-case";
+import { ConnectMercadoPagoUseCase } from "../../../core/payment/application/use-cases/connect-mercadopago/connect-mercadopago.use-case";
+import { DisconnectMercadoPagoUseCase } from "../../../core/payment/application/use-cases/connect-mercadopago/disconnect-mercadopago.use-case";
+import { GetMusicianEscrowsUseCase } from "../../../core/payment/application/use-cases/get-musician-escrows/get-musician-escrows.use-case";
 import { GetMusicianTipsUseCase } from "../../../core/payment/application/use-cases/get-musician-tips/get-musician-tips.use-case";
 import { GetMusicianWalletUseCase } from "../../../core/payment/application/use-cases/get-musician-wallet/get-musician-wallet.use-case";
+import { GetTipUseCase } from "../../../core/payment/application/use-cases/get-tip/get-tip.use-case";
+import { RefundFailedWithdrawUseCase } from "../../../core/payment/application/use-cases/refund-failed-withdraw/refund-failed-withdraw.use-case";
 import { SendTipUseCase } from "../../../core/payment/application/use-cases/send-tip/send-tip.use-case";
-import {
-  PlanCheckService,
-  SubscriptionInMemoryRepository,
-} from "../../../core/plans";
 import { UpdateMusicianPixKeyUseCase } from "../../../core/payment/application/use-cases/update-musician-pix-key/update-musician-pix-key.use-case";
 import { WithdrawToPixUseCase } from "../../../core/payment/application/use-cases/withdraw-to-pix/withdraw-to-pix.use-case";
 import { MusicianWallet } from "../../../core/payment/domain/musician-wallet.aggregate";
@@ -17,10 +19,15 @@ import {
   PaymentMethod,
   TipStatus,
 } from "../../../core/payment/domain/tip-enums";
+import { BookingEscrowInMemoryRepository } from "../../../core/payment/infra/db/in-memory/booking-escrow-in-memory.repository";
 import { MusicianWalletInMemoryRepository } from "../../../core/payment/infra/db/in-memory/musician-wallet-in-memory.repository";
 import { TipInMemoryRepository } from "../../../core/payment/infra/db/in-memory/tip-in-memory.repository";
 import { TransactionInMemoryRepository } from "../../../core/payment/infra/db/in-memory/transaction-in-memory.repository";
 import { PixGatewayMock } from "../../../core/payment/infra/gateways/pix-gateway.mock";
+import {
+  PlanCheckService,
+  SubscriptionInMemoryRepository,
+} from "../../../core/plans";
 import { AuthGuard } from "../../auth-module/auth.guard";
 import { RolesGuard } from "../../auth-module/roles.guard";
 import { PaymentController } from "../payment.controller";
@@ -38,6 +45,7 @@ describe("PaymentController Integration Tests", () => {
   let txRepo: TransactionInMemoryRepository;
   let walletRepo: MusicianWalletInMemoryRepository;
   let bandRepo: BandInMemoryRepository;
+  let escrowRepo: BookingEscrowInMemoryRepository;
   let pixGateway: PixGatewayMock;
 
   const MUSICIAN_ID = "11111111-1111-4111-8111-111111111111";
@@ -55,7 +63,11 @@ describe("PaymentController Integration Tests", () => {
     tipRepo = new TipInMemoryRepository();
     txRepo = new TransactionInMemoryRepository();
     walletRepo = new MusicianWalletInMemoryRepository();
+    // Fake de UnitOfWork: executa o trabalho direto — repositório in-memory
+    // não tem transação, e a corrida que o lock impede não se reproduz aqui.
+    const fakeUow = { do: async (fn: (uow: any) => any) => fn(null) } as any;
     bandRepo = new BandInMemoryRepository();
+    escrowRepo = new BookingEscrowInMemoryRepository();
     pixGateway = new PixGatewayMock();
 
     const passGuard = { canActivate: () => true };
@@ -78,7 +90,7 @@ describe("PaymentController Integration Tests", () => {
             txRepo,
             walletRepo,
             bandRepo,
-            { do: async (fn: (uow: any) => any) => fn(null) } as any,
+            fakeUow,
             { publish: jest.fn(), publishIntegrationEvents: jest.fn() } as any,
           ),
         },
@@ -88,16 +100,42 @@ describe("PaymentController Integration Tests", () => {
         },
         {
           provide: WithdrawToPixUseCase,
-          useValue: new WithdrawToPixUseCase(walletRepo, txRepo),
+          useValue: new WithdrawToPixUseCase({
+            walletRepo,
+            txRepo,
+            uow: fakeUow,
+            refundUseCase: new RefundFailedWithdrawUseCase(
+              txRepo,
+              walletRepo,
+              fakeUow,
+            ),
+            emailVerificationChecker: new FakeEmailVerificationChecker(),
+          }),
         },
         {
           provide: UpdateMusicianPixKeyUseCase,
           useValue: new UpdateMusicianPixKeyUseCase(walletRepo),
         },
         {
+          provide: GetTipUseCase,
+          useValue: new GetTipUseCase(tipRepo),
+        },
+        {
           provide: GetMusicianTipsUseCase,
           useValue: new GetMusicianTipsUseCase(tipRepo),
         },
+        {
+          provide: GetMusicianEscrowsUseCase,
+          useValue: new GetMusicianEscrowsUseCase(escrowRepo),
+        },
+        /*
+         * Vínculo Mercado Pago — não exercitado nestes casos, mas o controller
+         * os injeta por token de CLASSE. Declará-los é metade do valor deste
+         * teste: se o controller passar a injetar algo que os providers do
+         * módulo não fornecem, isto quebra antes do container real.
+         */
+        { provide: ConnectMercadoPagoUseCase, useValue: {} },
+        { provide: DisconnectMercadoPagoUseCase, useValue: {} },
       ],
     })
       .overrideGuard(AuthGuard)
@@ -150,17 +188,23 @@ describe("PaymentController Integration Tests", () => {
     });
 
     it("should create multiple tips independently", async () => {
-      await controller.sendTip({
-        musician_id: MUSICIAN_ID,
-        amount: 10,
-        payment_method: PaymentMethod.PIX,
-      } as any, AUDIENCE_USER);
+      await controller.sendTip(
+        {
+          musician_id: MUSICIAN_ID,
+          amount: 10,
+          payment_method: PaymentMethod.PIX,
+        } as any,
+        AUDIENCE_USER,
+      );
 
-      await controller.sendTip({
-        musician_id: MUSICIAN_ID,
-        amount: 25,
-        payment_method: PaymentMethod.PIX,
-      } as any, AUDIENCE_USER);
+      await controller.sendTip(
+        {
+          musician_id: MUSICIAN_ID,
+          amount: 25,
+          payment_method: PaymentMethod.PIX,
+        } as any,
+        AUDIENCE_USER,
+      );
 
       const tips = await tipRepo.findAll();
       expect(tips).toHaveLength(2);
@@ -278,9 +322,9 @@ describe("PaymentController Integration Tests", () => {
       expect(result).toBeInstanceOf(TipsListPresenter);
       expect(result.total).toBe(2);
       expect(result.items).toHaveLength(2);
-      expect(result.items.every((tip) => tip.status === TipStatus.PENDING)).toBe(
-        true,
-      );
+      expect(
+        result.items.every((tip) => tip.status === TipStatus.PENDING),
+      ).toBe(true);
     });
 
     it("should filter tips by status", async () => {
@@ -357,11 +401,12 @@ describe("PaymentController Integration Tests", () => {
     it("should withdraw funds, create a completed transaction, and return updated balance", async () => {
       const wallet = MusicianWallet.create({ musician_id: MUSICIAN_ID });
       wallet.receiveFunds(200);
+      // O destino é a chave cadastrada na carteira (A1), não uma do corpo.
+      wallet.updatePixKey("musician@pix.com", "email");
       await walletRepo.insert(wallet);
 
       const result = await controller.withdrawToPix(MUSICIAN_ID, {
         amount: 110,
-        pix_key: { key: "musician@pix.com", type: "email" },
       } as any);
 
       expect(result).toBeInstanceOf(WithdrawToPixPresenter);
@@ -381,7 +426,6 @@ describe("PaymentController Integration Tests", () => {
       await expect(
         controller.withdrawToPix(MUSICIAN_ID, {
           amount: 50,
-          pix_key: { key: "test@pix.com", type: "email" },
         } as any),
       ).rejects.toThrow();
     });
@@ -389,12 +433,12 @@ describe("PaymentController Integration Tests", () => {
     it("should throw when withdrawing more than available balance", async () => {
       const wallet = MusicianWallet.create({ musician_id: MUSICIAN_ID });
       wallet.receiveFunds(50);
+      wallet.updatePixKey("test@pix.com", "email");
       await walletRepo.insert(wallet);
 
       await expect(
         controller.withdrawToPix(MUSICIAN_ID, {
           amount: 100,
-          pix_key: { key: "test@pix.com", type: "email" },
         } as any),
       ).rejects.toThrow();
     });

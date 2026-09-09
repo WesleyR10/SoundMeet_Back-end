@@ -12,12 +12,16 @@ class FakeEventProcessingService {
 describe("AsaasWebhookController — validação de token", () => {
   const makeController = (configuredToken: string | undefined) => {
     const configService = {
-      get: jest.fn().mockImplementation((key: string) =>
-        key === "ASAAS_WEBHOOK_TOKEN" ? configuredToken : undefined,
-      ),
+      get: jest
+        .fn()
+        .mockImplementation((key: string) =>
+          key === "ASAAS_WEBHOOK_TOKEN" ? configuredToken : undefined,
+        ),
     };
     return new AsaasWebhookController(
       configService as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -74,24 +78,42 @@ describe("AsaasWebhookController — roteamento PAYMENT_RECEIVED (assinatura vs 
   let confirmTipPaymentUseCase: { execute: jest.Mock };
   let activateSubscriptionUseCase: { execute: jest.Mock };
   let txRepo: { findByExternalId: jest.Mock; update: jest.Mock };
+  let markEscrowHeldUseCase: { execute: jest.Mock };
+  let refundFailedWithdrawUseCase: { execute: jest.Mock };
   let controller: AsaasWebhookController;
 
   beforeEach(() => {
     configService = {
-      get: jest.fn().mockImplementation((key: string) =>
-        key === "ASAAS_WEBHOOK_TOKEN" ? TOKEN : undefined,
-      ),
+      get: jest
+        .fn()
+        .mockImplementation((key: string) =>
+          key === "ASAAS_WEBHOOK_TOKEN" ? TOKEN : undefined,
+        ),
     };
     confirmTipPaymentUseCase = { execute: jest.fn().mockResolvedValue({}) };
     activateSubscriptionUseCase = {
       execute: jest.fn().mockResolvedValue({ action: "activated" }),
     };
     txRepo = { findByExternalId: jest.fn(), update: jest.fn() };
+    refundFailedWithdrawUseCase = {
+      execute: jest.fn().mockResolvedValue({
+        transaction_id: "t1",
+        changed: true,
+        wallet_balance: 200,
+      }),
+    };
+    markEscrowHeldUseCase = {
+      execute: jest
+        .fn()
+        .mockResolvedValue({ escrow_id: "e1", status: "held", changed: true }),
+    };
 
     controller = new AsaasWebhookController(
       configService as never,
       confirmTipPaymentUseCase as never,
       activateSubscriptionUseCase as never,
+      markEscrowHeldUseCase as never,
+      refundFailedWithdrawUseCase as never,
       txRepo as never,
       new FakeEventProcessingService() as never,
     );
@@ -152,8 +174,54 @@ describe("AsaasWebhookController — roteamento PAYMENT_RECEIVED (assinatura vs 
 
     expect(confirmTipPaymentUseCase.execute).toHaveBeenCalledWith({
       tip_id: "tip-uuid-123",
+      // Caminho legado: no Asaas a gorjeta entrava na conta da PLATAFORMA.
+      settlement: "platform",
       payment: expect.objectContaining({ amount: 20 }),
     });
     expect(activateSubscriptionUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it("externalReference com prefixo escrow: retém a custódia do cachê", async () => {
+    await controller.handleEvent(TOKEN, {
+      event: "PAYMENT_RECEIVED",
+      payment: {
+        id: "pay_escrow_1",
+        externalReference: "escrow:44444444-4444-4444-8444-444444444444",
+        value: 1500,
+        netValue: 1485,
+        billingType: "PIX",
+        status: "RECEIVED",
+      },
+    } as never);
+
+    expect(markEscrowHeldUseCase.execute).toHaveBeenCalledWith({
+      escrow_id: "44444444-4444-4444-8444-444444444444",
+      external_id: "pay_escrow_1",
+    });
+    // Cachê nunca pode cair no caminho da gorjeta — a referência seria lida
+    // como UUID de tip e confirmaria uma gorjeta que não existe.
+    expect(confirmTipPaymentUseCase.execute).not.toHaveBeenCalled();
+    expect(activateSubscriptionUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it("🔴 NÃO usa o valor do corpo do webhook para reter", async () => {
+    // O valor retido é o `net_amount` congelado na criação da custódia. Ler
+    // `payment.value` deixaria um POST forjado inflar o held_balance.
+    await controller.handleEvent(TOKEN, {
+      event: "PAYMENT_RECEIVED",
+      payment: {
+        id: "pay_escrow_2",
+        externalReference: "escrow:55555555-5555-4555-8555-555555555555",
+        value: 999_999,
+        netValue: 999_999,
+        billingType: "PIX",
+        status: "RECEIVED",
+      },
+    } as never);
+
+    const [[input]] = markEscrowHeldUseCase.execute.mock.calls;
+    expect(input).not.toHaveProperty("amount");
+    expect(input).not.toHaveProperty("value");
+    expect(Object.keys(input).sort()).toEqual(["escrow_id", "external_id"]);
   });
 });

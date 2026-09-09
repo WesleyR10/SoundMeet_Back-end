@@ -1,25 +1,15 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsNumber, IsString, Min, ValidateNested } from "class-validator";
+import { IsNumber, Min } from "class-validator";
 
-export class WithdrawPixKeyDto {
-  @ApiProperty()
-  @IsString()
-  key: string;
-
-  @ApiProperty()
-  @IsString()
-  type: string;
-}
-
+/**
+ * O saque NÃO recebe a chave de destino: ela é sempre a que está cadastrada na
+ * carteira (`GET/PATCH .../wallet/pix-key`). Aceitar o destino aqui deixava um
+ * token comprometido drenar o saldo num único POST. Ver
+ * `Docs/audits/security-review-2026-08-28.md` (A1).
+ */
 export class WithdrawToPixDto {
   @ApiProperty({ minimum: 1 })
   @IsNumber()
   @Min(1)
   amount: number;
-
-  @ApiProperty({ type: WithdrawPixKeyDto })
-  @ValidateNested()
-  @Type(() => WithdrawPixKeyDto)
-  pix_key: WithdrawPixKeyDto;
 }
