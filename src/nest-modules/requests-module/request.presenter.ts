@@ -2,8 +2,12 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 
 import { RequestFeedbackOutput } from "../../core/request/application/use-cases/common/request-feedback-output";
-import { RequestOutput } from "../../core/request/application/use-cases/common/request-output";
+import {
+  RequestBoostOutput,
+  RequestOutput,
+} from "../../core/request/application/use-cases/common/request-output";
 import { GetMusicianRequestsOutput } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
+import { GetRequestBoostPaymentOutput } from "../../core/request/application/use-cases/get-request-boost-payment/get-request-boost-payment.use-case";
 import { GetRequestSuggestionsOutput } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsOutput } from "../../core/request/application/use-cases/list-requests/list-requests.use-case";
 import { CollectionPresenter } from "../shared-module/collection.presenter";
@@ -22,6 +26,80 @@ export class RequestPointsPresenter {
     this.description = points.description;
     this.metadata = points.metadata;
     this.earnedAt = points.earnedAt;
+  }
+}
+
+/**
+ * Destaque pago, na resposta HTTP.
+ *
+ * 🔴 `dedication` sai cru: toda rota que devolve `RequestPresenter` é
+ * participante-escopada (`assertRequestParticipant`), e o músico precisa ler a
+ * dedicatória para decidir se aceita. O portão do público é
+ * `Request.publicDedication`, usado pelo "tocando agora".
+ *
+ * `is_boosting` (e não `status`) é o que a UI deve consultar para decidir se
+ * mostra o selo de destaque — `expired` e `cancelled` são pedidos comuns.
+ */
+export class RequestBoostPresenter {
+  amount: number;
+  dedication: string | null;
+  status: string;
+  tip_id: string | null;
+  @Transform(({ value }: { value: Date }) => value.toISOString())
+  promised_at: Date;
+  @Transform(
+    ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
+  )
+  charged_at: Date | null;
+  @Transform(
+    ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
+  )
+  paid_at: Date | null;
+  cancellation_reason: string | null;
+  is_boosting: boolean;
+  is_public: boolean;
+
+  constructor(boost: RequestBoostOutput) {
+    this.amount = boost.amount;
+    this.dedication = boost.dedication;
+    this.status = boost.status;
+    this.tip_id = boost.tip_id;
+    this.promised_at = boost.promised_at;
+    this.charged_at = boost.charged_at;
+    this.paid_at = boost.paid_at;
+    this.cancellation_reason = boost.cancellation_reason;
+    this.is_boosting = boost.is_boosting;
+    this.is_public = boost.is_public;
+  }
+}
+
+/** Cobrança do destaque — o QR que o fã precisa para pagar. */
+export class RequestBoostPaymentPresenter {
+  request_id: string;
+  song_title: string;
+  artist: string | null;
+  amount: number;
+  dedication: string | null;
+  status: string;
+  tip_id: string | null;
+  qr_code: string | null;
+  copy_paste_code: string | null;
+  @Transform(
+    ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
+  )
+  expires_at: Date | null;
+
+  constructor(output: GetRequestBoostPaymentOutput) {
+    this.request_id = output.request_id;
+    this.song_title = output.song_title;
+    this.artist = output.artist;
+    this.amount = output.amount;
+    this.dedication = output.dedication;
+    this.status = output.status;
+    this.tip_id = output.tip_id;
+    this.qr_code = output.qr_code;
+    this.copy_paste_code = output.copy_paste_code;
+    this.expires_at = output.expires_at;
   }
 }
 
@@ -61,6 +139,9 @@ export class RequestPresenter {
   is_old: boolean;
   is_urgent: boolean;
   priority: "low" | "medium" | "high";
+  @ApiProperty({ type: () => RequestBoostPresenter, nullable: true })
+  boost: RequestBoostPresenter | null;
+  is_boosted: boolean;
   @ApiProperty({ type: () => RequestPointsPresenter })
   points_value: RequestPointsPresenter;
   is_special_request: boolean;
@@ -96,6 +177,8 @@ export class RequestPresenter {
     this.is_old = output.is_old;
     this.is_urgent = output.is_urgent;
     this.priority = output.priority;
+    this.boost = output.boost ? new RequestBoostPresenter(output.boost) : null;
+    this.is_boosted = output.is_boosted;
     this.points_value = new RequestPointsPresenter(output.points_value);
     this.is_special_request = output.is_special_request;
     this.can_be_accepted = output.can_be_accepted;
@@ -132,11 +215,17 @@ export class RequestSuggestionsPresenter {
   musician_id: string;
   genres: string[];
   suggestions: GetRequestSuggestionsOutput["suggestions"];
+  /**
+   * O músico consegue receber gorjeta. `false` esconde o destaque pago na tela
+   * do fã — oferecer algo que a escrita vai recusar é pior que não oferecer.
+   */
+  accepts_tips: boolean;
 
   constructor(output: GetRequestSuggestionsOutput) {
     this.musician_id = output.musician_id;
     this.genres = output.genres;
     this.suggestions = output.suggestions;
+    this.accepts_tips = output.accepts_tips;
   }
 }
 

@@ -7,15 +7,20 @@ import { BatchRespondToRequestsUseCase } from "../../core/request/application/us
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
 import { CreateRequestFeedbackUseCase } from "../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
 import { DeleteRequestUseCase } from "../../core/request/application/use-cases/delete-request/delete-request.use-case";
+import { ExpireStaleRequestBoostsUseCase } from "../../core/request/application/use-cases/expire-stale-request-boosts/expire-stale-request-boosts.use-case";
 import { GetMusicianRequestsUseCase } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestUseCase } from "../../core/request/application/use-cases/get-request/get-request.use-case";
+import { GetRequestBoostPaymentUseCase } from "../../core/request/application/use-cases/get-request-boost-payment/get-request-boost-payment.use-case";
 import { GetRequestFeedbackUseCase } from "../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { GetRequestSuggestionsUseCase } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsUseCase } from "../../core/request/application/use-cases/list-requests/list-requests.use-case";
+import { MarkRequestBoostPaidUseCase } from "../../core/request/application/use-cases/mark-request-boost-paid/mark-request-boost-paid.use-case";
 import { MarkRequestPlayedUseCase } from "../../core/request/application/use-cases/mark-request-played/mark-request-played.use-case";
 import { RespondToRequestUseCase } from "../../core/request/application/use-cases/respond-to-request/respond-to-request.use-case";
 import { UpdateRequestUseCase } from "../../core/request/application/use-cases/update-request/update-request.use-case";
 import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
+import { IBoostChargePort } from "../../core/request/domain/ports/boost-charge.port";
+import { ITipEligibilityPort } from "../../core/request/domain/ports/tip-eligibility.port";
 import { IRequestRepository } from "../../core/request/domain/request.repository";
 import { IRequestFeedbackRepository } from "../../core/request/domain/request-feedback.repository";
 import { IRequestVoteRepository } from "../../core/request/domain/request-vote.repository";
@@ -26,6 +31,8 @@ import { IClock } from "../../core/shared/application/clock.interface";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
+import { BoostChargeAdapter } from "./boost-charge.adapter";
+import { TipEligibilityAdapter } from "./tip-eligibility.adapter";
 
 export const REPOSITORIES = {
   REQUEST_REPOSITORY: {
@@ -81,6 +88,7 @@ export const USE_CASES = {
       configService: ConfigSchemaType,
       clock: IClock,
       domainEventMediator: DomainEventMediator,
+      tipEligibility: ITipEligibilityPort,
     ) => {
       return new CreateRequestUseCase(
         requestRepo,
@@ -91,6 +99,8 @@ export const USE_CASES = {
         configService.get<number>("REQUEST_COOLDOWN_MINUTES")!,
         clock,
         domainEventMediator,
+        configService.get<number>("REQUEST_BOOST_MIN_AMOUNT")!,
+        tipEligibility,
       );
     },
     inject: [
@@ -101,6 +111,7 @@ export const USE_CASES = {
       ConfigService,
       SERVICES.CLOCK.provide,
       DomainEventMediator,
+      TipEligibilityAdapter,
     ],
   },
   LIST_REQUESTS_USE_CASE: {
@@ -157,6 +168,7 @@ export const USE_CASES = {
       musicianRepo: IMusicianRepository,
       configService: ConfigSchemaType,
       domainEventMediator: DomainEventMediator,
+      boostCharge: IBoostChargePort,
     ) => {
       return new RespondToRequestUseCase(
         requestRepo,
@@ -164,6 +176,7 @@ export const USE_CASES = {
         musicianRepo,
         configService.get<number>("REQUEST_RESPONSE_TIME_MINUTES")!,
         domainEventMediator,
+        boostCharge,
       );
     },
     inject: [
@@ -172,6 +185,55 @@ export const USE_CASES = {
       "MusicianRepository",
       ConfigService,
       DomainEventMediator,
+      BoostChargeAdapter,
+    ],
+  },
+  GET_REQUEST_BOOST_PAYMENT_USE_CASE: {
+    provide: GetRequestBoostPaymentUseCase,
+    useFactory: (
+      requestRepo: IRequestRepository,
+      boostCharge: IBoostChargePort,
+      configService: ConfigSchemaType,
+    ) => {
+      return new GetRequestBoostPaymentUseCase(
+        requestRepo,
+        boostCharge,
+        configService.get<number>("REQUEST_BOOST_PAYMENT_WINDOW_MINUTES")!,
+      );
+    },
+    inject: [
+      REPOSITORIES.REQUEST_REPOSITORY.provide,
+      BoostChargeAdapter,
+      ConfigService,
+    ],
+  },
+  MARK_REQUEST_BOOST_PAID_USE_CASE: {
+    provide: MarkRequestBoostPaidUseCase,
+    useFactory: (
+      requestRepo: IRequestRepository,
+      domainEventMediator: DomainEventMediator,
+    ) => {
+      return new MarkRequestBoostPaidUseCase(requestRepo, domainEventMediator);
+    },
+    inject: [REPOSITORIES.REQUEST_REPOSITORY.provide, DomainEventMediator],
+  },
+  EXPIRE_STALE_REQUEST_BOOSTS_USE_CASE: {
+    provide: ExpireStaleRequestBoostsUseCase,
+    useFactory: (
+      requestRepo: IRequestRepository,
+      configService: ConfigSchemaType,
+      clock: IClock,
+    ) => {
+      return new ExpireStaleRequestBoostsUseCase(
+        requestRepo,
+        configService.get<number>("REQUEST_BOOST_PAYMENT_WINDOW_MINUTES")!,
+        clock,
+      );
+    },
+    inject: [
+      REPOSITORIES.REQUEST_REPOSITORY.provide,
+      ConfigService,
+      SERVICES.CLOCK.provide,
     ],
   },
   // Bloco 9.4c — compõe o use case individual, não reimplementa.
@@ -193,10 +255,19 @@ export const USE_CASES = {
     useFactory: (
       requestRepo: IRequestRepository,
       musicianRepo: IMusicianRepository,
+      tipEligibility: ITipEligibilityPort,
     ) => {
-      return new GetRequestSuggestionsUseCase(requestRepo, musicianRepo);
+      return new GetRequestSuggestionsUseCase(
+        requestRepo,
+        musicianRepo,
+        tipEligibility,
+      );
     },
-    inject: [REPOSITORIES.REQUEST_REPOSITORY.provide, "MusicianRepository"],
+    inject: [
+      REPOSITORIES.REQUEST_REPOSITORY.provide,
+      "MusicianRepository",
+      TipEligibilityAdapter,
+    ],
   },
   MARK_REQUEST_PLAYED_USE_CASE: {
     provide: MarkRequestPlayedUseCase,

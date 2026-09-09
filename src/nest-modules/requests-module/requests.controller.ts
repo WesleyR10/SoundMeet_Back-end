@@ -33,6 +33,7 @@ import { GetMusicianRequestsInput } from "../../core/request/application/use-cas
 import { GetMusicianRequestsUseCase } from "../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestInput } from "../../core/request/application/use-cases/get-request/get-request.input";
 import { GetRequestUseCase } from "../../core/request/application/use-cases/get-request/get-request.use-case";
+import { GetRequestBoostPaymentUseCase } from "../../core/request/application/use-cases/get-request-boost-payment/get-request-boost-payment.use-case";
 import { GetRequestFeedbackUseCase } from "../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { GetRequestSuggestionsInput } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.input";
 import { GetRequestSuggestionsUseCase } from "../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
@@ -66,6 +67,7 @@ import { UpdateRequestDto } from "./dto/update-request.dto";
 import { VoteRequestDto } from "./dto/vote-request.dto";
 import {
   MusicianRequestsPresenter,
+  RequestBoostPaymentPresenter,
   RequestCollectionPresenter,
   RequestFeedbackPresenter,
   RequestPresenter,
@@ -115,6 +117,9 @@ export class RequestsController {
 
   @Inject(GetRequestFeedbackUseCase)
   private getFeedbackUseCase: GetRequestFeedbackUseCase;
+
+  @Inject(GetRequestBoostPaymentUseCase)
+  private getRequestBoostPaymentUseCase: GetRequestBoostPaymentUseCase;
 
   @Post()
   @Roles("audience", "musician", "admin")
@@ -341,6 +346,43 @@ export class RequestsController {
     });
     const output = await this.voteRequestUseCase.execute(input);
     return RequestsController.serialize(output);
+  }
+
+  /**
+   * Cobrança do destaque pago.
+   *
+   * Vem ANTES de `@Get(":id")` por disciplina de ordem — aqui o caminho tem
+   * três segmentos e não colidiria, mas rota de leitura declarada depois de um
+   * `:id` é o defeito que não dá erro de compilação e some numa refatoração.
+   *
+   * `:id` (e não `:request_id`) para acompanhar o resto do controller: aqui não
+   * há ownership guard resolvendo por parâmetro — quem confere a posse é
+   * `assertRequestParticipant`, dentro do use-case —, então o nome do parâmetro
+   * não autoriza nada.
+   */
+  @Get(":id/boost/payment")
+  @Roles("audience", "admin")
+  @ApiOperation({
+    summary: "Cobrança do destaque pago de um pedido",
+    description:
+      "Devolve o QR PIX da gorjeta que destaca este pedido. A cobrança nasce quando o MÚSICO aceita — o fã normalmente não está na tela nesse instante, e é por isso que ela pode ser relida aqui. Em `promised` ainda não existe cobrança e em `cancelled` nunca vai existir: nesses casos o status volta preenchido e o QR nulo, para a UI explicar o estado em vez de mostrar erro.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RequestBoostPaymentPresenter })
+  @ApiResponse({ status: 403, description: "Você não participa deste pedido." })
+  @ApiResponse({ status: 404, description: "Pedido ou destaque inexistente." })
+  async getBoostPayment(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+  ) {
+    const output = await this.getRequestBoostPaymentUseCase.execute({
+      request_id: id,
+      requesting_participant_ids: currentUser
+        ? resolveParticipantIds(currentUser)
+        : undefined,
+      is_admin: currentUser?.roles.includes("admin"),
+    });
+    return new RequestBoostPaymentPresenter(output);
   }
 
   @Get(":id")

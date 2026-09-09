@@ -9,17 +9,18 @@ import {
   MusicianId,
 } from "../../../core/musician/domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { BatchRespondToRequestsUseCase } from "../../../core/request/application/use-cases/batch-respond-to-requests/batch-respond-to-requests.use-case";
 import { RequestOutputMapper } from "../../../core/request/application/use-cases/common/request-output";
 import { CreateRequestUseCase } from "../../../core/request/application/use-cases/create-request/create-request.use-case";
 import { CreateRequestFeedbackUseCase } from "../../../core/request/application/use-cases/create-request-feedback/create-request-feedback.use-case";
 import { DeleteRequestUseCase } from "../../../core/request/application/use-cases/delete-request/delete-request.use-case";
 import { GetMusicianRequestsUseCase } from "../../../core/request/application/use-cases/get-musician-requests/get-musician-requests.use-case";
 import { GetRequestUseCase } from "../../../core/request/application/use-cases/get-request/get-request.use-case";
+import { GetRequestBoostPaymentUseCase } from "../../../core/request/application/use-cases/get-request-boost-payment/get-request-boost-payment.use-case";
 import { GetRequestFeedbackUseCase } from "../../../core/request/application/use-cases/get-request-feedback/get-request-feedback.use-case";
 import { GetRequestSuggestionsUseCase } from "../../../core/request/application/use-cases/get-request-suggestions/get-request-suggestions.use-case";
 import { ListRequestsUseCase } from "../../../core/request/application/use-cases/list-requests/list-requests.use-case";
 import { MarkRequestPlayedUseCase } from "../../../core/request/application/use-cases/mark-request-played/mark-request-played.use-case";
-import { BatchRespondToRequestsUseCase } from "../../../core/request/application/use-cases/batch-respond-to-requests/batch-respond-to-requests.use-case";
 import { RespondToRequestAction } from "../../../core/request/application/use-cases/respond-to-request/respond-to-request.input";
 import { RespondToRequestUseCase } from "../../../core/request/application/use-cases/respond-to-request/respond-to-request.use-case";
 import { UpdateRequestUseCase } from "../../../core/request/application/use-cases/update-request/update-request.use-case";
@@ -246,6 +247,18 @@ describe("RequestsController Integration Tests", () => {
             requestFeedbackRepositoryInstance,
             repositoryInstance,
             eventRepository,
+          ),
+        },
+        {
+          provide: GetRequestBoostPaymentUseCase,
+          useValue: new GetRequestBoostPaymentUseCase(
+            repositoryInstance,
+            // Sem provedor real: o teste exercita a rota e a posse, não o QR.
+            {
+              createCharge: jest.fn(),
+              getCharge: jest.fn().mockResolvedValue(null),
+            },
+            15,
           ),
         },
       ],

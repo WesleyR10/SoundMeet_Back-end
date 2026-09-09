@@ -49,6 +49,8 @@ function makeRequestOutput(
     is_old: false,
     is_urgent: false,
     priority: "low",
+    boost: null,
+    is_boosted: false,
     points_value: {
       value: 25,
       source: "music_request",
