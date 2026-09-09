@@ -7,10 +7,12 @@ import { ICalendarReadModel } from "../../core/scheduling/application/gateways/c
 import { AcceptInquiryUseCase } from "../../core/scheduling/application/use-cases/accept-inquiry/accept-inquiry.use-case";
 import { AddUnavailabilityUseCase } from "../../core/scheduling/application/use-cases/add-unavailability/add-unavailability.use-case";
 import { CancelBookingUseCase } from "../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.use-case";
+import { CheckInBookingUseCase } from "../../core/scheduling/application/use-cases/check-in-booking/check-in-booking.use-case";
 import { CompleteConfirmedBookingsUseCase } from "../../core/scheduling/application/use-cases/complete-confirmed-bookings/complete-confirmed-bookings.use-case";
 import { ConfirmBookingUseCase } from "../../core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case";
 import { ConvertInquiryToBookingUseCase } from "../../core/scheduling/application/use-cases/convert-inquiry-to-booking/convert-inquiry-to-booking.use-case";
 import { CreateInquiryUseCase } from "../../core/scheduling/application/use-cases/create-inquiry/create-inquiry.use-case";
+import { DisputeBookingUseCase } from "../../core/scheduling/application/use-cases/dispute-booking/dispute-booking.use-case";
 import { ExpirePendingBookingsUseCase } from "../../core/scheduling/application/use-cases/expire-pending-bookings/expire-pending-bookings.use-case";
 import { GetAvailabilityUseCase } from "../../core/scheduling/application/use-cases/get-availability/get-availability.use-case";
 import { GetBookingUseCase } from "../../core/scheduling/application/use-cases/get-booking/get-booking.use-case";
@@ -310,6 +312,39 @@ export const USE_CASES = {
       EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
       REPOSITORIES.BAND_REPOSITORY.provide,
     ],
+  },
+  /**
+   * Registro da apresentação (F1.3a).
+   *
+   * `bandRepo` entra porque `assertNegotiationParticipant` exige liderança
+   * quando o vínculo do ator é a banda — declarar em nome de quem tocou é ato
+   * do líder, mesma regra de confirmar e cancelar.
+   */
+  CHECK_IN_BOOKING_USE_CASE: {
+    provide: CheckInBookingUseCase,
+    useFactory: (
+      bookingRepo: IBookingRepository,
+      bandRepo: IBandRepository,
+      clock: IClock,
+    ) => {
+      return new CheckInBookingUseCase(bookingRepo, bandRepo, clock);
+    },
+    inject: [
+      REPOSITORIES.BOOKING_REPOSITORY.provide,
+      REPOSITORIES.BAND_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
+    ],
+  },
+  /**
+   * Contestação da apresentação. Sem `bandRepo`: só o CONTRATANTE contesta, e
+   * essa checagem não passa por liderança de banda nenhuma.
+   */
+  DISPUTE_BOOKING_USE_CASE: {
+    provide: DisputeBookingUseCase,
+    useFactory: (bookingRepo: IBookingRepository, clock: IClock) => {
+      return new DisputeBookingUseCase(bookingRepo, clock);
+    },
+    inject: [REPOSITORIES.BOOKING_REPOSITORY.provide, SERVICES.CLOCK.provide],
   },
   EXPIRE_PENDING_BOOKINGS_USE_CASE: {
     provide: ExpirePendingBookingsUseCase,

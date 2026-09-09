@@ -18,7 +18,9 @@ import {
 } from "@nestjs/swagger";
 
 import { CancelBookingUseCase } from "../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.use-case";
+import { CheckInBookingUseCase } from "../../core/scheduling/application/use-cases/check-in-booking/check-in-booking.use-case";
 import { ConfirmBookingUseCase } from "../../core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case";
+import { DisputeBookingUseCase } from "../../core/scheduling/application/use-cases/dispute-booking/dispute-booking.use-case";
 import { GetBookingUseCase } from "../../core/scheduling/application/use-cases/get-booking/get-booking.use-case";
 import { ListBookingsUseCase } from "../../core/scheduling/application/use-cases/list-bookings/list-bookings.use-case";
 import { ProposeBookingInput } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.input";
@@ -37,10 +39,19 @@ import {
   BookingPresenter,
 } from "./booking.presenter";
 import { CancelBookingDto } from "./dto/cancel-booking.dto";
+import { DisputeBookingDto } from "./dto/dispute-booking.dto";
 import { ProposeBookingDto } from "./dto/propose-booking.dto";
 import { SearchBookingsDto } from "./dto/search-bookings.dto";
 
-function deriveCancelledBy(
+/**
+ * Lado da negociação em que o autenticado está agindo.
+ *
+ * Serve a `cancelled_by` (quem cancelou) e a `proposed_by` (quem propôs) — é a
+ * mesma pergunta feita em dois momentos, então é uma função só. Sempre derivada
+ * do JWT, nunca do corpo: os dois campos descrevem autoria, e autoria vinda de
+ * input do cliente é forjável.
+ */
+function deriveActorSide(
   user: AuthenticatedUser,
 ): "establishment" | "musician" | "band" {
   if (user.roles.includes("musician")) return "musician";
@@ -61,6 +72,12 @@ export class BookingsController {
 
   @Inject(CancelBookingUseCase)
   private cancelUseCase: CancelBookingUseCase;
+
+  @Inject(CheckInBookingUseCase)
+  private checkInUseCase: CheckInBookingUseCase;
+
+  @Inject(DisputeBookingUseCase)
+  private disputeUseCase: DisputeBookingUseCase;
 
   @Inject(ListBookingsUseCase)
   private listUseCase: ListBookingsUseCase;
@@ -131,6 +148,10 @@ export class BookingsController {
         requesting_participant_ids: resolveParticipantIds(user),
         requesting_musician_id: user?.userId,
         is_admin: user.isAdmin,
+        // Depois do spread, como todo campo de autoria: registra qual lado
+        // originou a proposta para o consumidor saber de quem é a vez de
+        // responder. Ver `proposed_by` em booking.aggregate.ts.
+        proposed_by: deriveActorSide(user),
       }),
     );
     return new BookingPresenter(output);
@@ -172,11 +193,87 @@ export class BookingsController {
   ) {
     const output = await this.cancelUseCase.execute({
       booking_id: id,
-      cancelled_by: deriveCancelledBy(user),
+      cancelled_by: deriveActorSide(user),
       requesting_participant_ids: resolveParticipantIds(user),
       requesting_musician_id: user?.userId,
       is_admin: user.isAdmin,
       ...dto,
+    });
+    return new BookingPresenter(output);
+  }
+
+  /**
+   * Registro da apresentação — a prova de que o show aconteceu.
+   *
+   * Vale por si contra chargeback (camada 3), e é a primeira das duas condições
+   * que liberam a custódia do cachê. A hora é do SERVIDOR: o corpo é vazio de
+   * propósito, porque aceitar `checked_in_at` do cliente permitiria registrar um
+   * show de ontem como se fosse de hoje — e este registro existe para provar
+   * *quando* algo aconteceu.
+   *
+   * As duas partes podem registrar. Em muita casa quem tem o app aberto no fim
+   * da noite é o dono, e um check-in feito pela contraparte é prova ainda mais
+   * forte a favor do artista.
+   */
+  @Post(":id/check-in")
+  @Roles("establishment", "musician", "admin")
+  @ApiOperation({
+    summary: "Registrar a apresentação (check-in)",
+    description:
+      "Marca que o show aconteceu, com a hora do servidor. Só em booking confirmado e não antes do horário de início. Idempotente: o primeiro registro é o que vale.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 201, type: BookingPresenter })
+  @ApiResponse({ status: 403, description: "Não é parte deste show." })
+  @ApiResponse({
+    status: 422,
+    description: "Booking não confirmado, ou show ainda não começou.",
+  })
+  async checkIn(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const output = await this.checkInUseCase.execute({
+      booking_id: id,
+      requesting_participant_ids: resolveParticipantIds(user),
+      requesting_musician_id: user?.userId,
+      is_admin: user.isAdmin,
+    });
+    return new BookingPresenter(output);
+  }
+
+  /**
+   * Contestação da apresentação pelo estabelecimento.
+   *
+   * 🔴 **Só o contratante.** Contestar é dizer "o serviço não foi entregue como
+   * combinado"; deixar o artista fazer isso seria deixá-lo travar o próprio
+   * pagamento. A checagem é feita dentro do use-case, que tem o booking em mãos.
+   *
+   * Congela a liberação automática da custódia e manda o caso para mediação.
+   */
+  @Post(":id/dispute")
+  @Roles("establishment", "admin")
+  @ApiOperation({
+    summary: "Contestar a apresentação",
+    description:
+      "Abre contestação dentro da janela. Bloqueia a liberação automática do cachê em custódia até a mediação decidir. Idempotente: a primeira contestação é a que vale.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 201, type: BookingPresenter })
+  @ApiResponse({
+    status: 403,
+    description: "Somente o estabelecimento contratante contesta.",
+  })
+  async dispute(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: DisputeBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const output = await this.disputeUseCase.execute({
+      booking_id: id,
+      reason: dto.reason,
+      requesting_participant_ids: resolveParticipantIds(user),
+      is_admin: user.isAdmin,
     });
     return new BookingPresenter(output);
   }

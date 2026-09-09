@@ -19,6 +19,13 @@ export class BookingPresenter {
   fee: number | null;
   notes: string | null;
   status: BookingStatusEnum;
+  @ApiProperty({
+    enum: ["establishment", "musician", "band"],
+    nullable: true,
+    description:
+      "Lado que originou a proposta. Permite ao cliente oferecer 'confirmar' apenas à contraparte — a API aceita o confirm de ambos os lados, então sem este campo não há como distinguir uma proposta aceita de uma autoconfirmada. `null` em bookings anteriores ao campo.",
+  })
+  proposed_by: string | null;
   buffer_minutes: number;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   buffered_start_at: Date;
@@ -41,6 +48,17 @@ export class BookingPresenter {
     ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
   )
   completed_at: Date | null;
+  /** Registro da apresentação — prova de execução do serviço (F1.3a). */
+  @Transform(
+    ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
+  )
+  checked_in_at: Date | null;
+  checked_in_by: string | null;
+  @Transform(
+    ({ value }: { value: Date | null }) => value?.toISOString() ?? null,
+  )
+  disputed_at: Date | null;
+  dispute_reason: string | null;
   @Transform(({ value }: { value: Date }) => value.toISOString())
   created_at: Date;
   @Transform(({ value }: { value: Date }) => value.toISOString())
@@ -57,6 +75,7 @@ export class BookingPresenter {
     this.fee = output.fee;
     this.notes = output.notes;
     this.status = output.status as BookingStatusEnum;
+    this.proposed_by = output.proposed_by;
     this.buffer_minutes = output.buffer_minutes;
     this.buffered_start_at = output.buffered_start_at;
     this.buffered_end_at = output.buffered_end_at;
@@ -65,6 +84,10 @@ export class BookingPresenter {
     this.confirmed_at = output.confirmed_at;
     this.cancelled_at = output.cancelled_at;
     this.completed_at = output.completed_at;
+    this.checked_in_at = output.checked_in_at;
+    this.checked_in_by = output.checked_in_by;
+    this.disputed_at = output.disputed_at;
+    this.dispute_reason = output.dispute_reason;
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
   }
