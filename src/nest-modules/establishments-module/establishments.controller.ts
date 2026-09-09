@@ -24,10 +24,10 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { randomUUID } from "crypto";
 import { createReadStream, promises as fs } from "fs";
 import { diskStorage } from "multer";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 
 import {
   EstablishmentOutput,
@@ -36,6 +36,7 @@ import {
 import { CreateEstablishmentUseCase } from "../../core/establishment/application/use-cases/create-establishment/create-establishment.use-case";
 import { CreateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/create-establishment-profile/create-establishment-profile.use-case";
 import { DeleteEstablishmentUseCase } from "../../core/establishment/application/use-cases/delete-establishment/delete-establishment.use-case";
+import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { DeleteEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/delete-establishment-profile/delete-establishment-profile.use-case";
 import { GetEstablishmentUseCase } from "../../core/establishment/application/use-cases/get-establishment/get-establishment.use-case";
 import { GetHiringDashboardUseCase } from "../../core/establishment/application/use-cases/get-hiring-dashboard/get-hiring-dashboard.use-case";
@@ -44,7 +45,6 @@ import { ListEstablishmentsUseCase } from "../../core/establishment/application/
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
 import { UploadEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
-import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
   AuthGuard,
@@ -56,6 +56,7 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { AuthenticatedUser } from "../auth-module";
+import { assertFileSignature } from "../shared-module/upload/detect-file-mime";
 import { CreateEstablishmentDto } from "./dto/create-establishment.dto";
 import { CreateEstablishmentProfileDto } from "./dto/create-establishment-profile.dto";
 import { GetHiringDashboardDto } from "./dto/get-hiring-dashboard.dto";
@@ -304,17 +305,22 @@ export class EstablishmentsController {
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: EstablishmentAnalyticsCollectionPresenter })
+  @ApiResponse({
+    status: 402,
+    description:
+      "Plano FREE — `advanced_analytics` exige Growth ou PRO (gate 9.7a).",
+  })
   async listAnalytics(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Query() query: SearchEstablishmentAnalyticsDto,
   ) {
     const output = await this.listAnalyticsUseCase.execute({
+      establishment_id: id,
       page: query.page,
       per_page: query.per_page,
       sort: query.sort,
       sort_dir: query.sort_dir,
       filter: {
-        establishment_id: id,
         ...(query.date_gte && { date_gte: query.date_gte }),
         ...(query.date_lte && { date_lte: query.date_lte }),
       },
@@ -346,7 +352,11 @@ export class EstablishmentsController {
           cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
         },
       }),
-      limits: { fileSize: Number(process.env.ESTABLISHMENT_MENU_PDF_MAX_SIZE ?? 5 * 1024 * 1024) },
+      limits: {
+        fileSize: Number(
+          process.env.ESTABLISHMENT_MENU_PDF_MAX_SIZE ?? 5 * 1024 * 1024,
+        ),
+      },
       fileFilter: (_req, file, cb) => {
         if (file.mimetype !== "application/pdf") {
           return cb(new Error("Only PDF files are allowed"), false);
@@ -364,17 +374,11 @@ export class EstablishmentsController {
     }
 
     try {
-      const { fileTypeFromBuffer } = await import("file-type");
-      const fd = await fs.open(file.path, "r");
-      const buf = Buffer.alloc(4100);
-      await fd.read(buf, 0, 4100, 0);
-      await fd.close();
-      const detected = await fileTypeFromBuffer(buf);
-      if (!detected || detected.mime !== "application/pdf") {
-        throw new UnprocessableEntityException(
-          "Invalid file: only PDF format is accepted",
-        );
-      }
+      await assertFileSignature(
+        file.path,
+        ["application/pdf"],
+        "Invalid file: only PDF format is accepted",
+      );
 
       const output = await this.uploadMenuPdfUseCase.execute({
         establishment_id: id,

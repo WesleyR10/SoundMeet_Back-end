@@ -21,6 +21,7 @@ import { RegisterPushTokenUseCase } from "../../core/musician/application/use-ca
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { SetBandOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
+import { SetMusicianRequestScopeUseCase } from "../../core/musician/application/use-cases/set-musician-request-scope/set-musician-request-scope.use-case";
 import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { TransferBandLeadershipUseCase } from "../../core/musician/application/use-cases/transfer-band-leadership/transfer-band-leadership.use-case";
 import { UpdateBandUseCase } from "../../core/musician/application/use-cases/update-band/update-band.use-case";
@@ -196,6 +197,13 @@ export const USE_CASES = {
     provide: SetMusicianOpenToGigsUseCase,
     useFactory: (musicianRepo: IMusicianRepository) => {
       return new SetMusicianOpenToGigsUseCase(musicianRepo);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
+  },
+  SET_MUSICIAN_REQUEST_SCOPE_USE_CASE: {
+    provide: SetMusicianRequestScopeUseCase,
+    useFactory: (musicianRepo: IMusicianRepository) => {
+      return new SetMusicianRequestScopeUseCase(musicianRepo);
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
   },

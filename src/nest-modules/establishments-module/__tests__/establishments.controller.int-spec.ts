@@ -9,6 +9,7 @@ import { EstablishmentOutputMapper } from "../../../core/establishment/applicati
 import { CreateEstablishmentUseCase } from "../../../core/establishment/application/use-cases/create-establishment/create-establishment.use-case";
 import { CreateEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/create-establishment-profile/create-establishment-profile.use-case";
 import { DeleteEstablishmentUseCase } from "../../../core/establishment/application/use-cases/delete-establishment/delete-establishment.use-case";
+import { DeleteEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { DeleteEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-profile/delete-establishment-profile.use-case";
 import { GetEstablishmentUseCase } from "../../../core/establishment/application/use-cases/get-establishment/get-establishment.use-case";
 import { GetHiringDashboardUseCase } from "../../../core/establishment/application/use-cases/get-hiring-dashboard/get-hiring-dashboard.use-case";
@@ -16,9 +17,8 @@ import { ListEstablishmentAnalyticsUseCase } from "../../../core/establishment/a
 import { ListEstablishmentsUseCase } from "../../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
-import { VerifyEstablishmentUseCase } from "../../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import { UploadEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
-import { DeleteEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
+import { VerifyEstablishmentUseCase } from "../../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
   Establishment,
   EstablishmentId,
@@ -33,13 +33,13 @@ import { CreateEventUseCase } from "../../../core/events/application/use-cases/c
 import { DeleteEventUseCase } from "../../../core/events/application/use-cases/delete-event/delete-event.use-case";
 import { FinishEventUseCase } from "../../../core/events/application/use-cases/finish-event/finish-event.use-case";
 import { GetEventUseCase } from "../../../core/events/application/use-cases/get-event/get-event.use-case";
-import { ListEventsUseCase } from "../../../core/events/application/use-cases/list-events/list-events.use-case";
 import { ListEventAttendeesUseCase } from "../../../core/events/application/use-cases/list-event-attendees/list-event-attendees.use-case";
 import { ListEventMusiciansUseCase } from "../../../core/events/application/use-cases/list-event-musicians/list-event-musicians.use-case";
+import { ListEventsUseCase } from "../../../core/events/application/use-cases/list-events/list-events.use-case";
 import { RemoveEventAttendeeUseCase } from "../../../core/events/application/use-cases/remove-event-attendee/remove-event-attendee.use-case";
 import { RemoveEventPerformerUseCase } from "../../../core/events/application/use-cases/remove-event-performer/remove-event-performer.use-case";
-import { UpdateEventMusicianStatusUseCase } from "../../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import { UpdateEventUseCase } from "../../../core/events/application/use-cases/update-event/update-event.use-case";
+import { UpdateEventMusicianStatusUseCase } from "../../../core/events/application/use-cases/update-event-musician-status/update-event-musician-status.use-case";
 import { EntityValidationError } from "../../../core/shared/domain/validators/validation.error";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
@@ -56,7 +56,8 @@ describe("EstablishmentsController Integration Tests", () => {
   beforeEach(async () => {
     const repositoryInstance = new EstablishmentInMemoryRepository();
     const eventRepositoryInstance = new EventInMemoryRepository();
-    const eventMusicianRepositoryInstance = new EventMusicianInMemoryRepository();
+    const eventMusicianRepositoryInstance =
+      new EventMusicianInMemoryRepository();
 
     const moduleBuilder = Test.createTestingModule({
       controllers: [EstablishmentsController],
@@ -262,7 +263,9 @@ describe("EstablishmentsController Integration Tests", () => {
 
     const entity = await repository.findById(new EstablishmentId(presenter.id));
     expect(entity).toBeInstanceOf(Establishment);
-    expect(presenter.qr_code).toBe(`soundmeet://establishment/${presenter.id}`);
+    expect(presenter.qr_code).toBe(
+      `https://soundmeet.com.br/local/${presenter.id}`,
+    );
 
     const output = EstablishmentOutputMapper.toOutput(entity!);
     expect(presenter).toEqual(new EstablishmentPresenter(output));
@@ -289,7 +292,9 @@ describe("EstablishmentsController Integration Tests", () => {
     const entity = await repository.findById(establishment.establishment_id);
     expect(entity!.name).toBe("Updated Name");
     expect(entity!.website).toBe("https://example.com");
-    expect(presenter.qr_code).toBe(`soundmeet://establishment/${presenter.id}`);
+    expect(presenter.qr_code).toBe(
+      `https://soundmeet.com.br/local/${presenter.id}`,
+    );
   });
 
   it("should create, update and delete an establishment profile", async () => {
@@ -351,6 +356,101 @@ describe("EstablishmentsController Integration Tests", () => {
 
     const entity = await repository.findById(establishment.establishment_id);
     expect(entity!.profile).toBeNull();
+  });
+
+  // A3 — a ficha só vale se ATRAVESSAR: gravar, reler do repositório e sair no
+  // presenter. Ficou fora do teste acima de propósito, para nomear a regressão.
+  it("should round-trip the stage tech spec through write, storage and presenter", async () => {
+    const establishment = Establishment.fake()
+      .anEstablishment()
+      .withName("Stage Spec Venue")
+      .withEmail("stagespec@venue.com")
+      .withEstablishmentType("bar")
+      .build();
+    establishment.removeProfile();
+    await repository.insert(establishment);
+
+    await controller.createProfile(establishment.establishment_id.id, {
+      location: {
+        street: "Rua da Música",
+        number: "42",
+        neighborhood: "Centro",
+        city: "São Paulo",
+        state: "SP",
+        zipCode: "01310-100",
+      },
+    } as any);
+
+    const updated = await controller.updateProfile(
+      establishment.establishment_id.id,
+      {
+        stageTechSpec: {
+          hasPa: true,
+          mixerChannels: 12,
+          monitors: 2,
+          backline: ["Bateria", "Cubo de guitarra"],
+          dimensions: { widthM: 5, depthM: 3 },
+          power: { outlets: 6, voltage: "110V/220V" },
+          hasParking: false,
+          soundcheckWindow: "18:00-19:00",
+        },
+      } as any,
+    );
+
+    expect(updated.stage_tech_spec).toMatchObject({
+      hasPa: true,
+      mixerChannels: 12,
+      monitors: 2,
+      backline: ["Bateria", "Cubo de guitarra"],
+      dimensions: { widthM: 5, depthM: 3, heightM: null },
+      power: { outlets: 6, voltage: "110V/220V" },
+      // `false` ("não tem estacionamento") não pode virar null ("não respondeu").
+      hasParking: false,
+      soundcheckWindow: "18:00-19:00",
+      notes: null,
+    });
+
+    // Releitura: prova que persistiu, e não que só voltou pelo caminho da escrita.
+    const reloaded = await repository.findById(establishment.establishment_id);
+    expect(reloaded!.profile!.stageTechSpec!.mixerChannels).toBe(12);
+    expect(reloaded!.profile!.stageTechSpec!.hasParking).toBe(false);
+
+    const cleared = await controller.updateProfile(
+      establishment.establishment_id.id,
+      { stageTechSpec: null } as any,
+    );
+    expect(cleared.stage_tech_spec).toBeNull();
+  });
+
+  it("should not touch the stage tech spec when the field is absent from the payload", async () => {
+    const establishment = Establishment.fake()
+      .anEstablishment()
+      .withName("Untouched Spec Venue")
+      .withEmail("untouched@venue.com")
+      .withEstablishmentType("bar")
+      .build();
+    establishment.removeProfile();
+    await repository.insert(establishment);
+
+    await controller.createProfile(establishment.establishment_id.id, {
+      location: {
+        street: "Rua da Música",
+        number: "42",
+        neighborhood: "Centro",
+        city: "São Paulo",
+        state: "SP",
+        zipCode: "01310-100",
+      },
+      stageTechSpec: { hasPa: true },
+    } as any);
+
+    const updated = await controller.updateProfile(
+      establishment.establishment_id.id,
+      { capacity: 120 } as any,
+    );
+
+    expect(updated.capacity).toBe(120);
+    expect(updated.stage_tech_spec).toMatchObject({ hasPa: true });
   });
 
   it("should create a profile via updateProfile when it does not exist", async () => {
@@ -516,7 +616,7 @@ describe("EstablishmentsController Integration Tests", () => {
     expect(presenter.name).toBe("Test Restaurant");
     expect(presenter.email).toBe("test@restaurant.com");
     expect(presenter.qr_code).toBe(
-      `soundmeet://establishment/${establishment.establishment_id.id}`,
+      `https://soundmeet.com.br/local/${establishment.establishment_id.id}`,
     );
   });
 

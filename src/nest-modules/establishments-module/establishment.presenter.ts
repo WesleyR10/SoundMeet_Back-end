@@ -13,6 +13,8 @@ export class EstablishmentPresenter {
   description: string | null;
   avatar: string | null;
   cnpj: EstablishmentOutput["cnpj"];
+  // CPF vem mascarado do mapper — a rota é `@Public()`.
+  legal_representative: EstablishmentOutput["legal_representative"];
   email: string;
   phone: string | null;
   website: string | null;
@@ -40,6 +42,7 @@ export class EstablishmentPresenter {
     this.description = output.description;
     this.avatar = output.avatar;
     this.cnpj = output.cnpj;
+    this.legal_representative = output.legal_representative;
     this.email = output.email;
     this.phone = output.phone;
     this.website = output.website;
@@ -74,10 +77,20 @@ export class EstablishmentProfilePresenter {
   amenities: string[];
   preferred_genres: string[];
   operating_hours: Record<string, unknown> | null;
+  stage_tech_spec: EstablishmentProfileOutput["stage_tech_spec"];
   price_range: EstablishmentProfileOutput["price_range"];
   social_links: Record<string, unknown> | null;
-  @Transform(({ value }: { value: Array<{ id: string; url: string; uploaded_at: Date }> }) =>
-    value.map((e) => ({ id: e.id, url: e.url, uploaded_at: e.uploaded_at.toISOString() })),
+  @Transform(
+    ({
+      value,
+    }: {
+      value: Array<{ id: string; url: string; uploaded_at: Date }>;
+    }) =>
+      value.map((e) => ({
+        id: e.id,
+        url: e.url,
+        uploaded_at: e.uploaded_at.toISOString(),
+      })),
   )
   menu_pdfs: Array<{ id: string; url: string; uploaded_at: Date }>;
   @Transform(({ value }: { value: Date }) => value.toISOString())
@@ -93,6 +106,7 @@ export class EstablishmentProfilePresenter {
     this.amenities = output.amenities;
     this.preferred_genres = output.preferred_genres;
     this.operating_hours = output.operating_hours;
+    this.stage_tech_spec = output.stage_tech_spec;
     this.price_range = output.price_range;
     this.social_links = output.social_links;
     this.menu_pdfs = output.menu_pdfs;

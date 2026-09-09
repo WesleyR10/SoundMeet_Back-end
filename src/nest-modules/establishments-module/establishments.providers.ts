@@ -2,7 +2,6 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { IEventRepository } from "@core/events/domain";
 import { PlanCheckService } from "@core/plans/domain/plan-check.service";
 import { IIdentityClaimsWriter } from "@core/shared/application/identity-claims.interface";
-import { IDENTITY_CLAIMS_WRITER } from "../auth-module/auth.providers";
 import { IDateTimeService } from "@core/shared/domain/date-time.service";
 import { IGeocodingService } from "@core/shared/domain/geocoding.service";
 import { LuxonDateTimeService } from "@core/shared/infra/date-time/luxon-date-time.service";
@@ -33,6 +32,7 @@ import { S3EstablishmentStorage } from "../../core/establishment/infra/storage/s
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
+import { IDENTITY_CLAIMS_WRITER } from "../auth-module/auth.providers";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { EVENTS_PROVIDERS } from "../events-module/events.providers";
 import { MUSICIANS_PROVIDERS } from "../musicians-module/musicians.providers";
@@ -251,10 +251,16 @@ export const USE_CASES = {
   },
   LIST_ESTABLISHMENT_ANALYTICS_USE_CASE: {
     provide: ListEstablishmentAnalyticsUseCase,
-    useFactory: (repo: IEstablishmentAnalyticsRepository) => {
-      return new ListEstablishmentAnalyticsUseCase(repo);
+    useFactory: (
+      repo: IEstablishmentAnalyticsRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new ListEstablishmentAnalyticsUseCase(repo, planCheckService);
     },
-    inject: [REPOSITORIES.ESTABLISHMENT_ANALYTICS_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_ANALYTICS_REPOSITORY.provide,
+      PlanCheckService,
+    ],
   },
   CREATE_ESTABLISHMENT_PROFILE_USE_CASE: {
     provide: CreateEstablishmentProfileUseCase,

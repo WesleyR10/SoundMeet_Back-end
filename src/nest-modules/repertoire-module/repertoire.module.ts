@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+
 import { DatabaseModule } from "../database-module/database.module";
 import { MusicLibraryModule } from "../music-library-module/music-library.module";
 import { PlansModule } from "../plans-module/plans.module";
@@ -16,7 +17,12 @@ import { REPERTOIRE_PROVIDERS } from "./repertoire.providers";
 // nominal + link público), que reaproveitam GetChordSheetForMusicLibraryUseCase
 // já existente sem tocar em core/synced-lyrics.
 @Module({
-  imports: [DatabaseModule, PlansModule, MusicLibraryModule, SyncedLyricsModule],
+  imports: [
+    DatabaseModule,
+    PlansModule,
+    MusicLibraryModule,
+    SyncedLyricsModule,
+  ],
   controllers: [
     RepertoireController,
     RepertoirePublicController,

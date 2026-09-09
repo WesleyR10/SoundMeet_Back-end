@@ -25,6 +25,7 @@ function makeMusicianOutput(
     bio: null,
     avatar: null,
     phone: "+5511999999999",
+    cnpj: null,
     genres: ["Rock"],
     instruments: ["Guitar"],
     experience_years: 0,
@@ -387,7 +388,8 @@ describe("MusiciansController Unit Tests", () => {
       const mockSetTouringLocationUseCase = {
         execute: jest.fn().mockResolvedValue(output),
       };
-      (controller as any).setTouringLocationUseCase = mockSetTouringLocationUseCase;
+      (controller as any).setTouringLocationUseCase =
+        mockSetTouringLocationUseCase;
 
       const serializeSpy = jest.spyOn(MusiciansController, "serialize");
       const input = {
@@ -416,11 +418,14 @@ describe("MusiciansController Unit Tests", () => {
       const mockClearTouringLocationUseCase = {
         execute: jest.fn().mockResolvedValue(makeMusicianOutput({ id })),
       };
-      (controller as any).clearTouringLocationUseCase = mockClearTouringLocationUseCase;
+      (controller as any).clearTouringLocationUseCase =
+        mockClearTouringLocationUseCase;
 
       await controller.clearTouringLocation(id);
 
-      expect(mockClearTouringLocationUseCase.execute).toHaveBeenCalledWith({ id });
+      expect(mockClearTouringLocationUseCase.execute).toHaveBeenCalledWith({
+        id,
+      });
     });
   });
 

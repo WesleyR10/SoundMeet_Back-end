@@ -24,21 +24,22 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { randomUUID } from "crypto";
 import { createReadStream, promises as fs } from "fs";
 import { diskStorage } from "multer";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 
-import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
 import { ClearMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
-import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
+import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
+import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
-import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
+import { SetMusicianRequestScopeUseCase } from "../../core/musician/application/use-cases/set-musician-request-scope/set-musician-request-scope.use-case";
+import { SetMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
@@ -54,11 +55,13 @@ import {
   Roles,
   RolesGuard,
 } from "../auth-module";
+import { assertFileSignature } from "../shared-module/upload/detect-file-mime";
 import { CreateMusicianDto } from "./dto/create-musician.dto";
 import { CustomizeQRCodeDto } from "./dto/customize-qr-code.dto";
-import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { RegisterPushTokenDto } from "./dto/register-push-token.dto";
+import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { SetMusicianOpenToGigsDto } from "./dto/set-musician-open-to-gigs.dto";
+import { SetMusicianRequestScopeDto } from "./dto/set-musician-request-scope.dto";
 import { SetMusicianTouringLocationDto } from "./dto/set-musician-touring-location.dto";
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
 import { UpdateMusicianProfileDto } from "./dto/update-musician-profile.dto";
@@ -93,6 +96,9 @@ export class MusiciansController {
 
   @Inject(SetMusicianOpenToGigsUseCase)
   private setOpenToGigsUseCase: SetMusicianOpenToGigsUseCase;
+
+  @Inject(SetMusicianRequestScopeUseCase)
+  private setRequestScopeUseCase: SetMusicianRequestScopeUseCase;
 
   @Inject(DeleteMusicianUseCase)
   private deleteUseCase: DeleteMusicianUseCase;
@@ -203,10 +209,19 @@ export class MusiciansController {
           cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
         },
       }),
-      limits: { fileSize: Number(process.env.MUSICIAN_AVATAR_MAX_SIZE ?? 5 * 1024 * 1024) },
+      limits: {
+        fileSize: Number(
+          process.env.MUSICIAN_AVATAR_MAX_SIZE ?? 5 * 1024 * 1024,
+        ),
+      },
       fileFilter: (_req, file, cb) => {
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
-          return cb(new Error("Only JPEG, PNG or WEBP images are allowed"), false);
+        if (
+          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
+        ) {
+          return cb(
+            new Error("Only JPEG, PNG or WEBP images are allowed"),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -221,22 +236,16 @@ export class MusiciansController {
     }
 
     try {
-      const { fileTypeFromBuffer } = await import("file-type");
-      const fd = await fs.open(file.path, "r");
-      const buf = Buffer.alloc(4100);
-      await fd.read(buf, 0, 4100, 0);
-      await fd.close();
-      const detected = await fileTypeFromBuffer(buf);
-      if (!detected || !["image/jpeg", "image/png", "image/webp"].includes(detected.mime)) {
-        throw new UnprocessableEntityException(
-          "Invalid file: only JPEG, PNG or WEBP images are accepted",
-        );
-      }
+      const detectedMime = await assertFileSignature(
+        file.path,
+        ["image/jpeg", "image/png", "image/webp"],
+        "Invalid file: only JPEG, PNG or WEBP images are accepted",
+      );
 
       const output = await this.uploadAvatarUseCase.execute({
         musician_id: id,
         data: createReadStream(file.path),
-        content_type: detected.mime,
+        content_type: detectedMime,
         file_size: file.size,
       });
 
@@ -269,10 +278,19 @@ export class MusiciansController {
           cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
         },
       }),
-      limits: { fileSize: Number(process.env.MUSICIAN_QR_LOGO_MAX_SIZE ?? 2 * 1024 * 1024) },
+      limits: {
+        fileSize: Number(
+          process.env.MUSICIAN_QR_LOGO_MAX_SIZE ?? 2 * 1024 * 1024,
+        ),
+      },
       fileFilter: (_req, file, cb) => {
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
-          return cb(new Error("Only JPEG, PNG or WEBP images are allowed"), false);
+        if (
+          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
+        ) {
+          return cb(
+            new Error("Only JPEG, PNG or WEBP images are allowed"),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -287,22 +305,16 @@ export class MusiciansController {
     }
 
     try {
-      const { fileTypeFromBuffer } = await import("file-type");
-      const fd = await fs.open(file.path, "r");
-      const buf = Buffer.alloc(4100);
-      await fd.read(buf, 0, 4100, 0);
-      await fd.close();
-      const detected = await fileTypeFromBuffer(buf);
-      if (!detected || !["image/jpeg", "image/png", "image/webp"].includes(detected.mime)) {
-        throw new UnprocessableEntityException(
-          "Invalid file: only JPEG, PNG or WEBP images are accepted",
-        );
-      }
+      const detectedMime = await assertFileSignature(
+        file.path,
+        ["image/jpeg", "image/png", "image/webp"],
+        "Invalid file: only JPEG, PNG or WEBP images are accepted",
+      );
 
       const output = await this.uploadQrLogoUseCase.execute({
         musician_id: id,
         data: createReadStream(file.path),
-        content_type: detected.mime,
+        content_type: detectedMime,
         file_size: file.size,
       });
 
@@ -382,6 +394,28 @@ export class MusiciansController {
     const output = await this.setOpenToGigsUseCase.execute({
       id,
       open_to_gigs: dto.open_to_gigs,
+    });
+    return MusiciansController.serialize(output);
+  }
+
+  @Patch(":id/request-scope")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Definir se o público pode pedir música fora do repertório",
+    description:
+      "Ligado (padrão), o fã busca no catálogo da plataforma e pode pedir qualquer música — o músico recusa o que não toca. Desligado, o pedido só é aceito acompanhado de uma música da biblioteca DESTE músico; a recusa passa a ser do servidor, não uma sugestão de UI.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async setRequestScope(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: SetMusicianRequestScopeDto,
+  ) {
+    const output = await this.setRequestScopeUseCase.execute({
+      id,
+      accepts_requests_outside_repertoire:
+        dto.accepts_requests_outside_repertoire,
     });
     return MusiciansController.serialize(output);
   }

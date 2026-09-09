@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { Type } from "class-transformer";
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class SearchRepertoiresDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })

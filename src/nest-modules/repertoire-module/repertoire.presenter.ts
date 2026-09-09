@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
 import {
   RepertoireInviteeOutput,
   RepertoireOutput,
@@ -35,6 +36,13 @@ export class RepertoireSongPresenter {
   @ApiPropertyOptional({ nullable: true, example: 210 })
   effective_duration_seconds: number | null;
 
+  @ApiProperty({
+    example: true,
+    description:
+      "Se há letra ou acordes prontos para o Play Mode exibir. false = abrir a música cai na tela 'Sem cifra disponível'.",
+  })
+  has_chord_sheet: boolean;
+
   constructor(output: RepertoireSongOutput) {
     this.song_id = output.song_id;
     this.music_library_id = output.music_library_id;
@@ -45,6 +53,7 @@ export class RepertoireSongPresenter {
     this.duration_override_seconds = output.duration_override_seconds;
     this.duration_seconds = output.duration_seconds;
     this.effective_duration_seconds = output.effective_duration_seconds;
+    this.has_chord_sheet = output.has_chord_sheet;
   }
 }
 
@@ -108,11 +117,14 @@ export class RepertoirePresenter {
     this.name = output.name;
     this.songs = output.songs.map((s) => new RepertoireSongPresenter(s));
     this.song_count = output.song_count;
-    this.estimated_show_duration_minutes = output.estimated_show_duration_minutes;
+    this.estimated_show_duration_minutes =
+      output.estimated_show_duration_minutes;
     this.is_shared = output.is_shared;
     this.share_token = output.share_token;
     this.share_token_expires_at = output.share_token_expires_at;
-    this.invitees = output.invitees.map((i) => new RepertoireInviteePresenter(i));
+    this.invitees = output.invitees.map(
+      (i) => new RepertoireInviteePresenter(i),
+    );
     this.created_at = output.created_at;
     this.updated_at = output.updated_at;
   }

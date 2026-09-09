@@ -1,8 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 
-import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-profile-output";
+import { IMusicianStorage } from "../../../core/musician/application/ports/musician-storage.interface";
 import { ClearMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
-import { SetMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
+import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-profile-output";
 import { CreateMusicianUseCase } from "../../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeleteMusicianUseCase } from "../../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
@@ -10,21 +10,21 @@ import { GetMusicianUseCase } from "../../../core/musician/application/use-cases
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
+import { SetMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { UpdateMusicianUseCase } from "../../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
 import { UploadQrLogoUseCase } from "../../../core/musician/application/use-cases/upload-qr-logo/upload-qr-logo.use-case";
-import { IMusicianStorage } from "../../../core/musician/application/ports/musician-storage.interface";
 import { VerifyMusicianUseCase } from "../../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
-import { PlanCheckService } from "../../../core/plans/domain/plan-check.service";
-import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
-import { SubscriptionInMemoryRepository } from "../../../core/plans/infra/db/in-memory/subscription-in-memory.repository";
 import {
   Musician,
   MusicianId,
 } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
+import { PlanCheckService } from "../../../core/plans/domain/plan-check.service";
+import { SubscriptionInMemoryRepository } from "../../../core/plans/infra/db/in-memory/subscription-in-memory.repository";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
   MusicianCollectionPresenter,
@@ -102,8 +102,10 @@ describe("MusiciansController Integration Tests", () => {
         },
         {
           provide: GetMusicianUseCase,
-          useFactory: (repo: IMusicianRepository, planCheck: PlanCheckService) =>
-            new GetMusicianUseCase(repo, planCheck),
+          useFactory: (
+            repo: IMusicianRepository,
+            planCheck: PlanCheckService,
+          ) => new GetMusicianUseCase(repo, planCheck),
           inject: ["MusicianRepository", "PlanCheckService"],
         },
         {
@@ -140,8 +142,10 @@ describe("MusiciansController Integration Tests", () => {
         },
         {
           provide: CustomizeQRCodeUseCase,
-          useFactory: (repo: IMusicianRepository, planCheck: PlanCheckService) =>
-            new CustomizeQRCodeUseCase(repo, planCheck),
+          useFactory: (
+            repo: IMusicianRepository,
+            planCheck: PlanCheckService,
+          ) => new CustomizeQRCodeUseCase(repo, planCheck),
           inject: ["MusicianRepository", "PlanCheckService"],
         },
         {
@@ -196,7 +200,9 @@ describe("MusiciansController Integration Tests", () => {
 
         expect(entity).toBeInstanceOf(Musician);
         expect(entity!.toJSON()).toMatchObject(expected);
-        expect(presenter.qr_code).toBe(`soundmeet://musician/${presenter.id}`);
+        expect(presenter.qr_code).toBe(
+          `https://soundmeet.com.br/musico/${presenter.id}`,
+        );
 
         const output = MusicianOutputMapper.toOutput(entity!);
         expect(presenter).toEqual(new MusicianPresenter(output));
@@ -229,7 +235,9 @@ describe("MusiciansController Integration Tests", () => {
         const entity = await repository.findById(new MusicianId(presenter.id));
 
         expect(entity!.toJSON()).toMatchObject(expected);
-        expect(presenter.qr_code).toBe(`soundmeet://musician/${presenter.id}`);
+        expect(presenter.qr_code).toBe(
+          `https://soundmeet.com.br/musico/${presenter.id}`,
+        );
 
         const output = MusicianOutputMapper.toOutput(entity!);
         expect(presenter).toEqual(new MusicianPresenter(output));
@@ -276,7 +284,7 @@ describe("MusiciansController Integration Tests", () => {
     expect(presenter.genres).toEqual(musician.genres);
     expect(presenter.instruments).toEqual(musician.instruments);
     expect(presenter.qr_code).toBe(
-      `soundmeet://musician/${musician.musician_id.id}`,
+      `https://soundmeet.com.br/musico/${musician.musician_id.id}`,
     );
   });
 

@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsDate,
   IsNotEmpty,
@@ -32,10 +33,15 @@ export class AddEventPerformerDto {
   @IsOptional()
   status?: EventMusicianStatus;
 
+  // Horário do SET do performer (não o do evento). Sem @Type o corpo JSON
+  // chega com string e o 422 sai antes do use case — ver
+  // `create-event.input.ts`.
+  @Type(() => Date)
   @IsDate()
   @IsOptional()
   start_at?: Date | null;
 
+  @Type(() => Date)
   @IsDate()
   @IsOptional()
   end_at?: Date | null;

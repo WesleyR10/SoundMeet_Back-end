@@ -20,6 +20,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
+import { RepertoireOutput } from "../../core/repertoire/application/use-cases/common/repertoire-output";
 import {
   AddSongUseCase,
   CheckRepertoireSongAccessUseCase,
@@ -38,13 +39,12 @@ import {
   ShareRepertoireUseCase,
   UnshareRepertoireUseCase,
 } from "../../core/repertoire/application/use-cases/index";
-import { RepertoireOutput } from "../../core/repertoire/application/use-cases/common/repertoire-output";
 import { Repertoire } from "../../core/repertoire/domain/repertoire.aggregate";
 import { NotFoundError } from "../../core/shared/domain/errors/not-found.error";
 import { GetChordSheetForMusicLibraryUseCase } from "../../core/synced-lyrics/application/use-cases/get-chord-sheet-for-music-library/get-chord-sheet-for-music-library.use-case";
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   MusicianOwnershipGuard,
@@ -118,7 +118,10 @@ export class RepertoireController {
   @Post()
   @Roles("musician", "admin")
   @UseGuards(MusicianOwnershipGuard)
-  @ApiOperation({ summary: "Criar repertório", description: "Gate de plano: max_repertoires." })
+  @ApiOperation({
+    summary: "Criar repertório",
+    description: "Gate de plano: max_repertoires.",
+  })
   @ApiParam({ name: "musician_id", format: "uuid" })
   @ApiResponse({ status: 201, type: RepertoirePresenter })
   async create(
@@ -256,7 +259,8 @@ export class RepertoireController {
   @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Reordenar músicas",
-    description: "Recebe todos os song_ids na nova ordem. Posições recalculadas 1..N.",
+    description:
+      "Recebe todos os song_ids na nova ordem. Posições recalculadas 1..N.",
   })
   @ApiParam({ name: "musician_id", format: "uuid" })
   @ApiParam({ name: "repertoire_id", format: "uuid" })
@@ -412,7 +416,8 @@ export class RepertoirePublicController {
   @Get("shared/:token")
   @ApiOperation({
     summary: "Acessar repertório compartilhado publicamente",
-    description: "Busca repertório por token público. Token tem 7 dias de expiração.",
+    description:
+      "Busca repertório por token público. Token tem 7 dias de expiração.",
   })
   @ApiParam({ name: "token", format: "uuid" })
   @ApiResponse({ status: 200, type: RepertoirePresenter })
@@ -429,8 +434,10 @@ export class RepertoirePublicController {
   @Public()
   @Get("shared/:token/songs/:music_library_id/chord-sheet")
   @ApiOperation({
-    summary: "Buscar cifra de uma música de um repertório compartilhado publicamente",
-    description: "Token válido e não expirado + música precisa pertencer ao repertório.",
+    summary:
+      "Buscar cifra de uma música de um repertório compartilhado publicamente",
+    description:
+      "Token válido e não expirado + música precisa pertencer ao repertório.",
   })
   @ApiParam({ name: "token", format: "uuid" })
   @ApiParam({ name: "music_library_id", format: "uuid" })
@@ -464,13 +471,12 @@ export class RepertoireInvitesController {
   @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Listar repertórios que fui convidado",
-    description: "Retorna os repertórios de outros músicos onde o músico autenticado é um convidado.",
+    description:
+      "Retorna os repertórios de outros músicos onde o músico autenticado é um convidado.",
   })
   @ApiParam({ name: "musician_id", format: "uuid" })
   @ApiResponse({ status: 200, type: [RepertoirePresenter] })
-  async listMyInvites(
-    @Param("musician_id", UUID_PIPE) musician_id: string,
-  ) {
+  async listMyInvites(@Param("musician_id", UUID_PIPE) musician_id: string) {
     const outputs = await this.listMyInvitesUseCase.execute({ musician_id });
     return outputs.map((o) => new RepertoirePresenter(o));
   }

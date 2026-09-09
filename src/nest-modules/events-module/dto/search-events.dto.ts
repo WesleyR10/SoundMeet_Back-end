@@ -23,8 +23,25 @@ export class SearchEventsDto implements Omit<
   @IsOptional()
   per_page?: number;
 
+  /**
+   * ⚠️ Nome da COLUNA do Prisma, não do domínio — é o que
+   * `EventPrismaRepository.sortableFields` aceita (`["startTime",
+   * "created_at", "name"]`). Campo fora da lista lança `InvalidArgumentError`
+   * e vira 422; não há fallback silencioso.
+   *
+   * O enum anterior anunciava `start_at` e `updated_at`, que **não existem**
+   * na lista — quem seguisse o Swagger tomava 422 (verificado por HTTP em
+   * 08/ago/2026). Este DTO serve às três listagens do módulo, e cada
+   * repositório tem a sua lista; as outras duas estão citadas abaixo para não
+   * ser preciso caçá-las:
+   *   - attendees  → ["joinedAt", "leftAt"]
+   *   - performers → ["created_at", "status", "fee"]
+   */
   @ApiPropertyOptional({
-    enum: ["name", "startTime", "start_at", "created_at", "updated_at"],
+    description:
+      "Campo de ordenação. Eventos: name | startTime | created_at. " +
+      "Attendees: joinedAt | leftAt. Performers: created_at | status | fee.",
+    enum: ["name", "startTime", "created_at"],
   })
   @IsString()
   @IsOptional()

@@ -11,14 +11,18 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 
 import { ListMusicLibraryUseCase } from "../../core/music-library/application/use-cases/list-music-library/list-music-library.use-case";
+import { SearchSongCatalogUseCase } from "../../core/music-library/application/use-cases/search-song-catalog/search-song-catalog.use-case";
 import {
   AuthGuard,
   CurrentUserContextGuard,
   Public,
+  Roles,
   RolesGuard,
 } from "../auth-module";
 import { SearchPublicRepertoireDto } from "./dto/search-public-repertoire.dto";
+import { SearchSongCatalogDto } from "./dto/search-song-catalog.dto";
 import { PublicMusicLibraryCollectionPresenter } from "./public-music-library.presenter";
+import { SongCatalogPresenter } from "./song-catalog.presenter";
 
 /**
  * Catálogo de músicas de um músico, visível a quem vai **pedir** (Bloco 9.6c).
@@ -43,6 +47,9 @@ import { PublicMusicLibraryCollectionPresenter } from "./public-music-library.pr
 export class PublicRepertoireController {
   @Inject(ListMusicLibraryUseCase)
   private listUseCase: ListMusicLibraryUseCase;
+
+  @Inject(SearchSongCatalogUseCase)
+  private searchCatalogUseCase: SearchSongCatalogUseCase;
 
   @Get(":musician_id/repertoire")
   @Public()
@@ -77,5 +84,37 @@ export class PublicRepertoireController {
     });
 
     return new PublicMusicLibraryCollectionPresenter(output);
+  }
+
+  /**
+   * Catálogo para o fã escolher a música do pedido.
+   *
+   * NÃO é `@Public()`, ao contrário da rota de repertório acima: `POST
+   * /requests` já exige fã autenticado, então uma busca anônima aqui só
+   * acrescentaria uma superfície raspável do catálogo inteiro da plataforma —
+   * o mesmo buraco do SM-026, agora com o nosso banco no lugar da LRCLIB.
+   */
+  @Get(":musician_id/song-catalog")
+  @Roles("audience", "musician", "admin")
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @ApiOperation({
+    summary: "Catálogo de músicas para pedir a este músico",
+    description:
+      "Devolve `scope`: `platform` (o músico aceita pedidos de qualquer música e a busca varre tudo que a plataforma já cifrou) ou `repertoire` (ele só aceita o próprio repertório). Quem decide é o músico — o cliente não escolhe o escopo. Metadado apenas: nunca acordes, cifra, letra, nem o dono de nenhuma linha.",
+  })
+  @ApiParam({ name: "musician_id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: SongCatalogPresenter })
+  async songCatalog(
+    @Param("musician_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    musicianId: string,
+    @Query() query: SearchSongCatalogDto,
+  ) {
+    const output = await this.searchCatalogUseCase.execute({
+      musician_id: musicianId,
+      term: query.term ?? null,
+      limit: query.limit,
+    });
+
+    return new SongCatalogPresenter(output);
   }
 }

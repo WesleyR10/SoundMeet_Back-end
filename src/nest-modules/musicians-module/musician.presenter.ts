@@ -12,6 +12,7 @@ export class MusicianPresenter {
   bio: string | null;
   avatar: string | null;
   phone: string | null;
+  cnpj: string | null;
   qr_code: string | null;
   qr_customization: MusicianOutput["qr_customization"];
   rating: number;
@@ -19,6 +20,15 @@ export class MusicianPresenter {
   is_active: boolean;
   is_verified: boolean;
   open_to_gigs: boolean | null;
+  /**
+   * O público pode pedir música fora do repertório deste músico.
+   *
+   * Sai também no presenter PÚBLICO de propósito: é a tela do fã que
+   * decide onde buscar e qual aviso mostrar. Não é PII — descreve como
+   * este músico recebe pedidos, exatamente como `open_to_gigs` descreve
+   * se ele aceita contratação.
+   */
+  accepts_requests_outside_repertoire: boolean;
   genres: string[];
   instruments: string[];
   experience_years: number;
@@ -40,6 +50,7 @@ export class MusicianPresenter {
     this.bio = output.bio;
     this.avatar = output.avatar;
     this.phone = output.phone;
+    this.cnpj = output.cnpj;
     this.qr_code = output.qr_code;
     this.qr_customization = output.qr_customization;
     this.plan_tier = output.plan_tier;
@@ -48,6 +59,8 @@ export class MusicianPresenter {
     this.is_active = output.is_active;
     this.is_verified = output.is_verified;
     this.open_to_gigs = output.open_to_gigs;
+    this.accepts_requests_outside_repertoire =
+      output.accepts_requests_outside_repertoire;
     this.genres = output.genres;
     this.instruments = output.instruments;
     this.experience_years = output.experience_years;
@@ -60,7 +73,7 @@ export class MusicianPresenter {
   }
 }
 
-// Versão sem PII (email/phone) — usada em toda visão pública/de terceiro:
+// Versão sem PII (email/phone/cnpj) — usada em toda visão pública/de terceiro:
 // GET /musicians (lista, sempre) e GET /musicians/:id quando quem chama não é
 // o próprio músico nem admin. O dono continua recebendo MusicianPresenter
 // completo através da mesma rota, condicionado no controller (ver findOne).
@@ -77,6 +90,15 @@ export class PublicMusicianPresenter {
   is_active: boolean;
   is_verified: boolean;
   open_to_gigs: boolean | null;
+  /**
+   * O público pode pedir música fora do repertório deste músico.
+   *
+   * Sai também no presenter PÚBLICO de propósito: é a tela do fã que
+   * decide onde buscar e qual aviso mostrar. Não é PII — descreve como
+   * este músico recebe pedidos, exatamente como `open_to_gigs` descreve
+   * se ele aceita contratação.
+   */
+  accepts_requests_outside_repertoire: boolean;
   genres: string[];
   instruments: string[];
   experience_years: number;
@@ -104,6 +126,8 @@ export class PublicMusicianPresenter {
     this.is_active = output.is_active;
     this.is_verified = output.is_verified;
     this.open_to_gigs = output.open_to_gigs;
+    this.accepts_requests_outside_repertoire =
+      output.accepts_requests_outside_repertoire;
     this.genres = output.genres;
     this.instruments = output.instruments;
     this.experience_years = output.experience_years;
