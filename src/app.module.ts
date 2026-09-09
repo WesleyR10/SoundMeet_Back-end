@@ -9,6 +9,7 @@ import { HealthController } from "./health.controller";
 import { AiAudioModule } from "./nest-modules/ai-audio-module/ai-audio.module";
 import { AiCifraModule } from "./nest-modules/ai-cifra-module/ai-cifra.module";
 import { AudiencesModule } from "./nest-modules/audiences-module/audiences.module";
+import { AuthGuard } from "./nest-modules/auth-module/auth.guard";
 import { AuthModule } from "./nest-modules/auth-module/auth.module";
 import { CampaignModule } from "./nest-modules/campaign-module/campaign.module";
 import { ChatModule } from "./nest-modules/chat-module/chat.module";
@@ -22,6 +23,7 @@ import { DatabaseModule } from "./nest-modules/database-module/database.module";
 import { EstablishmentsModule } from "./nest-modules/establishments-module/establishments.module";
 import { EventModule } from "./nest-modules/events-module/events.module";
 import { GamificationModule } from "./nest-modules/gamification-module/gamification.module";
+import { IndicationsModule } from "./nest-modules/indications-module/indications.module";
 import { GoogleCalendarModule } from "./nest-modules/google-calendar-module/google-calendar.module";
 import { MailModule } from "./nest-modules/mail-module/mail.module";
 import { MusicLibraryModule } from "./nest-modules/music-library-module/music-library.module";
@@ -38,6 +40,7 @@ import { RequestsModule } from "./nest-modules/requests-module/requests.module";
 import { ReviewsModule } from "./nest-modules/reviews-module/reviews.module";
 import { SchedulingModule } from "./nest-modules/scheduling-module/scheduling.module";
 import { UserThrottlerGuard } from "./nest-modules/shared-module/guards/user-throttler.guard";
+import { RedisThrottlerStorage } from "./nest-modules/shared-module/throttler/redis-throttler.storage";
 import { SyncedLyricsModule } from "./nest-modules/synced-lyrics-module/synced-lyrics.module";
 
 const normalizeTransport = (value: string | undefined, fallback: string) =>
@@ -65,12 +68,33 @@ const shouldRegisterRabbitmqHandlers =
     ConfigModuleRoot.forRoot(),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<EnvConfig>) => [
-        {
-          ttl: (config.get<number>("RATE_LIMIT_TTL") ?? 60) * 1000,
-          limit: config.get<number>("RATE_LIMIT_MAX") ?? 100,
-        },
-      ],
+      useFactory: (config: ConfigService<EnvConfig>) => {
+        const throttlers = [
+          {
+            ttl: (config.get<number>("RATE_LIMIT_TTL") ?? 60) * 1000,
+            limit: config.get<number>("RATE_LIMIT_MAX") ?? 100,
+          },
+        ];
+
+        /*
+         * Storage compartilhado em Redis para o limite valer em cluster (A3).
+         * Fora dele o balde vive na memória de cada instância e o limite efetivo
+         * é `limit × Nº de instâncias`. Em `test` fica em memória de propósito —
+         * as suítes não sobem Redis e o storage padrão não depende dele; sem
+         * `REDIS_URL` idem, para não quebrar dev offline. O storage é fail-open:
+         * Redis fora do ar afrouxa o limite, nunca derruba o request.
+         */
+        const redisUrl = config.get<string>("REDIS_URL");
+        const isTest = config.get<string>("NODE_ENV") === "test";
+        if (isTest || !redisUrl) {
+          return { throttlers };
+        }
+
+        return {
+          throttlers,
+          storage: new RedisThrottlerStorage(redisUrl),
+        };
+      },
     }),
     RabbitmqModule.forRoot({ enableConsumers: shouldRegisterRabbitmqHandlers }),
 
@@ -85,6 +109,7 @@ const shouldRegisterRabbitmqHandlers =
     EventModule,
     SchedulingModule,
     GamificationModule,
+    IndicationsModule,
     MusicLibraryModule,
     PaymentModule,
     PlansModule,
@@ -113,12 +138,33 @@ const shouldRegisterRabbitmqHandlers =
   ],
   controllers: [HealthController],
   /*
-   * `UserThrottlerGuard` no lugar do `ThrottlerGuard` padrão: o tracker passa a
-   * ser o `sub` do JWT, com fallback para IP em rota anônima. Sem isso, o
-   * `soundmeet-web` — onde todo tráfego sai do IP do BFF — compartilhava um
-   * único balde de RATE_LIMIT_MAX entre todos os operadores do painel. Ver o
-   * cabeçalho do guard.
+   * A ORDEM DESTE ARRAY É A ORDEM DE EXECUÇÃO. Não reordenar sem ler abaixo.
+   *
+   * 1) `UserThrottlerGuard` no lugar do `ThrottlerGuard` padrão: o tracker passa
+   *    a ser o `sub` do JWT, com fallback para IP em rota anônima. Sem isso, o
+   *    `soundmeet-web` — onde todo tráfego sai do IP do BFF — compartilhava um
+   *    único balde de RATE_LIMIT_MAX entre todos os operadores do painel. Ver o
+   *    cabeçalho do guard.
+   *
+   * 2) `AuthGuard` global (AUTH-2): no Nest, **não autenticado é o default** —
+   *    uma rota sem `@UseGuards(AuthGuard)` nasce pública, e esquecer o guard
+   *    não quebra o build. Foi assim que `GET /synced-lyrics/search` virou proxy
+   *    grátis da LRCLIB (SM-026). Com o guard global a omissão passa a falhar
+   *    fechado: quem quiser rota anônima escreve `@Public()` de propósito.
+   *    O guard trata `@Public()` com soft-auth — ver `auth.guard.ts`.
+   *
+   * 🔴 O throttler vem PRIMEIRO de propósito. Guards globais rodam na ordem de
+   * registro; com o `AuthGuard` na frente, uma requisição com token inválido
+   * levaria 401 **sem passar pelo rate limiter**, e tentativas com token forjado
+   * deixariam de ser contadas — justamente o cenário de força bruta que o limite
+   * existe para conter. O custo é uma verificação RSA a mais por request
+   * autenticado (o throttler faz a sua, o AuthGuard faz a dele), explicado no
+   * cabeçalho de `user-throttler.guard.ts`. É ruído perto de qualquer ida ao
+   * banco, e inverter a ordem para economizá-la trocaria defesa por microssegundo.
    */
-  providers: [{ provide: APP_GUARD, useClass: UserThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
+    { provide: APP_GUARD, useClass: AuthGuard },
+  ],
 })
 export class AppModule {}
