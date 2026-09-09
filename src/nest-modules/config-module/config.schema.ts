@@ -9,6 +9,10 @@ export type EnvConfig = {
 
   SWAGGER_EXAMPLES_ENABLED?: boolean;
   SWAGGER_EXAMPLES_REQUIRED_ONLY?: boolean;
+  /** SM-020 — falso por padrão em produção; `/api/docs` responde 404. */
+  SWAGGER_ENABLED?: boolean;
+  /** SM-020 — origens do CORS separadas por vírgula. Obrigatória em produção. */
+  CORS_ALLOWED_ORIGINS?: string;
 
   // Database URLs
   DATABASE_URL: string;
@@ -36,7 +40,8 @@ export type EnvConfig = {
   KEYCLOAK_REALM: string;
   KEYCLOAK_CLIENT_ID: string;
   KEYCLOAK_CLIENT_SECRET: string;
-  KEYCLOAK_MOBILE_CLIENT_ID: string;
+  KEYCLOAK_REGISTRATION_CLIENT_ID: string;
+  KEYCLOAK_REGISTRATION_CLIENT_SECRET: string;
   KEYCLOAK_INTERNAL_URL?: string;
   KEYCLOAK_JWKS_URI?: string;
   KEYCLOAK_JWKS_CACHE_TTL_SECONDS?: number;
@@ -72,6 +77,25 @@ export type EnvConfig = {
   CLOUDFLARE_R2_SECRET_ACCESS_KEY?: string;
   CLOUDFLARE_R2_BUCKET?: string;
 
+  // Contrato digital (F1.3b) — storage PRIVADO, bucket próprio.
+  // Nunca compartilhar o bucket público de mídia: o documento tem CPF, CNPJ,
+  // endereço e valor de cachê.
+  CONTRACT_STORAGE_PROVIDER?: "minio" | "aws_s3" | "cloudflare_r2";
+  CONTRACT_STORAGE_BUCKET?: string;
+  /** Base da página pública de verificação, impressa no rodapé do documento. */
+  CONTRACT_VERIFICATION_BASE_URL?: string;
+  /** Identificação da plataforma no documento (não a torna parte do contrato). */
+  CONTRACT_ISSUER_LEGAL_NAME?: string;
+  CONTRACT_ISSUER_DOCUMENT?: string;
+  /**
+   * Segredo do HMAC do código de assinatura (segundo fator).
+   *
+   * O código tem 6 dígitos — 1 milhão de possibilidades. Guardado como hash
+   * sem chave, um dump do Redis se converte nos códigos vivos por tabela
+   * pré-computada. Com este segredo, não. Gerar com `openssl rand -hex 32`.
+   */
+  CONTRACT_CHALLENGE_SECRET?: string;
+
   // AI Audio
   AI_AUDIO_STORAGE_PROVIDER?: "minio" | "aws_s3" | "cloudflare_r2";
   AI_AUDIO_SEPARATION_HTTP_BASE_URL?: string;
@@ -89,6 +113,12 @@ export type EnvConfig = {
   AI_AUDIO_MAX_FILE_SIZE?: number;
   AI_AUDIO_ALLOWED_MIME_TYPES?: string;
   AI_AUDIO_DEFAULT_MODEL_ID?: string;
+  /**
+   * Horas que os stems separados ficam no storage antes de a varredura apagá-los.
+   * Curto de propósito — stem é a gravação, separada; ver
+   * `core/ai-audio/domain/stems-retention.ts`.
+   */
+  AI_AUDIO_STEMS_RETENTION_HOURS?: number;
   AI_AUDIO_PROGRESS_TOKEN?: string;
 
   RABBITMQ_ROUTING_KEY_AI_CIFRA_ANALYSIS_REQUESTED?: string;
@@ -126,6 +156,14 @@ export type EnvConfig = {
   AI_CIFRA_ALLOWED_MIME_TYPES?: string;
   AI_CIFRA_DEFAULT_MODEL_ID?: string;
   AI_CIFRA_PROGRESS_TOKEN?: string;
+  /**
+   * Shared secret que o backend envia ao chamar os workers de IA (ai-cifra e
+   * ai-audio-separation) no header `x-ai-worker-token`, e que os workers
+   * validam (fail-closed). Protege endpoints internos que baixam qualquer
+   * objeto do bucket com credenciais próprias e consomem GPU — antes abertos a
+   * qualquer um na rede. Ver `Docs/audits/security-review-2026-08-28.md` (A-10).
+   */
+  AI_WORKER_TOKEN?: string;
   AI_CIFRA_AUDIO_TTL_MINUTES?: number;
   AI_CIFRA_SIMPMUSIC_YTDLP_BIN?: string;
   AI_CIFRA_SIMPMUSIC_YTDLP_TIMEOUT_MS?: number;
@@ -135,8 +173,30 @@ export type EnvConfig = {
   // External APIs
   CIFRA_CLUB_API_KEY?: string;
   ULTIMATE_GUITAR_API_KEY?: string;
+  /**
+   * App do Spotify — vínculo OAuth do FÃ ("salvar a música que ouvi ao vivo").
+   *
+   * ⚠️ Estas duas viveram anos aqui sem nenhum consumidor, agrupadas com as
+   * APIs de letra/cifra. Desde 21/ago/2026 elas alimentam o
+   * `SpotifyAdapter` — não são mais placeholders.
+   *
+   * Ausentes = a feature não liga (o provider devolve `null` e a rota responde
+   * "indisponível"), em vez de subir com credencial vazia e falhar no toque do
+   * usuário.
+   */
   SPOTIFY_CLIENT_ID?: string;
   SPOTIFY_CLIENT_SECRET?: string;
+  /** Para onde o Spotify devolve o `code`. Precisa bater com o app registrado. */
+  SPOTIFY_REDIRECT_URI?: string;
+  /** Deep link de volta para o app depois do callback. */
+  SPOTIFY_APP_RETURN_URL?: string;
+  SPOTIFY_ACCOUNTS_URL?: string;
+  SPOTIFY_API_URL?: string;
+  /**
+   * Mercado usado no casamento de faixa (ISO 3166-1 alpha-2). Faixa
+   * indisponível no país não deve ser sugerida — o fã tocaria num link morto.
+   */
+  SPOTIFY_MARKET?: string;
   GENIUS_CLIENT_ID?: string;
   GENIUS_CLIENT_SECRET?: string;
   GENIUS_ACCESS_TOKEN?: string;
@@ -168,16 +228,86 @@ export type EnvConfig = {
   ASAAS_WALLET_ID?: string;
   ASAAS_WEBHOOK_TOKEN?: string;
 
-  // Iugu — gorjetas PIX
-  IUGU_API_URL: string;
-  IUGU_API_TOKEN?: string;
-  IUGU_ACCOUNT_ID?: string;
-  IUGU_WEBHOOK_TOKEN?: string;
+  // ─── Mercado Pago (gateway da GORJETA) ─────────────────────────────────
+  /**
+   * O vértice da gorjeta roda no MP, e não no Asaas: 0,99% **sem piso** contra
+   * R$1,99 **fixos**. Num ticket de R$5–60 a taxa fixa dá prejuízo abaixo de
+   * R$22 no plano FREE. Ver `Docs/payment-gateway-research-2026-08.md`.
+   *
+   * Ausente = gorjeta cai no `PixGatewayMock` (nada real é processado).
+   */
+  MERCADOPAGO_API_URL?: string;
+  /** App do marketplace — usados só no fluxo OAuth de vínculo do músico. */
+  MERCADOPAGO_CLIENT_ID?: string;
+  MERCADOPAGO_CLIENT_SECRET?: string;
+  /** Para onde o MP devolve o `code` depois da autorização. */
+  MERCADOPAGO_REDIRECT_URI?: string;
+  /**
+   * Taxa do Mercado Pago por PIX recebido, em % (padrão 0,99).
+   *
+   * 🔴 Ela é DESCONTADA da comissão da plataforma, não somada a ela: a tabela
+   * de preços promete "9% / 7% / 5% (**1% gateway incluso**)", e no marketplace
+   * do MP a taxa dele sai do bruto antes da nossa. Sem esse desconto o músico
+   * receberia 1pp a menos do que foi anunciado.
+   *
+   * Configurável porque o MP tem faixa de 0,49% para CNPJ com volume.
+   */
+  MERCADOPAGO_FEE_PERCENTAGE?: number;
+  /**
+   * Para onde o callback redireciona o NAVEGADOR depois de vincular.
+   *
+   * Deep link do app (`soundmeet://...`) por padrão — o músico sai do navegador
+   * e volta para a tela de carteira, que é de onde ele saiu.
+   */
+  MERCADOPAGO_APP_RETURN_URL?: string;
+  /**
+   * Segredo da assinatura `x-signature` do webhook.
+   *
+   * 🔴 Sem ele o controller recusa TUDO (fail-closed): um webhook sem
+   * autenticação deixaria qualquer POST confirmar gorjetas.
+   */
+  MERCADOPAGO_WEBHOOK_SECRET?: string;
+  /**
+   * Access token da conta da PLATAFORMA.
+   *
+   * ⚠️ **Não é usado para criar gorjeta.** A cobrança é criada com o token do
+   * MÚSICO (OAuth) — é isso que faz o dinheiro cair na conta dele em vez da
+   * nossa. Fica declarado para chamadas administrativas eventuais; usá-lo no
+   * fluxo de gorjeta desfaria a arquitetura inteira.
+   */
+  MERCADOPAGO_PLATFORM_ACCESS_TOKEN?: string;
+  /**
+   * Public key do SDK de front-end (tokenização de cartão).
+   *
+   * Hoje nada no SoundMeet usa: a gorjeta é PIX e o cartão da assinatura roda
+   * no Asaas. Declarada para o dia em que houver checkout de cartão no web.
+   */
+  MERCADOPAGO_PUBLIC_KEY?: string;
+  /**
+   * Custódia do cachê (F1.3a). 🔴 Ligar isto muda o CONTRATO: passa a
+   * selecionar a variante `cache_pagamento.com_custodia` e a incluir a cláusula
+   * `custodia_liberacao`. Só ligue com a Conta Escrow de fato habilitada no
+   * provedor — contrato que promete custódia sem custódia é declaração falsa.
+   */
+  ESCROW_ENABLED?: boolean;
+  /**
+   * Razão social da INSTITUIÇÃO DE PAGAMENTO que mantém o valor.
+   *
+   * 🔴 Nunca "SoundMeet". A cláusula afirma que o valor custodiado não integra
+   * o patrimônio da plataforma. Sem este nome, o escrow não é ligado no
+   * contrato (falha para o lado seguro).
+   */
+  ESCROW_CUSTODIAN_LEGAL_NAME?: string;
 
   // Email — Resend
   RESEND_API_KEY?: string;
   MAIL_FROM?: string;
-  MAIL_BASE_URL?: string;
+  // MAIL_BASE_URL foi REMOVIDA em 28/set/2026. Valia
+  // `https://api.soundmeet.com.br` e servia apenas ao link de verificação de
+  // e-mail — que passou a apontar para a PÁGINA do web (`APP_URL` +
+  // `/verificar-email`), não para a API. Mantê-la aqui deixaria uma variável
+  // que o `.env` define e nada lê: o mesmo tipo de mentira silenciosa do
+  // `verifyEmail: true` que não verificava nada.
 
   // Rate Limiting
   RATE_LIMIT_TTL: number;
@@ -200,11 +330,22 @@ export type EnvConfig = {
   MAX_REQUESTS_PER_USER_PER_EVENT: number;
   REQUEST_COOLDOWN_MINUTES: number;
   REQUEST_RESPONSE_TIME_MINUTES: number;
+  /** Piso do destaque pago (R$). Ver `BoostMinimumAmountPolicy`. */
+  REQUEST_BOOST_MIN_AMOUNT: number;
+  /** Janela para pagar o destaque depois do aceite. Conta do aceite. */
+  REQUEST_BOOST_PAYMENT_WINDOW_MINUTES: number;
   VOTING_INTERVAL_MINUTES: number;
 
   // Scheduling
   BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: number;
   BOOKING_COMPLETION_DELAY_HOURS: number;
+
+  /**
+   * Carência de saque após trocar a chave PIX (A1 camada 2). Saque para uma
+   * chave trocada há menos de X horas é bloqueado, dando ao dono tempo de reagir
+   * à notificação. `0` desliga a carência.
+   */
+  PIX_KEY_CHANGE_COOLDOWN_HOURS: number;
 
   // Prisma
   PRISMA_LOG_QUERIES: boolean;

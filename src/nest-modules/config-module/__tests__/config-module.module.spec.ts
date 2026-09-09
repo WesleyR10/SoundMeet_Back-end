@@ -39,9 +39,44 @@ describe("Schema Unit Tests", () => {
     KEYCLOAK_URL: "http://localhost:8080",
     KEYCLOAK_CLIENT_ID: "soundmeet-api",
     KEYCLOAK_CLIENT_SECRET: "secret",
+    KEYCLOAK_REGISTRATION_CLIENT_SECRET: "registration-secret",
     JWT_SECRET: "jwt-secret",
     JWT_REFRESH_SECRET: "jwt-refresh-secret",
   };
+
+  // SM-020 — a superfície HTTP muda de default conforme o ambiente, e o
+  // ambiente errado é justamente onde ninguém olha.
+  describe("SM-020 — Swagger e CORS por ambiente", () => {
+    test("produção EXIGE CORS_ALLOWED_ORIGINS — sem default", () => {
+      expectValidate(schema, {
+        ...minimalRequired,
+        NODE_ENV: "production",
+      }).toContain('"CORS_ALLOWED_ORIGINS" is required');
+    });
+
+    test("fora de produção, o default cobre localhost", () => {
+      const { value } = schema.validate({
+        ...minimalRequired,
+        NODE_ENV: "development",
+      });
+      expect(value.CORS_ALLOWED_ORIGINS).toContain("http://localhost:3000");
+    });
+
+    test("SWAGGER_ENABLED nasce false em produção e true fora dela", () => {
+      const prod = schema.validate({
+        ...minimalRequired,
+        NODE_ENV: "production",
+        CORS_ALLOWED_ORIGINS: "https://app.soundmeet.com.br",
+      });
+      expect(prod.value.SWAGGER_ENABLED).toBe(false);
+
+      const dev = schema.validate({
+        ...minimalRequired,
+        NODE_ENV: "development",
+      });
+      expect(dev.value.SWAGGER_ENABLED).toBe(true);
+    });
+  });
 
   describe("required env vars", () => {
     test("invalid cases", () => {
@@ -105,7 +140,7 @@ describe("Schema Unit Tests", () => {
       const validated = schema.validate(minimalRequired).value;
 
       expect(validated.PORT).toBe(3000);
-      expect(validated.APP_URL).toBe("https://soundmeet.app");
+      expect(validated.APP_URL).toBe("https://soundmeet.com.br");
       expect(validated.RABBITMQ_EXCHANGE).toBe("soundmeet.exchange");
       expect(validated.MINIO_PORT).toBe(9000);
       expect(validated.PRISMA_LOG_QUERIES).toBe(false);

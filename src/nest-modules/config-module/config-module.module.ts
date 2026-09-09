@@ -15,9 +15,49 @@ export const CONFIG_ENV_SCHEMA = {
     .valid("development", "production", "test")
     .default("development"),
   PORT: Joi.number().default(3000),
-  APP_URL: Joi.string().default("https://soundmeet.app"),
+  APP_URL: Joi.string().default("https://soundmeet.com.br"),
   SWAGGER_EXAMPLES_ENABLED: Joi.boolean().default(true),
   SWAGGER_EXAMPLES_REQUIRED_ONLY: Joi.boolean().default(false),
+
+  /*
+   * SM-020 — a documentação some em produção por PADRÃO, e é preciso ligá-la
+   * de propósito.
+   *
+   * `/api/docs` é o mapa completo da API: toda rota, todo DTO, todo campo,
+   * incluindo as administrativas. Não é segredo em si — segurança não pode
+   * depender de esconder o contrato —, mas é o atalho que transforma
+   * reconhecimento em enumeração pronta. Desligado aqui, a rota devolve 404
+   * como qualquer outra que não existe.
+   *
+   * O default inverte por ambiente porque o custo do engano é assimétrico:
+   * esquecer de ligar em dev custa um `SWAGGER_ENABLED=true`, esquecer de
+   * desligar em produção publica o mapa.
+   */
+  SWAGGER_ENABLED: Joi.boolean().when("NODE_ENV", {
+    is: "production",
+    then: Joi.boolean().default(false),
+    otherwise: Joi.boolean().default(true),
+  }),
+
+  /*
+   * Origens permitidas no CORS, separadas por vírgula.
+   *
+   * 🔴 Em produção é OBRIGATÓRIA e não tem default. Antes o `main.ts` embutia
+   * `http://localhost:3000/3001/8080` na allowlist de TODOS os ambientes, com
+   * `credentials: true` — ou seja, qualquer página servida do localhost da
+   * máquina de um usuário logado podia chamar a API de produção com o cookie
+   * dele. Uma allowlist que sempre contém localhost não é allowlist.
+   *
+   * Sem default em produção porque o valor certo é específico do deploy:
+   * qualquer palpite nosso seria ou permissivo demais ou quebraria o front.
+   */
+  CORS_ALLOWED_ORIGINS: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().required(),
+    otherwise: Joi.string().default(
+      "http://localhost:3000,http://localhost:3001,http://localhost:8080",
+    ),
+  }),
 };
 
 export const CONFIG_DATABASE_CACHE_SCHEMA = {
@@ -61,7 +101,22 @@ export const CONFIG_AUTH_SCHEMA = {
   KEYCLOAK_REALM: Joi.string().default("soundmeet"),
   KEYCLOAK_CLIENT_ID: Joi.string().required(),
   KEYCLOAK_CLIENT_SECRET: Joi.string().required(),
-  KEYCLOAK_MOBILE_CLIENT_ID: Joi.string().default("soundmeet-mobile"),
+  /*
+   * AUTH-1 — client CONFIDENCIAL do auto-login pós-cadastro.
+   *
+   * O `soundmeet-mobile` deixou de aceitar Direct Access Grant: o client_id dele
+   * viaja dentro do APK, então qualquer script batia direto no `/token` do
+   * Keycloak com e-mail e senha, pulando o `@Throttle` do Nest inteiro.
+   *
+   * O cadastro ainda precisa devolver sessão (o usuário acabou de escolher a
+   * senha; mandá-lo à tela de login em seguida seria pedir para digitar duas
+   * vezes), e para isso o grant de senha continua existindo — mas atrás de um
+   * secret que só o backend tem, onde o rate limit da nossa API é inescapável.
+   */
+  KEYCLOAK_REGISTRATION_CLIENT_ID: Joi.string().default(
+    "soundmeet-registration",
+  ),
+  KEYCLOAK_REGISTRATION_CLIENT_SECRET: Joi.string().required(),
   KEYCLOAK_INTERNAL_URL: Joi.string().uri().optional(),
   KEYCLOAK_JWKS_URI: Joi.string().uri().optional(),
   KEYCLOAK_JWKS_CACHE_TTL_SECONDS: Joi.number().min(1).default(300),
@@ -72,11 +127,15 @@ export const CONFIG_AUTH_SCHEMA = {
   // Clients autorizados a emitir token para esta API (claim `azp`). Vazio =
   // camada extra desligada; a checagem de `aud` continua valendo.
   KEYCLOAK_ALLOWED_AZP: Joi.string().allow("").optional(),
-  // Obrigatório em produção. Ligar em outros ambientes exige o audience mapper
-  // configurado no realm (scripts/keycloak-sync.mjs) — ver Docs/auth/keycloak.md.
+  // Em produção é TRAVADO em `true` (não só default): desligar a verificação de
+  // audience num ambiente real reabre o token confusion — qualquer client do
+  // realm passaria a emitir token aceito por esta API. Mesma postura de
+  // `AUTH_JWT_VALIDATION_MODE`, que é `.valid("keycloak")` em prod. Fora de
+  // produção continua opcional (ligar exige o audience mapper no realm —
+  // scripts/keycloak-sync.mjs, ver Docs/auth/keycloak.md).
   KEYCLOAK_VERIFY_AUDIENCE: Joi.boolean().when("NODE_ENV", {
     is: "production",
-    then: Joi.boolean().default(true),
+    then: Joi.boolean().valid(true).default(true),
     otherwise: Joi.boolean().default(false),
   }),
   JWT_SECRET: Joi.string().required(),
@@ -107,10 +166,35 @@ export const CONFIG_STORAGE_SCHEMA = {
 };
 
 export const CONFIG_EXTERNAL_APIS_SCHEMA = {
+  /*
+   * 🔴 Obrigatória em produção, e a razão é o modo de falhar.
+   *
+   * O `MailService` faz `new Resend(apiKey)` no construtor, e o SDK LANÇA com
+   * chave indefinida — então sem esta variável o app não sobe, com ou sem
+   * validação. A diferença é a mensagem: sem o Joi, o operador recebe
+   * `Missing API key. Pass it to the constructor new Resend("re_123")`, que não
+   * nomeia a variável nem indica que o problema é de configuração, e o
+   * container entra em restart loop enquanto alguém procura. Descoberto ao
+   * executar `scripts/smoke-test-prod.sh` pela primeira vez.
+   *
+   * Fora de produção segue opcional: o SDK só é exercitado quando um e-mail é
+   * enviado de fato.
+   */
+  RESEND_API_KEY: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+  MAIL_FROM: Joi.string().default("noreply@soundmeet.com.br"),
   CIFRA_CLUB_API_KEY: Joi.string().optional(),
   ULTIMATE_GUITAR_API_KEY: Joi.string().optional(),
   SPOTIFY_CLIENT_ID: Joi.string().optional(),
   SPOTIFY_CLIENT_SECRET: Joi.string().optional(),
+  SPOTIFY_REDIRECT_URI: Joi.string().allow("").optional(),
+  SPOTIFY_APP_RETURN_URL: Joi.string().allow("").optional(),
+  SPOTIFY_ACCOUNTS_URL: Joi.string().default("https://accounts.spotify.com"),
+  SPOTIFY_API_URL: Joi.string().default("https://api.spotify.com"),
+  SPOTIFY_MARKET: Joi.string().length(2).uppercase().default("BR"),
   GENIUS_CLIENT_ID: Joi.string().optional(),
   GENIUS_CLIENT_SECRET: Joi.string().optional(),
   GENIUS_ACCESS_TOKEN: Joi.string().optional(),
@@ -134,24 +218,6 @@ export const CONFIG_PAYMENT_SCHEMA = {
     then: Joi.string().min(1).required(),
     otherwise: Joi.string().allow("").optional(),
   }),
-
-  // Iugu — gorjetas PIX (0,99%, sem mínimo fixo)
-  IUGU_API_URL: Joi.string().uri().default("https://api.iugu.com/v1"),
-  IUGU_API_TOKEN: Joi.string().when("NODE_ENV", {
-    is: "production",
-    then: Joi.string().min(1).required(),
-    otherwise: Joi.string().allow("").optional(),
-  }),
-  IUGU_ACCOUNT_ID: Joi.string().when("NODE_ENV", {
-    is: "production",
-    then: Joi.string().min(1).required(),
-    otherwise: Joi.string().allow("").optional(),
-  }),
-  IUGU_WEBHOOK_TOKEN: Joi.string().when("NODE_ENV", {
-    is: "production",
-    then: Joi.string().min(1).required(),
-    otherwise: Joi.string().allow("").optional(),
-  }),
 };
 
 export const CONFIG_LIMITS_SCHEMA = {
@@ -169,10 +235,25 @@ export const CONFIG_LIMITS_SCHEMA = {
   MAX_REQUESTS_PER_USER_PER_EVENT: Joi.number().default(10), // Máximo de solicitações por usuário por evento
   REQUEST_COOLDOWN_MINUTES: Joi.number().default(120), // Cooldown ( Tempo mínimo entre solicitações) entre solicitações em minutos
   REQUEST_RESPONSE_TIME_MINUTES: Joi.number().default(60), // Tempo máximo para resposta de uma solicitação em minutos
+  /*
+   * Destaque pago do pedido musical.
+   *
+   * O piso existe para impedir que R$0,50 ocupe o topo da fila — a ordenação é
+   * por valor. Fica em config, e não no domínio, porque reajustar piso não pode
+   * custar mudança de código de negócio.
+   */
+  REQUEST_BOOST_MIN_AMOUNT: Joi.number().positive().default(2),
+  /*
+   * Janela para pagar depois do aceite do músico. Conta do ACEITE, não da
+   * promessa — ver `RequestBoost.charged_at`.
+   */
+  REQUEST_BOOST_PAYMENT_WINDOW_MINUTES: Joi.number().positive().default(15),
   VOTING_INTERVAL_MINUTES: Joi.number().default(3), // Intervalo de votação em minutos
 
   BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: Joi.number().min(0).default(72),
   BOOKING_COMPLETION_DELAY_HOURS: Joi.number().min(0).default(24), // Janela de disputa pós-show (Docs/payment-gateway-decisions.md) antes de completar automaticamente
+  // A1 camada 2 — carência de saque após troca de chave PIX. 24h por padrão; 0 desliga.
+  PIX_KEY_CHANGE_COOLDOWN_HOURS: Joi.number().min(0).default(24),
 };
 
 export const CONFIG_PRISMA_SCHEMA = {
@@ -197,6 +278,8 @@ export const CONFIG_AI_AUDIO_SCHEMA = {
     then: Joi.string().min(1).required(),
     otherwise: Joi.string().allow("").optional(),
   }),
+  // Mínimo de 1h: prazo zero apagaria os stems antes do ensaio começar.
+  AI_AUDIO_STEMS_RETENTION_HOURS: Joi.number().min(1).optional(),
 };
 
 export const CONFIG_AI_CIFRA_SCHEMA = {
@@ -227,6 +310,14 @@ export const CONFIG_AI_CIFRA_SCHEMA = {
     .optional(),
   AI_CIFRA_PROCESSING_GPU_CHECK_INTERVAL_MS: Joi.number().min(0).optional(),
   AI_CIFRA_PROGRESS_TOKEN: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+  // Shared secret backend → workers de IA (A-10). Required em produção, como o
+  // progress token: sem ele o backend não consegue provar que é ele chamando o
+  // worker, e o worker (fail-closed) recusaria todo processamento.
+  AI_WORKER_TOKEN: Joi.string().when("NODE_ENV", {
     is: "production",
     then: Joi.string().min(1).required(),
     otherwise: Joi.string().allow("").optional(),
@@ -282,6 +373,37 @@ export const CONFIG_GOOGLE_CALENDAR_SCHEMA = {
     Joi.string().optional(),
   RABBITMQ_QUEUE_GOOGLE_CALENDAR_BOOKING_CONFIRMED: Joi.string().optional(),
   RABBITMQ_QUEUE_GOOGLE_CALENDAR_BOOKING_CANCELLED: Joi.string().optional(),
+  // Mercado Pago — gateway da gorjeta. Sem a URL, a gorjeta cai no mock.
+  MERCADOPAGO_API_URL: Joi.string().allow("").optional(),
+  MERCADOPAGO_CLIENT_ID: Joi.string().allow("").optional(),
+  // Segredo do app do marketplace: exigido em produção quando a URL está
+  // configurada, porque sem ele o fluxo OAuth de vínculo não fecha.
+  MERCADOPAGO_CLIENT_SECRET: Joi.string().allow("").optional(),
+  MERCADOPAGO_REDIRECT_URI: Joi.string().allow("").optional(),
+  // Descontada da NOSSA comissão ("gateway incluso"), nunca somada ao músico.
+  MERCADOPAGO_FEE_PERCENTAGE: Joi.number().min(0).max(100).default(0.99),
+  MERCADOPAGO_APP_RETURN_URL: Joi.string().allow("").optional(),
+  // Fail-closed no controller: sem ele nenhum webhook é aceito.
+  MERCADOPAGO_WEBHOOK_SECRET: Joi.string().allow("").optional(),
+  // ⚠️ NÃO usado para criar gorjeta — a cobrança sai com o token do músico.
+  MERCADOPAGO_PLATFORM_ACCESS_TOKEN: Joi.string().allow("").optional(),
+  MERCADOPAGO_PUBLIC_KEY: Joi.string().allow("").optional(),
+  ESCROW_ENABLED: Joi.boolean().default(false),
+  // Exigido quando o escrow está ligado: cláusula de custódia sem dizer QUEM
+  // custodia é papel fraco justamente onde o valor do documento está.
+  ESCROW_CUSTODIAN_LEGAL_NAME: Joi.string().when("ESCROW_ENABLED", {
+    is: true,
+    then: Joi.string().min(3).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
+  // Segredo do HMAC do código de assinatura do contrato (segundo fator).
+  // Sem ele, o hash de um código de 6 dígitos é quebrável por tabela.
+  // Gerar com: openssl rand -hex 32
+  CONTRACT_CHALLENGE_SECRET: Joi.string().when("NODE_ENV", {
+    is: "production",
+    then: Joi.string().min(32).required(),
+    otherwise: Joi.string().allow("").optional(),
+  }),
   // Chave AES-256-GCM (32 bytes base64) para tokens OAuth em repouso.
   // Gerar com: openssl rand -base64 32
   TOKEN_ENCRYPTION_KEY: Joi.string().when("NODE_ENV", {
