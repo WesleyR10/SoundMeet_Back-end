@@ -3,7 +3,6 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { AttendEventUseCase } from "../../../core/audience/application/use-cases/attend-event/attend-event.use-case";
 import { AudienceOutputMapper } from "../../../core/audience/application/use-cases/common/audience-output";
 import { CompleteProfileUseCase } from "../../../core/audience/application/use-cases/complete-profile/complete-profile.use-case";
-import { CreateAudienceUseCase } from "../../../core/audience/application/use-cases/create-audience/create-audience.use-case";
 import { DeleteAudienceUseCase } from "../../../core/audience/application/use-cases/delete-audience/delete-audience.use-case";
 import { GetAudienceUseCase } from "../../../core/audience/application/use-cases/get-audience/get-audience.use-case";
 import { IndicateMusicianUseCase } from "../../../core/audience/application/use-cases/indicate-musician/indicate-musician.use-case";
@@ -27,8 +26,8 @@ import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
 import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
-import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import { MusicianCollectionPresenter } from "../../musicians-module/musician.presenter";
+import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
   AudienceCollectionPresenter,
   AudiencePresenter,
@@ -38,7 +37,6 @@ import {
 } from "../audience.presenter";
 import { AudiencesController } from "../audiences.controller";
 import {
-  CreateAudienceFixture,
   ListAudiencesFixture,
   UpdateAudienceFixture,
 } from "../testing/audience-fixture";
@@ -69,12 +67,6 @@ describe("AudiencesController Integration Tests", () => {
         {
           provide: "UserInteractionRepository",
           useValue: userInteractionRepositoryInstance,
-        },
-        {
-          provide: CreateAudienceUseCase,
-          useFactory: (repo: IAudienceRepository) =>
-            new CreateAudienceUseCase(repo),
-          inject: ["AudienceRepository"],
         },
         {
           provide: UpdateAudienceUseCase,
@@ -217,7 +209,8 @@ describe("AudiencesController Integration Tests", () => {
       ],
     });
 
-    const module: TestingModule = await applyAuthGuardMocks(moduleBuilder).compile();
+    const module: TestingModule =
+      await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<AudiencesController>(AudiencesController);
     audienceRepository = module.get<IAudienceRepository>("AudienceRepository");
@@ -229,9 +222,6 @@ describe("AudiencesController Integration Tests", () => {
 
   it("should be defined", () => {
     expect(controller).toBeDefined();
-    expect((controller as any).createUseCase).toBeInstanceOf(
-      CreateAudienceUseCase,
-    );
     expect((controller as any).updateUseCase).toBeInstanceOf(
       UpdateAudienceUseCase,
     );
@@ -262,26 +252,6 @@ describe("AudiencesController Integration Tests", () => {
     );
     expect((controller as any).recommendMusiciansUseCase).toBeInstanceOf(
       RecommendMusiciansUseCase,
-    );
-  });
-
-  describe("should create an audience", () => {
-    const arrange = CreateAudienceFixture.arrangeForCreate();
-
-    test.each(arrange)(
-      "when body is $send_data",
-      async ({ send_data, expected }) => {
-        const presenter = await controller.create(send_data as any);
-        const entity = await audienceRepository.findById(
-          new AudienceId(presenter.id),
-        );
-
-        expect(entity).toBeInstanceOf(Audience);
-        expect(entity!.toJSON()).toMatchObject(expected);
-
-        const output = AudienceOutputMapper.toOutput(entity!);
-        expect(presenter).toEqual(new AudiencePresenter(output));
-      },
     );
   });
 

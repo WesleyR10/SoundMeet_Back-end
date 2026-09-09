@@ -23,7 +23,6 @@ import {
 import { AttendEventUseCase } from "../../core/audience/application/use-cases/attend-event/attend-event.use-case";
 import { AudienceOutput } from "../../core/audience/application/use-cases/common/audience-output";
 import { CompleteProfileUseCase } from "../../core/audience/application/use-cases/complete-profile/complete-profile.use-case";
-import { CreateAudienceUseCase } from "../../core/audience/application/use-cases/create-audience/create-audience.use-case";
 import { DeleteAudienceUseCase } from "../../core/audience/application/use-cases/delete-audience/delete-audience.use-case";
 import { GetAudienceUseCase } from "../../core/audience/application/use-cases/get-audience/get-audience.use-case";
 import { IndicateMusicianUseCase } from "../../core/audience/application/use-cases/indicate-musician/indicate-musician.use-case";
@@ -53,7 +52,6 @@ import {
 } from "./audience.presenter";
 import { AttendEventDto } from "./dto/attend-event.dto";
 import { CompleteProfileDto } from "./dto/complete-profile.dto";
-import { CreateAudienceDto } from "./dto/create-audience.dto";
 import { IndicateMusicianDto } from "./dto/indicate-musician.dto";
 import { MakeMusicRequestDto } from "./dto/make-music-request.dto";
 import { RecommendMusiciansDto } from "./dto/recommend-musicians.dto";
@@ -69,9 +67,6 @@ import { VoteSongDto } from "./dto/vote-song.dto";
 @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("audiences")
 export class AudiencesController {
-  @Inject(CreateAudienceUseCase)
-  private createUseCase: CreateAudienceUseCase;
-
   @Inject(UpdateAudienceUseCase)
   private updateUseCase: UpdateAudienceUseCase;
 
@@ -111,18 +106,20 @@ export class AudiencesController {
   @Inject(RecommendMusiciansUseCase)
   private recommendMusiciansUseCase: RecommendMusiciansUseCase;
 
-  @Post()
-  @Public()
-  @ApiOperation({
-    summary: "Criar usuário do público",
-    description: "Cria um usuário do público com preferências e gamificação.",
-  })
-  @ApiResponse({ status: 201, type: AudiencePresenter })
-  async create(@Body() createAudienceDto: CreateAudienceDto) {
-    const output = await this.createUseCase.execute(createAudienceDto);
-    return AudiencesController.serialize(output);
-  }
-
+  /*
+   * SM-021 — não existe `POST /audiences`, e a ausência é a correção.
+   *
+   * A rota era `@Public()` e criava o perfil com UUID aleatório, enquanto o
+   * caminho canônico (`RegisterUseCase`) usa `new AudienceId(externalId)` — o
+   * `sub` do Keycloak. Qualquer automação podia então despejar perfis órfãos:
+   * gente que não loga, não é dona de e-mail nenhum e ocupa banco.
+   *
+   * Restringir a `admin` não resolveria: o use-case só sabia produzir um
+   * agregado que viola a invariante de identidade do sistema, e uma capacidade
+   * que só gera dado inconsistente não fica melhor com autorização — só fica
+   * mais discreta. Por isso o `CreateAudienceUseCase` foi removido junto: o
+   * registro é o único caminho de nascimento de um Audience.
+   */
   @Get()
   @Roles("admin")
   @ApiOperation({
@@ -273,7 +270,7 @@ export class AudiencesController {
       event_id: body.event_id,
       establishment_id: body.establishment_id,
       message: body.message,
-      is_priority: body.is_priority,
+      boost: body.boost,
       metadata: body.metadata,
     });
     return new MakeMusicRequestPresenter(output);
@@ -342,7 +339,8 @@ export class AudiencesController {
   ) {
     const output = await this.shareSocialMediaUseCase.execute({
       audience_id: id,
-      request_id: body.request_id,
+      content_type: body.content_type,
+      content_id: body.content_id,
       platform: body.platform,
       message: body.message,
     });

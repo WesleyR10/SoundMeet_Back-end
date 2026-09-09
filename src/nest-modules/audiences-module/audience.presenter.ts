@@ -141,7 +141,19 @@ export class MakeMusicRequestPresenter {
     event_id?: string;
     establishment_id?: string;
     message?: string;
-    is_priority?: boolean;
+    /**
+     * Destaque pago do pedido.
+     *
+     * 🔴 Substituiu `is_priority`, que era ecoado do input e nunca persistido:
+     * a API respondia "prioridade: sim" para um pedido que nascia comum. Aqui
+     * o valor vem do pedido realmente criado.
+     */
+    boost?: {
+      amount: number;
+      dedication: string | null;
+      status: string;
+      is_boosting: boolean;
+    };
     requested_at: Date;
     status: "pending" | "accepted" | "rejected";
   };

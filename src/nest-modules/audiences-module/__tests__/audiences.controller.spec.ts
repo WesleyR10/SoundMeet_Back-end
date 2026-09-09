@@ -1,6 +1,10 @@
+import { RequestMethod } from "@nestjs/common";
+import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
+
 import { AudienceOutput } from "../../../core/audience/application/use-cases/common/audience-output";
 import { ListAudiencesOutput } from "../../../core/audience/application/use-cases/list-audiences/list-audiences.use-case";
 import { SortDirection } from "../../../core/shared/domain/repository/search-params";
+import { IS_PUBLIC_KEY } from "../../auth-module/auth.decorators";
 import {
   AudienceCollectionPresenter,
   AudiencePresenter,
@@ -9,7 +13,6 @@ import {
   SendTipPresenter,
 } from "../audience.presenter";
 import { AudiencesController } from "../audiences.controller";
-import { CreateAudienceDto } from "../dto/create-audience.dto";
 import { SearchAudiencesDto } from "../dto/search-audiences.dto";
 import { UpdateAudienceDto } from "../dto/update-audience.dto";
 
@@ -74,27 +77,40 @@ describe("AudiencesController Unit Tests", () => {
     controller = new AudiencesController();
   });
 
-  describe("create", () => {
-    it("should create an audience", async () => {
-      const output = makeAudienceOutput();
-      const mockCreateUseCase = {
-        execute: jest.fn().mockResolvedValue(output),
-      };
-      (controller as any).createUseCase = mockCreateUseCase;
+  /*
+   * SM-021 — regressão: a criação de público não pode voltar por HTTP.
+   *
+   * A varredura é por metadata do Nest, e não por `controller.create`, porque
+   * o risco real não é alguém restaurar o método com o mesmo nome — é alguém
+   * adicionar um `@Post()` novo, com outro nome, sem lembrar por que ele não
+   * existia. E nenhuma rota deste controller pode ser `@Public()`: perfil de
+   * público nasce no registro, com o `sub` do Keycloak, ou não nasce.
+   */
+  describe("SM-021 — superfície pública", () => {
+    const routes = () =>
+      Object.getOwnPropertyNames(AudiencesController.prototype)
+        .filter((name) => name !== "constructor")
+        .map((name) => {
+          const handler = (AudiencesController.prototype as any)[name];
+          return {
+            name,
+            path: Reflect.getMetadata(PATH_METADATA, handler),
+            method: Reflect.getMetadata(METHOD_METADATA, handler),
+            isPublic: Reflect.getMetadata(IS_PUBLIC_KEY, handler),
+          };
+        })
+        .filter((r) => r.method !== undefined);
 
-      const serializeSpy = jest.spyOn(AudiencesController, "serialize");
-      const input: CreateAudienceDto = {
-        name: "User",
-        email: "user@example.com",
-        favorite_genres: ["Rock"],
-      } as any;
+    it("não expõe POST na raiz do recurso", () => {
+      const rootPosts = routes().filter(
+        (r) =>
+          r.method === RequestMethod.POST && (r.path === "/" || r.path === ""),
+      );
+      expect(rootPosts).toEqual([]);
+    });
 
-      const presenter = await controller.create(input);
-
-      expect(mockCreateUseCase.execute).toHaveBeenCalledWith(input);
-      expect(serializeSpy).toHaveBeenCalledWith(output);
-      expect(presenter).toBeInstanceOf(AudiencePresenter);
-      expect(presenter).toStrictEqual(new AudiencePresenter(output));
+    it("não tem nenhuma rota @Public()", () => {
+      expect(routes().filter((r) => r.isPublic)).toEqual([]);
     });
   });
 
