@@ -70,6 +70,11 @@ Em staging/producao, esse valor deve vir de secret manager/env seguro.
 
 Client publico para frontend web com Authorization Code + PKCE.
 
+Redirect URIs versionadas incluem `localhost`, `https://soundmeet.com.br/*` **e**
+`https://soundmeet.com.br/*` / `https://app.soundmeet.com.br/*` (domínio
+Hostinger, 29/ago/2026). O QR/App Links continuam em `.app` até o bloqueio de
+`Docs/qr-code.md` fechar. Detalhe: [ops/domain-soundmeet-com-br.md](../ops/domain-soundmeet-com-br.md).
+
 ### `soundmeet-mobile`
 
 Client publico para app mobile com deep links e Authorization Code + PKCE.
@@ -375,15 +380,29 @@ Fluxo do `RegisterUseCase`:
 3. Atribui a realm role (`musician` ou `audience`) ao novo usuario.
 4. Cria o aggregate `Musician`/`Audience` usando o **mesmo UUID** do `sub` retornado pelo Keycloak como ID primario (ver invariante em [business-rules.md](../business-rules.md)).
 5. Emite (best-effort, nao bloqueante) um token de verificacao de email via `VerifyEmailService.issueVerificationToken()` — reaproveita os campos `email_token`/`email_token_expires_at` ja existentes e `MailService.sendEmailVerification()`.
-6. Autentica o usuario via Direct Access Grant (`grant_type=password`, client publico `soundmeet-mobile`) e retorna `access_token`/`refresh_token`.
+6. Autentica o usuario via grant de senha no client **confidencial** `soundmeet-registration` (`KEYCLOAK_REGISTRATION_CLIENT_SECRET`, so no backend) e retorna `access_token`/`refresh_token`.
+
+   > 🔴 **AUTH-1 (31/ago/2026):** ate essa data o passo 6 usava o client **publico** `soundmeet-mobile`. Como o `client_id` publico esta dentro do APK, qualquer script batia direto no `/token` do Keycloak e pulava o `@Throttle` do Nest inteiro. Hoje `soundmeet-mobile` tem `directAccessGrantsEnabled: false` e o grant vive num client cujo secret nunca sai do servidor — o rate limit do Nest voltou a ser inescapavel. O grant de senha **continua existindo aqui de proposito**: o usuario acabou de escolher a senha, e manda-lo para a tela de login em seguida seria pedir para digitar duas vezes. Para LOGIN nao ha grant de senha em lugar nenhum: e Authorization Code + PKCE.
 
 Qualquer falha entre os passos 2 e 4 aciona compensacao (`deleteUser` best-effort no Keycloak) para nao deixar conta orfa. Falha no passo 6 (autenticacao) **nao** aciona compensacao, pois a conta ja foi criada com sucesso — o cliente recebe 503 e deve cair para a tela de login normal.
 
-**Por que `emailVerified: true` na criacao, e nao o fluxo nativo `VERIFY_EMAIL` do Keycloak:** o realm tem `verifyEmail: true` com `VERIFY_EMAIL` como required action padrao. Se o usuario fosse criado sem `emailVerified: true`, o Direct Access Grant do passo 6 falharia com `invalid_grant: Account is not fully set up` (Keycloak bloqueia password grant com required actions pendentes) — o que quebraria o requisito de retornar tokens imediatamente (sem redirect de browser). A verificacao de posse do email passa a ser responsabilidade da aplicacao (mecanismo `email_token` ja existente), nao do Keycloak.
+**Por que `emailVerified: true` na criacao, e nao o fluxo nativo `VERIFY_EMAIL` do Keycloak:** o realm tem `verifyEmail: true` com `VERIFY_EMAIL` como required action padrao. Se o usuario fosse criado sem `emailVerified: true`, o grant de senha do passo 6 falharia com `invalid_grant: Account is not fully set up` (Keycloak bloqueia password grant com required actions pendentes) — o que quebraria o requisito de retornar tokens imediatamente (sem redirect de browser). A verificacao de posse do email passa a ser responsabilidade da aplicacao (mecanismo `email_token` ja existente), nao do Keycloak.
 
-**Risco residual:** `POST /audiences` continua `@Public()` no NestJS, permitindo criar um `Audience` sem usuario Keycloak correspondente. Fora do escopo desta implementacao — considerar restringir a admin/interno numa iteracao futura.
+~~**Risco residual:** `POST /audiences` continua `@Public()` no NestJS, permitindo criar um `Audience` sem usuario Keycloak correspondente.~~ ✅ **Resolvido em 26/ago/2026 (SM-021):** a rota, o `CreateAudienceUseCase`, o input e o DTO foram **removidos**. O caminho criava o agregado com UUID aleatorio enquanto o canonico faz `new AudienceId(externalId)` (o `sub`), produzindo perfil orfao. Restringir a `admin` nao resolveria: uma capacidade que so sabe produzir agregado violando a invariante de identidade nao fica melhor com autorizacao, fica mais discreta. Ha regressao em `audiences.controller.spec.ts`.
 
-## Login por email/senha (`POST /api/v1/auth/login`)
+## ~~Login por email/senha (`POST /api/v1/auth/login`)~~ — REMOVIDO (AUTH-1, 31/ago/2026)
+
+> 🔴 **Esta rota, o `LoginUseCase` e o `LoginDto` não existem mais.** O login é
+> Authorization Code + PKCE contra o Keycloak, aberto dentro do app em Chrome
+> Custom Tab / `ASWebAuthenticationSession`. Ver a seção "AUTH-1 — fim do Direct
+> Access Grant" no fim deste documento.
+>
+> A descrição abaixo fica como registro do que existia e por quê — o passo 3 em
+> especial (resolver papel consultando o repositório, nunca decodificando o JWT)
+> explica por que a checagem de papel teve de migrar para o cliente: com PKCE não
+> há corpo de resposta, e a verdade passou a ser a role do JWT.
+
+### Como era (histórico)
 
 Espelha o `RegisterUseCase`, mas sem criar nada — so autentica e resolve o papel/perfil ja existente. Implementacao: `src/core/auth/application/use-cases/login/`.
 
@@ -454,3 +473,64 @@ Quando o produto evoluir para B2B/enterprise, reavaliar:
 - automacao de criacao de groups por estabelecimento/banda;
 - guards especificos de ownership usando `establishment_ids` e `band_ids`;
 - mappers de audience estritos para producao.
+
+---
+
+## AUTH-1 — fim do Direct Access Grant (31/ago/2026)
+
+O login por senha saiu da API. Hoje é Authorization Code + PKCE, aberto **dentro
+do app** (Chrome Custom Tab / `ASWebAuthenticationSession`).
+
+### Clients do realm depois da mudança
+
+| Client | Público? | Direct Grant | Standard Flow | Para quê |
+|--------|----------|--------------|---------------|----------|
+| `soundmeet-api` | não | não | não | service account (`manage-users`, `view-realm`) |
+| `soundmeet-web` | sim | não | sim | painel do estabelecimento (PKCE via BFF) |
+| `soundmeet-mobile` | sim | **não** (era `true`) | sim | app (PKCE) |
+| `soundmeet-registration` | **não** | **sim** | não | auto-login pós-cadastro, só pelo backend |
+| `soundmeet-admin` | sim | não | sim | painel admin |
+
+🔴 **Por que o Direct Grant migrou para um client confidencial em vez de sumir:**
+o cadastro precisa devolver sessão — o usuário acabou de escolher a senha, e
+mandá-lo à tela de login em seguida seria pedir para digitar duas vezes. O que
+não podia continuar era o grant morar num client **público**, cujo `client_id`
+viaja dentro do APK: qualquer script batia direto no `/token` do Keycloak e
+pulava o `@Throttle` do Nest inteiro. Com secret, o grant só é alcançável de
+dentro do backend, onde o rate limit é inescapável.
+
+Verificado contra o Keycloak local:
+
+```
+POST /token client_id=soundmeet-mobile grant_type=password
+  -> 400 "Client not allowed for direct access grants"
+POST /token client_id=soundmeet-registration (sem secret)
+  -> 401 "Invalid client or Invalid client credentials"
+POST /token client_id=soundmeet-registration + client_secret
+  -> 200
+```
+
+### Variáveis novas
+
+- `KEYCLOAK_REGISTRATION_CLIENT_ID` (default `soundmeet-registration`)
+- `KEYCLOAK_REGISTRATION_CLIENT_SECRET` — **obrigatória** (Joi). Precisa casar
+  com `KEYCLOAK_REGISTRATION_CLIENT_SECRET` do `scripts/keycloak-sync.mjs`.
+- `KEYCLOAK_MOBILE_CLIENT_ID` foi **removida** — virou config morta quando o
+  grant deixou de usar o client do app.
+
+⚠️ **`npm run keycloak:sync` é obrigatório antes de subir a API**, senão o
+cadastro responde **503**: o client confidencial existe no `realm-soundmeet.json`
+mas ainda não no Keycloak em execução.
+
+### Armadilhas registradas
+
+- **Descrição de client tem limite de 255 caracteres** (coluna do Keycloak). Uma
+  descrição longa derruba o sync com `500 unknown_error`, e a causa real só
+  aparece no log do container: `value too long for type character varying(255)`.
+- **`loginTheme` precisou entrar no `pickDefined` de `upsertRealm`** — o script
+  usa lista fixa de propriedades do realm, então sem a linha o tema compila, o
+  container sobe e a tela de login continua a padrão, sem erro em lugar nenhum.
+- **`authenticateWithPassword` tinha TRÊS chamadores**, não um: `login`,
+  `register` e `register-establishment` (o `/cadastro` do web). Desligar o DAG
+  sem tratar os dois cadastros derrubaria o cadastro da web junto.
+

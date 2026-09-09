@@ -41,7 +41,7 @@ Marcações:
 
 - [x] QR Code permanente vinculado ao perfil do músico (não por apresentação)  
        Código: musician.aggregate.ts ([2]) (`generateQRCode`).  
-       Regra: QR usa esquema `soundmeet://musician/{id}` + URL pública `https://soundmeet.app/musician/{id}` e é gerado na criação.
+       Regra: QR usa esquema `soundmeet://musician/{id}` + URL pública `https://soundmeet.com.br/musician/{id}` e é gerado na criação.
 
 - [x] Ativação/desativação e verificação de perfil  
        Código: musician.aggregate.ts ([2]).  
@@ -117,7 +117,7 @@ Marcações:
 
 - [x] QR Code permanente do estabelecimento  
        Código: establishment.aggregate.ts ([6]) (`generateQRCode`).  
-       Regra: QR segue o padrão `soundmeet://establishment/{id}` com URL pública `https://soundmeet.app/establishment/{id}`.
+       Regra: QR segue o padrão `soundmeet://establishment/{id}` com URL pública `https://soundmeet.com.br/establishment/{id}`.
 
 - [x] Validação de CNPJ com tratamento de erro de domínio  
        Código: establishment.aggregate.ts ([6]).  
@@ -145,7 +145,7 @@ Marcações:
 - [ ] Sistema de avaliações/reviews entre estabelecimentos e músicos
 - [~] Agenda compartilhada com disponibilidade de músicos e bandas — leitura já existe (`GET scheduling/calendar/free-busy`, `GET scheduling/calendar/month-slots`, ambos `@Public()`); falta o "tempo real" (push via WebSocket) **(corrigido jul/2026 — estava `[ ]`)**
 - [x] Sistema de comunicação (chat seguro, histórico de conversas) — `src/core/chat/` (Conversation + Message) + `chat-module` (gateway `/chat`, REST, 15 testes de integração), registrado em `app.module.ts` **(corrigido jul/2026 — estava `[ ]`, contradizia roadmap.md Bloco 7.1 que já marca `✅`)**
-- [ ] Gestão de indicações com priorização por relevância — `IndicateMusicianUseCase` existe do lado do público (audiência ganha pontos), mas falta notificação/dashboard do lado do estabelecimento
+- [x] **Caixa de indicações do estabelecimento (28/set/2026)** — `GET /establishments/:establishment_id/indications` + `PATCH .../:indication_id` (vista/arquivada), com tela em `/dashboard/indicacoes` no web. 🔴 **Antes disso a indicação era DESCARTADA:** `IndicateMusicianUseCase` só dava pontos ao fã e emitia `MusicianIndicatedEvent`, que **nenhum handler escutava** — não faltava tela, faltava dado. Ver seção "Indicação de talentos" abaixo. Priorização por relevância segue pendente (a ordenação é cronológica)
 - [ ] Gestão completa de eventos (confirmação, lembretes, pagamentos automatizados)
 - [ ] Módulo de marketing (integração social, geração de artes, campanhas, cupons)
 
@@ -319,8 +319,7 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
        Código: recommend-musicians.use-case.ts ([16]).  
        Regra: usa `favorite_instruments` e `favorite_genres` do Audience para filtrar músicos ativos via `MusicianRepository.search`.
 
-- [~] Sistema de indicação de talentos para estabelecimentos  
-  A ideia está refletida nas entidades de Audience, Musician e nas preferências, mas ainda **não há** um fluxo fechado (use-case + agregados específicos) que implemente o botão “Indicar para Estabelecimento”, o dashboard de indicações e as recompensas associadas.
+- [x] **Sistema de indicação de talentos para estabelecimentos (28/set/2026)** — ciclo fechado: domínio `src/core/indication/` (agregado + 3 repositórios), `IndicateMusicianSheet` no perfil público do músico (mobile), caixa de entrada no dashboard do estabelecimento (web) e pontos no ledger da gamificação. Ver seção dedicada abaixo.
 
 ---
 
@@ -390,6 +389,91 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 - [~] Limite explícito de pedidos por pessoa/evento  
   Ainda não há uma contagem consolidada “X pedidos por usuário por evento”. O que existe é a detecção de duplicidade via `isSimilarTo` e lógica de priorização por idade/estado.
 
+### Destaque pago — gorjeta acoplada ao pedido *(27/ago/2026)*
+
+- [x] 🔴 **A cobrança só nasce no ACEITE do músico.** Antes disso o que existe é
+      uma PROMESSA do fã, e nenhum centavo saiu da conta de ninguém. É a decisão
+      que dispensa **todo** o código de estorno neste fluxo: recusa em
+      `promised` vira `cancelled` e a história acaba.
+      Código: `RequestBoost` (VO), `RespondToRequestUseCase.chargeBoostIfPromised`.
+- [x] **Estados:** `promised` → `awaiting_payment` → `paid`, com `expired` e
+      `cancelled` como saídas. Os três terminais são irreversíveis — reabrir
+      qualquer um significaria cobrar de novo ou destacar um pedido que ninguém
+      pagou.
+- [x] **`promised` já destaca a fila, mesmo sem pagamento.** Não é descuido: quem
+      paga só depois do aceite precisa que o destaque exista ANTES do aceite,
+      senão o músico nunca vê o pedido para aceitar. O risco (o fã promete e
+      some) é limitado ao mesmo resultado de um pedido comum — o músico tocou de
+      graça — e `NoPendingRequestForMusicianPolicy` já limita a um pedido
+      pendente por músico.
+- [x] 🔴 **O aceite NUNCA falha por causa do gateway.** Provedor fora do ar,
+      token expirado: o `accept` conclui e o destaque vai para `cancelled`.
+      Derrubar o aceite deixaria o músico travado no palco, e o pedido de música
+      — que é o produto — deixaria de funcionar por um problema de pagamento.
+- [x] **Ordem obrigatória: cobrança primeiro, pedido depois.** A FK
+      `music_requests.boostTipId -> tips.id` faz o banco EXIGIR isso. No pior
+      caso sobra uma cobrança `pending` que ninguém paga — barulho, não dano; a
+      ordem inversa deixaria o pedido apontando para cobrança inexistente.
+- [x] **Elegibilidade é checada na CRIAÇÃO, não no aceite**
+      (`MusicianAcceptsTipsPolicy` + `ITipEligibilityPort`). Sem conta do
+      provedor vinculada não há para onde o dinheiro ir; descobrir isso só no
+      aceite faria o músico aceitar no meio do show e a cobrança quebrar — com o
+      fã achando que ia pagar e o músico achando que ia receber.
+- [x] **Piso configurável** (`REQUEST_BOOST_MIN_AMOUNT`, default R$2). Sem piso o
+      destaque vira grátis na prática, porque a ordenação entre destacados é por
+      valor. Mora em config: reajustar piso não pode custar mudança de domínio.
+- [x] 🔴 **A janela de pagamento conta do ACEITE (`charged_at`), nunca da
+      promessa.** O fã promete quando faz o pedido; o músico pode aceitar meia
+      hora depois, e contar da promessa entregaria um QR já vencido no instante
+      em que o fã o recebe. `REQUEST_BOOST_PAYMENT_WINDOW_MINUTES`, default 15.
+- [x] **Expirar tira o destaque, não o aceite.** O pedido continua `accepted` —
+      o músico já disse sim, muitas vezes já tocou, e desfazer isso puniria o
+      artista pelo comportamento do fã. Perde-se a posição na fila e a
+      dedicatória pública. Job a cada 5 min (`ExpireRequestBoostsJob`).
+- [x] **Ordenação da fila:** destaque primeiro, maior valor primeiro, depois a
+      prioridade por idade que já existia.
+      🔴 Os dois níveis de destaque são **sempre DESC**, independentes de
+      `sort_dir` — deixá-los seguir o parâmetro faria `?sort_dir=asc` enterrar no
+      fim da fila exatamente os pedidos pagos. Verificado contra Postgres real em
+      `test/request/boosted-request-ordering.e2e-spec.ts` (o `ORDER BY` é SQL
+      cru; o repositório in-memory não prova nada sobre ele).
+- [x] 🔴 **A dedicatória é pública SÓ depois de paga.** `Request.publicDedication`
+      é o único portão, e quem o lê é o "tocando agora"
+      (`GetLivePerformanceUseCase`). O campo cru continua saindo em
+      `RequestOutput` porque toda rota que o serve passa por
+      `assertRequestParticipant` — e o **músico precisa ler a dedicatória para
+      decidir se aceita**, que é metade do motivo para aceitar.
+- [x] **A UI do músico nunca diz "recebido" antes do webhook.**
+      `awaiting_payment` mostra "a confirmar". Mesma disciplina que mantém
+      `held_balance` fora de `balance`. Regra no domínio do mobile
+      (`request-boost.rules.ts`), com teste — dentro do JSX seria intestável.
+- [x] 🔴 **`is_priority` foi REMOVIDO.** Era campo fantasma: o cliente mandava
+      `true`, `MakeMusicRequestUseCase` ecoava `true` em `request_metadata`, e
+      nada era persistido — não chegava ao `CreateRequestUseCase` nem ao
+      agregado. Além de morto, era prioridade afirmada pelo próprio cliente. A
+      prioridade real agora custa dinheiro e é verificada pelo domínio.
+
+**Rotas**
+
+- `POST /audiences/:id/music-requests` e `POST /requests` — body aceita
+  `boost { amount, dedication? }`.
+- `GET /requests/:id/boost/payment` — o QR da cobrança, relido a qualquer
+  momento. Existe porque a cobrança nasce no aceite, com o fã fora da tela.
+- `GET /requests/musicians/:id/suggestions` ganhou `accepts_tips` — a UI esconde
+  o destaque em vez de oferecer algo que a escrita vai recusar. Viaja aqui, e
+  não no perfil do músico, porque `musicians-module` lendo `MusicianWallet`
+  criaria ciclo com `PaymentModule`.
+
+**Notificações** (socket `/notifications`, rooms `user:<id>`)
+
+- `request.boost.payment_ready` → fã, no aceite (com o QR).
+- `request.boost.paid` → fã, na confirmação (gatilho da celebração).
+- `request.boost.confirmed` → músico, para o card virar "confirmado" ao vivo.
+- ⚠️ **Só socket para o fã, sem push.** `Audience` não tem `push_token` (só
+  `Musician`). Quem está com o app fechado no momento do aceite não é avisado —
+  o caminho de recuperação é o banner de pendência na Home, alimentado por
+  `GET /requests/:id/boost/payment`. Registrar push de audience é bloco à parte.
+
 **Gamificação integrada ao pedido**
 
 - [x] Pontos por pedido criado e pedido aceito  
@@ -418,6 +502,29 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 - [x] QR code PIX único permanente associado ao perfil do músico  
        A base está nos QR codes de Musician/Establishment e na entidade `Tip` com `pix_key`. O fluxo completo de geração/gestão de PIX está modelado, mas ainda não há integração real com provedores externos de PIX.
+
+- [x] **O payload da cobrança PIX é persistido** (`tips.pixQrCode`/`pixCopyPaste`,
+      27/ago/2026). Antes ele só existia na resposta HTTP da criação: quem
+      fechasse a tela perdia o QR para sempre e a gorjeta ficava `pending` sem
+      caminho de volta. No fluxo de destaque isso deixaria de ser inconveniente
+      e viraria impossibilidade — a cobrança nasce no aceite do músico, com o fã
+      fora da tela. **Não** entra no regime de cifragem do `pix_key`: aquela é a
+      chave de RECEBIMENTO do músico (dado permanente dele); isto é um código de
+      cobrança de uso único que o pagador precisa enxergar para pagar.
+
+- [x] **`GET /tips/:id` — o fã relê a própria gorjeta** (27/ago/2026). O PIX é
+      assíncrono e, sem esta rota, o app mostrava o QR e nunca ficava sabendo do
+      resultado. Só o dono lê (`ForbiddenException` caso contrário): o guard de
+      rota prova quem é o usuário, não de quem é a gorjeta. Presenter próprio
+      (`AudienceTipPresenter`), distinto do `TipPresenter` que serve a carteira
+      do músico — nenhum dos dois expõe `pix_key`.
+
+- [x] **`tip.confirmed` também vai para o FÃ.** Até aqui o `TipCompletedEvent` só
+      notificava o músico; quem pagou não recebia nada. ⚠️ Num pedido com
+      destaque este evento e `request.boost.paid` chegam os dois — o app
+      deduplica por `tip_id`, e o payload mais rico ENRIQUECE o que já está na
+      tela em vez de ser descartado (a ordem entre os dois handlers não é
+      garantida).
 
 - [x] Mensagem personalizada com a gorjeta  
        Código: tip.aggregate.ts ([19]).  
@@ -468,6 +575,19 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
     persistir deixava a janela inteira da chamada HTTP com o saldo antigo visível
     — dois saques simultâneos de R$110 sobre R$200 emitiam **duas transferências
     reais** e gravavam **um só débito**.
+  - ✅ **As três barreiras foram verificadas contra Postgres real** em
+    `test/payment/withdraw-concurrency.e2e-spec.ts` (26/ago/2026). Os testes
+    unitários **não conseguem** prová-las: lá o `UnitOfWorkFakeInMemory` não abre
+    transação e o repositório in-memory devolve a mesma instância do agregado —
+    o que faz a segunda leitura enxergar o débito da primeira é a referência
+    compartilhada, não o lock.
+    🔴 Verificado por remoção deliberada do `FOR UPDATE`: sem ele, cinco saques
+    concorrentes com saldo para dois são **todos aceitos**, cinco transferências
+    reais são emitidas e o saldo cai só duas vezes (R$550 saindo, R$220
+    debitados). ⚠️ O caso de **dois** concorrentes é flaky sem o lock (às vezes o
+    escalonamento do Node os põe em fila e o teste passa com o código quebrado);
+    quem dá a garantia determinística é o de cinco — não remova um achando que o
+    outro cobre.
   - **Três barreiras, nenhuma substitui a outra:** o lock da carteira
     (`findByMusicianIdForUpdate`, `SELECT ... FOR UPDATE`) serializa execuções
     concorrentes; o saldo barra o segundo saque quando não há fundo para os dois;
@@ -504,7 +624,33 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
     do próprio saque. Transação já `completed` nunca é estornada — seria devolver
     saldo sacável de dinheiro que já está com o músico.
 
-- [x] 🔴 **Aritmética monetária de `MusicianWallet` é em CENTAVOS INTEIROS** (26/ago/2026)  
+- [x] 🔴 **Aritmética monetária em CENTAVOS INTEIROS — no `Money` VO** (26/ago/2026)  
+       Código: `shared/domain/value-objects/money.vo.ts`.  
+       Regras:
+  - `add`, `subtract`, `multiply` e `divide` operam em centavos. **A imprecisão
+    de ponto flutuante não degradava o valor: ela LANÇAVA**, porque o construtor
+    recusa mais de duas casas decimais. `0.1 + 0.2` e `150.30 - 110` derrubavam a
+    operação inteira com `InvalidMoneyError`, e são valores comuns — saldo com
+    centavos é o normal de quem soma gorjetas.
+  - O defeito ficou latente porque **o `Money` não tinha um único teste**. Agora
+    tem 29.
+  - 🔴 **`allocate(n)` é novo, e é a operação que `divide` não sabe fazer.**
+    Reparte um valor em N quotas cuja soma é exatamente o original, distribuindo
+    o resto de um centavo por vez. `divide` serve para "valor por unidade"
+    (cachê por hora); repartir dinheiro entre pessoas com ele perde centavos.
+  - Dois call sites estavam quebrados e foram corrigidos junto:
+    - **`Transaction.create`** calculava `net_amount` como `amount - fee` em
+      float cru. Um cachê de R$1.111,10 com 10% de comissão dava
+      `999.9899999999999` e a transação nascia inválida — a confirmação do
+      pagamento falhava com o dinheiro já aprovado no gateway.
+    - 🔴 **O split de gorjeta entre membros de banda** usava
+      `Math.floor(net / n)` sobre REAIS, tratando centavos como resto
+      descartável. R$30,00 entre 4 dava **R$9 ao líder e R$7 a cada um dos
+      outros** — o justo é R$7,50, e como a soma fechava em R$30 nada denunciava
+      o desvio. R$18,20 entre 3 produzia `6.199999999999999` e derrubava a
+      confirmação inteira. Hoje usa `allocate`.
+
+- [x] **`MusicianWallet` expressa intenção, não mecânica** (26/ago/2026)  
        Código: `musician-wallet.aggregate.ts`.  
        Regras:
   - `Money.add`/`subtract` operam em ponto flutuante e o `Money` recusa mais de
@@ -514,10 +660,12 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
     somados), não a exceção.
   - Vale para `receiveFunds`, `withdrawFunds`, `refundWithdrawal`,
     `recordExternalEarning`, `holdFunds`, `releaseHeldFunds` e `refundHeldFunds`.
-    Mesma razão de `BookingEscrow.splitAmount`.
-  - ⚠️ **O `Money` VO em si continua somando em ponto flutuante** — o mesmo
-    defeito de classe existe em todo agregado que faz `add`/`subtract`. Corrigido
-    aqui porque é onde o saque vive; a correção geral está em aberto.
+    Todos voltaram a usar `balance.add(money)` / `subtract` depois que o `Money`
+    foi corrigido — a mecânica de centavos mora no VO, não espalhada pelo
+    agregado.
+  - ✅ **Corrigido na raiz em 26/ago/2026** — ver "Aritmética monetária" abaixo.
+    `Money.add`/`subtract` passaram a operar em centavos, e o agregado voltou a
+    expressar intenção (`balance.add(money)`) em vez de mecânica de centavos.
 
 **Monetização e planos**
 
@@ -661,6 +809,15 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 - [~] Algoritmo completo de ranking mensal (Top Fãs, Top Sugestões, Top Discoverers, etc.)  
   Estrutura de `Ranking` e `UserPoints` já está pronta, com use-cases para cálculo e leaderboard; contudo, a lógica fina de cada tipo de ranking (combinações específicas de métricas) ainda pode ser expandida para refletir todos os cenários descritos em _Features_.
+
+- [x] Leaderboard com identidade exibível (7.16b)
+       Código: `get-leaderboard.use-case.ts`, `findTopUsersWithProfile` em `user-points-prisma.repository.ts`, `UserPointsPresenter`.
+       Regras:
+  - `GET /gamification/leaderboard` devolve `nickname` e `avatar` do fã além dos pontos. Antes só saía `user_id`, e o app exibia "Fã #\<hash\>": um fã não pode consultar `GET /audiences/:id` de outro fã (dono/admin-only), então não havia como resolver o nome pelo cliente.
+  - Resolvido em **um único SQL** (`include` da relação `UserPoints.audience`, obrigatória no schema), não por segundo round-trip. `nickname`/`avatar` **não** são copiados para dentro do agregado `UserPoints` — a identidade continua sendo do `Audience`.
+  - `nickname`/`avatar` são `null` para quem nunca preencheu o apelido; o cliente cai no `Fã #\<hash\>`. Nunca fabricar nome.
+  - 🔴 **A rota é `@Public()`**: apelido e avatar de fã são dados públicos por decisão de produto — é a mesma premissa que justifica o compartilhamento social valer só 10 pontos. **Nunca acrescentar e-mail, telefone ou preferências ao `UserPointsPresenter`**, que é servido sem autenticação. Não há enumeração da base: a resposta é top-N, com `limit` capado em 100.
+  - Os campos são opcionais no `UserPointsOutput` e só o caminho do leaderboard os popula — `GET /gamification/users/:id/points` (consulta do próprio usuário) devolve `undefined` neles, de propósito.
 
 ---
 
@@ -1152,9 +1309,34 @@ Código: `src/nest-modules/shared-module/security/http-security.policy.ts`, `mai
   produção segura — produção não roda a partir dele.
   - ⚠️ `/tmp` do `app` é **volume, não tmpfs**: os uploads de áudio passam inteiros
     por `os.tmpdir()`, e um tmpfs colocaria centenas de MB na RAM do host.
-  - ⚠️ **Pendente de validação:** o smoke test no rodapé do arquivo não foi
-    executado. `read_only` é a mudança com maior chance de quebrar um caminho de
-    escrita não mapeado.
+  - ✅ **Validado em 26/ago/2026** por `scripts/smoke-test-prod.sh`: 18/18
+    verificações passam (non-root nos quatro serviços, raiz somente leitura,
+    `/tmp` do app gravável, `/api/docs` 404, cabeçalhos do Helmet, nenhuma porta
+    de banco publicada). O script sobe a stack num projeto isolado e derruba no
+    fim — não toca o compose de desenvolvimento.
+  - 🔴 **A primeira execução encontrou cinco defeitos que só apareceriam no
+    deploy**, e é por isso que o smoke test não é opcional:
+    1. `envs/.env.production.example` **omitia doze variáveis obrigatórias** — o
+       Joi recusava o boot e o container entrava em restart loop.
+    2. `RESEND_API_KEY` **não estava no schema Joi**. O `MailService` faz
+       `new Resend(apiKey)` no construtor e o SDK lança com chave indefinida:
+       o app não subia, com a mensagem `Missing API key`, que não nomeia a
+       variável nem indica que o problema é de configuração. Agora é obrigatória
+       em produção e falha no validador, com mensagem acionável.
+    3. O healthcheck do RabbitMQ era `rabbitmq-diagnostics ping`, que confirma o
+       nó Erlang e **não** os listeners. O broker leva ~22s para completar o
+       boot; o `ping` respondia OK em poucos segundos, o `depends_on:
+       service_healthy` liberava o app na janela e ele morria em `ECONNREFUSED`
+       no timeout de 5s do cliente AMQP — crash loop a cada deploy, sem nada de
+       errado no broker. Hoje é `check_port_connectivity`.
+       ⚠️ O compose de **desenvolvimento** tem o mesmo `ping` e o mesmo defeito
+       latente; lá o `restart: unless-stopped` mascara.
+    4. `REDIS_URL` não levava a senha que o próprio compose configurava via
+       `requirepass` — o app subia, conectava e morria no primeiro comando com
+       `NOAUTH Authentication required`.
+    5. `container_name` fixo colidia com o compose de desenvolvimento e
+       impediria staging e produção no mesmo host. Removido: o nome vem do
+       projeto (`-p`).
   - Os workers de GPU **não** estão nesse compose: em produção vivem em host próprio
     (um por placa de 8GB). O endurecimento deles está nos Dockerfiles.
   - 🔴 **O Keycloak também não** — ele já tem compose próprio
@@ -1196,4 +1378,100 @@ Código: `src/nest-modules/shared-module/security/http-security.policy.ts`, `mai
 [29]: ../src/core/gamification/domain/value-objects/interaction-metadata.vo.ts
 [30]: ../src/core/gamification/domain/ranking.aggregate.ts
 [31]: ../src/core/gamification/domain/value-objects/ranking-type.vo.ts
+
+---
+
+## Indicação de talentos e compartilhamento social (28/set/2026)
+
+### O que estava errado
+
+As duas rotas existiam (`POST /audiences/:id/indications` e
+`.../social-shares`) e **pareciam funcionar**. Não funcionavam:
+
+1. 🔴 **A indicação era descartada.** Não havia tabela. O use-case incrementava
+   `Audience.points` e emitia `MusicianIndicatedEvent` — e **nenhum handler o
+   escutava**. Pior: os use-cases nem recebiam o `DomainEventMediator`, então o
+   evento nem chegava a ser publicado. Quem indicou quem, para onde e por quê
+   sumia. Era por isso que o "dashboard de indicações do estabelecimento" nunca
+   pôde ser construído.
+2. 🔴 **Dois sistemas de pontos, divergindo em silêncio.** As rotas mexiam em
+   `Audience.points` (nível do fã); o ledger canônico `UserScore` +
+   `UserPoints` — que o **leaderboard lê** — nunca via nada. E os valores
+   divergiam: `AudiencePoints` dava `share_social: 50` / `indicate_musician: 3`,
+   enquanto `gamification-points.ts` dava 50 ao share e **nem conhecia** a
+   indicação.
+3. 🔴 **O compartilhamento era fraude trivial.** 50 pontos — o mesmo que um
+   pedido ACEITO — numa ação sem dedupe e sem nada que a corrobore.
+   `imageShare.ts` **documenta no próprio código** que o SO não distingue
+   "compartilhou" de "abriu o menu e cancelou". Vinte toques = os 1000 pontos de
+   `isTopFan`, e o leaderboard é público.
+
+### As decisões
+
+**Valores unificados** nos dois sistemas: compartilhamento **10** (ordem de
+`SCAN_QR`, ação leve e não verificável), indicação **15** (exige mais intenção:
+escolher músico, local e motivo). Os **50 pontos ficam reservados à missão
+7.11**, que exige prova do post — é o que o roadmap 7.3 já mandava tratar como
+fonte única deste tema.
+
+**Dedupe por conteúdo, no ledger.** `UserScore` já é a fonte de verdade dos
+pontos; uma segunda tabela de "o que já foi pago" poderia divergir dele.
+`existsByUserTypeAndReference(user_id, score_type, reference_id)` — **as três
+colunas**, porque só `(user, tipo)` bloquearia o segundo compartilhamento de
+qualquer conteúdo e só a referência bloquearia o crédito de outro usuário sobre
+o mesmo card.
+
+- Compartilhamento: referência `<content_type>:<content_id>`. O prefixo evita
+  colisão entre ids de domínios diferentes (dois UUID podem coincidir por
+  acidente de seed, e a colisão apareceria como crédito negado sem motivo).
+- Indicação: referência `<musician_id>:<establishment_id>`.
+
+⚠️ **Compartilhar/indicar de novo continua funcionando** — mandar o card para
+outro grupo é uso normal. O que não acontece duas vezes é o **crédito**.
+
+**`platform` virou opcional** no compartilhamento: o share sheet do SO não
+informa o destino. Exigir o campo obrigaria o cliente a inventar um valor, e
+dado inventado entra em relatório como se fosse verdade.
+
+**O contrato do share mudou:** `request_id` deu lugar a `content_type` +
+`content_id` (`tip_receipt` | `show_recap` | `qr_code` | `request`). A rota não
+tinha nenhum cliente, então a troca não quebrou ninguém.
+
+### A indicação como entidade
+
+Domínio `src/core/indication/` + `indications-module` (1 controller).
+Migration `20260908120000_add_indications`.
+
+- **Unicidade `(audience_id, musician_id, establishment_id)` no BANCO.** Dois
+  POSTs simultâneos furam qualquer checagem só na aplicação, e o mesmo fã
+  indicando o mesmo artista para a mesma casa de novo é a mesma opinião,
+  repetida. `RecordIndicationUseCase` é idempotente: repetir devolve a
+  existente; numa corrida, o `ConflictError` do UNIQUE cai na releitura e
+  **nenhum dos dois usuários vê erro**.
+- **`status` (`new`/`seen`/`archived`) pertence a QUEM RECEBE.** O fã indica e
+  sai de cena; não há método que ele possa chamar. `markAsSeen()` **não
+  ressuscita** uma arquivada — senão ela voltaria à caixa sozinha.
+- **Arquivar não apaga.** A indicação continua contando como sinal do público
+  (e como ponto já creditado). Some da lista, não da história.
+- 🔴 **`:indication_id`, nunca `:id`.** Um `:id` de sub-recurso colide com o
+  fallback do ownership guard e dá 403 no dono legítimo — armadilha já paga em
+  `personal-chord-sheet`. Há `@OwnershipParam({ param: "establishment_id" })`
+  explícito e teste de regressão em `indications-module/__tests__/di-check.spec.ts`.
+- 🔴 **`UpdateIndicationStatusUseCase` confere `establishment_id` contra a linha
+  carregada, e responde 404 — não 403.** O guard prova quem é o usuário, nunca
+  de quem é o sub-recurso; e "existe mas não é sua" já confirma a existência a
+  quem não deveria saber.
+- **Alvos polimórficos sem FK** (precedente de `Review`/`UserScore`), mas o
+  `SearchParams.filter` tem **override obrigatório** — sem ele a caixa de um
+  estabelecimento devolveria as indicações de todos. Há teste que falha se o
+  override for removido.
+- **O nome do fã NÃO sai** no presenter. A caixa existe para o dono reagir ao
+  sinal do público, não para descobrir quem gosta de quem.
+
+### Ordem no handler
+
+`AudienceEventsHandlers` **persiste antes de creditar**, e as duas coisas falham
+independentemente: a indicação é o dado de negócio, os pontos são acessórios.
+Perder a indicação por causa da gamificação seria o pior resultado. Nenhuma
+falha de pontos propaga para o usuário.
 

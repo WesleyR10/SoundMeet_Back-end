@@ -17,6 +17,7 @@ Backend em **NestJS + DDD + Clean Architecture + Hexagonal**, ORM **Prisma/Postg
 | [payment-gateway-decisions.md](payment-gateway-decisions.md) | Gateways, escrow, chargeback — arquitetura decidida | Mexer em pagamento ou ligar o escrow |
 | [payment-gateway-research-2026-08.md](payment-gateway-research-2026-08.md) | 🔴 **A taxa PIX do Asaas é FIXA (R$1,99)** e torna deficitária toda gorjeta abaixo de R$22. Comparativo com Woovi/Mercado Pago/Efí/Pagar.me, restrições operacionais do Asaas e a recomendação de rotear por vértice | **Antes** de escolher gateway ou escrever o F1.0 |
 | [auth/keycloak.md](auth/keycloak.md)                 | Realm, clients, roles, groups e claims Keycloak     | Configurar autenticação/autorização |
+| [ops/domain-soundmeet-com-br.md](ops/domain-soundmeet-com-br.md) | Domínio Hostinger, DNS, túnel, mapa de chaves MP, Keycloak/Google | Depois de comprar o domínio; webhooks e OAuth |
 | [workflow/git-workflow.md](workflow/git-workflow.md) | Git Flow + Conventional Commits                     | Commits e branches                  |
 
 ### Contrato digital de show ([contract/](contract/contract-digital.md))

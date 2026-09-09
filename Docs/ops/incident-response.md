@@ -59,31 +59,90 @@ exposição é invalidar a credencial.
    reescrita muda todos os SHAs e quebra clones existentes.
 5. Registre no §6.
 
-#### 🔴 Item ABERTO — `RESEND_API_KEY` no histórico público
+#### 🔴 Item ABERTO — `envs/.env.e2e` no histórico público
 
-Encontrado em **26/ago/2026** durante a implementação do SM-019.
+Encontrado em **26/ago/2026** (SM-019). **Reverificado commit a commit em
+29/ago/2026**, o que mudou o escopo do item: não é uma chave, são **sete
+valores**, e o mais grave não é o do Resend.
+
+> ⚠️ **Correção de auditoria.** O veredito da revisão de 28/ago/2026
+> (`Docs/audits/security-review-2026-08-28.md`, "Git: nenhum `.env`/chave/
+> service-account no histórico dos três repos") está **errado** e não deve ser
+> citado. A varredura provavelmente olhou `git ls-files` (rastreamento atual, no
+> qual o arquivo de fato não aparece) em vez do histórico. Um `grep` do formato
+> da chave ancorado no início do valor também falharia: **há um espaço depois do
+> `=`**.
 
 | | |
 |---|---|
-| **O quê** | `RESEND_API_KEY` com formato de chave real (`re_…`) |
-| **Onde** | `envs/.env.e2e`, em 5 commits alcançáveis, o mais recente `185ad7c` |
+| **O quê** | `envs/.env.e2e` com valores reais em 7 variáveis sensíveis |
+| **Onde** | 5 commits; entrou em `552cec6` (30/dez/2025), Resend em `783a148` (24/jun/2026), último com o arquivo: `185ad7c` (01/jul/2026) |
 | **Alcance** | `origin/develop` do repositório **público** `WesleyR10/SoundMeet_Back-end` |
-| **Desde quando** | O arquivo deixou de ser rastreado em `79ef798`, mas **permanece no histórico** |
-| **Estado atual** | `envs/.env.e2e` está em `.gitignore`; `envs/.env.example` **não** contém chave real |
-| **Ação necessária** | **Rotacionar a chave no painel do Resend** e conferir o log de envio por uso indevido |
+| **Desde quando** | Deixou de ser rastreado em `79ef798` (07/ago/2026) — **permanece no histórico**, cerca de 7 meses exposto |
+| **Estado atual** | `envs/.env.e2e` está no `.gitignore`; `envs/.env.e2e.example` tem só placeholder |
 
-O que essa chave permite a quem a tiver: enviar e-mail **como o domínio
-verificado do SoundMeet**. O dano não é o custo do envio — é phishing com
-remetente legítimo contra os próprios usuários, exatamente na hora em que o
-produto pede confiança para tratar de dinheiro.
+**Todos os sete valores diferem dos placeholders do `.env.e2e.example`** — foi
+conferido um a um, então nenhum deles pode ser descartado como "exemplo". A
+ordem de rotação abaixo é por dano, não por ordem alfabética:
 
-Outros valores do mesmo arquivo (`KEYCLOAK_CLIENT_SECRET`, `MINIO_*`, `JWT_*`)
-aparentam ser de ambiente local (`soundmeet123`, `test…`). **Confirme um a um**
-antes de descartar: se algum foi reaproveitado em algum ambiente real, entra na
-mesma rotação.
+| Prioridade | Variável | O que permite a quem tiver |
+|---|---|---|
+| 🔴 **1** | `KEYCLOAK_CLIENT_SECRET` | Segredo do client confidencial `soundmeet-api`, cujo service account tem `realm-management: ["manage-users", "view-realm"]` (`infra/keycloak/service-account-role-assignments.json`). Ou seja: **criar usuário, resetar a senha de qualquer conta e ler e-mail/nome de todo o realm.** É acesso administrativo à identidade — supera phishing em severidade e é incidente de dados pessoais (§5). |
+| 🔴 **2** | `RESEND_API_KEY` | Enviar e-mail **como o domínio verificado do SoundMeet**. Phishing com remetente legítimo, exatamente quando o produto pede confiança para tratar de dinheiro. ⚠️ A chave é **Full access / All domains**, então também **lê a lista de contatos** (dado pessoal), **apaga domínios** (derruba todo e-mail transacional) e **cria outras chaves** (persistência). |
+| 🟠 3 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Objetos de mídia, se o par tiver sido reaproveitado fora da máquina local. |
+| 🟢 4 | `JWT_SECRET` / `JWT_REFRESH_SECRET` | Baixo: `config-module.module.ts` trava `AUTH_JWT_VALIDATION_MODE=keycloak` em produção, o que torna o HS256 local inútil fora de dev. Rotacione por higiene. |
+| 🟢 5 | `DATABASE_URL` | Credencial de banco local; só importa se o host for alcançável de fora. |
 
-> Enquanto este bloco estiver aqui, o item está **aberto**. Ao rotacionar,
-> substitua-o por uma linha no registro do §6 com a data.
+> **Reverificado em 01/set/2026.** O item continua **aberto e não rotacionado**:
+> `git show 185ad7c:envs/.env.e2e` ainda devolve os sete valores, o commit
+> continua em `origin/develop`, e o `RESEND_API_KEY` de `envs/.env` é **o mesmo
+> prefixo** do vazado — ou seja, a chave comprometida segue sendo a chave em uso.
+> Nada aqui é código: a rotação acontece no painel de cada provedor.
+
+🔴 **Dois fatos descobertos em 01/set/2026 que mudam a execução do passo 2:**
+
+- **A chave do Resend é também a senha SMTP do Keycloak.** O realm traz
+  `smtpServer.password = ${env.RESEND_API_KEY}` (`infra/keycloak/realm-soundmeet.json`)
+  e o `keycloak-sync.mjs` **não** sincroniza `smtpServer` — a lista de
+  propriedades dele não inclui o bloco. Então rotacionar mexendo só no `.env` do
+  backend deixa o Keycloak com a chave velha até alguém reimportar o realm ou
+  editar SMTP no admin console. O sintoma é caro e mudo: **"Esqueci a senha" e a
+  verificação de e-mail param de sair**, e desde o AUTH-1 (31/ago) o
+  "Esqueci a senha" deixou de ser um `Alert('Em breve')` e virou o caminho real
+  de recuperação de conta do app. A rotação tem **três** destinos, não um:
+  `envs/.env` (dev), o secret manager (prod) e o realm do Keycloak.
+- **Havia três arquivos com credenciais reais NÃO ignorados pelo git**
+  (`envs/.env.bak-keys-*`, `.env.bak-mp-*`, `.env.bak-prodcreds-*`, criados por
+  scripts de rotação). `git status` os mostrava como `??`: um `git add envs/`
+  repetiria o IR-1 com conteúdo pior — o nome do terceiro diz `prodcreds`. A
+  lista de nomes exatos do `.gitignore` era a causa: ela só protege o nome que
+  alguém lembrou de escrever. Corrigido invertendo para deny-by-default
+  (`envs/*` + `!envs/*.example`). Os arquivos continuam no disco; **apague-os
+  depois da rotação.**
+
+**Ações, nesta ordem:**
+
+1. **Keycloak** → client `soundmeet-api` → Credentials → *Regenerate secret*.
+   Atualizar `KEYCLOAK_CLIENT_SECRET` no ambiente. Antes de regenerar, olhar
+   *Sessions* e o event log do realm por criação de usuário ou reset de senha
+   que não reconheça — é essa a evidência que o §5.3 exige guardar.
+2. **Resend** → criar chave nova e **revogar** a antiga
+   (`586c6381-5cfe-4f73-a37b-833c1cc1c30f`). 🔴 A nova deve ser **Sending
+   access** e **restrita ao domínio verificado**, não `Full access`/`All
+   domains` como a atual — a chave que vazou podia muito mais do que enviar.
+   Antes de revogar: **Logs**, filtrar pela chave antiga, salvar print dos
+   envios desde 24/jun/2026.
+2b. **Keycloak → Realm settings → Email → Password**: colar a chave nova do
+   Resend. Sem este passo o e-mail transacional do realm (verificação e
+   "Esqueci a senha") para de sair, em silêncio. Conferir com um
+   *Test connection* e um reset de senha de ponta a ponta.
+3. MinIO e JWT: rotacionar se tiverem saído da máquina local.
+3b. Apagar `envs/.env.bak-*` do disco — eles guardam a geração anterior de
+   credenciais e não têm mais função depois da rotação.
+4. Só então considerar `git filter-repo`. Não substitui nada acima.
+5. Registrar no §6 e substituir este bloco por uma linha com a data.
+
+> Enquanto este bloco estiver aqui, o item está **aberto**.
 
 ### 2.2 Acesso indevido a conta de usuário
 

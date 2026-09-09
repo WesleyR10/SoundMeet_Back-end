@@ -96,31 +96,52 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
       `bandRepo` e resolve o líder (`resolveBeneficiary`) — banda não tem conta no provedor, o
       vínculo OAuth é sempre de uma pessoa. A **divisão** entre integrantes segue na confirmação
 
+#### 🔴 Pré-condição do bloco MP — rebuildar o container (achado em 29/ago/2026)
+
+O `soundmeet-app` roda **imagem buildada**, não o código do disco. Em 29/ago a imagem em execução
+era de **14/ago** e `POST /api/v1/webhooks/mercadopago` respondia **404** — a rota existia no código
+e no `payment.module.ts`, mas não no container. Qualquer tentativa anterior de "testar a gorjeta"
+mediu código de duas semanas atrás, o que é **pior que não testar**: dá resultado, e o resultado é
+falso. `docker compose build app && docker compose up -d app` antes de qualquer item MP.4–MP.8.
+
 #### Depois de pegar as chaves da API do Mercado Pago
 
-> Credenciais em [mercadopago.com.br/developers](https://www.mercadopago.com.br/developers) →
-> "Suas integrações" → criar aplicação com modelo **Marketplace**. Saem na hora, sem aprovação
-> comercial — foi esse o critério que a Iugu não atendeu.
+> Credenciais em [mercadopago.com.br/developers](https://www.mercadopago.com.br/developers).
+> App canônica: **SoundMeetPIX (`7348187308113120`)**, homologada em 29/ago/2026.
+> A app **SoundMeet (`2780871563698928`)** ficou leftover — produção inativa; o
+> vendedor de teste `3629491815` nasceu nela. Não misturar `client_id` /
+> `webhook_secret` / token entre as duas. Mapa: [ops/domain-soundmeet-com-br.md](ops/domain-soundmeet-com-br.md).
+>
+> 🔴 **`soundmeet.com.br` comprado na Hostinger em 29/ago/2026** (apex resolve
+> para parking `2.57.91.91`). Desde 07/set/2026 é **também o host do QR** — o
+> `soundmeet.app` anterior é de terceiro e saiu. Rebuildar o mobile só depois de
+> o DNS responder e o `assetlinks.json` sair 200.
 
-- [x] **MP.1a** `MERCADOPAGO_CLIENT_ID`, `MERCADOPAGO_PLATFORM_ACCESS_TOKEN` e
-      `MERCADOPAGO_PUBLIC_KEY` preenchidos em `envs/.env` (20/ago/2026, credenciais de teste). A
-      Public Key não tem consumidor hoje — só serviria para tokenizar CARTÃO no cliente, e a
-      gorjeta é PIX puro, criado 100% no backend
-- [ ] **MP.1b** Faltam `MERCADOPAGO_CLIENT_SECRET` (em "Suas integrações" → a aplicação →
-      Credenciais de teste, **abaixo** do Client ID — não confundir com o Access Token) e
-      `MERCADOPAGO_WEBHOOK_SECRET` (só existe depois do MP.2). ⚠️ Sem o webhook secret o controller
-      recusa **todo** webhook (fail-closed) — sintoma: gorjeta eternamente `pending`, log
-      `mercadopago.webhook.rejected / secret_not_configured`
-- [ ] **MP.1c** Cadastrar `MERCADOPAGO_REDIRECT_URI` em "Suas integrações" → a aplicação → Detalhes
-      → URLs de redirecionamento. 🔴 O MP exige **HTTPS** ali — `http://localhost:3000/...` não vai
-      nem salvar no painel. Para testar o vínculo em sandbox local, expor o backend com um túnel
-      (ngrok/Cloudflare Tunnel) e cadastrar a URL HTTPS do túnel como redirect_uri **e** atualizar
-      `MERCADOPAGO_REDIRECT_URI` no `.env` para o mesmo valor — tem que bater exatamente, o MP
-      rejeita na troca do `code` se divergir
-- [ ] **MP.2** Registrar a URL de webhook no painel do MP (Webhooks → Configurar notificações)
-      apontando para `POST /api/v1/webhooks/mercadopago`, evento **`payment`**. Também exige HTTPS —
-      mesmo túnel do MP.1c serve para isso em ambiente local. Recomendam URL de teste separada da de
-      produção
+- [x] **MP.1a** `MERCADOPAGO_CLIENT_ID` da SoundMeetPIX no `envs/.env`.
+      `MERCADOPAGO_PLATFORM_ACCESS_TOKEN` e `MERCADOPAGO_PUBLIC_KEY` estão
+      preenchidos com credenciais **TEST-** e **não são lidos pelo código** —
+      a cobrança usa o token OAuth do músico. Public Key só serviria para
+      tokenizar CARTÃO no cliente; a gorjeta é PIX puro.
+- [x] **MP.1b** `MERCADOPAGO_CLIENT_SECRET` da SoundMeetPIX (só existe em
+      credenciais de produção; o OAuth de sandbox também usa esse secret — desenho
+      do MP). `MERCADOPAGO_WEBHOOK_SECRET` é o da **PIX** (`13e799e…`), não o da
+      app SoundMeet (`b2a8882…`) — a sessão anterior deixou o secret velho no
+      `.env` e todo HMAC caía em `signature_mismatch`.
+- [ ] **MP.1c** Cadastrar `MERCADOPAGO_REDIRECT_URI` em "Suas integrações" →
+      SoundMeetPIX → Configurações da aplicação → URLs de redirecionamento
+      (**não é IPN**). 🔴 O MP exige HTTPS; `http://localhost` não salva.
+      Túnel vivo em 29/ago:
+      `https://default-andreas-patterns-suspension.trycloudflare.com/api/v1/musicians/mercadopago/callback`.
+      ⚠️ Quick tunnel sorteia hostname a cada start. Túnel nomeado
+      (`api.soundmeet.com.br`) exige zona na Cloudflare — passo a passo no doc
+      do domínio. **Não há MCP que edite redirect URI de app já criada.**
+- [x] **MP.2** Webhook sandbox da SoundMeetPIX →
+      `POST /api/v1/webhooks/mercadopago`, tópicos **`payment` + `order`**.
+      `order` é ignorado com 200 (o controller só confirma `type=payment`).
+      **IPN não se configura** — a doc do MP descontinua e não valida secret.
+      Produção do webhook: **não** apontar para o túnel.
+      ✅ HMAC conferido: sem assinatura / assinatura de outro secret → 403;
+      secret da PIX → passa da assinatura.
 - [x] **MP.3** 🔴 **Bug real encontrado e corrigido em 20/ago/2026** — o comentário em
       `mercadopago-oauth.gateway.ts` já dizia que faltava `offline_access` e o parâmetro nunca
       chegou a existir em `buildAuthorizationUrl`: nenhum músico conseguiria vincular a conta
@@ -130,10 +151,16 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
       criado, cobrindo URL, troca de código, refresh e leitura de pagamento
 - [ ] **MP.4** Fluxo ponta a ponta em sandbox: conectar conta → gorjeta → webhook → gorjeta
       `completed`. **Conferir na conta de teste do músico que o valor caiu lá**, e na nossa que
-      entrou só o `marketplace_fee` — é a prova de que o dinheiro não passa pela plataforma
-- [ ] **MP.5** Validar a conta da taxa com valor real: gorjeta de R$20 no plano FREE deve dar
-      `marketplace_fee` **R$1,60** e total retido do músico **R$1,80 (9%)**. Se der R$1,80 de
-      `marketplace_fee`, o "1% gateway incluso" da tabela de preços virou mentira
+      entrou só o `marketplace_fee` — é a prova de que o dinheiro não passa pela plataforma.
+      ⚠️ O vendedor `3629491815` tem que **autorizar a SoundMeetPIX** (OAuth). Reusar o
+      `APP_USR-` antigo da app SoundMeet como se fosse da PIX é a identidade errada.
+      ⚠️ `POST /v1/orders` recusa credencial `TEST-` da app (`invalid_credentials`).
+      Provado 29/ago: o mesmo endpoint com `APP_USR-` de test user devolveu **201 + QR PIX**.
+      Não migrar o gateway para Payments API por causa disso.
+- [x] **MP.5** Aritmética no código, R$20: FREE `marketplace_fee` **R$1,60** (total
+      retido R$1,80 = 9%); ESSENTIAL **R$1,20**; PRO **R$0,80**. Testes em
+      `mp-marketplace-fee.spec.ts` e `send-tip.use-case.spec.ts`. Falta o gateway
+      confirmar o mesmo número num pagamento real (MP.4).
 - [ ] **MP.6** Testar **gorjeta de banda** — é o caminho que estava quebrado até 20/ago e o único
       que depende de resolver o líder
 - [ ] 🟡 **MP.6a** (achado em 20/ago, decisão de produto pendente, não é bug de código) Na gorjeta de
@@ -419,14 +446,18 @@ Marque `[x]` conforme concluir. **Não pule a ordem** dentro de cada bloco salvo
 - [x] **7.14** ✅ **Concluído em 07/ago/2026 (Bloco 9.6c)** — `GET /musicians/:musician_id/repertoire` (`@Public()`) com `PublicMusicLibraryItemPresenter`: só metadado (título, artista, gênero, dificuldade, duração), controller próprio em vez de afrouxar o genérico, allowlist explícita com teste de regressão. **Navegação de repertório para o público** — `MusicLibraryController` é `@Roles("musician","admin")` na classe inteira; um fã não pode ver o catálogo de um músico pra escolher a música ao pedir:
   - [x] **7.14a** Resolvido pelo **endpoint dedicado** (a segunda opção listada aqui), não pelo afrouxamento da rota genérica: relaxar `MusicLibraryController` exigiria lembrar em toda mudança futura de não deixar `chords`/`lyrics` escaparem no presenter. O controller novo nasce com um presenter que só sabe montar metadado.
   - **Escopo revisado (jul/2026, decisão do usuário durante auditoria):** `MusicLibrary.musicianId` é obrigatório no schema — cada item pertence a um músico específico, não é catálogo global. Com o modelo de IA de cifra ainda em treino, a maioria dos itens hoje tem só `title`/`artist` preenchidos, sem `chords`/`chord_sheet`/`lyrics`. Por isso o endpoint deve expor **só metadado de busca** (título, artista, gênero, difficulty) — **nunca** `chords`/`chord_sheet`/`lyrics`/`notes` — via um `PublicMusicLibraryPresenter` novo (mesmo padrão do `PublicMusicianPresenter`, Bloco 1.d). Mesma filosofia da busca que o músico já usa (`GET /musicians/:id/ai-cifra/search`, Bloco 6.6): identificar a música antes de qualquer conteúdo de cifra existir. Endpoint dedicado (`GET /musicians/:id/repertoire`, exigindo `musician_id` — nunca lista solta) é mais seguro que relaxar a rota genérica, evita vazar campo sensível por engano na resposta.
-  - Desbloqueia: `soundmeet-mobile/Docs/roadmap-mobile.md` Bloco 11.8 (`SongRequestScreen` com catálogo navegável em vez de só free-text/sugestões)
+  - ~~Desbloqueia: `soundmeet-mobile/Docs/roadmap-mobile.md` Bloco 11.8 (`SongRequestScreen` com catálogo navegável em vez de só free-text/sugestões)~~ — **consumido em 09/set/2026**, nos DOIS clientes (`RepertoirePicker` no mobile, `SongCatalogPicker` no web). ⚠️ Ficou **um mês** entregue sem cliente nenhum: rota pronta não produz erro quando ninguém a chama, e a auditoria cruzada de 08/set não pegou porque perguntava se o cliente chama algo inexistente — nunca se existe algo que ninguém chama
 
 - [ ] **7.15** **Validação de QR de estabelecimento** (baixa prioridade — não expandir escopo agora) — `ScanQRUseCase` (`src/core/audience/application/use-cases/scan-qr/scan-qr.use-case.ts`) só valida o esquema `soundmeet://musician/<uuid>`; se/quando check-in de estabelecimento via QR virar feature real, espelhar a mesma validação atômica + anti-abuso (5 scans/dia) para `soundmeet://establishment/<uuid>`. Registrar aqui apenas para não perder o rastro — não detalhar sub-tarefas até haver decisão de produto.
 
-- [ ] **7.16** **Leaderboard sem identidade exibível** (descoberto na implementação do `LeaderboardScreen` do fã, jul/2026) — `GET /gamification/leaderboard` retorna `UserPointsPresenter[]`, que só tem `user_id` (sem nome/avatar); e um fã não pode resolver isso chamando `GET /audiences/:id` de outro usuário (`@Roles("audience","admin")` + ownership guard, dono/admin-only). Resultado: hoje o ranking é tecnicamente funcional mas anônimo (mobile mostra "Fã #<hash>" em vez de um nome):
-  - [ ] **7.16a** Endpoint público (ou escopado a `audience`) que resolva `user_id → nickname/display_name/avatar` para uma lista de IDs — ex. `GET /audiences/public-profiles?ids=...` retornando só os campos exibíveis (nunca e-mail/telefone/preferências privadas)
-  - [ ] **7.16b** Alternativa mais simples: `UserPointsPresenter`/`GetLeaderboardUseCase` já populam `nickname`/`avatar` diretamente na resposta do leaderboard, evitando um segundo round-trip
-  - Desbloqueia: `soundmeet-mobile/Docs/roadmap-mobile.md` Bloco 11.12 (`LeaderboardScreen` com nome real em vez de posição anônima)
+- [x] **7.16** **Leaderboard sem identidade exibível — resolvido pela 7.16b** (gap descoberto na implementação do `LeaderboardScreen` do fã, jul/2026; verificado contra o código em 09/set/2026). O ranking era tecnicamente funcional mas anônimo: `GET /gamification/leaderboard` só devolvia `user_id`, e um fã não podia resolver isso chamando `GET /audiences/:id` de outro usuário (`@Roles("audience","admin")` + ownership guard, dono/admin-only), então o mobile exibia "Fã #\<hash\>".
+  - [x] **7.16b escolhida** — `findTopUsersWithProfile` na porta `IUserPointsRepository` devolve `UserPointsLeaderboardEntry` (`user_points` + `nickname` + `avatar`); `UserPointsOutputMapper.toLeaderboardOutput` e `UserPointsPresenter` carregam os dois campos até o HTTP. **Um único SQL:** o Prisma resolve por `include` (a relação `UserPoints.audience` já existe no schema, obrigatória e `onDelete: Cascade` — por isso `model.audience.nickname` não precisa de guarda). Sem round-trip extra e sem duplicar `nickname`/`avatar` dentro do agregado `UserPoints`, que é a fronteira entre bounded contexts.
+  - [~] **7.16a superseded, não implementada** — o endpoint `GET /audiences/public-profiles?ids=...` resolveria o mesmo problema com **duas** chamadas e uma superfície pública nova a defender. Só volta a fazer sentido se outra tela precisar resolver identidade de fã em lote fora do leaderboard; hoje nada precisa.
+  - 🔴 **`nickname`/`avatar` só são populados no caminho do leaderboard.** `GetUserPointsUseCase` (consulta do próprio usuário) não enriquece — os campos são opcionais no `UserPointsOutput` de propósito. Quem adicionar uma terceira rota sobre `UserPointsPresenter` precisa decidir explicitamente se enriquece, senão os campos chegam `undefined` sem erro nenhum.
+  - ⚠️ **A rota é `@Public()`** (allowlist em `route-auth-coverage.spec.ts`: "leaderboard público"), então nickname e avatar de fã são dados públicos por decisão de produto — coerente com `business-rules.md`, que já registra "o leaderboard é público" ao justificar a queda do compartilhamento social para 10 pontos. Não há enumeração: a resposta é top-N com `limit` capado em 100, nunca a base inteira. **Nunca acrescentar e-mail, telefone ou preferências a este presenter.**
+  - **In-memory degrada, não lança:** `UserPointsInMemoryRepository` recebe `IAudienceRepository` **opcional** e devolve `nickname`/`avatar` `null` quando não injetado (mesmo padrão de `EventInMemoryRepository` ↔ `EstablishmentInMemoryRepository`). Em produção o binding é `UserPointsPrismaRepository`, que sempre faz o JOIN.
+  - Testes: 4 casos em `get-leaderboard.use-case.spec.ts` (nome resolvido, fã sem apelido → `null`, ordenação+limit, e o caso negativo sem `audienceRepo` injetado). Suíte gamification **18 suítes / 194 testes ✅**.
+  - Desbloqueou: `soundmeet-mobile/Docs/roadmap-mobile.md` Bloco 11.12 — `LeaderboardRow` mostra o nome real, com fallback para "Fã #\<hash\>" só quando o fã nunca preencheu o apelido.
 
 - [x] **7.18** **Google Calendar sync (17/jul/2026)** — bookings confirmados/cancelados sincronizados one-way com a agenda pessoal do músico (ou do líder da banda — decisão de produto: só a conta do líder, nunca de cada membro):
   - [x] **7.18a** Domínio novo `src/core/google-calendar/`: `GoogleCalendarIntegration` (1:1 com Musician, tokens OAuth cifrados) + `GoogleCalendarSyncedEvent` (mapeamento booking→evento, contabilidade de idempotência) — aggregates completos, validators, fake builders, repositórios in-memory + Prisma (tabelas `google_calendar_integrations`/`google_calendar_synced_events`, migration `20260717120000`)
@@ -1054,13 +1085,84 @@ O `ai-audio-module` estava completo e com **zero UI** desde sempre. Esta fatia d
 
 ---
 
+## Bloco 15 — Pedido com gorjeta, celebração e QR universal ✅ *(27/ago/2026)*
+
+> Três das quatro "ideias de ganho claro" auditadas em 27/ago. A quarta
+> (onboarding do fã sem cadastro) ficou fora por decisão do usuário.
+> Detalhe das regras em [business-rules.md](business-rules.md) (Request →
+> "Destaque pago") e [qr-code.md](qr-code.md).
+
+### 15.1 — Destaque pago no pedido musical (backend)
+
+- [x] `RequestBoost` VO + colunas em `music_requests` + enum `RequestBoostStatus`
+- [x] `BoostMinimumAmountPolicy` e `MusicianAcceptsTipsPolicy` na cadeia de `CanMakeRequestPolicy`
+- [x] Portas `IBoostChargePort` / `ITipEligibilityPort` (inversão: `core/request` não conhece `core/payment`)
+- [x] Cobrança criada no aceite, via `SendTipUseCase` — nenhuma mecânica de gorjeta duplicada
+- [x] `GET /requests/:id/boost/payment`, `GET /tips/:id`, `accepts_tips` nas sugestões
+- [x] Job de expiração a cada 5 min + eventos de domínio + notificações por socket
+- [x] Ordenação da fila verificada contra Postgres real (`test/request/boosted-request-ordering.e2e-spec.ts`)
+- [x] 🔴 `is_priority` removido — era campo fantasma (ver business-rules)
+
+### 15.2 — UI do fã e do músico (mobile)
+
+- [x] `RequestBoostSection` em `SongRequestScreen` (valor + dedicatória + preview do card)
+- [x] `useFanNotificationsSocket` — **o fã nunca havia conectado no socket**; `connectSocket()` só era chamado no navigator do músico
+- [x] `PendingBoostHost` (banner flutuante + folha do QR) e `RequestBoostPaymentSheet`
+- [x] `RequestCard` do músico com faixa de destaque e dedicatória
+- [x] `NowPlayingCard` exibe a dedicatória quando a música tocando veio de destaque pago
+
+### 15.3 — Celebração pós-pagamento
+
+- [x] `TipCelebrationOverlay` (bloom radial, `CelebrationBurst` com gravidade, contagem do valor, montagem do recibo, dedicatória)
+- [x] `TipReceiptCard` (ViewShot) + share/galeria reusando `imageShare.ts`
+- [x] 🔴 **Primeiro tratamento de reduce-motion do app** (`useReducedMotion`) — com a preferência ligada o overlay vai direto ao estado final, sem versão "mais lenta"
+- [x] Valor no card é **opt-in, desligado por padrão** — mesma postura do `ShowRecapCard`
+
+### 15.4 — QR universal (backend + mobile + web)
+
+- [x] QR grava `https://soundmeet.com.br/musico/<uuid>`; parser aceita os dois formatos com allowlist de origem
+- [x] `app.json` com `associatedDomains` + `intentFilters` (`autoVerify`)
+- [x] Rotas `/.well-known/*` no `soundmeet-web`, com 404 quando não configurado
+- [x] `InstallAppSheet` (só renderiza com URL de loja real)
+- [x] `npm run backfill:qr-links`
+
+### Pendente deste bloco
+
+- [x] ~~**DECIDIR O HOST CANÔNICO**~~ — **resolvido em 07/set/2026:
+      `soundmeet.com.br`**, o domínio efetivamente registrado.
+      🔴 O host anterior, `soundmeet.app`, **é de terceiro** — nunca foi
+      comprado, entrou por suposição. Ele responde 308 para `www` (redirect já
+      quebraria a busca do `assetlinks.json`/AASA) e o `www` serve **outro
+      produto** (SPA Vite, em inglês, `theme-color #DC2E73`). Um QR impresso
+      apontando para lá levaria o fã ao site de um estranho — a mesma falha do
+      adesivo colado por cima, cometida por nós.
+      Ajustados: `QR_DEFAULT_BASE_URL`, a allowlist do `ScanQRUseCase`,
+      `ALLOWED_HOSTS` do mobile e o `app.json`. Detalhe em
+      [qr-code.md](qr-code.md) e [ops/domain-soundmeet-com-br.md](ops/domain-soundmeet-com-br.md).
+- [ ] **DNS do `soundmeet.com.br` apontando para o `soundmeet-web`** — hoje o
+      apex está no parking da Hostinger. É o que falta para o `/.well-known/*`
+      responder e o rebuild ser seguro.
+- [x] ~~**Aplicar a migration** `20260827120000_add_request_boost`~~ — aplicada em 07/set/2026
+- [x] ~~`ANDROID_SHA256_CERT_FINGERPRINTS`~~ — obtido em 27/ago do APK do build de 16/ago (sem gastar build), já em `soundmeet-web/.env.local`. ⚠️ Trocar pelo fingerprint do Google quando publicar com Play App Signing
+- [ ] **`IOS_APP_TEAM_ID`** — não existe conta Apple nem build iOS. Android funciona independente
+- [ ] **URLs de loja** — só depois de publicar; até lá a `InstallAppSheet` não renderiza
+- [ ] **Rebuild nativo do mobile** — `app.json` mudou configuração nativa, não sai por OTA.
+      🔴 **Só DEPOIS do host resolvido e do `assetlinks.json` respondendo 200 com
+      `application/json`:** o `autoVerify` roda no momento da INSTALAÇÃO, e um
+      domínio que falha ali fica marcado como não verificado **em cache** — o APK
+      novo abriria no navegador até ser reinstalado
+- [ ] **Push para o público**: `Audience` não tem `push_token`. Quem está com o app fechado quando o músico aceita não é avisado; hoje só o banner de pendência recupera
+- [ ] Verificar o caminho do dinheiro ponta a ponta depende de MP.1b–MP.8 (sandbox do Mercado Pago)
+
+---
+
 ## Viabilidade (referência rápida)
 
 | Feature                    | Status                                               |
 | -------------------------- | ---------------------------------------------------- |
 | Perfil + QR (geração)      | ✅                                                   |
-| Validação QR (parse/UUID)  | ✅ Bloco 2 completo (UoW atômico + testes com UUID real) |
-| Pedidos musicais           | ✅                                                   |
+| Validação QR (parse/UUID)  | ✅ Bloco 2 + **QR universal https** (Bloco 15.4) — allowlist de origem, `soundmeet://` legado aceito |
+| Pedidos musicais           | ✅ + **destaque pago** (Bloco 15.1) — gorjeta acoplada, cobrança só no aceite |
 | Saque PIX músico           | ~ `AsaasGatewayAdapter` ativo; gorjeta no Mercado Pago |
 | Gamificação (domínio)      | ✅                                                   |
 | Folha de cifra / IA        | ✅ sync/bulk/materialização (6.1–6.3); ~ tuning Demucs (6.4) |
@@ -1069,6 +1171,80 @@ O `ai-audio-module` estava completo e com **zero UI** desde sempre. Esta fatia d
 | Badge "Aberto agora"       | ✅ backend (7.8a/7.8b) — sem UI de preenchimento em nenhuma plataforma; fatia W1 de [roadmap-web.md](roadmap-web.md) |
 | Dashboard estabelecimento  | ~ parcial                                            |
 | Chat integrado             | ✅ Bloco 7.1 completo (Conversation/Message, gateway `/chat`, push, 15 testes) **(corrigido jul/2026 — tabela estava desatualizada frente ao Bloco 7.1 acima)** |
+
+---
+
+## Bloco 16 — Tier 3: lote, turnê, confirmação de e-mail, indicação (28/set/2026)
+
+Quatro itens de uma anotação que os tratava como backend-a-fazer. A verificação
+mostrou outra coisa: **os quatro já tinham rota HTTP**. Dois estavam completos;
+dois tinham rota que *parecia* funcionar e não fazia o que prometia.
+
+- [x] **16.1 Responder pedidos em lote — MOBILE.** Backend já estava pronto
+      desde o 9.4c (07/ago/2026): `POST /requests/batch-respond`, throttle
+      6/min, teto 50, dedupe, sequencial. Faltava só o app.
+      Seleção múltipla por long-press na `LiveDashboardScreen`,
+      `SelectionActionBar` flutuante, `BatchRejectSheet` (primeira coleta de
+      `rejection_reason` do app — a recusa individual nunca pediu motivo).
+      🔴 **O relatório parcial é o ponto da fatia:** a rota devolve **200 mesmo
+      com parte do lote falhando**. Os que falham **permanecem na fila,
+      marcados e com o motivo no próprio card**, e a seleção é reduzida a eles
+      para retentar. Sumir com o item que falhou faria o músico achar que
+      respondeu 30 tendo respondido 27. Regras puras em
+      `domain/request-batch.rules.ts` (10 testes, exercitados contra o caso
+      negativo).
+
+- [x] **16.2 Modo turnê — MOBILE.** Backend pronto desde o 7.13d
+      (16/jul/2026). Seção nova no accordion de perfil, **reusando
+      `EditLocationSection` sem alteração** (é totalmente controlado por props).
+      O autofill de CEP virou `shared/services/cep/useCepAutofill.ts`, usado
+      pelas duas seções — duas cópias divergiriam na primeira correção.
+      Atalhos de duração (3/7/15/30) em vez de date picker, e a UI mostra **a
+      data em que expira**, não os dias restantes.
+      ⚠️ Aqui a falha de geocodificação **bloqueia o save** (decisão do 7.13d),
+      ao contrário do update de perfil, que é best-effort — a UI reflete isso.
+      🔴 O payload é **snake_case** (`LocationInput`), ao contrário do
+      `PATCH :id/profile`, que é camelCase: com `forbidNonWhitelisted`, um
+      `zipCode` aqui é 422 no lote inteiro. `buildTouringPayload` centraliza e
+      tem teste que falha se alguém trocar a convenção.
+
+- [x] **16.3 Confirmação de e-mail.** Ver [email.md](email.md) §2 e §4 —
+      a seção do Keycloak estava **factualmente errada** e foi reescrita.
+      Resumo: o Keycloak **nunca** enviou verificação (`createUser` cria com
+      `emailVerified: true` + `requiredActions: []`), e `email_verified_at` era
+      escrito num lugar e **lido em nenhum**.
+      🔴 `GET /auth/verify-email` **mutava estado com token de uso único** —
+      prefetch de scanner de e-mail o queimava antes do usuário clicar. Hoje:
+      `GET .../status` consulta, `POST` confirma, o GET antigo redireciona.
+      `POST /auth/resend-verification` (resposta genérica, para não virar
+      oráculo de enumeração). Página `(public)/verificar-email` no web
+      (`noindex`, fora do sitemap). `verifyEmail: false` no realm —
+      **e a linha precisou entrar no `pickDefined` do `keycloak-sync.mjs`**,
+      mesma armadilha do `loginTheme`.
+      **O gate: saque PIX.** `EmailNotVerifiedError` → 403 +
+      `code: EMAIL_NOT_VERIFIED`, com CTA de reenvio na `WithdrawSheet`.
+      A checagem fica na validação de entrada, **antes de `reserve()`** — as
+      três barreiras de concorrência ficaram intocadas, e há teste que falha se
+      alguém mover o gate para depois.
+
+- [x] **16.4 Indicação de talentos + compartilhamento social.** Ver
+      [business-rules.md](business-rules.md) → "Indicação de talentos e
+      compartilhamento social". Resumo: a indicação era **descartada** (sem
+      tabela, evento sem handler, use-cases sem mediator), o compartilhamento
+      valia **50 pontos auto-declarados e sem dedupe**, e os dois sistemas de
+      pontos divergiam. Agora: domínio `src/core/indication/` + migration,
+      caixa de entrada no dashboard do web, sheet de indicação no perfil
+      público do app, valores unificados (10/15) e dedupe por conteúdo no
+      ledger.
+
+**Não implementado, com motivo:** deep link de verificação no app. O AASA
+(`/musico/*`, `/local/*`) e o `intentFilters` **não capturam**
+`/verificar-email`, então o link já abre no navegador nas duas plataformas —
+que é o comportamento correto, já que a página web faz tudo. Capturá-lo no app
+exigiria mudar AASA + intentFilters + **rebuild nativo** para replicar uma
+página que já funciona.
+
+**Suíte:** 405 suítes / 3944 testes ✅ · mobile 29/321 ✅ · web 102/1010 ✅
 
 ---
 

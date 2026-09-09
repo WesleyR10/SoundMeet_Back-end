@@ -10,6 +10,30 @@
 > A ordem importa. Ligar produção antes de o item 4 (custódia da chave de cifra)
 > estar resolvido significa gerar backups que **não podem ser restaurados**.
 
+> **Atualização 01/set/2026 (OPS-1) — o que saiu do papel e o que NÃO saiu.**
+>
+> ✅ **A verificação do drill (§4.3) virou executável:** `npm run drill:verify`
+> (`scripts/verify-restore.ts`) roda 5 dos 8 critérios e sai com código 1 se
+> qualquer um falhar. Foi exercitado contra o banco local e, o que importa mais,
+> contra o caso negativo: com `TOKEN_ENCRYPTION_KEY` errada ele **falha**, com a
+> mensagem de auth tag do AES-GCM. Um check que não sabe falhar não é check.
+>
+> Ele roda contra um banco **restaurado**, não contra um backup — por isso vale
+> igual nas duas rotas do §3.1 e pôde ser escrito antes da decisão de deploy.
+>
+> 🔴 **O que continua bloqueado: o backup em si.** O §3.1 condiciona a rota de
+> PITR à decisão de deploy (`roadmap-web.md` §11, "Vercel vs. Docker"), e ela
+> segue aberta. Escrever `pgBackRest`/`wal-g` agora seria construir para um alvo
+> não escolhido — e o próprio §3.1 **recomenda o Postgres gerenciado** para um
+> time de uma pessoa, caso em que PITR é configuração e todo esse código vira
+> lixo.
+>
+> ⚠️ Um dado que estreita a decisão: `docker-compose.prod.yml` **já traz
+> Postgres no compose**, fixado por digest. Se o deploy for por ele, a rota é a
+> segunda do §3.1 e exige WAL próprio. Vale confirmar essa intenção antes de
+> escolher — é a diferença entre configurar um provedor e operar arquivamento
+> de WAL.
+
 ---
 
 ## 1. O que precisa de backup, e por quê
@@ -154,7 +178,17 @@ registrado, mesmo (principalmente) quando falha.
 5. Injetar `TOKEN_ENCRYPTION_KEY` **a partir do cofre** — não de um `.env`
    guardado ao lado do dump. Se este passo for fácil demais, o §1.2 foi violado.
 6. Aplicar migrations pendentes: `npx prisma migrate deploy`.
-7. Subir a aplicação e rodar as verificações do §4.3.
+7. Rodar as verificações do §4.3 — **automatizadas desde 01/set/2026**:
+
+   ```bash
+   DATABASE_URL=<banco restaurado> \
+   TOKEN_ENCRYPTION_KEY=<do cofre, digitada agora> \
+     npm run drill:verify
+   ```
+
+   Sai com código **1** se qualquer critério falhar, então serve de gate em
+   script. Os dois itens que ele NÃO cobre continuam manuais e estão marcados
+   no §4.3.
 8. Anotar `T_fim`. **RTO medido = T_fim − T_inicio.**
 9. Registrar em §5.
 10. Derrubar o ambiente e apagar os volumes.
@@ -181,21 +215,26 @@ WHERE indexname IN ('performances_one_live_per_event_musician',
 
 ### 4.3 Critérios de sucesso
 
-O drill só passa com **todos**:
+O drill só passa com **todos**. 🤖 = verificado por `npm run drill:verify`
+(`scripts/verify-restore.ts`); 👤 = manual, porque depende de serviço de pé.
 
-- [ ] Aplicação sobe e `GET /api/v1/health` responde 200.
-- [ ] Login funciona com um usuário real do ponto restaurado (prova que os dois
-      bancos estão no mesmo instante).
-- [ ] **Um `MusicianWallet` com token de Mercado Pago decifra** — é o único teste
-      que prova que a chave do §1.2 sobreviveu junto com o dado. Sem ele, o
+- [ ] 👤 Aplicação sobe e `GET /api/v1/health` responde 200.
+- [ ] 👤 Login funciona com um usuário real do ponto restaurado (prova que os
+      dois bancos estão no mesmo instante). O script cobre só o lado que alcança
+      sem o Keycloak: que todo `musician.id` tem formato de `sub`.
+- [ ] 🤖 **Um `MusicianWallet` com token de Mercado Pago decifra** — é o único
+      teste que prova que a chave do §1.2 sobreviveu junto com o dado. Sem ele, o
       restore parece bom e não é.
-- [ ] Contagem de `bookings`, `contracts` e `booking_escrows` bate com o
+      ⚠️ O seed passou a criar uma carteira vinculada **por causa deste
+      critério**: sem ela o script reportava "não pôde ser exercido", que não é
+      o mesmo que passou.
+- [ ] 🤖 Contagem de `bookings`, `contracts` e `booking_escrows` bate com o
       esperado para o ponto escolhido.
-- [ ] `held_balance` somado bate com os `booking_escrows` em `held` — custódia
+- [ ] 🤖 `held_balance` somado bate com os `booking_escrows` em `held` — custódia
       inconsistente depois de restore é dinheiro retido sem contrapartida.
-- [ ] Os dois índices do §4.2 existem.
-- [ ] Um PDF de contrato é baixável do bucket restaurado.
-- [ ] **RTO medido ≤ 4 h** e **RPO medido ≤ 5 min**.
+- [ ] 🤖 Os dois índices do §4.2 existem.
+- [ ] 👤 Um PDF de contrato é baixável do bucket restaurado.
+- [ ] 👤 **RTO medido ≤ 4 h** e **RPO medido ≤ 5 min**.
 
 ### 4.4 Quando o drill falha
 
@@ -211,6 +250,14 @@ emitida: parece cobertura, não é.
 | Data | Ponto restaurado | RTO medido | RPO medido | Resultado | Observações |
 |------|------------------|-----------|-----------|-----------|-------------|
 | — | — | — | — | **nenhum drill executado** | Não há produção. Primeira execução: junto com o primeiro deploy |
+
+> ⚠️ **A tabela acima continua vazia de propósito, e não deve ser preenchida com
+> a execução de 01/set/2026.** O que rodou naquele dia foi o *verificador*
+> contra o banco de desenvolvimento — não houve restauração de backup nenhum,
+> logo não há RTO nem RPO a medir. Registrar aquilo aqui daria a impressão de
+> cobertura que não existe, que é exatamente o que o §4.4 alerta.
+>
+> O primeiro drill de verdade é o do primeiro deploy.
 
 ---
 

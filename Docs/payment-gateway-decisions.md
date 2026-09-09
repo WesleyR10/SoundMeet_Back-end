@@ -298,8 +298,10 @@ resposta muda qual adapter implementar, não o domínio.
 
 ### Implementação
 - [x] ~~`MercadoPagoPixGateway` — gorjetas~~ — ✅ 19/ago/2026 (OAuth + webhook); 21/ago/2026 passou
-      a criar a cobrança na **Orders API** (`POST /v1/orders` + `marketplace_fee`). O Payments API
-      (`POST /v1/payments`) recusa as credenciais `APP_USR-` de teste da aplicação
+      a criar a cobrança na **Orders API** (`POST /v1/orders` + `marketplace_fee`). A Orders API
+      recusa credencial `TEST-` da app (`invalid_credentials`); sandbox usa test *user* com
+      `APP_USR-` (OAuth). Payments API aceita `TEST-` — não é motivo para trocar o gateway.
+      App canônica: SoundMeetPIX (`7348187308113120`). Ver [ops/domain-soundmeet-com-br.md](ops/domain-soundmeet-com-br.md).
 - [x] ~~`AsaasGatewayAdapter` — cachê (escrow)~~ — ✅ 19/ago/2026: `AsaasEscrowAdapter` +
       `AsaasSubaccountAdapter`, atrás de portas próprias. Assinatura e saque já existiam
 - [~] Webhook de confirmação PIX + idempotência (Bloco 1.7) — gorjeta no MP já tem

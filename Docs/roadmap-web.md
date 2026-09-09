@@ -79,7 +79,7 @@ role `establishment` para criar um estabelecimento.** Ovo e galinha fechado.
   (`identityClaims.addClaimValue`, linha 73) — que é exatamente o que o `EstablishmentOwnershipGuard`
   lê (`currentUser.establishmentIds.includes(...)`).
 - O client Keycloak `soundmeet-web` já existe: `publicClient`, PKCE S256, redirects
-  `localhost:3000/*`, `localhost:3001/*`, `https://soundmeet.app/*`.
+  `localhost:3000/*`, `localhost:3001/*`, `https://soundmeet.com.br/*`.
 - O CORS do backend já libera `localhost:3000`, `3001`, `8080` e `FRONTEND_URL`.
 
 **O que falta é só:** aceitar `role: "establishment"` no `RegisterUseCase` (+ `AddRoleUseCase`) e,

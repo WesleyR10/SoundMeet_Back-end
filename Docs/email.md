@@ -13,7 +13,7 @@ Usado para todos os emails gerados por ações do produto: verificação de cont
 | Free tier | 3.000 emails/mês |
 | SMTP relay | `smtp.resend.com:465` (SSL) — usado pelo Keycloak |
 
-Três variáveis de ambiente são obrigatórias: a chave de API do Resend, o endereço remetente (`noreply@soundmeet.com.br`) e a URL base da API para montar os links nos templates. O domínio deve ser verificado no painel do Resend com registros DNS SPF, DKIM e DMARC antes do uso em produção.
+Três variáveis de ambiente são obrigatórias: a chave de API do Resend, o endereço remetente (`noreply@soundmeet.com.br`) e a URL base da API para montar os links nos templates. O domínio `soundmeet.com.br` foi comprado na Hostinger em 29/ago/2026 (apex no parking). SPF, DKIM e DMARC no painel do Resend **ainda não** estão verificados — sem isso, produção cai em spam. Registros: [ops/domain-soundmeet-com-br.md](ops/domain-soundmeet-com-br.md).
 
 ---
 
@@ -31,25 +31,40 @@ Reservado para newsletters, promoções e automações de marketing quando o vol
 
 ---
 
-## 2. Integração com Keycloak
+## 2. Integração com Keycloak — o que REALMENTE acontece
 
-O Keycloak envia o email de **verificação inicial** na criação de conta via SMTP do Resend, usando a mesma chave de API como senha SMTP. Isso dispensa código NestJS para essa etapa específica — o Keycloak substitui variáveis de ambiente no realm JSON durante o `--import-realm`.
+> 🔴 **Corrigido em 28/set/2026.** Esta seção descrevia um fluxo que **nunca
+> rodou**. O texto anterior afirmava que o Keycloak enviava o e-mail de
+> verificação inicial via SMTP do Resend e que havia risco de duplicidade.
+> Nada disso acontecia.
 
-**Fluxo de criação de conta:**
+O realm tem `verifyEmail`, mas `KeycloakAdminGateway.createUser` cria **todo**
+usuário com `emailVerified: true` e `requiredActions: []`. Como
+`registrationAllowed: false`, o backend é o único caminho de nascimento de
+conta — logo o Keycloak **nunca enviou verificação e nunca bloqueou login**.
+A flag do realm era inerte, e o "e-mail duplicado" não existia.
 
-1. Backend cria o usuário via Keycloak Admin API
-2. Keycloak dispara email de verificação pelo SMTP do Resend
-3. Usuário clica no link do Keycloak
-4. Keycloak marca `email_verified = true` no token
-5. Próximo login do usuário já carrega a claim `email_verified: true`
+**Decisão (28/set/2026): quem verifica é o backend.**
 
-**Troca de email via Keycloak Admin API:**
+Ligar o Keycloak **quebraria o cadastro**: `RegisterUseCase` faz auto-login logo
+após criar a conta, e com a required action `VERIFY_EMAIL` pendente o grant de
+senha falha com *"Account is not fully set up"* — derrubando o cadastro do app
+**e** o `/cadastro` do web. Foi para evitar isso que o `emailVerified: true`
+está lá. Some-se: o template seria o do Keycloak (o tema só customiza
+`login.ftl`), e o fluxo do backend cobre os três perfis com o nosso design.
 
-Para atualizar o email no Keycloak, o backend usa dois endpoints sequenciais: primeiro atualiza o campo `email` do usuário via `PUT` e depois dispara o fluxo `VERIFY_EMAIL` via `execute-actions-email`, fazendo o Keycloak enviar um link de verificação para o novo endereço.
+Em consequência:
 
-> **Decisão de arquitetura:** o Keycloak e o backend têm fluxos paralelos de verificação. O fluxo do backend persiste o estado no banco da aplicação (`email_verified_at`), enquanto o Keycloak mantém seu próprio controle. Para evitar duplicidade de emails, ativar apenas um dos dois fluxos ou suprimir o email do Keycloak para o passo inicial.
+- `verifyEmail` passou a `false` no `realm-soundmeet.json` — flag que mente é
+  pior que ausente.
+- 🔴 **`verifyEmail` precisou entrar no `pickDefined` de `keycloak-sync.mjs`.**
+  Mesma armadilha que o `loginTheme` já custou: sem a linha, o valor do
+  realm.json é **ignorado** pelo sync e continua valendo o do `--import-realm`.
+  O sintoma seria mudar o arquivo, rodar o sync com sucesso, e nada mudar.
 
----
+**Troca de e-mail via Keycloak Admin API** (inalterado): o backend atualiza o
+campo `email` via `PUT` e dispara o fluxo `VERIFY_EMAIL` por
+`execute-actions-email` para o novo endereço.
 
 ## 3. Campos de suporte no banco
 
@@ -68,17 +83,51 @@ Esses campos são **infra-only** — não pertencem ao agregado de domínio e s�
 
 ## 4. Fluxo: Verificação de email no cadastro
 
-1. Backend cria conta via use case (Musician / Establishment / Audience)
-2. Evento de domínio `*CreatedEvent` emitido
-3. `MailEventHandler` captura o evento
-4. `MailService.sendEmailVerification` envia link com token UUID para o email do usuário
-5. Backend persiste `email_token` + `email_token_expires_at` (+24h)
-6. Usuário clica no link (`GET /api/v1/auth/verify-email?token=<uuid>`)
-7. `VerifyEmailUseCase` valida o token, atualiza `email_verified_at` e limpa os campos de token
+1. Backend cria a conta (`RegisterUseCase` / `RegisterEstablishmentUseCase`)
+2. `VerifyEmailService.issueVerificationToken` grava o **hash** do token
+   (SHA-256, TTL de 24h) e envia o link
+3. O link aponta para a **página do web**: `${APP_URL}/verificar-email?token=…`
+4. A página faz `GET /auth/verify-email/status?token=` — que apenas **consulta**
+5. O clique do usuário dispara `POST /auth/verify-email`, que confirma
+6. `email_verified_at` é preenchido e os campos de token são limpos
 
-> **Nota:** o Keycloak envia um email de verificação próprio no mesmo momento. O email do backend é complementar e garante o registro no banco da aplicação. Avaliar qual suprimir quando o realm estiver em produção.
+### 🔴 Por que a leitura e a confirmação são rotas separadas
 
----
+Gmail, Outlook Safe Links e antivírus corporativo fazem **GET de prefetch** em
+todo link que chega por e-mail. Com a confirmação num GET — como era até
+28/set/2026 — o scanner **consome o token de uso único antes do usuário
+clicar**, e o link legítimo passa a responder "inválido". A falha é
+intermitente, depende do provedor de e-mail do usuário, e não reproduz no
+ambiente de quem desenvolve.
+
+Por isso: **GET consulta, POST confirma.** O `GET /auth/verify-email` antigo
+continua existindo (e-mails já enviados não se atualizam), mas hoje só
+**redireciona** para a página — não confirma mais nada.
+
+### Reenvio
+
+`POST /auth/resend-verification` (throttle 3/min). Sem ele, token perdido ou
+expirado era beco sem saída.
+
+🔴 **A resposta é idêntica para e-mail existente e inexistente.** A rota é
+`@Public()` e anônima; responder diferente a transformaria num verificador de
+quem tem cadastro no SoundMeet.
+
+### Onde o e-mail confirmado passou a valer
+
+**Saque PIX.** `WithdrawToPixUseCase` recusa com `EmailNotVerifiedError`
+(403 + `code: EMAIL_NOT_VERIFIED`) enquanto o e-mail não for confirmado. É a
+única ação do produto que tira dinheiro do sistema em definitivo, e um e-mail
+não confirmado é um canal de recuperação de conta que ninguém provou existir.
+
+🔴 A checagem fica na **validação de entrada**, antes de `reserve()` — nunca
+dentro da transação. As três barreiras de concorrência (lock `FOR UPDATE`,
+saldo, chave de idempotência) e a ordem reserva → provedor são invariantes
+provadas contra Postgres real; o gate é pré-condição de negócio, não parte da
+mecânica de dinheiro. Há teste que falha se alguém o mover para depois.
+
+Antes disso, `email_verified_at` era escrito num lugar e **lido em nenhum** —
+backend, mobile e web inteiros.
 
 ## 5. Fluxo: Troca de email com revalidação
 
@@ -153,7 +202,9 @@ O `MailModule` é global — qualquer outro módulo NestJS pode injetar `MailSer
 
 | Status | Item |
 |---|---|
-| ✅ | `VerifyEmailService` + endpoint `GET /api/v1/auth/verify-email?token=X` |
+| ✅ | `VerifyEmailService` + `GET /auth/verify-email/status` (consulta) + `POST /auth/verify-email` (confirma) + `POST /auth/resend-verification` (reenvio). O GET antigo virou redirect para a página do web. |
+| ✅ | Página `/verificar-email` no `soundmeet-web` (`(public)`, `noindex`, fora do sitemap) |
+| ✅ | Gate de **saque PIX** por e-mail confirmado (403 + `code: EMAIL_NOT_VERIFIED`), com CTA de reenvio na `WithdrawSheet` do app |
 | ✅ | `MailEventHandler` com listeners para `*EmailChangedEvent` (Musician, Establishment, Audience) |
 | ✅ | Domain events `EmailChangedEvent` para os três perfis |
 | ✅ | Templates e métodos de serviço para verificação, troca, booking e boas-vindas |
