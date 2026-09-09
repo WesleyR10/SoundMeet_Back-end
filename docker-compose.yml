@@ -35,6 +35,8 @@ services:
       - KEYCLOAK_VERIFY_AUDIENCE=false
       - AI_CIFRA_ANALYSIS_HTTP_BASE_URL=http://ai-cifra-worker-gpu:8000
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
+      # Shared secret backend → workers de IA (A-10). O MESMO valor nos workers.
+      - AI_WORKER_TOKEN=${AI_WORKER_TOKEN:-dev-worker-token}
       - AI_CIFRA_DEFAULT_MODEL_ID=chordformer_v23_continuacao
       - AI_CIFRA_SIMPMUSIC_YTDLP_BIN=yt-dlp
       - AI_CIFRA_MUSIFY_PIPED_BASE_URL=https://api.piped.private.coffee
@@ -190,6 +192,16 @@ services:
       MAIL_FROM: ${MAIL_FROM:-noreply@soundmeet.com.br}
     volumes:
       - ./infra/keycloak/realm-soundmeet.json:/opt/keycloak/data/import/realm-soundmeet.json:ro
+      # Tema de login do SoundMeet (AUTH-1). Build:
+      #   cd ../soundmeet-keycloak-theme && npm ci && npm run build-keycloak-theme
+      #
+      # 🔴 O jar `22-to-25` e não o `all-other-versions`: a imagem acima é a
+      # 22.0, e o outro jar cobre 11–21 e 26+. Trocar os dois faz o Keycloak
+      # subir normalmente e simplesmente ignorar o tema.
+      # ⚠️ `${...:-/dev/null}` mantém o compose subindo mesmo sem o tema
+      # construído — o login volta ao padrão do Keycloak em vez de quebrar o
+      # boot de quem só quer rodar a API.
+      - ${SOUNDMEET_KC_THEME_JAR:-../soundmeet-keycloak-theme/dist_keycloak/keycloak-theme-for-kc-22-to-25.jar}:/opt/keycloak/providers/soundmeet-theme.jar:ro
     ports:
       - "8080:8080"
     depends_on:
@@ -256,6 +268,8 @@ services:
     environment:
       - AI_CIFRA_STORAGE_PROVIDER=minio
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
+      # A-10: valida o header do backend (fail-closed). Mesmo valor do serviço app.
+      - AI_WORKER_TOKEN=${AI_WORKER_TOKEN:-dev-worker-token}
       - AI_CIFRA_ENABLE_NEURAL_CHORDS=true
       - AI_CIFRA_OMAR_RQ_DEVICE=cpu
       - AI_CIFRA_MAX_AUDIO_SECONDS=800
@@ -312,6 +326,8 @@ services:
     environment:
       - AI_CIFRA_STORAGE_PROVIDER=minio
       - AI_CIFRA_ANALYSIS_HTTP_PATH=/v2/analyze
+      # A-10: valida o header do backend (fail-closed). Mesmo valor do serviço app.
+      - AI_WORKER_TOKEN=${AI_WORKER_TOKEN:-dev-worker-token}
       - AI_CIFRA_ENABLE_NEURAL_CHORDS=1
       - AI_CIFRA_OMAR_RQ_DEVICE=cuda
       - AI_CIFRA_MAX_AUDIO_SECONDS=600
@@ -374,6 +390,8 @@ services:
       - AI_AUDIO_STORAGE_PROVIDER=minio
       - AI_AUDIO_PROGRESS_URL=http://app:3000/api/v1/ai-audio/internal/separations
       - AI_AUDIO_PROGRESS_TOKEN=${AI_AUDIO_PROGRESS_TOKEN:-change-me}
+      # A-10: valida o header do backend (fail-closed). Mesmo valor do serviço app.
+      - AI_WORKER_TOKEN=${AI_WORKER_TOKEN:-dev-worker-token}
       - AWS_REGION=us-east-1
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000

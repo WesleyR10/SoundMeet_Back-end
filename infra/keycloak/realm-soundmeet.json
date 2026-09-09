@@ -7,7 +7,7 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
-  "verifyEmail": true,
+  "verifyEmail": false,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
   "smtpServer": {
@@ -214,12 +214,16 @@
       "redirectUris": [
         "http://localhost:3000/*",
         "http://localhost:3001/*",
-        "https://soundmeet.app/*"
+        "https://soundmeet.com.br/*",
+        "https://www.soundmeet.com.br/*",
+        "https://app.soundmeet.com.br/*"
       ],
       "webOrigins": [
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://soundmeet.app"
+        "https://soundmeet.com.br",
+        "https://www.soundmeet.com.br",
+        "https://app.soundmeet.com.br"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
@@ -309,13 +313,13 @@
     {
       "clientId": "soundmeet-mobile",
       "name": "SoundMeet Mobile",
-      "description": "Aplicativo mobile público do SoundMeet.",
+      "description": "Aplicativo mobile público do SoundMeet. Authorization Code + PKCE apenas — Direct Access Grant desligado em AUTH-1 (o client_id viaja no APK).",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "redirectUris": [
         "soundmeet://auth/callback",
@@ -407,6 +411,28 @@
       ]
     },
     {
+      "clientId": "soundmeet-registration",
+      "name": "SoundMeet Registration",
+      "description": "Direct Access Grant restrito ao auto-login pos-cadastro. Confidencial: o secret so existe no backend, nunca em cliente.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false"
+      },
+      "protocolMappers": []
+    },
+    {
       "clientId": "soundmeet-admin",
       "name": "SoundMeet Admin",
       "description": "Console administrativo da plataforma.",
@@ -419,9 +445,12 @@
       "serviceAccountsEnabled": false,
       "redirectUris": [
         "http://localhost:3002/*",
-        "https://admin.soundmeet.app/*"
+        "https://admin.soundmeet.com.br/*"
       ],
-      "webOrigins": ["http://localhost:3002", "https://admin.soundmeet.app"],
+      "webOrigins": [
+        "http://localhost:3002",
+        "https://admin.soundmeet.com.br"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "+"
@@ -533,21 +562,31 @@
     {
       "name": "soundmeet",
       "attributes": {
-        "tenant_id": ["soundmeet"],
-        "organization_id": ["soundmeet"]
+        "tenant_id": [
+          "soundmeet"
+        ],
+        "organization_id": [
+          "soundmeet"
+        ]
       },
       "subGroups": [
         {
           "name": "audiences",
-          "realmRoles": ["audience"]
+          "realmRoles": [
+            "audience"
+          ]
         },
         {
           "name": "musicians",
-          "realmRoles": ["musician"]
+          "realmRoles": [
+            "musician"
+          ]
         },
         {
           "name": "establishments",
-          "realmRoles": ["establishment"],
+          "realmRoles": [
+            "establishment"
+          ],
           "subGroups": [
             {
               "name": "_template",
@@ -555,19 +594,26 @@
                 {
                   "name": "owners",
                   "clientRoles": {
-                    "soundmeet-api": ["establishment_owner"]
+                    "soundmeet-api": [
+                      "establishment_owner"
+                    ]
                   }
                 },
                 {
                   "name": "staff",
                   "clientRoles": {
-                    "soundmeet-api": ["establishment_staff", "event_manager"]
+                    "soundmeet-api": [
+                      "establishment_staff",
+                      "event_manager"
+                    ]
                   }
                 },
                 {
                   "name": "analytics",
                   "clientRoles": {
-                    "soundmeet-api": ["analytics_viewer"]
+                    "soundmeet-api": [
+                      "analytics_viewer"
+                    ]
                   }
                 }
               ]
@@ -582,16 +628,24 @@
               "subGroups": [
                 {
                   "name": "managers",
-                  "realmRoles": ["musician"],
+                  "realmRoles": [
+                    "musician"
+                  ],
                   "clientRoles": {
-                    "soundmeet-api": ["band_manager"]
+                    "soundmeet-api": [
+                      "band_manager"
+                    ]
                   }
                 },
                 {
                   "name": "members",
-                  "realmRoles": ["musician"],
+                  "realmRoles": [
+                    "musician"
+                  ],
                   "clientRoles": {
-                    "soundmeet-api": ["band_member"]
+                    "soundmeet-api": [
+                      "band_member"
+                    ]
                   }
                 }
               ]
@@ -600,13 +654,18 @@
         },
         {
           "name": "admins",
-          "realmRoles": ["admin"]
+          "realmRoles": [
+            "admin"
+          ]
         },
         {
           "name": "support",
-          "realmRoles": ["support"]
+          "realmRoles": [
+            "support"
+          ]
         }
       ]
     }
-  ]
+  ],
+  "loginTheme": "soundmeet"
 }

@@ -58,6 +58,25 @@ services:
       # E-mail (mesmas vars do realm-soundmeet.json usado no dev)
       RESEND_API_KEY: "${RESEND_API_KEY:?obrigatorio}"
       MAIL_FROM: "${MAIL_FROM:?obrigatorio}"
+    volumes:
+      # Tema de login do SoundMeet (AUTH-1). Build:
+      #   cd soundmeet-keycloak-theme && npm ci && npm run build-keycloak-theme
+      #
+      # 🔴 O jar `all-other-versions` cobre 11–21 e **26+** — é o certo para
+      # esta imagem. O `22-to-25` é o do compose de desenvolvimento, que ainda
+      # roda a 22.0. Trocar os dois faz o Keycloak subir e ignorar o tema, sem
+      # erro nenhum: a tela de login volta ao PatternFly padrão.
+      #
+      # ⚠️ `command: start` (sem `--optimized`) re-augmenta a cada boot e
+      # detecta o provider sozinho. Se um dia este compose passar a usar
+      # `start --optimized`, o jar precisa estar presente durante o `kc.sh
+      # build` — o caminho recomendado aí é assar o tema numa imagem própria em
+      # vez de montá-lo.
+      #
+      # `:-/dev/null` mantém o boot funcionando quando o tema não foi
+      # construído: o login cai no padrão do Keycloak em vez de derrubar a
+      # autenticação inteira.
+      - "${KEYCLOAK_THEME_JAR:-/dev/null}:/opt/keycloak/providers/soundmeet-theme.jar:ro"
     # Sem `ports:` publicado no host — só o reverse proxy da rede interna
     # alcança a porta 8080. Ajuste se o proxy rodar fora deste compose.
     expose:

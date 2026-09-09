@@ -71,6 +71,23 @@ COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/package.json ./package.json
 COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
+
+# 🔴 NÃO REMOVA. Esta linha é o que faz a imagem SUBIR — e não parece.
+#
+# O plugin do @nestjs/swagger (nest-cli.json) gera um `_OPENAPI_METADATA_FACTORY`
+# em cada DTO/input/presenter e, para enums e tipos referenciados, assa um
+# `require()` com o caminho ABSOLUTO DO CÓDIGO-FONTE no momento do build —
+# `require("/app/src/core/plans/domain/plan-tier.enum")`. São 61 arquivos do
+# `dist`. O factory é chamado na aplicação dos decorators, ou seja, no LOAD do
+# módulo: sem esse caminho resolver, `node dist/main` morre no boot com
+# `MODULE_NOT_FOUND` antes de qualquer log da aplicação.
+#
+# O estágio de produção não copia `src/` (é TypeScript, e `require` não o
+# carregaria de qualquer forma). O symlink faz `/app/src/X` cair em
+# `/app/dist/X.js` — as duas árvores têm a mesma forma porque `rootDir: ./src`.
+#
+# Consequência a saber: `npm run start:prod` FORA do container não funciona,
+# porque ali `./src` é o TypeScript de verdade. Rodar sempre pela imagem.
 RUN ln -s ./dist ./src
 
 USER nestjs

@@ -46,7 +46,9 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+    "backfill:qr-links": "ts-node -r tsconfig-paths/register src/cmd/backfill-qr-links.ts",
     "backfill:sm016": "ts-node -r tsconfig-paths/register prisma/backfill-sm016-field-encryption.ts",
+    "drill:verify": "ts-node -r tsconfig-paths/register scripts/verify-restore.ts",
     "contract:samples": "ts-node -r tsconfig-paths/register scripts/generate-contract-samples.ts"
   },
   "dependencies": {
