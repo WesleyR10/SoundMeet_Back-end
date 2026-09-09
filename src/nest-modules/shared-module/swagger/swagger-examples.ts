@@ -502,6 +502,22 @@ export function defaultSwaggerExampleRegistry(): SwaggerExampleRegistryItem[] {
       }),
     },
     {
+      pattern: /stagetechspec|stage_tech_spec/i,
+      build: () => ({
+        hasPa: true,
+        mixerChannels: 12,
+        monitors: 2,
+        hasMicrophones: 4,
+        backline: ["Bateria", "Cubo de guitarra"],
+        dimensions: { widthM: 5, depthM: 3, heightM: 2.5 },
+        power: { outlets: 6, voltage: "110V/220V" },
+        hasParking: true,
+        hasSoundEngineer: false,
+        soundcheckWindow: "18:00-19:00",
+        notes: "Palco no fundo do salão, sem escada",
+      }),
+    },
+    {
       pattern: /coordinates/i,
       build: () => ({ lat: -23.55052, lng: -46.633308 }),
     },
@@ -578,7 +594,7 @@ export function defaultSwaggerExampleRegistry(): SwaggerExampleRegistryItem[] {
     { pattern: /tiktok/i, build: () => "@soundmeet" },
     { pattern: /youtube/i, build: () => "https://youtube.com/@soundmeet" },
     { pattern: /spotify/i, build: () => "https://open.spotify.com/artist/123" },
-    { pattern: /website|site/i, build: () => "https://soundmeet.app" },
+    { pattern: /website|site/i, build: () => "https://soundmeet.com.br" },
     { pattern: /payment_method|paymentmethod/i, build: () => "pix" },
     {
       pattern: /metadata/i,

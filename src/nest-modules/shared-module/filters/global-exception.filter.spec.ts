@@ -2,10 +2,10 @@ import { Controller, Get, INestApplication } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 
+import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import { DomainError } from "../../../core/shared/domain/errors/domain.error";
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
 import { InvalidUuidError } from "../../../core/shared/domain/value-objects/uuid.vo";
-import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import { GlobalExceptionFilter } from "./global-exception.filter";
 
 @Controller("stub-global-exception-filter")

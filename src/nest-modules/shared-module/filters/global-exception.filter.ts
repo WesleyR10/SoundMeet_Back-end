@@ -7,14 +7,15 @@ import {
 import * as Sentry from "@sentry/nestjs";
 import { Response } from "express";
 
+import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import { ConflictError } from "../../../core/shared/domain/errors/conflict.error";
 import { DomainError } from "../../../core/shared/domain/errors/domain.error";
+import { EmailNotVerifiedError } from "../../../core/shared/domain/errors/email-not-verified.error";
 import { ExternalServiceError } from "../../../core/shared/domain/errors/external-service.error";
 import { InvalidArgumentError } from "../../../core/shared/domain/errors/invalid-argument.error";
 import { InvalidOperationError } from "../../../core/shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../core/shared/domain/errors/not-found.error";
 import { UnauthorizedError } from "../../../core/shared/domain/errors/unauthorized.error";
-import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import {
   BaseValidationError,
   EntityValidationError,
@@ -163,6 +164,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       response.status(401).json({
         statusCode: 401,
         error: getErrorText(401),
+        message: [exception.message],
+      });
+      return;
+    }
+
+    // Antes de PlanLimitExceededError só por organização; são disjuntos.
+    // O `code` existe para o cliente poder oferecer "reenviar e-mail" — o
+    // corpo padrão ({statusCode, error, message}) não distinguiria este 403 de
+    // qualquer outra recusa de permissão.
+    if (exception instanceof EmailNotVerifiedError) {
+      response.status(403).json({
+        statusCode: 403,
+        error: getErrorText(403),
+        code: EmailNotVerifiedError.CODE,
         message: [exception.message],
       });
       return;
