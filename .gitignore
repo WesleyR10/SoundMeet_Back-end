@@ -45,6 +45,32 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+# SM-020: o arquivo real de produção. O `.env.production.local` acima NÃO o
+# cobre — nomes diferentes —, então sem esta linha um `git add envs/` levaria
+# segredos de produção para o histórico.
+.env.production
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🔴 IR-1 — dentro de `envs/` a regra é DENY-BY-DEFAULT.
+#
+# A lista de nomes exatos acima é justamente o que falhou: ela só protege o
+# nome que alguém lembrou de escrever. Em 01/set/2026 o `git status` mostrava
+# três arquivos NÃO ignorados com credenciais reais dentro —
+# `.env.bak-keys-*`, `.env.bak-mp-*` e `.env.bak-prodcreds-*`, criados por
+# scripts de rotação. Um `git add envs/` os levaria ao histórico do
+# repositório PÚBLICO: é o acidente do `.env.e2e` (IR-1) se repetindo, com
+# conteúdo pior — o nome do terceiro diz `prodcreds`.
+#
+# Invertido, o default passa a ser fechado: tudo em `envs/` é ignorado e só os
+# `*.example` (placeholders, conferíveis um a um) voltam. Arquivo de segredo
+# novo nasce ignorado sem ninguém precisar lembrar de nada — mesmo princípio
+# do `AuthGuard` global (AUTH-2).
+#
+# ⚠️ Um `.example` novo precisa ser conferido ANTES do commit: a exceção é por
+# sufixo, não por conteúdo. Foi um `.env.e2e` com valores reais que originou
+# este bloco.
+envs/*
+!envs/*.example
 
 # Database
 *.db
