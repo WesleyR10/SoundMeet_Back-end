@@ -3,9 +3,9 @@ import { Module } from "@nestjs/common";
 import { DatabaseModule } from "../database-module/database.module";
 import { EstablishmentsModule } from "../establishments-module/establishments.module";
 import { ChatController } from "./chat.controller";
-import { ChatEventsHandler } from "./chat-events.handler";
 import { ChatGateway } from "./chat.gateway";
 import { CHAT_PROVIDERS } from "./chat.providers";
+import { ChatEventsHandler } from "./chat-events.handler";
 
 @Module({
   imports: [DatabaseModule, EstablishmentsModule],

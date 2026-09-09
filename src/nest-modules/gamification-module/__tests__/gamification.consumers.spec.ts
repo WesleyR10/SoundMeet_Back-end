@@ -33,7 +33,9 @@ function validMsg(overrides: Record<string, unknown> = {}) {
 describe("GamificationTipCompletedConsumer", () => {
   it("recalcula TOP_FAS e TOP_APOIADORES em paralelo ao receber tip concluído", async () => {
     const execute = jest.fn().mockResolvedValue([]);
-    const consumer = new GamificationTipCompletedConsumer(makeModuleRef(execute));
+    const consumer = new GamificationTipCompletedConsumer(
+      makeModuleRef(execute),
+    );
 
     await consumer.onTipCompleted(validMsg());
 
@@ -60,7 +62,9 @@ describe("GamificationTipCompletedConsumer", () => {
 
   it("propaga erro quando CalculateRankingUseCase falha (mensagem vai para DLX via filter)", async () => {
     const execute = jest.fn().mockRejectedValue(new Error("db failure"));
-    const consumer = new GamificationTipCompletedConsumer(makeModuleRef(execute));
+    const consumer = new GamificationTipCompletedConsumer(
+      makeModuleRef(execute),
+    );
 
     await expect(consumer.onTipCompleted(validMsg())).rejects.toThrow(
       "db failure",
@@ -69,7 +73,9 @@ describe("GamificationTipCompletedConsumer", () => {
 
   it("processa mensagem com payload incompleto sem lançar exceção de tipagem", async () => {
     const execute = jest.fn().mockResolvedValue([]);
-    const consumer = new GamificationTipCompletedConsumer(makeModuleRef(execute));
+    const consumer = new GamificationTipCompletedConsumer(
+      makeModuleRef(execute),
+    );
 
     await consumer.onTipCompleted({ payload: {} });
 
@@ -78,7 +84,9 @@ describe("GamificationTipCompletedConsumer", () => {
 
   it("processa mensagem sem campo payload (mensagem malformada do broker)", async () => {
     const execute = jest.fn().mockResolvedValue([]);
-    const consumer = new GamificationTipCompletedConsumer(makeModuleRef(execute));
+    const consumer = new GamificationTipCompletedConsumer(
+      makeModuleRef(execute),
+    );
 
     await consumer.onTipCompleted({});
 

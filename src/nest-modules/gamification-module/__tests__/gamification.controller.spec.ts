@@ -119,7 +119,10 @@ describe("GamificationController Unit Tests", () => {
     };
 
     await expect(
-      controller.getUserPoints("22222222-2222-4222-8222-222222222222", adminUser),
+      controller.getUserPoints(
+        "22222222-2222-4222-8222-222222222222",
+        adminUser,
+      ),
     ).resolves.toBeNull();
   });
 

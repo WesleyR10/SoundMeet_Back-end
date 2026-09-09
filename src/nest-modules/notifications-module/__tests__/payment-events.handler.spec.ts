@@ -12,9 +12,10 @@ import { NotificationsPaymentEventsHandler } from "../payment-events.handler";
 import { PushNotificationService } from "../push-notification.service";
 
 const makeGatewayMock = (): jest.Mocked<
-  Pick<NotificationsGateway, "notifyTipReceived">
+  Pick<NotificationsGateway, "notifyTipReceived" | "notifyTipConfirmed">
 > => ({
   notifyTipReceived: jest.fn(),
+  notifyTipConfirmed: jest.fn(),
 });
 
 const makeMusicianRepoMock = (): jest.Mocked<
@@ -41,7 +42,9 @@ const makePushServiceMock = (): jest.Mocked<
 
 describe("NotificationsPaymentEventsHandler", () => {
   let handler: NotificationsPaymentEventsHandler;
-  let gateway: jest.Mocked<Pick<NotificationsGateway, "notifyTipReceived">>;
+  let gateway: jest.Mocked<
+    Pick<NotificationsGateway, "notifyTipReceived" | "notifyTipConfirmed">
+  >;
   let musicianRepo: jest.Mocked<Pick<IMusicianRepository, "findById">>;
   let audienceRepo: jest.Mocked<Pick<IAudienceRepository, "findById">>;
   let tipRepo: jest.Mocked<Pick<ITipRepository, "findById">>;

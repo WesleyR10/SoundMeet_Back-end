@@ -1,33 +1,46 @@
 import { ApiProperty } from "@nestjs/swagger";
 
-import {
-  EstablishmentPlanFeatures,
-  MusicianPlanFeatures,
-  PlanPricing,
-} from "../../core/plans/domain/plan-features.config";
-import { ListPlansOutput } from "../../core/plans/application/use-cases/list-plans/list-plans.use-case";
+import { SubscriptionOutput } from "../../core/plans/application/use-cases/common/subscription-output";
 import { CreateSubscriptionCheckoutOutput } from "../../core/plans/application/use-cases/create-subscription-checkout/create-subscription-checkout.use-case";
 import { GetActiveSubscriptionOutput } from "../../core/plans/application/use-cases/get-active-subscription/get-active-subscription.use-case";
-import { SubscriptionOutput } from "../../core/plans/application/use-cases/common/subscription-output";
+import {
+  ListPlansOutput,
+  PublicMusicianPlanFeatures,
+} from "../../core/plans/application/use-cases/list-plans/list-plans.use-case";
+import {
+  EstablishmentPlanFeatures,
+  PlanPricing,
+} from "../../core/plans/domain/plan-features.config";
 
 export class PlansCatalogPresenter {
   @ApiProperty({ description: "Tiers do músico com preços e features" })
   musician: Array<{
     tier: string;
     pricing: PlanPricing;
-    features: MusicianPlanFeatures;
+    // Sem os campos de antifraude (max_withdrawal_*): catálogo é @Public().
+    features: PublicMusicianPlanFeatures;
   }>;
 
-  @ApiProperty({ description: "Tiers do estabelecimento com preços e features" })
+  @ApiProperty({
+    description: "Tiers do estabelecimento com preços e features",
+  })
   establishment: Array<{
     tier: string;
     pricing: PlanPricing;
     features: EstablishmentPlanFeatures;
   }>;
 
+  @ApiProperty({
+    description:
+      'Features anunciadas como roadmap. A UI DEVE marcá-las como "em breve" ' +
+      "em vez de exibi-las como incluídas no tier (decisão 9.7a).",
+  })
+  coming_soon: { musician: string[]; establishment: string[] };
+
   constructor(output: ListPlansOutput) {
     this.musician = output.musician;
     this.establishment = output.establishment;
+    this.coming_soon = output.coming_soon;
   }
 }
 

@@ -12,7 +12,8 @@ import { BillingCycle } from "../../../core/plans/domain/plan-tier.enum";
 
 export class CreateSubscriptionCheckoutDto {
   @ApiProperty({
-    description: "Tier pago do plano (musician: essential|pro; establishment: growth|pro)",
+    description:
+      "Tier pago do plano (musician: essential|pro; establishment: growth|pro)",
     example: "essential",
   })
   @IsString()
@@ -23,7 +24,10 @@ export class CreateSubscriptionCheckoutDto {
   @IsEnum(BillingCycle)
   billing_cycle: BillingCycle;
 
-  @ApiProperty({ description: "Nome completo do pagador", example: "João da Silva" })
+  @ApiProperty({
+    description: "Nome completo do pagador",
+    example: "João da Silva",
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)

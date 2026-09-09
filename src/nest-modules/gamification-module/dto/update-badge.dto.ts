@@ -1,10 +1,10 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
+import { UpdateBadgeInput } from "../../../core/gamification/application/use-cases/update-badge/update-badge.input";
 import {
   BadgeCategory,
   BadgeRarity,
 } from "../../../core/gamification/domain/badge.aggregate";
-import { UpdateBadgeInput } from "../../../core/gamification/application/use-cases/update-badge/update-badge.input";
 
 export class UpdateBadgeDto extends UpdateBadgeInput {
   @ApiPropertyOptional()
@@ -16,7 +16,9 @@ export class UpdateBadgeDto extends UpdateBadgeInput {
   @ApiPropertyOptional()
   declare icon?: string;
 
-  @ApiPropertyOptional({ enum: ["engagement", "support", "discovery", "social"] })
+  @ApiPropertyOptional({
+    enum: ["engagement", "support", "discovery", "social"],
+  })
   declare category?: BadgeCategory;
 
   @ApiPropertyOptional()

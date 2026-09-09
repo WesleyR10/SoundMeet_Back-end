@@ -17,7 +17,10 @@ export type EmailVerificationProps = {
   verificationUrl: string;
 };
 
-export function EmailVerification({ name, verificationUrl }: EmailVerificationProps) {
+export function EmailVerification({
+  name,
+  verificationUrl,
+}: EmailVerificationProps) {
   return (
     <Html>
       <Head />
@@ -27,7 +30,8 @@ export function EmailVerification({ name, verificationUrl }: EmailVerificationPr
           <Heading style={h1}>SoundMeet</Heading>
           <Text style={text}>Olá, {name}!</Text>
           <Text style={text}>
-            Clique no botão abaixo para confirmar seu endereço de email e ativar sua conta.
+            Clique no botão abaixo para confirmar seu endereço de email e ativar
+            sua conta.
           </Text>
           <Section style={btnContainer}>
             <Button style={btn} href={verificationUrl}>

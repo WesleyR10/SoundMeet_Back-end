@@ -1,8 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 
-import { InquiryCreatedEvent } from "../../core/scheduling/domain/events/inquiry-created.event";
 import { OpenConversationUseCase } from "../../core/chat/application/use-cases";
+import { InquiryCreatedEvent } from "../../core/scheduling/domain/events/inquiry-created.event";
 
 @Injectable()
 export class ChatEventsHandler {

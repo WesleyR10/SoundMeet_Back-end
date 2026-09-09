@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../database-module/database.module";
-import { GamificationController } from "./gamification.controller";
 import { GamificationTipCompletedConsumer } from "./gamification.consumers";
+import { GamificationController } from "./gamification.controller";
 import { GAMIFICATION_PROVIDERS } from "./gamification.providers";
 
 @Module({

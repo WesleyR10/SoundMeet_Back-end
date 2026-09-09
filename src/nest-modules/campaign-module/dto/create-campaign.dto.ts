@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
@@ -9,7 +10,6 @@ import {
   IsUUID,
   MaxLength,
 } from "class-validator";
-import { Type } from "class-transformer";
 
 export class CreateCampaignDto {
   @ApiProperty({ description: "UUID do estabelecimento dono da campanha" })

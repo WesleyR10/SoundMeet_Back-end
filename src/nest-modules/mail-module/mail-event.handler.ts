@@ -1,10 +1,12 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { OnEvent } from "@nestjs/event-emitter";
 import { randomUUID } from "crypto";
 
 import { AudienceEmailChangedEvent } from "../../core/audience/domain/events/audience-email-changed.event";
 import { EstablishmentEmailChangedEvent } from "../../core/establishment/domain/events/establishment-email-changed.event";
 import { MusicianEmailChangedEvent } from "../../core/musician/domain/events/musician-email-changed.event";
+import { PixKeyChangedEvent } from "../../core/payment/domain/events/pix-key-changed.event";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { MailService } from "./mail.service";
 
@@ -16,7 +18,44 @@ export class MailEventHandler {
   constructor(
     private readonly mailService: MailService,
     private readonly prisma: PrismaService,
+    @Inject(ConfigService)
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Chave PIX de recebimento alterada — alerta de segurança por email (A1
+   * camada 2). O par do push do notifications-module: cobre quem está com o app
+   * fechado ou sem push. Best-effort — falha de email nunca desfaz a troca já
+   * persistida.
+   */
+  @OnEvent(PixKeyChangedEvent.name)
+  async handlePixKeyChanged(event: PixKeyChangedEvent): Promise<void> {
+    try {
+      const musician = await this.prisma.musician.findUnique({
+        where: { id: event.musician_id.id },
+        select: { email: true, name: true },
+      });
+      if (!musician?.email) {
+        return;
+      }
+
+      const cooldownHours =
+        this.configService.get<number>("PIX_KEY_CHANGE_COOLDOWN_HOURS") ?? 24;
+
+      await this.mailService.sendPixKeyChanged(musician.email, {
+        name: musician.name ?? "músico",
+        changedAt: event.occurred_on.toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+        }),
+        cooldownHours,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send pix-key-changed alert for musician=${event.musician_id.id}`,
+        error,
+      );
+    }
+  }
 
   @OnEvent(MusicianEmailChangedEvent.name)
   async handleMusicianEmailChanged(event: MusicianEmailChangedEvent) {

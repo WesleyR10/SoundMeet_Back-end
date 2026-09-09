@@ -32,8 +32,8 @@ import { ListBadgesUseCase } from "../../core/gamification/application/use-cases
 import { ListRankingsUseCase } from "../../core/gamification/application/use-cases/list-rankings/list-rankings.use-case";
 import { UpdateBadgeUseCase } from "../../core/gamification/application/use-cases/update-badge/update-badge.use-case";
 import {
-  AuthGuard,
   AuthenticatedUser,
+  AuthGuard,
   CurrentUser,
   CurrentUserContextGuard,
   Public,
@@ -105,7 +105,8 @@ export class GamificationController {
   @Get("users/:user_id/points")
   @ApiOperation({
     summary: "Consultar pontos do usuário",
-    description: "Retorna o resumo de pontos e nível atual do usuário. Requer autenticação; usuário só pode consultar os próprios pontos (admin pode consultar qualquer um).",
+    description:
+      "Retorna o resumo de pontos e nível atual do usuário. Requer autenticação; usuário só pode consultar os próprios pontos (admin pode consultar qualquer um).",
   })
   @ApiParam({ name: "user_id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: UserPointsPresenter })
@@ -127,7 +128,8 @@ export class GamificationController {
   @Get("users/:user_id/badges")
   @ApiOperation({
     summary: "Consultar badges do usuário",
-    description: "Retorna a lista de badges e progresso do usuário. Requer autenticação; usuário só pode consultar os próprios badges (admin pode consultar qualquer um).",
+    description:
+      "Retorna a lista de badges e progresso do usuário. Requer autenticação; usuário só pode consultar os próprios badges (admin pode consultar qualquer um).",
   })
   @ApiParam({ name: "user_id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: [UserBadgePresenter] })
@@ -239,7 +241,8 @@ export class GamificationController {
   @Roles("admin")
   @ApiOperation({
     summary: "[Admin] Conceder badge manualmente",
-    description: "Concede um badge a um usuário de forma manual. Requer role admin.",
+    description:
+      "Concede um badge a um usuário de forma manual. Requer role admin.",
   })
   @ApiParam({ name: "user_id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: UserBadgePresenter })

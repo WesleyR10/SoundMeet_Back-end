@@ -131,14 +131,4 @@ export class PrismaService
       throw error;
     }
   }
-
-  async executeRaw(sql: string, ...values: any[]) {
-    this.logger.debug(`Executing raw SQL: ${sql}`);
-    return this.$executeRawUnsafe(sql, ...values);
-  }
-
-  async queryRaw<T = unknown>(sql: string, ...values: any[]): Promise<T> {
-    this.logger.debug(`Querying raw SQL: ${sql}`);
-    return this.$queryRawUnsafe(sql, ...values);
-  }
 }

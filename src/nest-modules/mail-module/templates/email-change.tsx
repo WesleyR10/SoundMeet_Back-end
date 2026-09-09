@@ -18,7 +18,11 @@ export type EmailChangeProps = {
   confirmationUrl: string;
 };
 
-export function EmailChange({ name, newEmail, confirmationUrl }: EmailChangeProps) {
+export function EmailChange({
+  name,
+  newEmail,
+  confirmationUrl,
+}: EmailChangeProps) {
   return (
     <Html>
       <Head />
@@ -37,13 +41,13 @@ export function EmailChange({ name, newEmail, confirmationUrl }: EmailChangeProp
             </Button>
           </Section>
           <Text style={text}>
-            O link expira em <strong>24 horas</strong>. Seu email atual permanece
-            ativo até a confirmação.
+            O link expira em <strong>24 horas</strong>. Seu email atual
+            permanece ativo até a confirmação.
           </Text>
           <Hr style={hr} />
           <Text style={footer}>
-            Se você não solicitou esta alteração, ignore este email. Seu email não será
-            alterado.
+            Se você não solicitou esta alteração, ignore este email. Seu email
+            não será alterado.
           </Text>
         </Container>
       </Body>

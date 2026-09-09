@@ -19,11 +19,11 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
+import { CampaignOutput } from "../../core/campaign/application/use-cases/common/campaign-output";
 import { CreateCampaignUseCase } from "../../core/campaign/application/use-cases/create-campaign/create-campaign.use-case";
+import { DeleteCampaignUseCase } from "../../core/campaign/application/use-cases/delete-campaign/delete-campaign.use-case";
 import { GetCampaignUseCase } from "../../core/campaign/application/use-cases/get-campaign/get-campaign.use-case";
 import { ListCampaignsUseCase } from "../../core/campaign/application/use-cases/list-campaigns/list-campaigns.use-case";
-import { DeleteCampaignUseCase } from "../../core/campaign/application/use-cases/delete-campaign/delete-campaign.use-case";
-import { CampaignOutput } from "../../core/campaign/application/use-cases/common/campaign-output";
 import {
   AuthGuard,
   CurrentUser,
@@ -34,12 +34,12 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { AuthenticatedUser } from "../auth-module";
-import { CreateCampaignDto } from "./dto/create-campaign.dto";
-import { SearchCampaignsDto } from "./dto/search-campaigns.dto";
 import {
   CampaignCollectionPresenter,
   CampaignPresenter,
 } from "./campaign.presenter";
+import { CreateCampaignDto } from "./dto/create-campaign.dto";
+import { SearchCampaignsDto } from "./dto/search-campaigns.dto";
 
 @ApiTags("Campaigns")
 @ApiBearerAuth("JWT-auth")
@@ -99,7 +99,7 @@ export class CampaignController {
   ) {
     const output = await this.listUseCase.execute({
       ...query,
-      requesting_establishment_id: currentUser?.establishmentIds?.[0],
+      requesting_establishment_ids: currentUser?.establishmentIds,
       is_admin: currentUser?.roles.includes("admin"),
     });
     return new CampaignCollectionPresenter(output);
@@ -116,7 +116,7 @@ export class CampaignController {
   ) {
     const output = await this.getUseCase.execute({
       campaign_id: id,
-      requesting_establishment_id: currentUser?.establishmentIds?.[0],
+      requesting_establishment_ids: currentUser?.establishmentIds,
       is_admin: currentUser?.roles.includes("admin"),
     });
     return CampaignController.serialize(output);
@@ -136,11 +136,9 @@ export class CampaignController {
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
-    const establishment_id =
-      currentUser?.establishmentIds?.[0] ?? "";
     await this.deleteUseCase.execute({
       campaign_id: id,
-      establishment_id,
+      establishment_ids: currentUser?.establishmentIds ?? [],
       is_admin: currentUser?.roles.includes("admin"),
     });
   }

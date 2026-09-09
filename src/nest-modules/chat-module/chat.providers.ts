@@ -41,7 +41,9 @@ export const USE_CASES = {
   },
   OPEN_CONVERSATION: {
     provide: OpenConversationUseCase,
-    useFactory: (convRepo: IConversationRepository): OpenConversationUseCase => {
+    useFactory: (
+      convRepo: IConversationRepository,
+    ): OpenConversationUseCase => {
       return new OpenConversationUseCase(convRepo);
     },
     inject: [REPOSITORIES.CONVERSATION.provide],

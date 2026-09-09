@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 
-import { PlansModule } from "../plans-module/plans.module";
 import { DatabaseModule } from "../database-module/database.module";
+import { PlansModule } from "../plans-module/plans.module";
 import { CampaignController } from "./campaign.controller";
 import { CAMPAIGN_PROVIDERS } from "./campaign.providers";
 

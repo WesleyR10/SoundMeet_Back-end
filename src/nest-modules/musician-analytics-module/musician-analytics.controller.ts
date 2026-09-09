@@ -37,10 +37,15 @@ export class MusicianAnalyticsController {
   @ApiOperation({
     summary: "Analytics do músico",
     description:
-      "Retorna dados analíticos do músico (nota média, pedidos aceitos/rejeitados, total de gorjetas recebidas, músicas mais pedidas — todos all-time/global, sem escopo por evento). ESSENTIAL/PRO: realtime_available=true (stream WebSocket disponível). FREE: apenas dados agregados.",
+      "Retorna dados analíticos do músico (nota média, pedidos aceitos/rejeitados, total de gorjetas recebidas, músicas mais pedidas — todos all-time/global, sem escopo por evento). Exige ESSENTIAL ou PRO: o plano FREE recebe 402 (gate 9.7a).",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200 })
+  @ApiResponse({
+    status: 402,
+    description:
+      "Plano FREE — `realtime_analytics` exige ESSENTIAL ou PRO (gate 9.7a).",
+  })
   async getAnalytics(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
   ) {

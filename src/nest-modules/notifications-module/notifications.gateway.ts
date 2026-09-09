@@ -15,7 +15,11 @@ import {
   ChatMessageNewPayload,
   InquiryUpdatePayload,
   NewRequestPayload,
+  RequestBoostConfirmedPayload,
+  RequestBoostPaidPayload,
+  RequestBoostPaymentReadyPayload,
   RequestStatusChangedPayload,
+  TipConfirmedPayload,
   TipReceivedPayload,
 } from "./dto/notification.payloads";
 
@@ -91,6 +95,50 @@ export class NotificationsGateway
 
   notifyTipReceived(musicianId: string, payload: TipReceivedPayload): void {
     this.server.to(`user:${musicianId}`).emit("tip.received", payload);
+  }
+
+  /**
+   * Destaque pago: o músico aceitou, agora o fã paga.
+   *
+   * Vai para a room do FÃ (`user:<audience_id>`) — o gateway já entra nela para
+   * qualquer autenticado, audience inclusive, e `notifyRequestStatusChanged`
+   * usa o mesmo caminho.
+   */
+  notifyRequestBoostPaymentReady(
+    audienceId: string,
+    payload: RequestBoostPaymentReadyPayload,
+  ): void {
+    this.server
+      .to(`user:${audienceId}`)
+      .emit("request.boost.payment_ready", payload);
+  }
+
+  /** Pagamento confirmado — gatilho da celebração no app do fã. */
+  notifyRequestBoostPaid(
+    audienceId: string,
+    payload: RequestBoostPaidPayload,
+  ): void {
+    this.server.to(`user:${audienceId}`).emit("request.boost.paid", payload);
+  }
+
+  /**
+   * Gorjeta confirmada, para o FÃ que pagou.
+   *
+   * Cobre a gorjeta avulsa (enviada do perfil, fora de um pedido), que até
+   * aqui terminava no QR e nunca mais dava notícia.
+   */
+  notifyTipConfirmed(audienceId: string, payload: TipConfirmedPayload): void {
+    this.server.to(`user:${audienceId}`).emit("tip.confirmed", payload);
+  }
+
+  /** Espelho para o músico: o card na fila vira "confirmado". */
+  notifyRequestBoostConfirmedToMusician(
+    musicianId: string,
+    payload: RequestBoostConfirmedPayload,
+  ): void {
+    this.server
+      .to(`user:${musicianId}`)
+      .emit("request.boost.confirmed", payload);
   }
 
   // Reaproveita a mesma room `user:${musicianId}` já usada por

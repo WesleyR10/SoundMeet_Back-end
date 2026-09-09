@@ -1,7 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 
-import { MailEventHandler } from "./mail-event.handler";
 import { MailService } from "./mail.service";
+import { MailEventHandler } from "./mail-event.handler";
 
 @Global()
 @Module({

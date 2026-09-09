@@ -1,9 +1,11 @@
 import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
+import { ITipRepository } from "../../../core/payment/domain/repositories";
 import { RequestAcceptedEvent } from "../../../core/request/domain/events/request-accepted.event";
 import { RequestCreatedEvent } from "../../../core/request/domain/events/request-created.event";
 import { RequestRejectedEvent } from "../../../core/request/domain/events/request-rejected.event";
 import { RequestId } from "../../../core/request/domain/request.aggregate";
+import { ConfigSchemaType } from "../../config-module/config.schema";
 import { NotificationsGateway } from "../notifications.gateway";
 import { PushNotificationService } from "../push-notification.service";
 import { RequestEventsHandler } from "../request-events.handler";
@@ -36,6 +38,7 @@ describe("RequestEventsHandler", () => {
     >
   >;
   let musicianRepo: jest.Mocked<Pick<IMusicianRepository, "findById">>;
+  let tipRepo: jest.Mocked<Pick<ITipRepository, "findById">>;
   let pushNotificationService: jest.Mocked<
     Pick<PushNotificationService, "send">
   >;
@@ -49,10 +52,15 @@ describe("RequestEventsHandler", () => {
     gateway = makeGatewayMock();
     musicianRepo = makeMusicianRepoMock();
     pushNotificationService = makePushServiceMock();
+    tipRepo = { findById: jest.fn().mockResolvedValue(null) };
     handler = new RequestEventsHandler(
       gateway as unknown as NotificationsGateway,
       musicianRepo as unknown as IMusicianRepository,
       pushNotificationService as unknown as PushNotificationService,
+      tipRepo as unknown as ITipRepository,
+      {
+        get: jest.fn().mockReturnValue(15),
+      } as unknown as ConfigSchemaType,
     );
   });
 

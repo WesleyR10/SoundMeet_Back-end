@@ -1,10 +1,10 @@
-import { PlanCheckService } from "../../core/plans/domain/plan-check.service";
 import { CreateCampaignUseCase } from "../../core/campaign/application/use-cases/create-campaign/create-campaign.use-case";
+import { DeleteCampaignUseCase } from "../../core/campaign/application/use-cases/delete-campaign/delete-campaign.use-case";
 import { GetCampaignUseCase } from "../../core/campaign/application/use-cases/get-campaign/get-campaign.use-case";
 import { ListCampaignsUseCase } from "../../core/campaign/application/use-cases/list-campaigns/list-campaigns.use-case";
-import { DeleteCampaignUseCase } from "../../core/campaign/application/use-cases/delete-campaign/delete-campaign.use-case";
 import { ICampaignRepository } from "../../core/campaign/domain/campaign.repository";
 import { CampaignPrismaRepository } from "../../core/campaign/infra/db/prisma/campaign-prisma.repository";
+import { PlanCheckService } from "../../core/plans/domain/plan-check.service";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
 export const REPOSITORIES = {

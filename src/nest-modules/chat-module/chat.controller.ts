@@ -28,35 +28,43 @@ import {
 } from "../../core/chat/application/use-cases";
 import { ConversationListItem } from "../../core/chat/application/use-cases/list-conversations/list-conversations.use-case";
 import { SenderType } from "../../core/chat/domain/message.aggregate";
-import { Establishment, EstablishmentId } from "../../core/establishment/domain/establishment.aggregate";
-import { IEstablishmentRepository } from "../../core/establishment/domain/establishment.repository";
 import {
-  AuthGuard,
-  CurrentUserContextGuard,
-  RolesGuard,
-} from "../auth-module";
+  Establishment,
+  EstablishmentId,
+} from "../../core/establishment/domain/establishment.aggregate";
+import { IEstablishmentRepository } from "../../core/establishment/domain/establishment.repository";
+import { AuthGuard, CurrentUserContextGuard, RolesGuard } from "../auth-module";
 import { CurrentUser } from "../auth-module/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth-module/interfaces/authenticated-user.interface";
+import { ChatGateway } from "./chat.gateway";
 import { ListMessagesDto } from "./dto/list-messages.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
-import { ChatGateway } from "./chat.gateway";
 
-function resolveSender(user: AuthenticatedUser): {
-  sender_id: string;
+// Devolve as IDENTIDADES CANDIDATAS do ator, nunca uma única já escolhida:
+// um dono com mais de um estabelecimento (registerEstablishment permite até
+// 3) tem várias `establishmentIds`, e uma conversa pertence a uma unidade
+// específica — assumir sempre a [0] fazia o dono não conseguir sequer
+// enviar mensagem numa conversa da 2ª/3ª unidade (ForbiddenException, já
+// que a conversa nunca tem a 1ª unidade como participante). A identidade
+// exata é resolvida contra a conversa em si (Conversation.resolveParticipantId).
+function resolveSenderCandidates(user: AuthenticatedUser): {
+  candidate_ids: string[];
   sender_type: SenderType;
 } {
   if (user.roles.includes("musician")) {
-    return { sender_id: user.userId, sender_type: "musician" };
+    return { candidate_ids: [user.userId], sender_type: "musician" };
   }
   if (user.roles.includes("band")) {
     return {
-      sender_id: user.bandIds[0] ?? user.userId,
+      candidate_ids: user.bandIds.length ? user.bandIds : [user.userId],
       sender_type: "band",
     };
   }
   // establishment or default
   return {
-    sender_id: user.establishmentIds[0] ?? user.userId,
+    candidate_ids: user.establishmentIds.length
+      ? user.establishmentIds
+      : [user.userId],
     sender_type: "establishment",
   };
 }
@@ -99,10 +107,10 @@ export class ChatController {
     @Body() dto: SendMessageDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    const { sender_id, sender_type } = resolveSender(currentUser);
+    const { candidate_ids, sender_type } = resolveSenderCandidates(currentUser);
     const message = await this.sendMessageUseCase.execute({
       conversation_id: id,
-      sender_id,
+      sender_ids: candidate_ids,
       sender_type,
       content: dto.content,
     });
@@ -123,10 +131,10 @@ export class ChatController {
     @Query() query: ListMessagesDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    const { sender_id } = resolveSender(currentUser);
+    const { candidate_ids } = resolveSenderCandidates(currentUser);
     return this.getConversationUseCase.execute({
       conversation_id: id,
-      requester_id: sender_id,
+      requester_ids: candidate_ids,
       cursor: query.cursor,
       limit: query.limit,
     });
@@ -139,9 +147,9 @@ export class ChatController {
   })
   @ApiResponse({ status: 200 })
   async listConversations(@CurrentUser() currentUser: AuthenticatedUser) {
-    const { sender_id } = resolveSender(currentUser);
+    const { candidate_ids } = resolveSenderCandidates(currentUser);
     const { conversations } = await this.listConversationsUseCase.execute({
-      participant_id: sender_id,
+      participant_ids: candidate_ids,
     });
 
     return {
@@ -158,7 +166,17 @@ export class ChatController {
   // pode sofrer sem derrubar a listagem inteira (ver loadEstablishments).
   private async enrichWithEstablishment(
     conversations: ConversationListItem[],
-  ): Promise<Array<ConversationListItem & { establishment: { id: string; name: string; avatar: string | null } | null }>> {
+  ): Promise<
+    Array<
+      ConversationListItem & {
+        establishment: {
+          id: string;
+          name: string;
+          avatar: string | null;
+        } | null;
+      }
+    >
+  > {
     const byId = await this.loadEstablishments(
       conversations.map((c) => c.establishment_id),
     );
@@ -230,12 +248,12 @@ export class ChatController {
     id: string,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    const { sender_id } = resolveSender(currentUser);
-    await this.markAsReadUseCase.execute({
+    const { candidate_ids } = resolveSenderCandidates(currentUser);
+    const { reader_id } = await this.markAsReadUseCase.execute({
       conversation_id: id,
-      reader_id: sender_id,
+      reader_ids: candidate_ids,
     });
-    this.chatGateway.emitMessagesRead(id, sender_id);
+    this.chatGateway.emitMessagesRead(id, reader_id);
     return { ok: true };
   }
 }

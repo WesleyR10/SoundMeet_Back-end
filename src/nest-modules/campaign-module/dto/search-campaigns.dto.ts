@@ -39,7 +39,9 @@ export class SearchCampaignsDto implements ListCampaignsInput {
   @IsOptional()
   establishment_id?: string | null;
 
-  @ApiPropertyOptional({ description: "Filtrar por status (draft, active, sent, cancelled)" })
+  @ApiPropertyOptional({
+    description: "Filtrar por status (draft, active, sent, cancelled)",
+  })
   @IsString()
   @IsOptional()
   status?: string | null;

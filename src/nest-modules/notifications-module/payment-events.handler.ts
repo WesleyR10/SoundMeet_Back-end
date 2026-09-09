@@ -5,6 +5,7 @@ import { AudienceId } from "../../core/audience/domain/audience.aggregate";
 import { IAudienceRepository } from "../../core/audience/domain/audience.repository";
 import { MusicianId } from "../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
+import { PixKeyChangedEvent } from "../../core/payment/domain/events/pix-key-changed.event";
 import { TipCompletedEvent } from "../../core/payment/domain/events/tip-completed.event";
 import { ITipRepository } from "../../core/payment/domain/repositories";
 import { TipId } from "../../core/payment/domain/tip.aggregate";
@@ -33,8 +34,27 @@ export class NotificationsPaymentEventsHandler {
   @OnEvent(TipCompletedEvent.name)
   async handleTipCompleted(event: TipCompletedEvent): Promise<void> {
     const musicianId = event.musician_id?.id ?? null;
-    // Gorjeta de banda (sem musician_id) não tem um único destinatário
-    // individual pra notificar — gateway/push aqui são por músico.
+
+    /*
+     * O FÃ é avisado SEMPRE, inclusive em gorjeta de banda: quem pagou tem
+     * direito de saber que o pagamento entrou. Até aqui o app dele terminava
+     * no QR do PIX e nunca mais recebia notícia nenhuma — o pagamento era
+     * assíncrono e invisível.
+     *
+     * ⚠️ Num pedido com destaque este evento e `request.boost.paid` chegam os
+     * dois; o app deduplica por `tip_id`.
+     */
+    this.gateway.notifyTipConfirmed(event.audience_id.id, {
+      tip_id: event.aggregate_id.id,
+      musician_id: musicianId,
+      band_id: event.band_id?.id ?? null,
+      amount: event.amount.amount,
+      message: null,
+      occurred_at: event.occurred_on.toISOString(),
+    });
+
+    // Daqui para baixo é a notificação do MÚSICO. Gorjeta de banda não tem um
+    // destinatário individual — gateway/push aqui são por músico.
     if (!musicianId) {
       return;
     }
@@ -80,6 +100,36 @@ export class NotificationsPaymentEventsHandler {
     } catch (error) {
       this.logger.error(
         `Failed to notify tip.received for tip=${tipId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Chave PIX de recebimento alterada — alerta de segurança por push (A1 camada
+   * 2). Canal primário do músico: chega no app na hora, enquanto o saque para a
+   * nova chave ainda está na carência. O email (mail-module) cobre o app
+   * fechado. Best-effort — nunca desfaz a troca já persistida.
+   */
+  @OnEvent(PixKeyChangedEvent.name)
+  async handlePixKeyChanged(event: PixKeyChangedEvent): Promise<void> {
+    const musicianId = event.musician_id.id;
+    try {
+      const musician = await this.musicianRepo.findById(
+        new MusicianId(musicianId),
+      );
+      if (!musician?.push_token) {
+        return;
+      }
+      await this.pushNotificationService.send(musician.push_token, {
+        title: "🔐 Sua chave PIX foi alterada",
+        body: "Se não foi você, troque sua senha e fale com o suporte antes que o saque seja liberado.",
+        data: { type: "wallet.pix_key_changed" },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify pix_key_changed for musician=${musicianId}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

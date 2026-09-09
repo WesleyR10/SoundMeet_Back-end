@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
+import { CreateBadgeInput } from "../../../core/gamification/application/use-cases/create-badge/create-badge.input";
 import {
   BadgeCategory,
   BadgeRarity,
 } from "../../../core/gamification/domain/badge.aggregate";
-import { CreateBadgeInput } from "../../../core/gamification/application/use-cases/create-badge/create-badge.input";
 
 export class CreateBadgeDto extends CreateBadgeInput {
   @ApiProperty({ example: "Primeira Gorjeta" })

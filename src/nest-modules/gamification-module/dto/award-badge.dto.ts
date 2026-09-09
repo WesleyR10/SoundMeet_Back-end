@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
+import { AwardBadgeInput } from "../../../core/gamification/application/use-cases/award-badge/award-badge.input";
 import {
   BadgeType,
   BadgeTypeEnum,
 } from "../../../core/gamification/domain/value-objects/badge-type.vo";
-import { AwardBadgeInput } from "../../../core/gamification/application/use-cases/award-badge/award-badge.input";
 
 export class AwardBadgeDto extends AwardBadgeInput {
   @ApiProperty({ format: "uuid" })
