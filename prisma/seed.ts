@@ -94,6 +94,8 @@ import { BookingEscrowPrismaRepository } from "../src/core/payment/infra/db/pris
 import { Performance } from "../src/core/performance/domain/performance.aggregate";
 import { PerformancePrismaRepository } from "../src/core/performance/infra/db/prisma/performance-prisma.repository";
 import { Review } from "../src/core/review/domain/review.aggregate";
+import { Indication } from "../src/core/indication/domain/indication.aggregate";
+import { IndicationPrismaRepository } from "../src/core/indication/infra/db/prisma/indication-prisma.repository";
 import { ReviewPrismaRepository } from "../src/core/review/infra/db/prisma/review-prisma.repository";
 import { MusicLibraryPrismaRepository } from "../src/core/music-library/infra/db/prisma/music-library-prisma.repository";
 import { EstablishmentProfile } from "../src/core/establishment/domain/establishment-profile.aggregate";
@@ -113,7 +115,7 @@ import { ChordEdit } from "../src/core/personal-chord-sheet/domain/value-objects
 import { ChordSheetViewSettings } from "../src/core/personal-chord-sheet/domain/value-objects/chord-sheet-view-settings.vo";
 import { PersonalChordSheetPrismaRepository } from "../src/core/personal-chord-sheet/infra/db/prisma/personal-chord-sheet-prisma.repository";
 import { MusicianWallet } from "../src/core/payment/domain/musician-wallet.aggregate";
-import { Tip } from "../src/core/payment/domain/tip.aggregate";
+import { PaymentMethod, Tip } from "../src/core/payment/domain/tip.aggregate";
 import { Transaction } from "../src/core/payment/domain/transaction.aggregate";
 import {
   TransactionStatus,
@@ -133,6 +135,7 @@ import { Repertoire, RepertoireSong } from "../src/core/repertoire/domain/repert
 import { RepertoirePrismaRepository } from "../src/core/repertoire/infra/db/prisma/repertoire-prisma.repository";
 import { Request } from "../src/core/request/domain/request.aggregate";
 import { RequestVote } from "../src/core/request/domain/request-vote.aggregate";
+import { RequestBoost } from "../src/core/request/domain/value-objects/request-boost.vo";
 import { RequestPrismaRepository } from "../src/core/request/infra/db/prisma/request-prisma.repository";
 import { RequestVotePrismaRepository } from "../src/core/request/infra/db/prisma/request-vote-prisma.repository";
 import { Availability } from "../src/core/scheduling/domain/availability.aggregate";
@@ -197,10 +200,19 @@ async function reset() {
   await prisma.performedSong.deleteMany();
   await prisma.performance.deleteMany();
   await prisma.review.deleteMany();
+  // Folha: sem FK (alvos polimórficos, precedente de `reviews`/`user_scores`).
+  await prisma.indication.deleteMany();
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.requestVote.deleteMany();
   await prisma.requestFeedback.deleteMany();
+  /*
+   * 🔴 `musicRequest` ANTES de `tip`, e não por acaso: desde 27/ago/2026 o
+   * pedido aponta para a gorjeta do destaque
+   * (`music_requests.boostTipId -> tips.id`). Inverter derruba o `--reset`
+   * inteiro com violação de FK — a mesma armadilha já registrada para
+   * `booking_escrows`/`contracts`/`performances`.
+   */
   await prisma.musicRequest.deleteMany();
   await prisma.tip.deleteMany();
   await prisma.transaction.deleteMany();
@@ -736,6 +748,10 @@ async function main() {
       .withMusicianId(musician.musician_id)
       .build();
     wallet.updatePixKey(spec.email, "email");
+    // A chave semeada não deve nascer em carência (A1 camada 2): sem isto, um
+    // saque logo após o seed cairia no bloqueio de "chave recém-trocada". No
+    // mundo real a carência conta da troca de verdade; aqui a chave já é antiga.
+    wallet.pix_key_changed_at = null;
     // Só o João tem extrato no seed (gorjetas da seção 9 + transações da 14).
     // Carteira zerada com extrato cheio é o tipo de incoerência que faz perder
     // tempo achando que a tela de carteira está quebrada. Líquidos = bruto − 9%
@@ -744,6 +760,29 @@ async function main() {
       wallet.receiveFunds(22.75);
       wallet.receiveFunds(45.5);
       wallet.withdrawFunds(60);
+
+      /*
+       * 🔴 Vínculo de Mercado Pago semeado por causa do DRILL DE RESTAURAÇÃO,
+       * não por causa da tela de carteira.
+       *
+       * O critério mais importante do §4.3 de `Docs/ops/backup-restore.md` é
+       * "um `MusicianWallet` com token de Mercado Pago DECIFRA" — é o único que
+       * prova que a `TOKEN_ENCRYPTION_KEY` sobreviveu junto com o dado. Sem
+       * nenhuma carteira vinculada no seed, `npm run drill:verify` não tinha o
+       * que exercitar e reportava WARN: "não pôde ser exercido", que não é o
+       * mesmo que passou.
+       *
+       * Token e refresh são obviamente falsos; o que o drill verifica é o
+       * round-trip de AES-256-GCM contra as três colunas, não o valor.
+       */
+      wallet.linkMercadoPago({
+        mp_user_id: "SEED-MP-USER-0001",
+        access_token: "SEED-MP-ACCESS-TOKEN-nao-e-credencial-real",
+        refresh_token: "SEED-MP-REFRESH-TOKEN-nao-e-credencial-real",
+        // 180 dias é a validade real do token do MP; o job de renovação usa
+        // 15 dias de folga, então esta data o mantém fora da janela.
+        expires_at: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+      });
     }
     await walletRepo.insert(wallet);
 
@@ -1057,6 +1096,91 @@ async function main() {
     if (spec.status === "completed") tip.complete(`seed-tx-${Math.random().toString(36).slice(2, 10)}`);
     if (spec.status === "failed") tip.fail();
     await tipRepo.insert(tip);
+  }
+
+  // ── 9b. Pedidos com DESTAQUE pago (gorjeta acoplada ao pedido) ───────────
+  //
+  // Depois das gorjetas de propósito: a FK é `music_requests.boostTipId ->
+  // tips.id`, então a cobrança precisa existir antes do pedido apontar para
+  // ela. É a mesma ordem que `RespondToRequestUseCase` segue em produção — o
+  // banco não deixa fazer diferente.
+  //
+  // Os três estados que a UI precisa exercitar:
+  //   promised          → o card do fã antes do músico responder
+  //   awaiting_payment  → o banner "conclua o PIX" e a folha do QR
+  //   paid              → o selo "confirmado" e a dedicatória no palco
+  console.log("⚡ Pedidos com destaque…");
+  const boostSpecs = [
+    {
+      fan: fan1,
+      song: "Trem-Bala",
+      artist: "Ana Vilela",
+      amount: 10,
+      dedication: "Essa é pra minha esposa, Ana 💚",
+      state: "paid" as const,
+    },
+    {
+      fan: fan2,
+      song: "Sozinho",
+      artist: "Caetano Veloso",
+      amount: 5,
+      dedication: "Pro meu pai, que me ensinou essa",
+      state: "awaiting_payment" as const,
+    },
+    {
+      fan: fan1,
+      song: "Como É Grande o Meu Amor Por Você",
+      artist: "Roberto Carlos",
+      amount: 20,
+      dedication: null,
+      state: "promised" as const,
+    },
+  ];
+
+  for (const spec of boostSpecs) {
+    const request = Request.create({
+      event_id: evActive.event_id.id,
+      audience_id: spec.fan.audience_id.id,
+      musician_id: m1.musician_id.id,
+      song_title: spec.song,
+      artist: spec.artist,
+      boost: new RequestBoost({
+        amount: new Money(spec.amount),
+        dedication: spec.dedication,
+      }),
+    });
+
+    if (spec.state !== "promised") {
+      // A cobrança nasce no ACEITE — nunca antes. Semear `awaiting_payment`
+      // sem passar pelo aceite produziria um estado que o domínio não gera.
+      request.accept();
+
+      const boostTip = Tip.create({
+        audience_id: spec.fan.audience_id.id,
+        musician_id: m1.musician_id.id,
+        event_id: evActive.event_id.id,
+        amount: spec.amount,
+        message: spec.dedication,
+        payment_method: PaymentMethod.PIX,
+      });
+      boostTip.attachPixCharge(
+        "seed-qr-base64",
+        `00020126seed${boostTip.tip_id.id.slice(0, 8)}`,
+      );
+
+      if (spec.state === "paid") {
+        boostTip.complete(`seed-tx-${boostTip.tip_id.id.slice(0, 8)}`);
+      }
+      await tipRepo.insert(boostTip);
+
+      request.markBoostAwaitingPayment(boostTip.tip_id.id);
+      if (spec.state === "paid") {
+        request.markBoostPaid();
+      }
+    }
+
+    await requestRepo.insert(request);
+    seededRequests.push(request);
   }
 
   // ── 10. Line-up dos eventos (EventMusician) — necessário pro fluxo do fã
@@ -1820,6 +1944,48 @@ async function main() {
     await reviewRepo.insert(review);
   }
 
+  // ── 20b. Indicações de talento (28/set/2026) — os três estados da caixa ───
+  //
+  // Antes desta tabela a indicação era DESCARTADA: `IndicateMusicianUseCase` só
+  // dava pontos ao fã e emitia um evento que ninguém escutava. Sem linhas aqui,
+  // a caixa de entrada do estabelecimento nasce vazia e não há o que exercitar
+  // — mesmo motivo pelo qual o seed passou a criar carteira com Mercado Pago
+  // vinculado (o critério de restore que "não pôde ser exercido" não é o mesmo
+  // que passou).
+  console.log("🤝 Indicações…");
+  const indicationRepo = new IndicationPrismaRepository(prisma);
+  const seenIndication = Indication.create({
+    audience_id: fan2.audience_id.id,
+    musician_id: m2.musician_id.id,
+    establishment_id: e2.establishment_id.id,
+    message: "Tocou aqui perto e lotou. Combina demais com a casa.",
+  });
+  seenIndication.markAsSeen();
+
+  // Fã diferente do `seen` acima: a unique é (fã, músico, estabelecimento),
+  // então o mesmo músico pode ser indicado por várias pessoas para a mesma casa
+  // — é exatamente o sinal que a caixa de entrada existe para mostrar.
+  const archivedIndication = Indication.create({
+    audience_id: fan1.audience_id.id,
+    musician_id: m2.musician_id.id,
+    establishment_id: e2.establishment_id.id,
+  });
+  archivedIndication.archive();
+
+  for (const indication of [
+    // `new` é o que alimenta o badge da caixa.
+    Indication.create({
+      audience_id: fan1.audience_id.id,
+      musician_id: m1.musician_id.id,
+      establishment_id: e2.establishment_id.id,
+      message: "Melhor voz que ouvi esse ano, precisa tocar aí.",
+    }),
+    seenIndication,
+    archivedIndication,
+  ]) {
+    await indicationRepo.insert(indication);
+  }
+
   // ── 21. Contratos digitais (Bloco 10) — os três estados que a UI mostra ───
   //
   // Emitido → assinado por uma parte → assinado pelas duas. É o ciclo que as
@@ -2118,6 +2284,7 @@ async function main() {
   console.log("   Modo Ensaio:      as 5 músicas com cifra têm source=youtube + source_id fictício — a separação chega até o provider e falha limpa (422 da fonte), em vez de 422 por falta de dado");
   console.log("   Shows:            João encerrado no Maresia (6 músicas, com bis e 1 fora da biblioteca) + AO VIVO no Sarau de hoje (3ª música tocando) · Maria encerrada no Maresia");
   console.log("   Avaliações:       estabelecimento→músico (5), músico→estabelecimento (4) e fã→músico (5, sem comentário)");
+  console.log("   Indicações:       3 para o Maresia — nova (com motivo), vista e arquivada; alimenta /dashboard/indicacoes no web");
   console.log("   Contratos:        3 estados — emitido (ninguém assinou) · parcial (só o estabelecimento) · assinado pelos dois");
   console.log("   Custódia:         R$900 retidos (held, líquido R$810 espelhado em held_balance) + R$1200 pendentes");
   console.log("   Jobs de IA:       ai-cifra analisando 'Tempo Perdido' (45%) · ai-audio concluído em 'Wonderwall' (4 stems) e EXPIRADO em 'Evidências'");
@@ -2126,7 +2293,10 @@ async function main() {
   console.log("   Extras:           analytics do Bar do Zé (3 dias), ranking mensal de fãs (Bruno 1º, Ana 2º), Spotify vinculado à Ana (token fictício)");
   console.log("   Cifras pessoais:  João 2/3 (Wonderwall privada c/ edições + base_updated · Evidências na comunidade) · Carlos: Garota de Ipanema na comunidade, pronta pro João importar");
   if (keycloakSubs.size > 0) {
-    console.log(`   🔑 ${keycloakSubs.size} logins de teste (POST /api/v1/auth/login), senha ${KEYCLOAK_SEED_PASSWORD}:`);
+    // AUTH-1 (31/ago/2026): `POST /auth/login` não existe mais. O login é
+    // Authorization Code + PKCE contra o Keycloak — no app, pelo botão
+    // "Entrar"; para teste manual, pelo próprio realm.
+    console.log(`   🔑 ${keycloakSubs.size} logins de teste (Keycloak, PKCE), senha ${KEYCLOAK_SEED_PASSWORD}:`);
     console.log("      músicos:          musico1..musico8@seed-soundmeet.com");
     console.log("      fãs:              fa1@ e fa2@seed-soundmeet.com");
     console.log("      estabelecimentos: bar1@ rest1@ club1@ bar2@seed-soundmeet.com (claim establishment_ids escrito — o painel web funciona)");

@@ -95,6 +95,25 @@ enum MusicRequestStatus {
   played
 }
 
+/// Ciclo do "destaque" de um pedido musical (gorjeta acoplada ao pedido).
+///
+/// 🔴 A cobrança só nasce no ACEITE do músico — antes disso o que existe é uma
+/// PROMESSA do fã, e nenhum centavo se moveu. É o que dispensa qualquer
+/// estorno: recusa em `promised` vira `cancelled` e acabou.
+enum RequestBoostStatus {
+  /// Fã prometeu o valor; o músico ainda não respondeu. Já destaca a fila.
+  promised
+  /// Músico aceitou e a cobrança PIX foi criada. Continua destacando.
+  awaiting_payment
+  /// Webhook confirmou o pagamento. É só aqui que a dedicatória vai a público.
+  paid
+  /// A janela de pagamento venceu sem confirmação. NÃO destaca mais.
+  expired
+  /// Músico recusou antes do aceite, ou a cobrança não pôde ser criada.
+  /// NÃO destaca mais.
+  cancelled
+}
+
 enum SubscriptionStatus {
   active
   cancelled
@@ -882,13 +901,39 @@ model MusicRequest {
   votesCount      Int                @default(0)
   playedAt        DateTime?
   respondedAt     DateTime?
-  created_at      DateTime           @default(now())
-  updated_at      DateTime           @updatedAt
+
+  /// --- Destaque pago (gorjeta acoplada ao pedido) --------------------------
+  /// Valor PROMETIDO pelo fã. Enquanto `boostStatus` não for `paid`, isto é
+  /// intenção, nunca receita — a UI do músico diz "a confirmar", jamais
+  /// "recebido". Mesma disciplina que mantém `held_balance` fora de `balance`.
+  boostAmount     Decimal?            @db.Decimal(12, 2)
+  /// Dedicatória ("essa é pra minha esposa, Ana"). 🔴 Só vai a público quando
+  /// `boostStatus = paid`; a redação é feita no agregado, não no presenter.
+  boostDedication String?
+  boostStatus     RequestBoostStatus?
+  /// Cobrança gerada no aceite.
+  ///
+  /// A FK mora AQUI (pedido -> gorjeta) e não no `Tip`, por dois motivos: é uma
+  /// coluna só para os dois sentidos de navegação (o fã busca a cobrança a
+  /// partir do pedido; o webhook busca o pedido a partir da gorjeta, pelo
+  /// `@unique`), e o banco passa a **exigir** a ordem que o use-case já segue —
+  /// criar o `Tip` antes de gravar o pedido. A ordem inversa deixaria o pedido
+  /// apontando para uma cobrança inexistente, e aqui isso nem compila em runtime.
+  boostTipId      String?             @unique
+  boostPromisedAt DateTime?
+  /// Instante do ACEITE (quando a cobrança nasceu). A janela de pagamento
+  /// conta daqui, nunca de `boostPromisedAt` — ver `RequestBoost.charged_at`.
+  boostChargedAt  DateTime?
+  boostPaidAt     DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
   audience        Audience         @relation(fields: [audienceId], references: [id], onDelete: Cascade)
   musician        Musician         @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   library         MusicLibrary?    @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+  boostTip        Tip?             @relation(fields: [boostTipId], references: [id], onDelete: SetNull)
   votes           RequestVote[]
   feedback        RequestFeedback?
   performed_songs PerformedSong[]
@@ -901,6 +946,9 @@ model MusicRequest {
   @@index([audienceId, musicianId, status])
   @@index([eventId, status, created_at])
   @@index([eventId, status, priority])
+  /// Serve o ORDER BY da fila do músico (destaque primeiro, maior valor
+  /// primeiro). Ver `RequestPrismaRepository.search`, ramo `sort === "priority"`.
+  @@index([eventId, musicianId, boostStatus, boostAmount])
   @@map("music_requests")
 }
 
@@ -1044,6 +1092,16 @@ model Tip {
   paymentMethod    String // "pix", "credit_card", "wallet"
   status           TipStatus    @default(pending)
   transactionId    String?
+  /// Payload da cobrança PIX devolvido pelo provedor (BR Code + imagem base64).
+  ///
+  /// 🔴 Persistido de propósito, e NÃO entra no regime de cifragem do `pixKey`
+  /// abaixo: `pixKey` é chave de RECEBIMENTO do músico (dado permanente dele);
+  /// isto é um código de cobrança de uso único que o pagador precisa
+  /// enxergar. Antes de existir, quem fechasse a tela perdia o QR para sempre
+  /// e a gorjeta ficava `pending` sem caminho de volta — e no fluxo de destaque
+  /// a cobrança nasce com o fã fora da tela, então guardar é obrigatório.
+  pixQrCode        String?
+  pixCopyPaste     String?
   // Legado (SM-016, texto puro) — substituído pelas 3 colunas *Ciphertext/
   // *Iv/*AuthTag (AES-256-GCM). Mantido só para o backfill; remoção em
   // migration futura (política: adicionar → backfill → remover em separado).
@@ -1057,10 +1115,13 @@ model Tip {
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
 
-  audience Audience  @relation(fields: [audienceId], references: [id], onDelete: Restrict)
-  musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
-  band     Band?     @relation(fields: [bandId], references: [id], onDelete: SetNull)
-  event    Event?    @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  audience       Audience      @relation(fields: [audienceId], references: [id], onDelete: Restrict)
+  /// Lado inverso de `MusicRequest.boostTip`. A FK mora no PEDIDO, não aqui —
+  /// ver a nota em `MusicRequest.boostTipId`.
+  boostedRequest MusicRequest?
+  musician       Musician?     @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  band           Band?         @relation(fields: [bandId], references: [id], onDelete: SetNull)
+  event          Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([audienceId, status, created_at])
   @@index([musicianId, status, created_at])
@@ -1070,18 +1131,18 @@ model Tip {
 }
 
 model Transaction {
-  id            String            @id @default(uuid())
-  userId        String?
-  musicianId    String?
-  bandId        String?
-  type          String // "tip", "booking_fee", "commission"
-  amount        Decimal           @db.Decimal(12, 2)
-  fee           Decimal           @default(0) @db.Decimal(12, 2)
-  netAmount     Decimal           @db.Decimal(12, 2)
-  currency      CurrencyEnum      @default(BRL)
-  status        TransactionStatus @default(pending)
-  paymentMethod String
-  externalId    String?           @unique // ID do provedor de pagamento — UNIQUE impede lançar duas vezes o mesmo pagamento/transferência (NULLs não colidem no Postgres)
+  id             String            @id @default(uuid())
+  userId         String?
+  musicianId     String?
+  bandId         String?
+  type           String // "tip", "booking_fee", "commission"
+  amount         Decimal           @db.Decimal(12, 2)
+  fee            Decimal           @default(0) @db.Decimal(12, 2)
+  netAmount      Decimal           @db.Decimal(12, 2)
+  currency       CurrencyEnum      @default(BRL)
+  status         TransactionStatus @default(pending)
+  paymentMethod  String
+  externalId     String?           @unique // ID do provedor de pagamento — UNIQUE impede lançar duas vezes o mesmo pagamento/transferência (NULLs não colidem no Postgres)
   /// Chave de idempotência do CLIENTE (header `Idempotency-Key`), distinta do
   /// `externalId`, que é do PROVEDOR e só existe depois da chamada.
   ///
@@ -1093,10 +1154,10 @@ model Transaction {
   /// depois reabre exatamente a janela que este campo existe para fechar.
   /// Nullable — chamadores internos (job, webhook) não têm cliente para gerar
   /// chave, e NULLs não colidem no Postgres.
-  idempotencyKey String?          @unique
-  metadata      Json?
-  created_at    DateTime          @default(now())
-  updated_at    DateTime          @updatedAt
+  idempotencyKey String?           @unique
+  metadata       Json?
+  created_at     DateTime          @default(now())
+  updated_at     DateTime          @updatedAt
 
   audience Audience? @relation(fields: [userId], references: [id], onDelete: SetNull)
   musician Musician? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
@@ -1123,6 +1184,13 @@ model MusicianWallet {
   pixKeyIv                 String?
   pixKeyAuthTag            String?
   pixKeyType               String?
+  /// Quando a chave PIX de recebimento foi definida/alterada pela última vez.
+  /// Base da carência de saque (A1 camada 2): um saque para uma chave
+  /// recém-trocada fica bloqueado por `PIX_KEY_CHANGE_COOLDOWN_HOURS`, para que
+  /// um token comprometido não consiga trocar a chave e sacar na sequência sem
+  /// dar tempo ao dono de reagir à notificação. Nullable: carteiras antigas e
+  /// as que nunca cadastraram chave ficam sem carência (não há troca a punir).
+  pixKeyChangedAt          DateTime?
   bankAccount              Json? // Dados bancários — legado, ver acima
   bankAccountCiphertext    String?
   bankAccountIv            String?
@@ -1812,4 +1880,44 @@ model PerformedSong {
   @@index([performanceId, position])
   @@index([libraryId])
   @@map("performed_songs")
+}
+
+/// Indicação de um músico, feita por um fã, para um estabelecimento.
+///
+/// 🔴 **Antes desta tabela, a indicação era DESCARTADA.**
+/// `IndicateMusicianUseCase` existia desde sempre, mas só incrementava os
+/// pontos do fã e emitia um evento que ninguém escutava: quem indicou quem,
+/// para onde e por quê nunca era gravado. Era por isso que "o dashboard de
+/// indicações do estabelecimento" nunca pôde ser construído — não havia dado,
+/// e a metade B2B do ciclo simplesmente não existia.
+///
+/// Colunas de alvo sem FK, seguindo o precedente de `Review` e
+/// `UserScore.reference_id`: a existência de músico e estabelecimento é
+/// conferida no use-case antes de gravar.
+model Indication {
+  id String @id @default(uuid())
+
+  audience_id      String
+  musician_id      String
+  establishment_id String
+
+  /// Por que o fã indica. Opcional — obrigar texto reduziria a indicação a
+  /// quem tem disposição de escrever, e o sinal está no ato.
+  message String? @db.Text
+
+  /// "new" | "seen" | "archived" — estado do lado de QUEM RECEBE. O fã não o
+  /// altera; é a caixa de entrada do estabelecimento.
+  status String @default("new")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  /// "Uma indicação por fã, por músico, por estabelecimento" garantido NO
+  /// BANCO — dois POSTs simultâneos furam qualquer checagem só na aplicação, e
+  /// o mesmo fã repetindo a indicação é a mesma opinião, não uma nova.
+  @@unique([audience_id, musician_id, establishment_id])
+  /// Serve a caixa de entrada do estabelecimento (o acesso dominante).
+  @@index([establishment_id, status, created_at])
+  @@index([musician_id, created_at])
+  @@map("indications")
 }
