@@ -9,7 +9,8 @@
     },
     "transform": {
       "legacyDecorator": true,
-      "decoratorMetadata": true
+      "decoratorMetadata": true,
+      "useDefineForClassFields": false
     },
     "baseUrl": "./",
     "keepClassNames": true,
