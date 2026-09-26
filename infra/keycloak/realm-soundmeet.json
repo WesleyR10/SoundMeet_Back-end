@@ -7,6 +7,9 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
+  "internationalizationEnabled": true,
+  "defaultLocale": "pt-BR",
+  "supportedLocales": ["pt-BR"],
   "verifyEmail": false,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
@@ -413,7 +416,7 @@
     {
       "clientId": "soundmeet-registration",
       "name": "SoundMeet Registration",
-      "description": "Direct Access Grant restrito ao auto-login pos-cadastro. Confidencial: o secret so existe no backend, nunca em cliente.",
+      "description": "Login por senha do app (POST /auth/login) e auto-login pos-cadastro, com refresh e revogacao pela API (AUTH-3). Confidencial: o secret so existe no backend, nunca em cliente.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,

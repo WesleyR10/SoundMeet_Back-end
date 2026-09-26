@@ -26,6 +26,12 @@ const config = {
     "KEYCLOAK_API_CLIENT_SECRET",
     "soundmeet-api-local-secret",
   ),
+  // AUTH-1: client confidencial usado só no auto-login pós-cadastro. Precisa
+  // casar com KEYCLOAK_REGISTRATION_CLIENT_SECRET do backend.
+  registrationClientSecret: env(
+    "KEYCLOAK_REGISTRATION_CLIENT_SECRET",
+    "soundmeet-registration-local-secret",
+  ),
   googleClientId: env("GOOGLE_KEYCLOAK_CLIENT_ID", ""),
   googleClientSecret: env("GOOGLE_KEYCLOAK_CLIENT_SECRET", ""),
 };
@@ -134,11 +140,39 @@ async function upsertRealm(api, realm) {
     realm: realm.realm,
     enabled: realm.enabled,
     displayName: realm.displayName,
+    // AUTH-1: sem esta linha o `loginTheme` do realm.json é ignorado pelo sync
+    // e a tela de login continua a padrão — o tema compila, sobe no container e
+    // não aparece, que é o modo de falha mais caro de diagnosticar.
+    loginTheme: realm.loginTheme,
     registrationAllowed: realm.registrationAllowed,
     registrationEmailAsUsername: realm.registrationEmailAsUsername,
     loginWithEmailAllowed: realm.loginWithEmailAllowed,
     duplicateEmailsAllowed: realm.duplicateEmailsAllowed,
     resetPasswordAllowed: realm.resetPasswordAllowed,
+    // 🔴 Mesma armadilha do `loginTheme` acima: sem esta linha o
+    // `verifyEmail` do realm.json é IGNORADO pelo sync, e o valor que vale
+    // continua sendo o do `--import-realm` inicial. O sintoma seria mudar o
+    // arquivo, rodar o sync com sucesso e o comportamento não mudar.
+    verifyEmail: realm.verifyEmail,
+    /*
+     * 🔴 TERCEIRA ocorrência da mesma armadilha (depois de `loginTheme` e
+     * `verifyEmail`): esta lista é FIXA, então toda propriedade de realm que
+     * não estiver escrita aqui é silenciosamente descartada pelo sync.
+     *
+     * Sem estas três linhas o realm continua sem internacionalização e o
+     * Keycloak serve as mensagens em INGLÊS — foi o que produziu uma tela de
+     * login com "Entrar" e "Que bom te ver de novo" (do tema, em português)
+     * ao lado de "Email", "Password" e "Sign In" (do Keycloak, em inglês).
+     * O tema não tem como corrigir isso: `msgStr()` devolve o que o servidor
+     * resolveu para o locale ativo.
+     *
+     * ⚠️ Ao adicionar propriedade nova ao realm.json, adicione aqui também —
+     * o sync roda com sucesso e não muda nada, que é o modo de falha mais caro
+     * de diagnosticar.
+     */
+    internationalizationEnabled: realm.internationalizationEnabled,
+    defaultLocale: realm.defaultLocale,
+    supportedLocales: realm.supportedLocales,
     editUsernameAllowed: realm.editUsernameAllowed,
     bruteForceProtected: realm.bruteForceProtected,
     permanentLockout: realm.permanentLockout,
@@ -221,6 +255,9 @@ async function upsertClient(api, realmName, client) {
   const existing = await findClient(api, realmName, client.clientId);
   const representation = {
     ...client,
+    ...(client.clientId === "soundmeet-registration"
+      ? { secret: config.registrationClientSecret }
+      : {}),
     ...(client.clientId === "soundmeet-api"
       ? { secret: config.apiClientSecret }
       : {}),

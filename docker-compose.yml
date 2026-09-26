@@ -171,7 +171,23 @@ services:
   # em `infra/keycloak/docker-compose.prod.yml` (start, TLS, hostname estrito,
   # segredos via secret manager).
   keycloak:
-    image: quay.io/keycloak/keycloak:22.0
+    # 🔴 Imagem PRÓPRIA, com o tema assado (`infra/keycloak/Dockerfile`), e não
+    # mais `image:` + bind mount do jar. O motivo está no Dockerfile: bind mount
+    # de arquivo único quebra quando o Docker Desktop perde a visão do
+    # filesystem da distro WSL, e o container entra em crash-loop com
+    # `FileNotFoundException ... (Is a directory)`. O build context não passa
+    # por bind mount.
+    #
+    # O contexto é o `dist_keycloak` do tema — pasta que contém só os dois jars,
+    # então o tar enviado ao daemon é mínimo e não arrasta o monorepo.
+    #
+    # ⚠️ Depois de mexer no tema: `docker compose up -d --build keycloak`.
+    # `--force-recreate` sozinho reusa a imagem e o tema NÃO muda.
+    build:
+      context: ./infra/keycloak
+      additional_contexts:
+        theme: ../soundmeet-keycloak-theme/dist_keycloak
+    image: soundmeet-keycloak:dev
     container_name: soundmeet-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
@@ -190,18 +206,10 @@ services:
       # Email — usados pelo realm-soundmeet.json via ${env.VAR} no import
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-noreply@soundmeet.com.br}
-    volumes:
-      - ./infra/keycloak/realm-soundmeet.json:/opt/keycloak/data/import/realm-soundmeet.json:ro
-      # Tema de login do SoundMeet (AUTH-1). Build:
-      #   cd ../soundmeet-keycloak-theme && npm ci && npm run build-keycloak-theme
-      #
-      # 🔴 O jar `22-to-25` e não o `all-other-versions`: a imagem acima é a
-      # 22.0, e o outro jar cobre 11–21 e 26+. Trocar os dois faz o Keycloak
-      # subir normalmente e simplesmente ignorar o tema.
-      # ⚠️ `${...:-/dev/null}` mantém o compose subindo mesmo sem o tema
-      # construído — o login volta ao padrão do Keycloak em vez de quebrar o
-      # boot de quem só quer rodar a API.
-      - ${SOUNDMEET_KC_THEME_JAR:-../soundmeet-keycloak-theme/dist_keycloak/keycloak-theme-for-kc-22-to-25.jar}:/opt/keycloak/providers/soundmeet-theme.jar:ro
+    # ⚠️ SEM `volumes:`. Tema e realm.json são assados na imagem — os dois eram
+    # bind mount de arquivo único, e é exatamente essa forma de mount que
+    # quebra quando o Docker Desktop perde a visão do filesystem da distro WSL
+    # (ver o Dockerfile). Mudou o realm? `docker compose up -d --build keycloak`.
     ports:
       - "8080:8080"
     depends_on:
