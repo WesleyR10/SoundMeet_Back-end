@@ -390,6 +390,10 @@ falso. `docker compose build app && docker compose up -d app` antes de qualquer 
 - [ ] **7.4** Analytics MongoDB (logs, auditoria) — **reavaliado jul/2026, mantém no backlog:** as projeções PG (`MusicianAnalytics`/`EstablishmentAnalytics`) cobrem o produto hoje; Mongo entra quando houver telemetria de volume (ex.: `FeedVideoViewed` do 7.10d, logs de scan). Não iniciar antes do 7.10.
 - [~] **7.5** Planos premium / marketplace — **split (jul/2026):** planos premium estão FEITOS (gates 4C, features 4D, config central `plan-features.config.ts`, paywall mobile com valores espelhados — falta só o checkout recorrente, Bloco 4D.8/Asaas). O que sobra aqui é o **marketplace** (contratação intermediada com escrow) — manter como item futuro próprio; ver [monetization.md](monetization.md) e [payment-gateway-decisions.md](payment-gateway-decisions.md).
 - [ ] **7.9** **Vídeo de apresentação no perfil do músico (portfólio estático)** — Fase 1 do feed geo:
+  - ⚠️ **O ÁUDIO de apresentação foi entregue em 16/set/2026 (Bloco 17) e responde à mesma pergunta**
+    ("dá para ouvir como o artista soa antes de contratar?") por uma fração do custo — sem transcode
+    HLS, sem FFmpeg no runtime, sem player de vídeo. O vídeo continua pendente **como insumo do feed
+    do 7.10**, que é o que exige vídeo de verdade; não repetir o áudio em outro formato.
   - [ ] **7.9a** Campo `presentation_video_url String?` e `presentation_video_uploaded_at DateTime?` em `MusicianProfile` (Prisma)
   - [ ] **7.9b** Aggregate: `changePresentationVideo(url, uploadedAt)` + `clearPresentationVideo()` em `MusicianProfile`
   - [ ] **7.9c** Endpoint `POST /musicians/:id/presentation-video` — multipart, limite 60s / 100MB → transcode HLS via FFmpeg → S3 → salva URL; padrão igual `ai-cifra-uploads.controller.ts`
@@ -467,6 +471,11 @@ falso. `docker compose build app && docker compose up -d app` antes de qualquer 
   - [x] **7.18e** Sync assíncrono via RabbitMQ (trio dispatcher/consumers/rabbitmq no padrão synced-lyrics, channel `google_calendar_sync` prefetch 5, 2 filas — confirmed/cancelled): `GoogleCalendarSyncEventsHandler` escuta `BookingConfirmedEvent`/`BookingCancelledEvent` **cross-module via EventEmitter2** (precedente do notifications-module — scheduling-module ficou 100% intocado, zero acoplamento) e só enfileira; erros engolidos+logados (emitAsync propagaria pro fluxo de booking). `GoogleCalendarAuthError` adicionado a `NON_RETRIABLE_ERRORS` (token revogado → DLX direto, integração desativada). Transporte `GOOGLE_CALENDAR_SYNC_TRANSPORT` (`noop` default — inerte até ligar)
   - [x] **7.18f** Use cases do consumer: `SyncBookingConfirmedToGoogleCalendarUseCase` (resolve músico direto ou líder via `Band.members`, no-op se não conectado/sem líder/booking não mais confirmado; compensação da corrida confirm×cancel entre filas — re-check pós-create deleta evento órfão; título enriquecido best-effort com nome do estabelecimento) e `SyncBookingCancelledToGoogleCalendarUseCase` (fonte autoritativa = registro de sync, **não** re-resolve líder — troca de liderança não aponta pra agenda errada)
   - [x] **7.18g** Testes: 15 suítes novas, 93 casos (criptografia incl. adulteração/IV único; aggregates; token service c/ refresh+revogação; connect/status/disconnect; os 2 syncs incl. banda-líder, idempotência, compensação de corrida; HTTP client c/ axios mockado incl. retry/409/404; state service incl. state forjado/expirado; dispatcher/consumers/handler; controllers incl. XSS escape no callback). Suíte completa **na época**: 271/271, 2001/2001 ✅ (inclui fix de teste flaky pré-existente em `musician-profile-touring.aggregate.spec.ts` — dependia da data real). Baseline atual: **315 suítes / 2700 testes** (jul/2026, pós-8E)
+  - [x] **7.18h** **UI mobile + callback por deep link (24/set/2026)** — a feature tinha 7 subitens entregues e **zero chamadores**: `connect`/`status`/`DELETE` não eram invocados por nenhum cliente, então o músico não conseguia conectar a agenda. Fechado dos dois lados:
+    - **Backend:** o callback deixou de devolver página HTML e passa a `response.redirect` para `GOOGLE_CALENDAR_APP_RETURN_URL` (`?status=sucesso|cancelado|erro`, queda para `soundmeet://agenda/google`) — é o que faz a Chrome Custom Tab fechar sozinha, mesmo desenho de `mercadopago-callback.controller.ts`. O e-mail **não** viaja na URL (PII em histórico de navegador); quem o entrega é o `/status` autenticado. Spec do callback reescrita: 11 casos, incluindo "nunca põe o e-mail na URL de retorno" e o fallback sem env.
+    - **Mobile:** `GoogleCalendarCard` na `AgendaScreen` (`features/scheduling/`), com `useGoogleCalendarStatus`/`useConnectGoogleCalendar`/`useDisconnectGoogleCalendar`. Regra pura `parseGoogleCalendarReturn` com 5 casos — inclusive rejeitar URL de retorno que não seja exatamente a nossa, e status desconhecido virando `unknown` em vez de `failed` (backend novo com app velho não pode virar erro falso).
+    - ⚠️ **`GOOGLE_CALENDAR_REDIRECT_URI` em `localhost` não funciona no APARELHO** — o redirect acontece no navegador do celular, e `localhost:3000` lá é o próprio telefone. Para testar no aparelho é preciso um host alcançável **em https** (o Google só aceita `http` para `localhost`, e recusa IP puro): túnel tipo ngrok, com a URL registrada no Console. No emulador/navegador da máquina de dev o valor atual serve.
+    - 🔴 **Gate externo aberto:** `calendar.events` é escopo **sensível** no Google. Em publishing status *Testing* funciona para até 100 contas listadas como test users (com a tela de "app não verificado"); produção exige **verificação do app** no Google Cloud, que leva semanas. Não bloqueia o desenvolvimento, bloqueia o lançamento.
   - **Pendente (pós-chaves reais):** teste manual E2E com client OAuth real do Google Cloud (connect → confirmar booking → evento na agenda → cancelar → evento some) e conferência de que nenhum token aparece nos logs do consumer
 - [x] **7.17** **Corrigido (jul/2026, revisão do Bloco 11):** `GET /gamification/leaderboard?limit=N` retornava **422 em toda chamada** — `GetLeaderboardInput.limit`/`level` (`get-leaderboard.input.ts`) tinham `@IsNumber()` sem `@Type(() => Number)`; como o `ValidationPipe` global não usa `enableImplicitConversion`, o valor de query string (`"20"`) nunca virava `number` antes da validação, e `@IsNumber` rejeitava a string. Todos os DTOs irmãos (`SearchEstablishmentsDto`, `SearchEventsDto`, `GetRequestSuggestionsInput`) já tinham esse `@Type`; só este ficou de fora. Corrigido adicionando `@Type(() => Number)` em ambos os campos; verificado com `plainToClass`+`validateSync` isolado (antes: `isNumber`/`min`/`max` falhavam; depois: `limit: 20` como `number`, zero erros) e suíte `gamification` completa (190/190 passando). Achado durante revisão de qualidade do `LeaderboardScreen` do fã, não estava documentado como item aberto antes.
 
@@ -1245,6 +1254,78 @@ exigiria mudar AASA + intentFilters + **rebuild nativo** para replicar uma
 página que já funciona.
 
 **Suíte:** 405 suítes / 3944 testes ✅ · mobile 29/321 ✅ · web 102/1010 ✅
+
+---
+
+## Bloco 17 — Áudio de apresentação do músico 🎧 *(16/set/2026)*
+
+O estabelecimento decidia contratar vendo nome, gênero, cachê e nota — nada que dissesse como o
+artista **soa**. Entregue backend + web + mobile + seed na mesma fatia.
+
+- [x] **17.1** Migration `20260916120000_add_musician_presentation_audio` — quatro colunas aditivas
+      em `musicians`, sem backfill
+- [x] **17.2** VO `PresentationAudio` + `changePresentationAudio`/`removePresentationAudio` no
+      agregado (os dois devolvem a chave anterior, padrão de `Establishment.changeCover`)
+- [x] **17.3** `UploadMusicianPresentationAudioUseCase` e
+      `DeleteMusicianPresentationAudioUseCase` — o controller apura FATOS (MIME por magic bytes,
+      duração por `music-metadata`), o use-case aplica REGRAS (allowlist, 5–40s, tamanho)
+- [x] **17.4** `POST`/`DELETE /musicians/:id/presentation-audio` + campo nos dois presenters
+- [x] **17.5** 🔴 `MulterError` mapeado no `GlobalExceptionFilter` → **413**, não o 500 genérico
+      com alerta no Sentry. Conserta de lambuja os quatro uploads que já existiam
+- [x] **17.6** Web: `ArtistAudioPreview` (clique, `preload="none"`, um só tocando por vez),
+      `ArtistCard` convertido em **stretched link** e `media-src` na CSP
+- [x] **17.7** Mobile: `expo-document-picker`, seção no acordeão do `EditProfileScreen`, medição de
+      duração local antes de subir e player do que já está publicado
+- [x] **17.8** Seed: WAV sintetizado (~35s) subindo pelo use-case REAL, no **mesmo provider do app**
+      (`ESTABLISHMENT_STORAGE_PROVIDER` — hoje `cloudflare_r2`), sob o prefixo **`seed/`**; o
+      `--reset` varre só esse prefixo. ⚠️ A primeira versão só escrevia em MinIO e por isso não
+      gravava nada neste ambiente — corrigido em 17/set/2026
+- [ ] **17.9** Áudio na página pública `/musico/[id]` e no app do fã — o campo já existe nos dois
+      presenters; falta só a UI. Fatia própria, não iniciada
+
+**Sem gate de plano**, em todos os tiers: uma grade em que metade dos artistas não tem preview piora
+a tela para o estabelecimento, que é quem paga. O gate futuro é quantidade, não existência.
+
+---
+
+## Bloco 18 — Reputação do artista e destaque pago 📣 *(18/set/2026)*
+
+Quatro correções na tela de artistas do web, pedidas com captura. **Três premissas do briefing não
+sobreviveram à leitura do código** — está registrado no `CLAUDE.md` da raiz.
+
+- [x] **18.1** 🔴 Ordenação: `sort_dir` nunca era enviado e o backend cai em `asc`, então "Melhor
+      avaliados" abria com os **não avaliados** e "Mais recentes" com os **mais antigos**. Direção
+      passou a ser derivada do campo (`ARTIST_SORT_DIRECTIONS`). Era a única tela do painel sem
+      `sort_dir`
+- [x] **18.2** `GET /musicians/:id/ratings/summary` — nota quebrada por `author_type`. A nota
+      exibida **nunca foi** "de outros estabelecimentos": `aggregateForTarget` agrega o ledger
+      inteiro sem filtrar autor
+- [x] **18.3** Painel "Reputação" no perfil: a quebra da nota + o **currículo verificado**
+      (`GET /musicians/:id/resume`), que existia desde ago/2026 **sem cliente nenhum** em web ou
+      mobile. É a "popularidade" pedida, e já vinha com prova no banco
+- [x] **18.4** Faixa "Em destaque" (`GET /musicians/featured`, teto 3) — plano pago **não** reordena
+      a grade, para o rótulo da tela não virar falso. A faixa diz que é paga
+- [x] **18.5** `bands.formed_in` — tempo de estrada da banda, que não existia no schema. Backend +
+      web (`artistTenure`) + mobile (seção do líder)
+- [x] **18.6** Console de busca (abas + nome + ordenar + filtros) movido para **acima** do cartaz
+- [x] **18.7** `tooltip.tsx` (Base UI) — primitiva nova. No cartão o gatilho não recebe foco, de
+      propósito; a mesma frase tem gatilho focável no cabeçalho da grade
+- [x] **18.8** Seed: ledger de avaliações com lastro (a projeção era afirmada sem nenhuma linha em
+      `reviews`, e o João tinha o inverso — duas avaliações reais com `rating = 0`), `formed_in` nas
+      bandas, e público **e** casas avaliando cada músico para a quebra ter o que mostrar
+
+### Pendente deste bloco
+
+- [ ] 🔴 **Deploy:** `npx prisma migrate deploy`, **rebuild do `soundmeet-app`** (o container roda
+      imagem buildada — sem ele `/musicians/featured` e `/ratings/summary` dão 404 e a faixa some
+      sem erro) e `npm run seed -- --reset`. **Nada disso foi executado**
+- [ ] 🔴 **Verificação no navegador** — bloqueada pelo item acima
+- [ ] **Rotação entre assinantes na faixa** — com mais pagantes que as 3 vagas, os mesmos aparecem
+      sempre. Decisão de produto quando houver volume
+- [ ] **Quebra de nota para estabelecimento** (`/establishments/:id/ratings/summary`) — não existe;
+      quem lê a nota do local é o músico no mobile, e lá a procedência ainda não virou pergunta
+- [ ] **Áudio de apresentação da banda** — segue inexistente (`presentation_audio` é do agregado
+      `Musician`); é a sétima assimetria músico×banda
 
 ---
 

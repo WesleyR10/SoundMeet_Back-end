@@ -102,6 +102,98 @@ Marcações:
        Código: get-hiring-dashboard.use-case.ts ([5]).  
        Regra: `GetHiringDashboardUseCase` consolida histórico de eventos/performance/engajamento por músico para o estabelecimento; exposto em `GET establishments/:id/hiring-dashboard`, protegido por `EstablishmentOwnershipGuard`. **(corrigido jul/2026 — texto anterior estava desatualizado)**
 
+### Destaque pago na busca de artistas *(18/set/2026)*
+
+Faixa "Em destaque" acima da grade de `/dashboard/artistas`, com até 3 assinantes de plano pago.
+
+- [x] `GET /musicians/featured` (`@Public()`, `ListFeaturedMusiciansUseCase`). Sem filtro, sem
+      ordenação, sem paginação — teto em `FEATURED_MUSICIANS_MAX = 3`.
+- [x] 🔴 **É uma FAIXA, não um critério de ordenação, e a diferença é de honestidade.** O rodapé do
+      cartaz da tela ESCREVE a ordem em vigor ("ORDEM: MELHOR AVALIADOS"); um assinante com 3,6 à
+      frente de um FREE com 4,8 faria a tela afirmar uma hierarquia que ela não aplicou. A faixa
+      separada e **rotulada como paga** mantém as duas coisas verdadeiras.
+- [x] 🔴 **Não havia promessa a cumprir.** `plan-features.config.ts` não tem feature de prioridade
+      de busca em nenhum dos três tiers; o único "Aparece primeiro nas buscas" do repo está em
+      `monetization.md` §Formação de Bandas, seção **futura** e de outro marketplace. Isto é decisão
+      de produto nova — não há chave nova em `plan-features.config.ts` porque o destaque não é
+      gate de capacidade, é colocação.
+- [x] 🔴 **Pagar não substitui consentir.** Os ids vêm de assinaturas vigentes, mas a leitura passa
+      por `MusicianSearchParams.createPublic` — assinante PRO sem `open_to_gigs` **não** aparece.
+- [x] 🔴 **FREE excluído explicitamente** em `findActivePaidMusicianIds`. `plan_tier` é String sem
+      constraint: a invariante "tier gratuito não gera linha" vive numa convenção do seed, e uma
+      linha órfã compraria destaque de graça.
+- [x] `active` **e** `trial` contam como vigentes; `cancelled` e `expired` não.
+- [x] **Não expõe o tier.** O output é o presenter público — saber que é PRO e não ESSENTIAL não
+      muda nada para a casa e é dado comercial do artista.
+- [ ] **Sem rotação entre assinantes.** Com mais pagantes que vagas, os mesmos três aparecem
+      sempre. Decisão de produto pendente para quando houver volume.
+
+### Tempo de estrada da banda — `formed_in` *(18/set/2026)*
+
+- [x] Coluna `bands.formed_in` (`Int?`), migration aditiva sem backfill. `changeFormedIn()` no
+      agregado, aceita `null` para apagar.
+- [x] 🔴 **Não era falha de UI: `model Band` não tinha o campo.** O perfil do músico solo mostrava
+      "N anos de estrada" (`experience_years`) e o da banda não mostrava nada porque não havia dado.
+- [x] **ANO, não data.** Ninguém sabe o dia em que a banda se formou, e um `DATE` obrigaria a UI a
+      inventar "01/01" — precisão falsa num campo que o estabelecimento lê como credencial.
+- [x] 🔴 **Nunca derivado de `bands.created_at`** — aquilo é "cadastrada na SoundMeet desde", que é
+      outro fato. Compor um do outro é fabricar informação.
+- [x] **Unidade diferente do músico de propósito:** anos gravados envelhecem sozinhos no banco; o
+      ano é estável e o tempo se deriva dele na leitura.
+- [x] Validação: inteiro entre 1900 e o **ano corrente, recalculado a cada chamada**
+      (`formation-year.ts`). 🔴 `@Max(new Date().getFullYear())` congelaria o teto no load do
+      módulo e recusaria o ano corrente na virada do ano, uma vez por ano, sem teste quebrando.
+- [x] Entra em `POST /bands` (opcional) e `PATCH /bands/:id`. Editável pelo **líder**, no app
+      (`BandLeaderSettingsSection` → "Tempo de estrada").
+- [x] `PATCH` distingue `null` (apagar) de ausente (`!== undefined`) — quem digitou o ano errado
+      precisa de caminho de volta ao "não informado".
+
+### Áudio de apresentação — preview na contratação *(16/set/2026)*
+
+Trecho de **5 a 40 segundos** que o músico envia pelo app e o estabelecimento ouve **com clique**
+(nunca autoplay) no cartão da grade `/dashboard/artistas` e no perfil do artista.
+
+- [x] `POST /musicians/:id/presentation-audio` (multipart) e `DELETE` do mesmo caminho
+      Código: `musicians.controller.ts`, `upload-musician-presentation-audio.use-case.ts`,
+      `delete-musician-presentation-audio.use-case.ts`.
+      `@Roles("musician","admin")` + `MusicianOwnershipGuard` + `@Throttle(5/min)`. O DELETE aceita
+      admin para takedown de conteúdo.
+- [x] **Sem gate de plano — todos os tiers.** Uma grade em que metade dos artistas não tem preview
+      piora a tela para o estabelecimento, que é quem paga. Gate futuro é quantidade, não existência.
+- [x] Formatos: **MP3, M4A, AAC e WAV**, decididos pelos **bytes** (`assertFileSignature`), nunca
+      pelo `Content-Type` do cliente.
+      ⚠️ **Ogg e FLAC ficam FORA de propósito:** Safari não toca Ogg Vorbis e não há ffmpeg no
+      processo Node para transcodificar — aceitar seria prometer um preview que parte dos
+      estabelecimentos não ouve, sem erro em lugar nenhum.
+      ⚠️ `file-type@21` devolve **`audio/x-m4a`** para o `.m4a` de iPhone, não `audio/mp4`; os dois
+      estão na allowlist.
+- [x] Duração medida no servidor por `music-metadata` (`read-audio-duration.ts`) — não existe ffmpeg
+      no runtime Node, e todo `duration_seconds` do resto do sistema vem de worker externo, de forma
+      assíncrona. Arredonda antes de comparar: um trecho exportado como "40s" costuma vir com 40,04.
+- [x] Teto de 10 MB (`MUSICIAN_PRESENTATION_AUDIO_MAX_SIZE`). Acima disso o Multer aborta e o
+      `GlobalExceptionFilter` devolve **413** com mensagem legível — antes deste ramo virava 500 com
+      alerta no Sentry, e o músico não descobria que bastava mandar um arquivo menor.
+- [x] Mensagens de recusa em **PT-BR e com o número** ("o áudio tem 1min12 e o limite é 40
+      segundos") — elas chegam literais ao músico pelo `extractApiMessage` do app, sem outra fonte.
+- [x] Quatro colunas em `musicians`, e a segunda é a que costuma faltar:
+      `presentation_audio_url`, **`presentation_audio_key`**, `presentation_audio_duration_seconds`,
+      `presentation_audio_uploaded_at`. Agrupadas no VO `PresentationAudio`.
+      🔴 **Sem a chave do objeto, trocar o áudio deixaria o arquivo anterior órfão e pago para
+      sempre** — é o defeito que `Musician.avatar` tem e que o par `cover`/`cover_key` do
+      estabelecimento resolveu.
+- [x] Ordem na troca: grava o objeto novo (chave uuid nova, porque o CDN cacheia por caminho) →
+      atualiza o banco → **só então** apaga o antigo, com erro engolido.
+- [x] 🔴 **`getPublicUrl() === null` falha alto** (`ExternalServiceError`), divergindo do avatar: o
+      fallback `?? objectKey` gravaria a chave crua no campo de URL, e num `<audio src="musicians/…">`
+      o browser resolve como caminho relativo à página, leva 404 e o player fica mudo.
+- [x] O campo sai em **`MusicianPresenter` e `PublicMusicianPresenter`** (não é PII) — é o presenter
+      público que a busca do estabelecimento usa. A `object_key` **não** sai no output.
+- [ ] Banda não tem áudio de apresentação: o upload é do agregado `Musician` e não existe
+      `POST /bands/:id/presentation-audio`.
+- [x] Storage: o mesmo `ESTABLISHMENT_STORAGE_PROVIDER` do resto da mídia do músico — **Cloudflare
+      R2 neste projeto, inclusive em dev**; MinIO é fallback do compose. O seed grava sob o prefixo
+      `seed/` e o `--reset` varre só ele, para não apagar o que foi enviado pelo app.
+
 ---
 
 ## Domínio Establishment (Estabelecimentos)
@@ -122,6 +214,57 @@ Marcações:
 - [x] Validação de CNPJ com tratamento de erro de domínio  
        Código: establishment.aggregate.ts ([6]).  
        Regra: `changeCnpj` captura `InvalidCNPJError`, adiciona erro de notificação em `cnpj` e evita lançamento de exceção genérica.
+
+**Identidade visual — avatar e capa**
+
+- [x] **Capa (banner) do espaço (10/set/2026)** — `POST /establishments/:id/cover` (multipart, campo
+      `file`) e `DELETE /establishments/:id/cover`.
+      Código: `upload-establishment-cover.use-case.ts`, `delete-establishment-cover.use-case.ts`.
+      Regras:
+  - **Duas colunas, não uma.** `cover` é a URL pública; `cover_key` é a chave do objeto no bucket.
+    Sem a chave, cada troca de capa deixaria o arquivo anterior órfão e cobrado para sempre — é o
+    defeito que `avatar` tem e que `menu_pdfs` (`{ url, key }`) não tem. 🔴 `cover_key` **não sai no
+    presenter**: `GET /establishments/:id` é `@Public()` e a chave é endereço interno do storage.
+  - **Não existe "capa padrão" como arquivo.** O padrão é o que o cliente desenha quando `cover` é
+    `null` (gradiente da marca + waveform). Por isso "voltar ao padrão" é um `DELETE`, não o upload
+    de um asset nosso — hospedar um seria pagar storage para servir a todo mundo a mesma imagem que
+    o CSS produz de graça.
+  - 🔴 **O tipo gravado no storage é o DETECTADO pelos BYTES** (`assertFileSignature`, UPL-1), nunca
+    o `Content-Type` do cliente. Um HTML anunciado como `image/png` servido pelo CDN com o
+    Content-Type escolhido pelo atacante é XSS armazenado no nosso domínio de mídia.
+    Allowlist: `image/jpeg`, `image/png`, `image/webp`. Teto: 4 MB
+    (`ESTABLISHMENT_COVER_MAX_SIZE`) — menor que os 5 MB do cardápio porque a capa abre no painel
+    **e** na página pública indexada do local.
+  - **Chave nova (UUID) a cada upload, nunca `cover.jpg` fixo.** Sobrescrever a mesma chave
+    pareceria mais limpo e quebraria o CDN: o CloudFront guarda o objeto pelo caminho, e a capa
+    trocada continuaria servindo a antiga até uma invalidação que custa dinheiro e que ninguém
+    dispara.
+  - **Ordem: gravar a nova → persistir → apagar a antiga, sem relançar.** Apagar antes deixaria a
+    página pública com capa quebrada se o `update` falhasse; relançar transformaria "a capa foi
+    trocada, mas a faxina falhou" num erro na cara do dono sobre uma operação que deu certo.
+  - `DELETE` é **idempotente** — quem não tem capa recebe 200 com `cover: null`, não 404.
+
+- [x] **Foto de perfil (logo) do espaço (18/set/2026)** — `POST /establishments/:id/avatar`
+      (multipart, campo `file`) e `DELETE /establishments/:id/avatar`.
+      Código: `upload-establishment-avatar.use-case.ts`, `delete-establishment-avatar.use-case.ts`.
+      Migration `20260918120000_add_establishment_avatar_key` (aditiva, só a coluna `avatar_key`).
+      Regras:
+  - 🔴 **Antes disto nada no produto gravava `avatar`.** O único caminho era o `PATCH
+    /establishments/:id`, que aceitava a URL como **texto livre de até 500 caracteres, sem validação
+    de URL** — e nenhum cliente o usava. O círculo ao lado do nome, em "Meu espaço", era só leitura.
+  - **Espelho exato da capa:** par `avatar` (URL) + `avatar_key` (chave no bucket), bytes detectados
+    por `assertFileSignature` (JPEG/PNG/WEBP, sem SVG), chave UUID nova a cada upload, ordem gravar →
+    persistir → apagar a anterior sem relançar, `DELETE` idempotente, `avatar_key` fora do presenter.
+    Teto de **2 MB** (`ESTABLISHMENT_AVATAR_MAX_SIZE`) — metade da capa: a foto aparece em toda
+    conversa, lista e cartão, e o painel web já a recorta e reduz para 512×512 antes de enviar.
+  - 🔴 **`avatar` SAIU do `UpdateEstablishmentInput`.** Duas portas para o mesmo campo — uma com
+    chave, outra sem — fariam o PATCH desligar a chave do objeto que o upload gravou, e o arquivo
+    viraria lixo pago no bucket. Com `forbidNonWhitelisted`, quem mandar `avatar` no PATCH recebe
+    **422** (nenhum cliente manda — conferido no web e no mobile). A capa nunca esteve no PATCH.
+  - ⚠️ **Linhas antigas podem ter `avatar` com `avatar_key` nulo** (URL que não é objeto nosso).
+    Upload e remoção tratam isso: a URL é substituída/limpa e o storage **não** é tocado — tratar a
+    URL como chave apagaria, na melhor hipótese, nada.
+  - `changeAvatar(url, key)` no agregado devolve a chave ANTERIOR, como `changeCover`.
 
 **Avaliações e reputação do estabelecimento**
 
@@ -145,9 +288,106 @@ Marcações:
 - [ ] Sistema de avaliações/reviews entre estabelecimentos e músicos
 - [~] Agenda compartilhada com disponibilidade de músicos e bandas — leitura já existe (`GET scheduling/calendar/free-busy`, `GET scheduling/calendar/month-slots`, ambos `@Public()`); falta o "tempo real" (push via WebSocket) **(corrigido jul/2026 — estava `[ ]`)**
 - [x] Sistema de comunicação (chat seguro, histórico de conversas) — `src/core/chat/` (Conversation + Message) + `chat-module` (gateway `/chat`, REST, 15 testes de integração), registrado em `app.module.ts` **(corrigido jul/2026 — estava `[ ]`, contradizia roadmap.md Bloco 7.1 que já marca `✅`)**
+- [x] **A conversa pertence à NEGOCIAÇÃO, não só à inquiry (17/set/2026)** — ver "Chat — as duas portas da negociação" abaixo.
 - [x] **Caixa de indicações do estabelecimento (28/set/2026)** — `GET /establishments/:establishment_id/indications` + `PATCH .../:indication_id` (vista/arquivada), com tela em `/dashboard/indicacoes` no web. 🔴 **Antes disso a indicação era DESCARTADA:** `IndicateMusicianUseCase` só dava pontos ao fã e emitia `MusicianIndicatedEvent`, que **nenhum handler escutava** — não faltava tela, faltava dado. Ver seção "Indicação de talentos" abaixo. Priorização por relevância segue pendente (a ordenação é cronológica)
 - [ ] Gestão completa de eventos (confirmação, lembretes, pagamentos automatizados)
 - [ ] Módulo de marketing (integração social, geração de artes, campanhas, cupons)
+
+### Chat — as duas portas da negociação (17/set/2026)
+
+Uma `Conversation` nasce de **exatamente uma** de duas origens, e as duas abrem canal:
+
+| Porta | Evento | Coluna | O que é |
+|---|---|---|---|
+| "Conversar sobre uma data" | `InquiryCreatedEvent` | `conversations.inquiry_id` | Uma **pergunta**: tem assunto, não tem data de show. Quem aceita/recusa é o artista (`@Roles("musician","admin")`) |
+| "Propor um show" | `BookingProposedEvent` | `conversations.booking_id` | Uma **oferta**: tem data, horário e cachê, não tem assunto. Quem confirma é a contraparte |
+
+🔴 **Até aqui só a inquiry abria conversa, e a razão nunca foi de produto: era o
+schema.** `conversations.inquiry_id` era `NOT NULL` com FK para `inquiries`,
+então uma conversa literalmente não conseguia existir sem uma inquiry. A
+consequência é que `POST /scheduling/bookings` mandava data e cachê e deixava o
+artista **sem onde responder "pode ser 22h?"** — só aceitar o número ou recusar
+seco. A UI do estabelecimento chegava a **avisar** "não abre conversa"; aviso
+sobre o comportamento do próprio produto costuma ser cheiro de defeito.
+
+Migration `20260917120000_conversation_belongs_to_negotiation`, aditiva em três
+passos (soltar o `NOT NULL`, adicionar a coluna nullable, criar a CHECK).
+
+Cinco coisas para não redescobrir:
+
+- 🔴 **A invariante "exatamente uma porta" é dita em DOIS lugares, e os dois são
+  necessários.** No agregado (`validateNegotiationOrigin`) para o erro sair como
+  `EntityValidationError` com campo nomeado, e no banco
+  (`conversations_exactly_one_negotiation`) como última linha. Sem o primeiro, a
+  violação chega como erro de constraint do Postgres — em inglês, sem campo,
+  achatada num 500 pelo `GlobalExceptionFilter`.
+  ⚠️ A CHECK **não aparece no `schema.prisma`** (o Prisma não a modela). Se um
+  `migrate dev` gerar `DROP CONSTRAINT` dela, **remova o DROP** — mesmo aviso de
+  `performances_one_live_per_event_musician`.
+- 🔴 **Booking vindo de CONVERSÃO não abre segunda conversa.**
+  `ConvertInquiryToBookingUseCase` também chama `Booking.create`, logo emite o
+  mesmo `BookingProposedEvent` — e a inquiry de origem já tem canal desde o
+  `InquiryCreatedEvent`. Sem a guarda, a negociação ficaria partida em dois fios,
+  o histórico num e a proposta convertida no outro, **sem nada ligando os dois e
+  sem erro em lugar nenhum**. Quem carrega o sinal é `from_inquiry_id` no evento.
+  ⚠️ Ele **não é coluna do agregado** de propósito: o vínculo persistido é
+  `Inquiry.bookingId`, e duplicá-lo criaria duas verdades sobre o mesmo fato.
+- **`OpenConversationUseCase` é idempotente pelas DUAS chaves.** As colunas são
+  `@unique` e os handlers de evento podem reentrar (retry, replay de outbox);
+  sem a leitura antes do `insert`, a segunda execução levaria violação de
+  constraint e o `catch` do handler só a registraria no log.
+- **`chat` continua sem conhecer `scheduling` como módulo** — o acoplamento é
+  pelo evento de domínio importado como tipo, igual ao que já valia para a
+  inquiry. O `ChatModule` não importa o `SchedulingModule`.
+- **Os clientes escolhem o contexto pela coluna preenchida.** No `soundmeet-web`,
+  `NegotiationContext` é união discriminada por `kind` e há um cartão para cada
+  porta — um tipo só com tudo opcional deixaria a tela decidir por
+  `campo != null`, e bastaria um campo novo para ela mostrar a coisa errada.
+  O seed cria **uma conversa de cada origem**, senão o ramo de booking ficaria
+  intestável pelo app.
+
+### Chat — a proposta feita dentro da conversa (18/set/2026)
+
+Os dois conversam, chegam a um acordo, e o estabelecimento manda **ali mesmo** a proposta com data,
+horário e cachê; o artista aceita ou recusa pelo app, no cartão fixado no topo da conversa.
+
+🔴 **O que havia antes:** a conversa só servia para combinar. Numa conversa aberta por "propor um
+show", ajustar o horário exigiria um booking NOVO — e um booking novo emite `BookingProposedEvent`,
+que abre uma SEGUNDA conversa. E, do lado do músico, **o app não tinha tela nenhuma de booking**: nem
+as propostas de "Propor um show" podiam ser aceitas, apesar de o painel afirmar "quem aceita é o
+artista, pelo aplicativo".
+
+- [x] **`POST /scheduling/bookings/:id/revise`** (`ReviseBookingProposalUseCase`,
+      `Booking.reviseProposal`) — nova proposta sobre a **mesma** negociação. Reescreve início, fim,
+      cachê e observações; `proposed_by` passa a ser quem revisou (derivado do JWT); prazo novo de
+      **48h**; campos de cancelamento limpos. Emite `BookingProposalRevisedEvent` — **nunca**
+      `BookingProposedEvent`, que abriria outra conversa.
+  - Vale para `pending` (ajuste), `expired` (renovação) e `cancelled` **com `confirmed_at` nulo**
+    (nova oferta depois de uma recusa). 🔴 Booking que **já foi confirmado** nunca é revisto — tem
+    contrato emitido e, com escrow, cachê em custódia. É `confirmed_at`, não o `status`, que separa
+    "recusada" de "show desfeito": os dois terminam em `cancelled`.
+  - Oferta para o passado é recusada no domínio (`start_at` precisa ser futuro).
+  - Checa agenda (disponibilidade, show confirmado no intervalo, teto por dia no fuso da agenda)
+    **antes** de a proposta chegar ao artista. O `confirm` continua revalidando — esta checagem é para
+    a proposta não nascer impossível.
+  - Qualquer lado da negociação pode revisar (`assertNegotiationParticipant`), como na proposta
+    original. `proposed_by` no corpo é descartado pelo whitelist e sobrescrito pelo controller.
+- [x] **Conversão de inquiry aceita `open` além de `accepted`.** A regra antiga exigia o "aceitar
+      conversa" do artista antes de qualquer oferta, e travava o fluxo do chat: o artista respondia
+      por mensagem e nunca tocava no botão, e a conversão levava 422. O consentimento não é pulado —
+      muda de lugar: o booking nasce `pending` e só vira show quando o artista confirma. Recusada ou
+      vencida continua não convertendo.
+- [x] **A conversão passou a registrar `proposed_by`** (derivado do JWT, `deriveActorSide` agora em
+      `negotiation-actor-side.ts`, compartilhado pelos dois controllers). Antes nascia nulo, e o app
+      não tinha como saber que a vez era do artista.
+- [x] **Proposta de show avisa o artista** (`NotificationsSchedulingEventsHandler`): socket
+      `booking.updated` com status `proposed`/`revised` + push. 🔴 Até aqui só a inquiry tinha push —
+      "Propor um show" dependia de o artista abrir o app por acaso. Sem e-mail (etapa de negociação;
+      o comprovante é o e-mail da confirmação). Revisão feita pelo próprio artista não o notifica.
+      ⚠️ Booking de banda não gera push (o token é do músico, não da banda).
+- **O painel web decide convert × revise no BFF**, relendo conversa, inquiry e booking do backend —
+  o cliente manda só os termos, nunca um `booking_id`. O texto da proposta entra na conversa como
+  mensagem do estabelecimento (best-effort: se falhar, a proposta continua feita).
 
 Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não possuem fluxos completos (ex.: controllers, realtime, chat). A base de reservas e disponibilidade está concentrada no domínio _Scheduling_.
 
@@ -164,6 +404,23 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
   - Ciclo de vida inclui `pending`, `confirmed`, `cancelled`, `expired`, `completed` (com timestamps por transição quando aplicável).
   - Confirmação é permitida somente quando `status = pending`.
 
+- [x] **Proposta exige data E cachê** *(decisão de produto de 25/set/2026)*  
+       Código: `Booking.assertProposalTerms` (booking.aggregate.ts); DTOs de propor, converter inquiry
+       e revisar (`@IsPositive()` em `fee`).  
+       Regras:
+  - "Para iniciar conversa não precisa; para enviar proposta é obrigatório data e valor." Conversar
+    sem valor é a **inquiry**. Até aqui `fee: null` ("a combinar") passava, e o artista recebia uma
+    proposta sem ter o que aceitar.
+  - Vale para as **três portas** que produzem proposta: propor, converter inquiry e revisar. A regra
+    mora no agregado, e não num use-case, para uma quarta porta herdá-la sem saber que existe; o DTO
+    repete a exigência só para o 422 nomear o campo.
+  - Cachê precisa ser **maior que zero** — zero é "show de graça", não "a combinar".
+  - 🔴 **Não vale no construtor:** booking antigo sem cachê continua carregável (recusar ali daria
+    `LoadEntityError` em toda proposta "a combinar" já gravada). A tela segue exibindo "A combinar"
+    para esses; revisá-los exige informar o valor.
+  - Web: os três formulários (`ProposeBookingForm`, `ConvertInquiryForm`, `ProposalComposer` do
+    chat) marcam o campo como obrigatório, e o BFF reaplica o mesmo schema no servidor.
+
 **Use cases de agendamento**
 
 - [x] Propor reserva (pending) para músico ou banda com validação de disponibilidade e conflitos confirmados  
@@ -178,6 +435,11 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
        Regras:
   - A confirmação valida disponibilidade do alvo (músico ou banda) e conflitos confirmados do próprio alvo.
   - Em reservas de banda, após confirmar, o sistema tenta bloquear a agenda dos membros no intervalo com buffer, criando `unavailabilities` para cada membro. Esse bloqueio é operacional e não impede a confirmação caso algum membro já esteja indisponível.
+
+- [x] Revisar proposta (contraproposta) — `POST /scheduling/bookings/:id/revise` *(18/set/2026)*  
+       Código: revise-booking-proposal.use-case.ts.  
+       Regras: ver "Chat — a proposta feita dentro da conversa" em Establishment. Só booking nunca
+       confirmado; reabre `expired` e `cancelled` pré-confirmação; não cria booking nem conversa.
 
 **Leitura de agenda (Bloco 9.2 — 07/ago/2026)**
 
@@ -219,9 +481,23 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
   - Tokens OAuth persistidos **cifrados** (AES-256-GCM, chave `TOKEN_ENCRYPTION_KEY` de 32 bytes via env; IV único por operação). Nunca em texto claro, nunca logados, nunca expostos em presenter/`toJSON()`.
   - Client OAuth **separado** do login social (`GOOGLE_CALENDAR_CLIENT_ID/SECRET` ≠ `GOOGLE_KEYCLOAK_CLIENT_ID/SECRET` — o IdP do Keycloak tem `storeToken:false` e é inutilizável para Calendar). Escopo mínimo: `calendar.events` + `openid email`.
   - Callback OAuth é rota fixa `GET /google-calendar/oauth/callback` (`@Public()` — redirect de navegador sem Bearer): a autenticidade vem do `state` assinado (HMAC-SHA256 + nonce + expiração de 10min), validado antes de qualquer troca de `code`.
+  - 🔴 **O callback REDIRECIONA para o app, não devolve página** (24/set/2026). Até aqui ele respondia um HTML "volte ao aplicativo" — escrito quando a feature não tinha cliente nenhum. Quem abre o consentimento é a Chrome Custom Tab do app (`openAuthSessionAsync`), e ela **só fecha sozinha quando o navegador chega no `returnUrl`**: com a página, o músico terminava o fluxo e ficava olhando uma aba que ele mesmo tinha de fechar, e o app não sabia se deu certo — só que a aba sumiu. Hoje todos os caminhos terminam em `response.redirect(GOOGLE_CALENDAR_APP_RETURN_URL?status=sucesso|cancelado|erro)`, mesmo desenho de `mercadopago-callback.controller.ts`. Env opcional, com queda para `soundmeet://agenda/google`.
+    - **`cancelado` é status próprio, separado de `erro`**: quem desistiu foi o usuário, nada quebrou, e o app diz isso com outras palavras.
+    - 🔴 **O e-mail da conta NÃO viaja no redirect** — é PII e ficaria no histórico do navegador e em qualquer log de proxy pelo caminho. Quem o entrega é `GET .../status`, autenticado. De quebra, sem HTML na resposta não sobrou superfície de XSS aqui (o teste de escape que existia deixou de ter o que testar; no lugar dele há um que **falha se o e-mail aparecer na URL**).
+    - O motivo da recusa vai para o LOG, nunca para a query: `state` inválido é forja ou link velho, e detalhar a causa na URL ensina o atacante o que ajustar.
   - Sync é assíncrono via RabbitMQ (`GOOGLE_CALENDAR_SYNC_TRANSPORT`, default `noop` = feature inerte): handler `@OnEvent` cross-module só enfileira, o consumer chama a API do Google. Idempotência em 3 camadas: `messageId` na fila, status em `google_calendar_synced_events` e id determinístico do evento no Google (UUID do booking sem hífens; 409 = já criado = sucesso). Corrida confirm/cancel entre filas tem compensação: re-check do status pós-create remove evento órfão.
   - `GoogleCalendarAuthError` (token revogado) é **não-retriável** (listado no `RabbitmqConsumeErrorFilter`) e desativa a integração — o músico reconecta pelo app. Indisponibilidade do Google é retriável (backoff da fila). Músico sem conta conectada é estado normal → no-op silencioso, nunca erro.
-  - Disconnect (`DELETE /musicians/:id/google-calendar`) revoga o token no Google best-effort e **sempre** zera os tokens locais (indisponibilidade do Google não bloqueia o disconnect).
+  - Disconnect (`DELETE /musicians/:id/google-calendar`) revoga o token no Google best-effort e **sempre** zera os tokens locais (indisponibilidade do Google não bloqueia o disconnect). **Eventos já criados na agenda do músico não são apagados** — são dele; o que para é a sincronização daí em diante.
+
+- [x] **UI mobile — o músico consegue conectar (24/set/2026)**
+       Código: `soundmeet-mobile/src/features/scheduling/` (`domain/google-calendar.{types,rules}.ts`, `infrastructure/google-calendar.api.ts`, `application/useGoogleCalendar.ts`, `ui/components/GoogleCalendarCard.tsx`), montado na `AgendaScreen`.
+       Regras:
+  - 🔴 **O backend estava pronto desde jul/2026 e não tinha chamador em cliente nenhum** — `connect`/`status`/`DELETE` eram inalcançáveis, então a feature inteira (OAuth, cifra em repouso, sync por fila, 93 testes) não podia ser ligada por ninguém. Não faltava backend; faltava a porta.
+  - Card na **Agenda**, não no menu de perfil: é onde o modelo mental está. Web não entra — `soundmeet-web` é exclusivo do persona estabelecimento, e conectar agenda é ação do músico (mesma razão que mantém o vínculo do Mercado Pago fora do web).
+  - **O estado desconectado NÃO é alerta.** O `MercadoPagoLinkCard` grita em âmbar porque sem vínculo o músico *não recebe gorjeta* — ali a falha é do produto. Aqui não há nada quebrado: a agenda do app funciona sozinha e o Google é conveniência. Pintar de amarelo ensinaria a ignorar o amarelo que importa.
+  - **Enquanto o status não chega, o card não afirma nada.** Renderizar "Conectar" por padrão faria quem já conectou ver convite para reconectar a cada abertura — e reconexão dispara `prompt=consent` no Google à toa.
+  - **Desconectar pede confirmação**, porque o efeito é silencioso: nada some da tela, e o músico só descobriria meses depois que os shows pararam de aparecer.
+  - O card declara que show de banda entra **só na agenda do líder** — é a regra do backend, e escondê-la faria o membro achar que a integração dele falhou.
 
 ---
 
@@ -388,6 +664,75 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 
 - [~] Limite explícito de pedidos por pessoa/evento  
   Ainda não há uma contagem consolidada “X pedidos por usuário por evento”. O que existe é a detecção de duplicidade via `isSimilarTo` e lógica de priorização por idade/estado.
+
+### Escopo do pedido — catálogo da plataforma × repertório do músico *(09/set/2026)*
+
+- [x] 🔴 **O fã busca no catálogo da PLATAFORMA, não no repertório de um músico.**
+      `GET /musicians/:musician_id/song-catalog` devolve os pares (título, artista)
+      que a SoundMeet já cifrou, **deduplicados entre todos os músicos**.
+      ⚠️ "O catálogo do SoundMeet" **não é uma tabela** — `MusicLibrary` é
+      biblioteca *pessoal* (`musicianId`), e cada músico tem a própria linha da
+      mesma música, com a própria análise. O catálogo é a UNIÃO dessas linhas,
+      montada em SQL cru (`searchSongCatalog`), porque `groupBy` do Prisma não
+      aceita expressão (`lower(btrim(title))`) como chave — e sem normalizar,
+      "Garota de Ipanema" e "garota de ipanema " viram duas entradas.
+- [x] 🔴 **O dono de cada linha NUNCA sai na resposta.** A entrada diz "a
+      plataforma tem esta música", jamais "fulano toca esta música". O único id
+      que sai é `library_id`, e ele é sempre do músico **alvo** da busca.
+      Allowlist explícita em `SongCatalogItemPresenter`, mesmo desenho do
+      `PublicMusicLibraryItemPresenter`.
+- [x] **A rota é AUTENTICADA** (`@Roles("audience","musician","admin")`), ao
+      contrário de `GET /musicians/:id/repertoire`, que é `@Public()`.
+      `POST /requests` já exige fã autenticado, então uma busca anônima só
+      acrescentaria uma superfície raspável do catálogo inteiro — o buraco do
+      SM-026, agora com o nosso banco no lugar da LRCLIB.
+      ⚠️ Consequência no `soundmeet-web`: o catálogo **não pode** ser
+      pré-carregado na RSC de `/evento/[id]`, que renderiza antes do
+      cadastro-relâmpago. Quem busca é o formulário, via
+      `GET /api/public/audience/song-catalog`.
+- [x] **Só entra no catálogo música com conteúdo de cifra**
+      (`lrc_normalized IS NOT NULL OR chords IS NOT NULL`) — é a definição de
+      "música que ciframos". O predicado é o mesmo de
+      `MusicLibrary.hasChordSheetContent()`, **não** `chord_sheet`, que é
+      projeção materializada e marcaria como "sem cifra" músicas que o
+      `GET .../chord-sheet` serve normalmente.
+- [x] 🔴 **`Musician.accepts_requests_outside_repertoire` (default `true`) é
+      regra, não filtro de busca.** Com `false`, `CreateRequestUseCase` **recusa**
+      pedido que não venha acompanhado de um `library_id` daquele músico
+      (`InvalidOperationError` → 422). Um switch que só estreitasse a busca do
+      cliente prometeria um limite que o campo de texto livre desfaz no primeiro
+      toque — o cliente esconde o campo por conveniência, não por segurança.
+      Rota: `PATCH /musicians/:id/request-scope` (`MusicianOwnershipGuard`).
+- [x] **Default `true`, e não `null` como `open_to_gigs`.** São consentimentos
+      diferentes: `open_to_gigs` expõe o músico a um público novo e exige decisão
+      explícita; este só descreve o que o produto já fazia (o fã pede o que quiser,
+      o músico recusa). `null` obrigaria todo leitor a inventar a resposta.
+- [x] 🔴 **`library_id` de OUTRO músico é recusado nos DOIS escopos** (422,
+      `InvalidArgumentError`). Fosse checado só no modo restrito, bastaria o
+      músico religar o switch para o pedido passar a apontar para a linha de
+      terceiro. A posse é verificada por porta (`IRepertoireMembershipPort`),
+      obrigatória no construtor do use-case — opcional, um wiring que a
+      esquecesse desligaria a restrição em silêncio.
+- [x] **`library_id` nulo é caso legítimo e comum**: o fã digitou à mão, editou o
+      texto depois de escolher, ou escolheu música que a plataforma tem e **este**
+      músico ainda não cadastrou. Nos três o pedido segue por título e artista.
+      A coluna `music_requests.libraryId` **já existia e nunca era preenchida** —
+      `MakeMusicRequestUseCase` lê `metadata.library_id` desde sempre e nenhum
+      cliente mandava.
+- [x] **Quem escolhe o escopo é o SERVIDOR.** Não existe parâmetro de escopo na
+      query, de propósito: o use-case lê o músico e devolve
+      `scope: "platform" | "repertoire"` já resolvido. O cliente usa isso para
+      **explicar** ao fã ("Este artista prefere pedidos do próprio repertório"),
+      nunca para decidir.
+- [x] **No modo restrito os clientes escondem o texto livre** e o botão só habilita
+      com uma escolha que tenha `library_id`. É conveniência: evita o fã escrever
+      um pedido inteiro para levar 422.
+- ⚠️ **Verificação pendente:** `test/music-library/song-catalog.e2e-spec.ts` existe
+      e cobre dedupe, escopo de `library_id` e os dois `scope` contra Postgres real
+      — mas **não foi executado** (Docker indisponível na sessão de 09/set/2026).
+      O SQL cru desta consulta nunca rodou no banco. Precedente que justifica o
+      alerta: os dois bugs de SQL de `event-prisma.repository.ts`, que só
+      apareceram contra Postgres real.
 
 ### Destaque pago — gorjeta acoplada ao pedido *(27/ago/2026)*
 
@@ -848,8 +1193,28 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
       decimal porque foi feito para médias.
 - [x] Leitura pública paginada: `GET /musicians/:id/ratings`, `GET /establishments/:id/ratings`,
       com filtro `has_comment` e ordenação padrão pela mais recente.
+- [x] **Quebra por tipo de autor** *(18/set/2026)* — `GET /musicians/:id/ratings/summary`,
+      `@Public()`, `GetRatingBreakdownUseCase`. Devolve `overall` mais uma fatia por
+      `author_type` (`audience`, `establishment`, `musician`).
+      🔴 **Existe porque a nota exibida NUNCA foi "de outros estabelecimentos".**
+      `aggregateForTarget` agrega o ledger inteiro **sem filtrar autor**, então o número do cartão
+      de `/dashboard/artistas` sempre foi público + casas + músicos numa média só — e a tela do
+      estabelecimento levava a lê-lo como avaliação de pares. Era afirmação falsa por omissão.
+      ⚠️ **`overall` NÃO é a média das parciais** (os pesos diferem) — o output entrega os dois
+      lados para que nenhum cliente recomponha. Há teste que fixa a divergência.
+      ⚠️ **Cada fatia vem com o seu `total`**, e isso é obrigatório para a UI ser honesta: "5,0 do
+      público" com uma avaliação e com trinta são afirmações de força muito diferente.
+      ⚠️ **Tipo sem avaliação vem `null`, nunca `{average: 0, total: 0}`** — zero lê como "avaliado
+      mal", e a diferença entre isso e "não avaliado" é o ponto inteiro da quebra. O cliente filtra
+      por `total`, jamais por `average`: uma nota 1 com total 1 é a avaliação que mais importa.
+      ⚠️ Autor desconhecido (a coluna é String, não enum) é **descartado** da quebra, nunca somado a
+      um bucket conhecido — por isso `overall` vem da agregação própria, e não da soma das fatias.
+      Consumido pelo painel "Reputação" de `/dashboard/artistas/musicos/[id]` no web.
 - [ ] Moderação/denúncia de avaliação — não implementado.
 - [ ] `EstablishmentRatedEvent` segue sem ouvinte (evento morto, anterior a este bloco).
+- [ ] **Sem equivalente para estabelecimento.** `GET /establishments/:id/ratings/summary` não
+      existe — não por simetria esquecida, mas porque ninguém pediu: quem lê a nota do local é o
+      músico no mobile, e lá a procedência ainda não virou pergunta.
 
 ### UI do músico avaliando o estabelecimento *(21/ago/2026)*
 
@@ -892,6 +1257,9 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 - [x] Edição que não acha mais onde ancorar vira **conflito explícito** e não é aplicada: `anchor_not_found`, `symbol_mismatch`, `ambiguous_match`, `unparseable_symbol`, `out_of_range`. O músico revisa dois conflitos; ele não descobre no palco que a cifra saiu do lugar.
 - [x] Símbolo de acorde que o sistema não entende é **preservado verbatim**, nunca descartado.
 - [x] O matching é **enarmônico**: o músico gravou `Db`, a IA re-analisou como `C#`, a correção dele continua valendo.
+- [x] **O músico edita o que VÊ; o overlay guarda no tom ORIGINAL** *(25/set/2026)*. `ApplyChordEditsUseCase` desfaz o deslocamento da view atual (`transpose − capo`) em `from`/`to`/`symbol` antes de gravar. 🔴 Sem isso, com a cifra transposta, o `from` exibido (`A`) não casava com o base (`G`) → `symbol_mismatch`, e "corrigir" não fazia nada; e o acorde escolhido era gravado como base e **transposto de novo** na exibição.
+- [x] **O casamento tolera a simplificação exibida** *(25/set/2026)*. Com "acordes básicos", a tela mostra `Am` onde o base é `Am11`; `symbolsMatch` aceita o base simplificado em qualquer dos três níveis, para a correção não virar conflito se o músico trocar a simplificação depois. Fundamental ou qualidade diferentes continuam não casando.
+- [x] **Corrigir/remover ancora pelo tempo DO ACORDE, não da palavra** *(mobile, 25/set/2026)*. O token carrega `chordStartMs`; mandar o `startMs` da palavra caía fora da tolerância de 250 ms e virava `anchor_not_found` — 200 na resposta e nada na tela.
 
 ### Visualização
 - [x] Tom, capotraste, complexidade, instrumento e velocidade de rolagem são **parâmetros de visualização**, nunca gravados no acorde. Um único artefato serve todos os tons.
@@ -972,6 +1340,7 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 - [x] O agregado é **imutável por construção** — não existe mutador de conteúdo, só de status e assinatura.
 - [x] O contrato guarda o **snapshot congelado das cláusulas já renderizadas**. O catálogo só é consultado para *construir*; um contrato de 2026 renderiza igual para sempre.
 - [x] O mapper **recalcula o `content_hash` na carga** e recusa contrato adulterado no banco (`LoadEntityError`). Sem isso, publicar o hash na página de verificação seria decoração.
+- [x] 🔴 **Objeto aninhado no snapshot passa por VO de ordem fixa** *(14/set/2026)*. A coluna é `jsonb`, que reordena chaves, e o hash é `JSON.stringify`: o Anexo I (`ficha_tecnica_anexo`) guardado verbatim fazia **todo contrato de casa com ficha técnica** falhar na carga logo depois de emitido. `ContractVariables` normaliza por `StageTechSpec.fromJSON().toJSON()` — a mesma ordem da emissão, então nenhum hash gravado mudou.
 - [x] FKs: `Restrict` em booking/establishment, `SetNull` em musician/band — apagamento por LGPD zera o ponteiro e **o snapshot preserva a prova**.
 - [x] Status como enum Prisma (`issued` → `partially_signed` → `signed`, `annulled` como saída lateral) — é máquina de estado de domínio.
 
@@ -982,6 +1351,7 @@ Essas funcionalidades estão descritas em detalhes em _Features_, mas ainda não
 - [x] **Segundo fator por código de uso único** enviado ao e-mail **congelado** da parte — a conta autenticada prova que alguém com a senha entrou, não quem. O código nunca volta na resposta HTTP: ela traz só o destino mascarado e o vencimento. 10 min de validade, 5 tentativas, uso único, e pedir outro invalida o anterior.
 - [x] **O código é guardado como HMAC com segredo do servidor** (`CONTRACT_CHALLENGE_SECRET`, ≥32 chars exigidos em produção), não como hash puro *(19/ago/2026)*: 6 dígitos são 1 milhão de possibilidades, e um SHA-256 sem chave se converte nos códigos vivos por tabela pré-computada assim que o cache vaza. Comparação em tempo constante. `POST /:id/sign/challenge` tem `@Throttle` próprio de 5/60s — cada pedido escreve na caixa de entrada de alguém e mata o código anterior.
 - [x] Papel derivado do JWT, nunca do corpo. Em banda, **só o líder assina**; membro **lê** sem ser líder.
+- [x] **Parte PJ sem representante nomeado (músico MEI) assina com `signer_document: null`** *(14/set/2026)* — o documento dela é CNPJ, e o campo é CPF. Antes o CNPJ era copiado, o `ContractSignature` lançava e o MEI não conseguia assinar o próprio contrato.
 - [x] Segunda assinatura do mesmo lado → **422**; quem não é parte → **403**; `annul` de contrato assinado → **422** (e só admin).
 - [x] O documento **declara que não é título executivo** (CPC art. 784, III) e que é prova escrita apta a ação monitória (CPC art. 700). Prometer o contrário na UI seria falso.
 

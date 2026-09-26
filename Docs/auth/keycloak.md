@@ -382,7 +382,7 @@ Fluxo do `RegisterUseCase`:
 5. Emite (best-effort, nao bloqueante) um token de verificacao de email via `VerifyEmailService.issueVerificationToken()` — reaproveita os campos `email_token`/`email_token_expires_at` ja existentes e `MailService.sendEmailVerification()`.
 6. Autentica o usuario via grant de senha no client **confidencial** `soundmeet-registration` (`KEYCLOAK_REGISTRATION_CLIENT_SECRET`, so no backend) e retorna `access_token`/`refresh_token`.
 
-   > 🔴 **AUTH-1 (31/ago/2026):** ate essa data o passo 6 usava o client **publico** `soundmeet-mobile`. Como o `client_id` publico esta dentro do APK, qualquer script batia direto no `/token` do Keycloak e pulava o `@Throttle` do Nest inteiro. Hoje `soundmeet-mobile` tem `directAccessGrantsEnabled: false` e o grant vive num client cujo secret nunca sai do servidor — o rate limit do Nest voltou a ser inescapavel. O grant de senha **continua existindo aqui de proposito**: o usuario acabou de escolher a senha, e manda-lo para a tela de login em seguida seria pedir para digitar duas vezes. Para LOGIN nao ha grant de senha em lugar nenhum: e Authorization Code + PKCE.
+   > 🔴 **AUTH-1 (31/ago/2026):** ate essa data o passo 6 usava o client **publico** `soundmeet-mobile`. Como o `client_id` publico esta dentro do APK, qualquer script batia direto no `/token` do Keycloak e pulava o `@Throttle` do Nest inteiro. Hoje `soundmeet-mobile` tem `directAccessGrantsEnabled: false` e o grant vive num client cujo secret nunca sai do servidor — o rate limit do Nest voltou a ser inescapavel. O grant de senha **continua existindo aqui de proposito**: o usuario acabou de escolher a senha, e manda-lo para a tela de login em seguida seria pedir para digitar duas vezes. ~~Para LOGIN nao ha grant de senha em lugar nenhum: e Authorization Code + PKCE.~~ **Mudou em AUTH-3 (25/set/2026):** o login por senha voltou, no MESMO client confidencial — ver a secao "AUTH-3" no fim deste documento.
 
 Qualquer falha entre os passos 2 e 4 aciona compensacao (`deleteUser` best-effort no Keycloak) para nao deixar conta orfa. Falha no passo 6 (autenticacao) **nao** aciona compensacao, pois a conta ja foi criada com sucesso — o cliente recebe 503 e deve cair para a tela de login normal.
 
@@ -390,9 +390,13 @@ Qualquer falha entre os passos 2 e 4 aciona compensacao (`deleteUser` best-effor
 
 ~~**Risco residual:** `POST /audiences` continua `@Public()` no NestJS, permitindo criar um `Audience` sem usuario Keycloak correspondente.~~ ✅ **Resolvido em 26/ago/2026 (SM-021):** a rota, o `CreateAudienceUseCase`, o input e o DTO foram **removidos**. O caminho criava o agregado com UUID aleatorio enquanto o canonico faz `new AudienceId(externalId)` (o `sub`), produzindo perfil orfao. Restringir a `admin` nao resolveria: uma capacidade que so sabe produzir agregado violando a invariante de identidade nao fica melhor com autorizacao, fica mais discreta. Ha regressao em `audiences.controller.spec.ts`.
 
-## ~~Login por email/senha (`POST /api/v1/auth/login`)~~ — REMOVIDO (AUTH-1, 31/ago/2026)
+## Login por email/senha (`POST /api/v1/auth/login`) — removido no AUTH-1, de volta no AUTH-3
 
-> 🔴 **Esta rota, o `LoginUseCase` e o `LoginDto` não existem mais.** O login é
+> ✅ **De volta em 25/set/2026, em outro desenho** — ver a seção "AUTH-3" no fim
+> deste documento. O que segue descreve a versão REMOVIDA (grant no client
+> público) e fica como histórico.
+>
+> 🔴 **(AUTH-1, 31/ago/2026)** Esta rota, o `LoginUseCase` e o `LoginDto` deixaram de existir. O login passou a ser
 > Authorization Code + PKCE contra o Keycloak, aberto dentro do app em Chrome
 > Custom Tab / `ASWebAuthenticationSession`. Ver a seção "AUTH-1 — fim do Direct
 > Access Grant" no fim deste documento.
@@ -432,15 +436,16 @@ O mobile trata o caso "login social sem role" numa store transiente (nunca grava
 
 ## Usuarios de teste criados pelo seed
 
-`npm run seed -- --reset` cria **14 usuarios no Keycloak**, todos com a mesma senha.
+`npm run seed -- --reset` cria **15 usuarios no Keycloak**, todos com a mesma senha.
 
 > **Senha: `Seed@123`** — constante `KEYCLOAK_SEED_PASSWORD` em `prisma/seed.ts`.
 
 | Persona | E-mails | Papel de realm | Observacao |
 |---|---|---|---|
-| Musicos | `musico1@` … `musico8@seed-soundmeet.com` | `musician` | O `sub` do Keycloak **vira o id do aggregate**, igual ao `RegisterUseCase`. `musico1` (Joao) e o mais completo: carteira com extrato, banda, cifras pessoais, shows |
-| Fas | `fa1@` e `fa2@seed-soundmeet.com` | `audience` | Mesmo tratamento: `sub` = `audience_id` |
-| Estabelecimentos | `bar1@` `rest1@` `club1@` `bar2@seed-soundmeet.com` | `establishment` | 🔴 O `sub` **NAO** e o id do estabelecimento — ele tem UUID proprio, e o seed escreve o claim `establishment_ids` apos criar o aggregate |
+| Musicos | `musico1@seed-soundmeet.com` … `musico8@seedV-soundmeet.com` | `musician` | O `sub` do Keycloak **vira o id do aggregate**, igual ao `RegisterUseCase`. `musico1` (Joao) e o mais completo: carteira com extrato, banda, cifras pessoais, shows |
+| Fas | `fa1@seed-soundmeet.com` e `fa2@seed-soundmeet.com` | `audience` | Mesmo tratamento: `sub` = `audience_id` |
+| Estabelecimentos | `bar1@seed-soundmeet.com` `rest1@seed-soundmeet.com` `club1@seed-soundmeet.com` `bar2@seed-soundmeet.com` | `establishment` | 🔴 O `sub` **NAO** e o id do estabelecimento — ele tem UUID proprio, e o seed escreve o claim `establishment_ids` apos criar o aggregate |
+| Admin | `admin@seed-soundmeet.com` | `admin` | Unico SEM aggregate no banco, de proposito: e papel de operacao, nao persona. Existe porque 12 rotas `@Roles("admin")` (takedown de cifra da comunidade, gestao de badges, anular contrato) nao tinham como ser exercidas. `support` segue no realm e fora do seed — nenhuma rota o exige ainda |
 
 Todos no dominio `@seed-soundmeet.com`, deterministico por desenho.
 
@@ -533,4 +538,78 @@ mas ainda não no Keycloak em execução.
 - **`authenticateWithPassword` tinha TRÊS chamadores**, não um: `login`,
   `register` e `register-establishment` (o `/cadastro` do web). Desligar o DAG
   sem tratar os dois cadastros derrubaria o cadastro da web junto.
+
+## AUTH-3 — login por senha dentro do app (25/set/2026)
+
+Decisão de produto: a tela de e-mail e senha volta para **dentro** do app
+(nativa, com o visual do SoundMeet). O Google continua pelo navegador (Custom
+Tab) — o Google recusa login em WebView e o consentimento tem de ser a tela dele.
+
+**Não é a volta ao desenho anterior ao AUTH-1.** Dos três problemas que o AUTH-1
+apontou, só um era explorável — e ele é resolvido de outro jeito:
+
+| Problema do AUTH-1 | Como fica no AUTH-3 |
+|---|---|
+| 🔴 Grant no client **público** (`client_id` no APK): script ia direto ao `/token` e pulava o `@Throttle` | Grant no client **confidencial** `soundmeet-registration`. Sem o secret, o `/token` recusa — a única porta é `POST /auth/login`, com throttle |
+| Senha passa pelo app e pelo Nest | Aceito — é o normal de qualquer app first-party. Mitigado: senha não é logada, e o **Sentry filtra o corpo** (ver abaixo) |
+| MFA não cabe num POST só | Aceito por ora. MFA/passkey não estão no roadmap; quando entrarem, o caminho é passkey nativa ou o "OAuth 2.0 for First-Party Apps" (draft IETF) — que o Keycloak **ainda não suporta oficialmente** (discussão #25014, só extensão da comunidade) |
+
+A RFC 9700 diz que o grant de senha "MUST NOT be used"; o argumento dela é
+sobre expor a credencial a um **client de terceiro** e treinar o usuário a
+digitá-la fora do servidor de identidade. Aqui app, API e Keycloak são todos
+nossos. A violação do texto é consciente e está registrada aqui.
+
+### Rotas (todas `@Public()`, todas no client confidencial)
+
+| Rota | Throttle | Observação |
+|---|---|---|
+| `POST /auth/login` | 20/min por IP | Recusa **uniforme**: senha errada, conta inexistente, bloqueada ou desabilitada → mesmo 401 "E-mail ou senha incorretos" |
+| `POST /auth/refresh` | 30/min | 401 = sessão vencida (app sai); 503 = provedor fora (app **não** sai) |
+| `POST /auth/logout` | 30/min | `/revoke` do Keycloak — derruba também a sessão **offline**. Sempre 204 |
+| `POST /auth/forgot-password` | 3/min | `execute-actions-email` (UPDATE_PASSWORD, link de 30 min). Resposta idêntica em **todos** os casos, inclusive falha de envio |
+
+- 🔴 **O Keycloak só aceita refresh token do client que o emitiu** ("Unmatching
+  clients"). Por isso refresh e logout **também** passam pela API.
+  **Isso consertou um defeito latente do cadastro:** desde o AUTH-1 a sessão do
+  `POST /auth/register` nascia no client confidencial e o app a renovava no
+  público — quem criava conta era deslogado na primeira renovação (~15 min), sem
+  erro na tela. O app decide o canal pelo `azp` do próprio access token
+  (`session-channel.ts`), então sessões já gravadas funcionam sem migração.
+- **`scope=openid offline_access`** no grant de senha, igual ao PKCE do app. Sem
+  isso a sessão morre com `ssoSessionIdleTimeout` (30 min parado).
+- **Rate limit em duas camadas, cada uma cobre o que a outra não vê:** o throttle
+  é por IP (volume de uma origem); o brute force do Keycloak (`failureFactor: 5`,
+  bloqueio temporário) é por **conta** — o Keycloak não tem limite por IP.
+  ⚠️ 20/min e não 5 porque CGNAT de operadora e o Wi-Fi do bar põem centenas de
+  pessoas atrás do mesmo IP. ⚠️ **Em produção atrás de proxy**, `req.ip` é o IP
+  do proxy e o balde vira global — mesma limitação já registrada em
+  `user-throttler.guard.ts`; resolver exige decidir a topologia de deploy.
+- ⚠️ **Bloqueio de conta é vetor de DoS** (quem sabe o e-mail de alguém tranca a
+  conta por até 15 min). É o preço do brute force por conta; `permanentLockout`
+  fica `false` de propósito. O app, a partir da 3ª recusa seguida, avisa que a
+  conta "fica protegida por alguns minutos" — texto igual exista a conta ou não.
+- **Conta de estabelecimento no app:** o backend emite a sessão; o app lê as
+  roles, recusa **antes** de gravar e revoga a sessão no provedor.
+- **Porta separada no core:** `IIdentitySessionGateway` (login, refresh,
+  revogação, e-mail de redefinição), implementada pelo mesmo
+  `KeycloakAdminGateway`. Separada de `IIdentityProviderGateway` para os mocks de
+  cadastro não precisarem conhecer sessão.
+
+### 🔴 Sentry recebia a senha
+
+O `@sentry/nestjs` 10 anexa o **corpo da requisição** a todo evento
+(`maxIncomingRequestBodySize: 'medium'`, até 10 KB, é o default — e
+`sendDefaultPii: false` **não** desliga isso). Qualquer 500 inesperado em
+`POST /auth/register` já mandava senha, CPF e celular para o Sentry. Hoje
+`beforeSend`/`beforeSendTransaction` passam por `sentry-event-scrubber.ts`, que
+filtra por **nome de campo** (senha, token, secret, authorization, cookie, CPF,
+CNPJ, telefone) em corpo JSON, form-urlencoded, query e headers.
+
+### Pendente de deploy
+
+- `npm run keycloak:sync` (só a descrição do client mudou — o grant já existia).
+- Rebuild do `soundmeet-app` (rotas novas).
+- SMTP do Keycloak (`RESEND_API_KEY` no container dele) para o "Esqueci a senha"
+  enviar de fato; sem ele a rota responde a mensagem genérica e registra a falha
+  no log.
 
