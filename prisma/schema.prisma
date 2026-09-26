@@ -126,46 +126,61 @@ enum SubscriptionStatus {
 // ========================================
 
 model Musician {
-  id                     String    @id @default(uuid())
-  email                  String    @unique
-  name                   String
-  stage_name             String?
-  bio                    String?
-  avatar                 String?
-  phone                  String?   @unique
-  cpf                    String?   @unique
+  id                                  String    @id @default(uuid())
+  email                               String    @unique
+  name                                String
+  stage_name                          String?
+  bio                                 String?
+  avatar                              String?
+  // Áudio de apresentação (até 40s) — o trecho que o estabelecimento ouve antes
+  // de contratar. ⚠️ `presentation_audio_key` NÃO é redundância da URL: sem a
+  // chave do objeto, trocar o áudio deixaria o arquivo anterior no bucket sem
+  // nada apontando para ele, pago para sempre. É o defeito que `avatar` tem e
+  // que o par `cover`/`cover_key` do estabelecimento resolveu.
+  presentation_audio_url              String?
+  presentation_audio_key              String?
+  presentation_audio_duration_seconds Int?
+  presentation_audio_uploaded_at      DateTime?
+  phone                               String?   @unique
+  cpf                                 String?   @unique
   // CNPJ do MEI. Opcional e fora do cadastro: entra em configurações do perfil.
-  cnpj                   String?   @unique
-  genres                 String[]  @default([])
-  instruments            String[]  @default([])
-  experience_years       Int?
-  qr_code                String?   @unique
-  qr_foreground_color    String?
-  qr_background_color    String?
-  qr_logo_url            String?
-  qr_label               String?
-  push_token             String?
-  push_token_platform    String?
-  rating                 Float     @default(0)
-  total_ratings          Int       @default(0)
-  is_active              Boolean   @default(true)
-  is_verified            Boolean   @default(false)
+  cnpj                                String?   @unique
+  genres                              String[]  @default([])
+  instruments                         String[]  @default([])
+  experience_years                    Int?
+  qr_code                             String?   @unique
+  qr_foreground_color                 String?
+  qr_background_color                 String?
+  qr_logo_url                         String?
+  qr_label                            String?
+  push_token                          String?
+  push_token_platform                 String?
+  rating                              Float     @default(0)
+  total_ratings                       Int       @default(0)
+  is_active                           Boolean   @default(true)
+  is_verified                         Boolean   @default(false)
   // Consentimento explícito para aparecer em busca de estabelecimentos
   // (radar de contratação). null = ainda não decidiu — nunca default true,
   // decisão forçada no onboarding. Só true aparece em qualquer busca pública.
-  open_to_gigs           Boolean?
-  email_verified_at      DateTime?
-  email_pending          String?
+  open_to_gigs                        Boolean?
+  // Se o público pode pedir música FORA do repertório deste músico.
+  // Default true: o pedido de música é o produto, e o caminho principal é o
+  // fã pedir o que quiser e o músico recusar o que não toca. Desligar é
+  // decisão de quem cansou de recusar — e desligado é regra de VERDADE,
+  // validada no CreateRequestUseCase, não só um filtro de busca no cliente.
+  accepts_requests_outside_repertoire Boolean   @default(true)
+  email_verified_at                   DateTime?
+  email_pending                       String?
   // Legado (SM-016, texto puro, reversível) — substituído por
   // email_token_hash (SHA-256, one-way). Mantido só para o backfill;
   // remoção em migration futura (política: adicionar → backfill → remover).
-  email_token            String?
+  email_token                         String?
   // SHA-256 do token enviado por e-mail — nunca decifrado, só comparado no
   // momento da verificação (mesma ideia de um token de reset de senha).
-  email_token_hash       String?
-  email_token_expires_at DateTime?
-  created_at             DateTime  @default(now())
-  updated_at             DateTime  @updatedAt
+  email_token_hash                    String?
+  email_token_expires_at              DateTime?
+  created_at                          DateTime  @default(now())
+  updated_at                          DateTime  @updatedAt
 
   // Relacionamentos
   profile                     MusicianProfile?
@@ -247,6 +262,11 @@ model Band {
   description    String?
   avatar         String?
   genres         String[]
+  // Ano de formação da banda — o equivalente ao `experience_years` do músico
+  // solo. ANO, não data: ninguém sabe o dia, e um DATE obrigaria a UI a
+  // inventar "01/01". ⚠️ NÃO confundir com `created_at`, que é "cadastrada na
+  // SoundMeet desde" — derivar um do outro seria fabricar fato.
+  formed_in      Int?
   qr_code        String?       @unique
   price_model    String? // "per_event" | "per_hour"
   price_min      Decimal?      @db.Decimal(12, 2)
@@ -420,7 +440,18 @@ model Establishment {
   email                         String  @unique
   name                          String
   description                   String?
+  // Foto de perfil (logo) do espaco. Mesmo par URL + chave da capa, e pelo
+  // mesmo motivo: ate 18/set/2026 so existia `avatar`, gravado como texto
+  // livre pelo PATCH, e trocar a foto deixaria o objeto antigo orfao no bucket.
   avatar                        String?
+  avatar_key                    String?
+  // Capa do espaco (banner do painel e da pagina publica). Duas colunas de
+  // proposito: `cover` e a URL publica que o cliente renderiza; `cover_key` e
+  // a chave do objeto no bucket, e sem ela a troca de capa deixaria o arquivo
+  // antigo orfao e cobrado para sempre - mesmo motivo pelo qual `menu_pdfs`
+  // guarda { url, key } em vez de so a URL.
+  cover                         String?
+  cover_key                     String?
   cnpj                          String? @unique
   // Quem assina pela PJ. Coletado em configurações do perfil, não no cadastro.
   legal_representative_name     String?
@@ -582,6 +613,7 @@ model Booking {
   google_calendar_synced_event GoogleCalendarSyncedEvent?
   contracts                    Contract[]
   escrow                       BookingEscrow?
+  conversation                 Conversation?
 
   @@index([musicianId, start_at, end_at])
   @@index([bandId, start_at, end_at])
@@ -620,9 +652,24 @@ model Inquiry {
   @@map("inquiries")
 }
 
+/// A conversa pertence à NEGOCIAÇÃO, e uma negociação nasce de duas portas: uma
+/// `Inquiry` ("conversar sobre uma data") ou um `Booking` ("propor um show").
+///
+/// Até 17/set/2026 `inquiry_id` era NOT NULL, e a consequência era de produto:
+/// propor um show com data e cachê não abria canal nenhum, então o artista só
+/// podia aceitar um número que não conseguia negociar ou recusar seco. A UI
+/// chegava a AVISAR "não abre conversa" — aviso sobre o comportamento do
+/// próprio produto.
+///
+/// 🔴 **Exatamente UM dos dois é preenchido**, e quem garante isso é a CHECK
+/// `conversations_exactly_one_negotiation`, escrita à mão na migration: o
+/// Prisma não modela CHECK, então ela não aparece neste schema. Se um
+/// `migrate dev` gerar um `DROP CONSTRAINT` dela, **remova o DROP** — mesmo
+/// aviso de `performances_one_live_per_event_musician`.
 model Conversation {
   id               String    @id @default(uuid())
-  inquiry_id       String    @unique
+  inquiry_id       String?   @unique
+  booking_id       String?   @unique
   establishment_id String
   musician_id      String?
   band_id          String?
@@ -630,7 +677,8 @@ model Conversation {
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
 
-  inquiry Inquiry @relation(fields: [inquiry_id], references: [id], onDelete: Cascade)
+  inquiry Inquiry? @relation(fields: [inquiry_id], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [booking_id], references: [id], onDelete: Cascade)
 
   @@map("conversations")
 }
