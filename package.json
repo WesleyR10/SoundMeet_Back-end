@@ -64,7 +64,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^11.0.0",
-    "@nestjs/platform-socket.io": "^11.0.0",
+    "@nestjs/platform-socket.io": "^12.1.0",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.0.0",
     "@nestjs/throttler": "^6.5.0",
