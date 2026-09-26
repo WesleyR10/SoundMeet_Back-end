@@ -127,7 +127,7 @@
     "@typescript-eslint/parser": "^6.0.0",
     "chokidar": "^3.6.0",
     "eslint": "^8.42.0",
-    "eslint-config-prettier": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.0.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "fork-ts-checker-webpack-plugin": "^9.1.0",
