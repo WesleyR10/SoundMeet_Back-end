@@ -1,4 +1,8 @@
-import AWS from "aws-sdk";
+import {
+  CreateBucketCommand,
+  HeadObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -9,13 +13,18 @@ import { DomainError } from "../../src/core/shared/domain/errors/domain.error";
 import { AiCifraModule } from "../../src/nest-modules/ai-cifra-module/ai-cifra.module";
 import { ConfigModuleRoot } from "../../src/nest-modules/config-module/config-module.module";
 import { PrismaService } from "../../src/nest-modules/database-module/prisma/prisma.service";
+import {
+  applyAuthGuardMocksAs,
+  musicianAuthUser,
+} from "../../src/nest-modules/shared-module/testing/auth-guard-mock";
 import { startApp } from "../../src/nest-modules/shared-module/testing/helpers";
 
-const DEFAULT_AUDIO_FILE_PATH = path.resolve(
-  process.cwd(),
-  "sample",
-  "Nós Dois - Lourena.mp3",
-);
+// Mesmo id usado no corpo do teste: o duplê do AuthGuard autentica
+// exatamente este músico, então a rota enxerga o dono do recurso.
+const E2E_MUSICIAN_ID = "3d2f7f8a-20f4-4d6a-9dbe-f5a76c0bfe61";
+
+const SAMPLE_DIR = path.resolve(process.cwd(), "sample");
+const DEFAULT_AUDIO_FILE_NAME = "Nós Dois - Lourena.mp3";
 
 const execFileAsync = promisify(execFile);
 
@@ -46,7 +55,7 @@ async function safeDockerComposeUpAiCifraWorker(): Promise<void> {
   }
 }
 
-function buildS3ClientFromEnv(): { s3: AWS.S3; bucket: string } {
+function buildS3ClientFromEnv(): { s3: S3Client; bucket: string } {
   const provider = (process.env.AI_CIFRA_STORAGE_PROVIDER ?? "minio").trim();
   const region = process.env.AWS_REGION ?? "us-east-1";
 
@@ -55,14 +64,11 @@ function buildS3ClientFromEnv(): { s3: AWS.S3; bucket: string } {
     const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!;
     const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!;
     const bucket = process.env.CLOUDFLARE_R2_BUCKET!;
-    const s3 = new AWS.S3({
-      apiVersion: "2006-03-01",
-      signatureVersion: "v4",
+    const s3 = new S3Client({
       region,
       endpoint,
-      accessKeyId,
-      secretAccessKey,
-      s3ForcePathStyle: true,
+      credentials: { accessKeyId, secretAccessKey },
+      forcePathStyle: true,
     });
     return { s3, bucket };
   }
@@ -74,23 +80,21 @@ function buildS3ClientFromEnv(): { s3: AWS.S3; bucket: string } {
   const secretAccessKey = process.env.MINIO_SECRET_KEY ?? "soundmeet123";
   const bucket = process.env.MINIO_BUCKET ?? "soundmeet-media";
 
-  const s3 = new AWS.S3({
-    apiVersion: "2006-03-01",
-    signatureVersion: "v4",
+  const s3 = new S3Client({
     region,
     endpoint: `http://${minioEndpoint}:${s3Port}`,
-    accessKeyId,
-    secretAccessKey,
-    s3ForcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
   });
   return { s3, bucket };
 }
 
-async function ensureBucketExists(s3: AWS.S3, bucket: string) {
+async function ensureBucketExists(s3: S3Client, bucket: string) {
   try {
-    await s3.createBucket({ Bucket: bucket }).promise();
+    await s3.send(new CreateBucketCommand({ Bucket: bucket }));
   } catch (error: any) {
-    const code = `${error?.code ?? ""}`;
+    // aws-sdk v3 expõe o código do erro em `name` (v2 usava `code`)
+    const code = `${error?.name ?? error?.code ?? ""}`;
     if (
       code !== "BucketAlreadyOwnedByYou" &&
       code !== "BucketAlreadyExists" &&
@@ -110,11 +114,33 @@ function guessContentTypeFromPath(filePath: string): string {
   return "audio/mpeg";
 }
 
+/**
+ * Resolve o arquivo pelo nome dentro de `sample/`, comparando em forma Unicode
+ * normalizada.
+ *
+ * Necessário porque acentos têm duas representações equivalentes em UTF-8:
+ * NFC (`ó` = U+00F3) e NFD (`o` + U+0301). O nome gravado no disco e o literal
+ * deste arquivo podem estar em formas diferentes — visualmente idênticos, mas
+ * com bytes distintos — e aí `fs.existsSync` falha com o arquivo presente.
+ */
+function resolveSampleByName(fileName: string): string | null {
+  const direct = path.join(SAMPLE_DIR, fileName);
+  if (fs.existsSync(direct)) return direct;
+
+  if (!fs.existsSync(SAMPLE_DIR)) return null;
+  const target = fileName.normalize("NFC");
+  const match = fs
+    .readdirSync(SAMPLE_DIR)
+    .find((entry) => entry.normalize("NFC") === target);
+  return match ? path.join(SAMPLE_DIR, match) : null;
+}
+
 function resolveAudioFile(): { filePath: string; contentType: string } {
   const envFile = (process.env.AI_CIFRA_E2E_FILE ?? "").trim();
-  const filePath = envFile || DEFAULT_AUDIO_FILE_PATH;
-  if (!fs.existsSync(filePath)) {
-    throw new DomainError(`Arquivo de áudio não encontrado: ${filePath}`);
+  const filePath = envFile || resolveSampleByName(DEFAULT_AUDIO_FILE_NAME);
+  if (!filePath || !fs.existsSync(filePath)) {
+    const attempted = envFile || path.join(SAMPLE_DIR, DEFAULT_AUDIO_FILE_NAME);
+    throw new DomainError(`Arquivo de áudio não encontrado: ${attempted}`);
   }
   return { filePath, contentType: guessContentTypeFromPath(filePath) };
 }
@@ -211,9 +237,17 @@ async function ensureAnalysisServiceReachable(): Promise<void> {
 describe("AI Cifra (e2e)", () => {
   jest.setTimeout(60 * 60 * 1000);
 
-  const appHelper = startApp({
-    imports: [ConfigModuleRoot.forRoot(), AiCifraModule],
-  });
+  const appHelper = startApp(
+    {
+      imports: [ConfigModuleRoot.forRoot(), AiCifraModule],
+    },
+    // As rotas são @UseGuards(AuthGuard, RolesGuard) e este e2e exercita o
+    // pipeline de áudio, não a autenticação — mockar os guards é o mesmo
+    // padrão dos .int-spec.ts dos controllers. Sem isso o teste tomaria 401,
+    // e montar AuthModule só para instanciar o AuthJwtVerifier arrastaria
+    // Keycloak/e-mail para dentro de um cenário que não os testa.
+    applyAuthGuardMocksAs(musicianAuthUser(E2E_MUSICIAN_ID)),
+  );
 
   beforeAll(async () => {
     await ensureAnalysisServiceReachable();
@@ -227,7 +261,7 @@ describe("AI Cifra (e2e)", () => {
   });
 
   it("cria upload e processa análise de cifra", async () => {
-    const musician_id = "3d2f7f8a-20f4-4d6a-9dbe-f5a76c0bfe61";
+    const musician_id = E2E_MUSICIAN_ID;
     const { filePath: audioFilePath, contentType } = resolveAudioFile();
 
     const { s3, bucket } = buildS3ClientFromEnv();
@@ -257,14 +291,18 @@ describe("AI Cifra (e2e)", () => {
 
     const upload = uploadRes.body.data;
 
-    const stored = await s3
-      .headObject({ Bucket: bucket, Key: upload.object_key })
-      .promise();
+    const stored = await s3.send(
+      new HeadObjectCommand({ Bucket: bucket, Key: upload.object_key }),
+    );
     expect(Number(stored.ContentLength)).toBe(audioStat.size);
 
     const analysisRes = await request(appHelper.app.getHttpServer())
       .post(`/api/v1/ai-cifra/uploads/${upload.id}/analyses`)
-      .send({ model_id: "crema_v1" })
+      // Sem model_id de propósito: usa o AI_CIFRA_DEFAULT_MODEL_ID do
+      // ambiente. Fixar um id aqui faz o teste apodrecer a cada troca de
+      // modelo — foi o que aconteceu com "crema_v1", que saiu da allowlist
+      // (DEFAULT_ALLOWED_MODEL_IDS em ai-cifra.providers.ts) e passou a dar 422.
+      .send({})
       .expect(201);
 
     const job = analysisRes.body.data;

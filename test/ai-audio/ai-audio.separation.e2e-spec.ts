@@ -1,4 +1,4 @@
-import AWS from "aws-sdk";
+import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import axios from "axios";
 import fs from "fs";
 import os from "os";
@@ -9,6 +9,10 @@ import { DomainError } from "../../src/core/shared/domain/errors/domain.error";
 import { AiAudioModule } from "../../src/nest-modules/ai-audio-module/ai-audio.module";
 import { ConfigModuleRoot } from "../../src/nest-modules/config-module/config-module.module";
 import { PrismaService } from "../../src/nest-modules/database-module/prisma/prisma.service";
+import {
+  applyAuthGuardMocksAs,
+  musicianAuthUser,
+} from "../../src/nest-modules/shared-module/testing/auth-guard-mock";
 import { startApp } from "../../src/nest-modules/shared-module/testing/helpers";
 
 const DEFAULT_MODELS = [
@@ -88,7 +92,7 @@ function resolveAudioFile(): { filePath: string; contentType: string } {
   return { filePath: generated, contentType: "audio/wav" };
 }
 
-function buildS3ClientFromEnv(): { s3: AWS.S3; bucket: string } {
+function buildS3ClientFromEnv(): { s3: S3Client; bucket: string } {
   const provider = (process.env.AI_AUDIO_STORAGE_PROVIDER ?? "minio").trim();
   const region = process.env.AWS_REGION ?? "us-east-1";
 
@@ -97,14 +101,11 @@ function buildS3ClientFromEnv(): { s3: AWS.S3; bucket: string } {
     const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!;
     const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!;
     const bucket = process.env.CLOUDFLARE_R2_BUCKET!;
-    const s3 = new AWS.S3({
-      apiVersion: "2006-03-01",
-      signatureVersion: "v4",
+    const s3 = new S3Client({
       region,
       endpoint,
-      accessKeyId,
-      secretAccessKey,
-      s3ForcePathStyle: true,
+      credentials: { accessKeyId, secretAccessKey },
+      forcePathStyle: true,
     });
     return { s3, bucket };
   }
@@ -116,23 +117,21 @@ function buildS3ClientFromEnv(): { s3: AWS.S3; bucket: string } {
   const secretAccessKey = process.env.MINIO_SECRET_KEY ?? "soundmeet123";
   const bucket = process.env.MINIO_BUCKET ?? "soundmeet-media";
 
-  const s3 = new AWS.S3({
-    apiVersion: "2006-03-01",
-    signatureVersion: "v4",
+  const s3 = new S3Client({
     region,
     endpoint: `http://${minioEndpoint}:${s3Port}`,
-    accessKeyId,
-    secretAccessKey,
-    s3ForcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
   });
   return { s3, bucket };
 }
 
-async function ensureBucketExists(s3: AWS.S3, bucket: string) {
+async function ensureBucketExists(s3: S3Client, bucket: string) {
   try {
-    await s3.createBucket({ Bucket: bucket }).promise();
+    await s3.send(new CreateBucketCommand({ Bucket: bucket }));
   } catch (error: any) {
-    const code = `${error?.code ?? ""}`;
+    // aws-sdk v3 expõe o código do erro em `name` (v2 usava `code`)
+    const code = `${error?.name ?? error?.code ?? ""}`;
     if (
       code !== "BucketAlreadyOwnedByYou" &&
       code !== "BucketAlreadyExists" &&
@@ -196,11 +195,23 @@ type ModelResult = {
   outputs: number;
 };
 
+// Mesmo id usado no corpo do teste: o duplê do AuthGuard autentica
+// exatamente este músico, então a rota enxerga o dono do recurso.
+const E2E_MUSICIAN_ID = "3d2f7f8a-20f4-4d6a-9dbe-f5a76c0bfe61";
+
 describe("AI Audio Benchmark (e2e)", () => {
   jest.setTimeout(60 * 60 * 1000);
-  const appHelper = startApp({
-    imports: [ConfigModuleRoot.forRoot(), AiAudioModule],
-  });
+  const appHelper = startApp(
+    {
+      imports: [ConfigModuleRoot.forRoot(), AiAudioModule],
+    },
+    // As rotas são @UseGuards(AuthGuard, RolesGuard) e este e2e exercita o
+    // pipeline de áudio, não a autenticação — mockar os guards é o mesmo
+    // padrão dos .int-spec.ts dos controllers. Sem isso o teste tomaria 401,
+    // e montar AuthModule só para instanciar o AuthJwtVerifier arrastaria
+    // Keycloak/e-mail para dentro de um cenário que não os testa.
+    applyAuthGuardMocksAs(musicianAuthUser(E2E_MUSICIAN_ID)),
+  );
 
   beforeAll(async () => {
     const { s3, bucket } = buildS3ClientFromEnv();
@@ -215,7 +226,7 @@ describe("AI Audio Benchmark (e2e)", () => {
   });
 
   it("executa separação com htdemucs_4stems (1 requisição)", async () => {
-    const musician_id = "3d2f7f8a-20f4-4d6a-9dbe-f5a76c0bfe61";
+    const musician_id = E2E_MUSICIAN_ID;
     const { filePath: audioFilePath, contentType } = resolveAudioFile();
     const output_format = parseOutputFormatFromEnv();
 
@@ -313,7 +324,7 @@ describe("AI Audio Benchmark (e2e)", () => {
   });
 
   // it("mede duração por modelo (1 por vez) e imprime resumo", async () => {
-  //   const musician_id = "3d2f7f8a-20f4-4d6a-9dbe-f5a76c0bfe61";
+  //   const musician_id = E2E_MUSICIAN_ID;
   //   const { filePath: audioFilePath, contentType } = resolveAudioFile();
   //   const model_ids = parseModelsFromEnv();
   //   const output_format = parseOutputFormatFromEnv();

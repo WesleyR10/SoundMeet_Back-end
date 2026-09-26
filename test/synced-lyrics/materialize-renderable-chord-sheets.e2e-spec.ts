@@ -1,12 +1,22 @@
 import { MaterializeRenderableChordSheetsUseCase } from "../../src/core/synced-lyrics/application/use-cases/materialize-renderable-chord-sheets/materialize-renderable-chord-sheets.use-case";
+import { AuthModule } from "../../src/nest-modules/auth-module/auth.module";
 import { ConfigModuleRoot } from "../../src/nest-modules/config-module/config-module.module";
 import { PrismaService } from "../../src/nest-modules/database-module/prisma/prisma.service";
+import { MailModule } from "../../src/nest-modules/mail-module/mail.module";
 import { startApp } from "../../src/nest-modules/shared-module/testing/helpers";
 import { SyncedLyricsModule } from "../../src/nest-modules/synced-lyrics-module/synced-lyrics.module";
 
 describe("Materialize Renderable Chord Sheets (e2e)", () => {
   const appHelper = startApp({
-    imports: [ConfigModuleRoot.forRoot(), SyncedLyricsModule],
+    // AuthModule é @Global(), mas um módulo global só exporta seus
+    // providers depois de instanciado — sem ele no grafo, o AuthGuard das
+    // rotas não consegue resolver o AuthJwtVerifier.
+    imports: [
+      ConfigModuleRoot.forRoot(),
+      AuthModule,
+      MailModule,
+      SyncedLyricsModule,
+    ],
   });
 
   it("materializa JSON renderizável a partir de LRC e chords.timeline", async () => {

@@ -1,6 +1,7 @@
 import request from "supertest";
 
 import { IIdentityProviderGateway } from "../../src/core/auth/infra/gateways/identity-provider-gateway.interface";
+import { generateValidCpf } from "../../src/core/shared/infra/testing/cpf.fixture";
 import { AuthModule } from "../../src/nest-modules/auth-module/auth.module";
 import { ConfigModuleRoot } from "../../src/nest-modules/config-module/config-module.module";
 import { PrismaService } from "../../src/nest-modules/database-module/prisma/prisma.service";
@@ -20,6 +21,28 @@ describe("Auth Register (e2e)", () => {
   });
 
   const runId = Date.now();
+
+  // `role=musician` exige cpf/phone (RegisterInput) e ambos são únicos —
+  // RegisterUseCase.assertCpfNotTaken/assertPhoneNotTaken respondem 409 em
+  // duplicata (anti multi-conta). Cada músico registrado na suíte precisa,
+  // portanto, do seu próprio par; `seq` desempata dentro da mesma execução.
+  let seq = 0;
+  function musicianPayload(
+    email: string,
+    overrides: Record<string, unknown> = {},
+  ) {
+    seq += 1;
+    const base = String(runId + seq).slice(-9);
+    return {
+      name: "E2E Músico",
+      email,
+      password: "Senha123",
+      role: "musician",
+      cpf: generateValidCpf(base),
+      phone: `+55119${base.slice(-8)}`,
+      ...overrides,
+    };
+  }
 
   // startApp() recria o app (e fecha PrismaService) a cada teste — por isso a
   // limpeza acontece dentro de cada it(), enquanto o app daquele teste ainda
@@ -44,7 +67,7 @@ describe("Auth Register (e2e)", () => {
 
     const res = await request(appHelper.app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ name: "E2E Músico", email, password: "Senha123", role: "musician" })
+      .send(musicianPayload(email))
       .expect(201);
 
     const output = res.body.data;
@@ -96,12 +119,15 @@ describe("Auth Register (e2e)", () => {
 
     const first = await request(appHelper.app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ name: "Primeiro", email, password: "Senha123", role: "musician" })
+      .send(musicianPayload(email, { name: "Primeiro" }))
       .expect(201);
 
+    // cpf/phone distintos de propósito: o único conflito com o registro
+    // anterior tem que ser o email, senão o 409 viria de "CPF já cadastrado"
+    // e o teste passaria pelo motivo errado.
     const res = await request(appHelper.app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ name: "Segundo", email, password: "Senha123", role: "musician" })
+      .send(musicianPayload(email, { name: "Segundo" }))
       .expect(409);
 
     expect(res.body.message).toEqual(["Email já cadastrado"]);
@@ -114,7 +140,7 @@ describe("Auth Register (e2e)", () => {
 
     const res = await request(appHelper.app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ name: "Senha Fraca", email, password: "123", role: "musician" })
+      .send(musicianPayload(email, { name: "Senha Fraca", password: "123" }))
       .expect(422);
 
     expect(res.body.message.join(" ")).toEqual(
@@ -127,7 +153,7 @@ describe("Auth Register (e2e)", () => {
 
     await request(appHelper.app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ name: "Role Inválida", email, password: "Senha123", role: "admin" })
+      .send(musicianPayload(email, { name: "Role Inválida", role: "admin" }))
       .expect(422);
   });
 });
