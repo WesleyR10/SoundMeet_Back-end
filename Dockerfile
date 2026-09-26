@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:26-alpine AS base
 
 # Instalar dependências do sistema
 RUN apk add --no-cache libc6-compat python3 make g++
@@ -31,7 +31,7 @@ COPY . .
 RUN rm -f src/metadata.ts && npm run build && npm prune --omit=dev
 
 # Estágio de produção
-FROM node:20-alpine AS production
+FROM node:26-alpine AS production
 
 # yt-dlp vem do release OFICIAL, não do apk.
 #
