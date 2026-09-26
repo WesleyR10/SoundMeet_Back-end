@@ -12,8 +12,16 @@
  *   - Determinístico: e-mails/nomes fixos (musico1@seed-soundmeet.com, ...).
  *   - NUNCA roda em produção (guarda por NODE_ENV).
  *
- * Cobertura (22/ago/2026): 52 dos 56 modelos do schema. Os quatro de fora são
- * decisão, não esquecimento — não semear é mais correto que semear:
+ * Cobertura (14/set/2026, CONTADA num banco semeado, não estimada): 51 dos 57
+ * modelos, e todos os estados de toda máquina de estado do schema (booking,
+ * inquiry, evento, line-up, contrato, custódia, gorjeta, transação, pedido,
+ * destaque, assinatura, jobs de IA, campanha, indicação, escopo de cifra).
+ * ⚠️ A contagem anterior ("52 dos 57") estava errada: agenda de banda (3
+ * tabelas) e `repertoire_invitees` nunca tinham linha. Para reconferir, conte
+ * as tabelas vazias depois de um `--reset` — devem ser exatamente as seis abaixo.
+ *
+ * Os seis de fora são decisão, não esquecimento — não semear é mais correto
+ * que semear:
  *   - `ProcessedEvent`: ledger de idempotência. Semeá-lo faria a app PULAR
  *     eventos que ela deveria processar. Ativamente nocivo.
  *   - `GoogleCalendarIntegration` / `GoogleCalendarSyncedEvent`: exigem token
@@ -21,11 +29,34 @@
  *     como conectada e que falha em toda chamada — pior que ausente.
  *   - `SyncedLyricsBulkJob`: controle do pré-carregamento de 10k letras, não é
  *     estado de usuário.
+ *   - `RequestFeedback`: tem agregado e use-cases, mas NENHUMA rota HTTP os
+ *     expõe. Semear seria dado que nenhuma tela alcança (mesmo caso do
+ *     `MusicianAnalytics`, abaixo).
  *   - `MusicianAnalytics` é caso à parte: a tabela existe no schema e NENHUM
  *     arquivo de `src/` a lê ou escreve (o use-case calcula na leitura). Ver a
  *     nota na seção 25.
- *   - Cria 14 usuários Keycloak de teste (8 músicos, 2 fãs, 4 estabelecimentos)
- *     com senha Seed@123
+ *   - `Establishment.cover` / `cover_key` (11/set/2026) ficam NULL nos quatro
+ *     estabelecimentos, e isto é o oposto da regra dos "dois lados". Ela vale
+ *     para flag booleana, onde os dois estados são dado; aqui o outro lado é um
+ *     OBJETO NO BUCKET. Gravar uma URL sem o arquivo por trás daria capa
+ *     quebrada em todo espaço semeado — e `null` já exercita o caminho
+ *     principal (a capa gerada pela marca), que é o que 100% dos donos veem
+ *     antes do primeiro upload. Para exercitar o outro lado, suba uma imagem
+ *     pela tela: é um clique, e é o fluxo real.
+ *   - `Musician.presentation_audio_*` (16/set/2026) é a EXCEÇÃO a essa regra, e
+ *     por um motivo que a capa não tem: aqui o seed **sobe o objeto de verdade**
+ *     (WAV sintetizado em `synthesizePresentationWav`, pelo
+ *     `UploadMusicianPresentationAudioUseCase` real), então não há URL sem
+ *     arquivo por trás. Só TRÊS dos oito músicos recebem áudio — o estado vazio
+ *     do cartão da grade é o caso mais comum em produção e precisa de alguém
+ *     que o exercite. Escreve no MESMO storage do app (hoje R2) sob o prefixo
+ *     `seed/`, e o `--reset` varre só esse prefixo — nada que o app gravou é
+ *     tocado. Sem storage configurado o seed avisa e segue.
+ *   - `Musician.avatar` (17/set/2026) segue a mesma exceção: CINCO dos oito
+ *     sobem foto de verdade (fixtures em `prisma/seed-assets/avatars/`, pelo
+ *     `UploadMusicianAvatarUseCase`), os outros três exercitam o fallback.
+ *   - Cria 15 usuários Keycloak de teste (8 músicos, 2 fãs, 4 estabelecimentos
+ *     e 1 admin) com senha Seed@123
  *     ANTES dos aggregates: o sub gerado vira o id do aggregate, como no
  *     RegisterUseCase (ownership guards comparam o sub do JWT com o id do
  *     recurso). Se o Keycloak estiver fora do ar, o seed conclui com aviso e
@@ -36,8 +67,18 @@
 import "reflect-metadata";
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
+import {
+  CreateBucketCommand,
+  DeleteObjectsCommand,
+  HeadBucketCommand,
+  ListObjectsV2Command,
+  PutBucketPolicyCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import axios, { type AxiosInstance } from "axios";
@@ -59,6 +100,7 @@ import { UserInteraction } from "../src/core/gamification/domain/user-interactio
 import { UserPoints } from "../src/core/gamification/domain/user-points.aggregate";
 import { UserScore } from "../src/core/gamification/domain/user-score.aggregate";
 import { BadgeTypeEnum } from "../src/core/gamification/domain/value-objects/badge-type.vo";
+import { UserLevel } from "../src/core/gamification/domain/value-objects/user-level.vo";
 import { ScoreTypeEnum } from "../src/core/gamification/domain/value-objects/score-type.vo";
 import { BadgePrismaRepository } from "../src/core/gamification/infra/db/prisma/badge-prisma.repository";
 import { UserBadgePrismaRepository } from "../src/core/gamification/infra/db/prisma/user-badge-prisma.repository";
@@ -71,7 +113,10 @@ import { AiAudioSeparationOutput } from "../src/core/ai-audio/domain/ai-audio-se
 import { AiAudioUpload } from "../src/core/ai-audio/domain/ai-audio-upload.aggregate";
 import { AiAudioSeparationJobPrismaRepository } from "../src/core/ai-audio/infra/db/prisma/ai-audio-separation-job-prisma.repository";
 import { AiAudioUploadPrismaRepository } from "../src/core/ai-audio/infra/db/prisma/ai-audio-upload-prisma.repository";
-import { AiCifraAnalysisJob } from "../src/core/ai-cifra/domain/ai-cifra-analysis-job.aggregate";
+import {
+  AiCifraAnalysisJob,
+  AiCifraAnalysisResult,
+} from "../src/core/ai-cifra/domain/ai-cifra-analysis-job.aggregate";
 import { AiCifraUpload } from "../src/core/ai-cifra/domain/ai-cifra-upload.aggregate";
 import { AiCifraAnalysisJobPrismaRepository } from "../src/core/ai-cifra/infra/db/prisma/ai-cifra-analysis-job-prisma.repository";
 import { AiCifraUploadPrismaRepository } from "../src/core/ai-cifra/infra/db/prisma/ai-cifra-upload-prisma.repository";
@@ -87,8 +132,12 @@ import {
 } from "../src/core/gamification/domain/value-objects/ranking-type.vo";
 import { RankingPrismaRepository } from "../src/core/gamification/infra/db/prisma/ranking-prisma.repository";
 import { CampaignPrismaRepository } from "../src/core/campaign/infra/db/prisma/campaign-prisma.repository";
-import { Contract } from "../src/core/contract/domain/contract.aggregate";
+import { IContractStorage } from "../src/core/contract/application/ports/contract-storage.interface";
+import { IssueContractUseCase } from "../src/core/contract/application/use-cases/issue-contract/issue-contract.use-case";
+import { ClauseCatalog } from "../src/core/contract/domain/catalog/clause-catalog";
 import { ContractPrismaRepository } from "../src/core/contract/infra/db/prisma/contract-prisma.repository";
+import { ReactPdfContractRenderer } from "../src/core/contract/infra/renderer/react-pdf-contract.renderer";
+import { S3ContractStorage } from "../src/core/contract/infra/storage/s3-contract.storage";
 import { BookingEscrow } from "../src/core/payment/domain/booking-escrow.aggregate";
 import { BookingEscrowPrismaRepository } from "../src/core/payment/infra/db/prisma/booking-escrow-prisma.repository";
 import { Performance } from "../src/core/performance/domain/performance.aggregate";
@@ -106,6 +155,12 @@ import { Band } from "../src/core/musician/domain/band.aggregate";
 import { Musician, MusicianId } from "../src/core/musician/domain/musician.aggregate";
 import { BandPrismaRepository } from "../src/core/musician/infra/db/prisma/band-prisma.repository";
 import { MusicianPrismaRepository } from "../src/core/musician/infra/db/prisma/musician-prisma.repository";
+import { IMusicianStorage } from "../src/core/musician/application/ports/musician-storage.interface";
+import { S3MusicianStorage } from "../src/core/musician/infra/storage/s3-musician.storage";
+import { UploadMusicianPresentationAudioUseCase } from "../src/core/musician/application/use-cases/upload-musician-presentation-audio/upload-musician-presentation-audio.use-case";
+import { UploadMusicianAvatarUseCase } from "../src/core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
+import { detectFileMime } from "../src/nest-modules/shared-module/upload/detect-file-mime";
+import { readAudioDurationSeconds } from "../src/nest-modules/shared-module/upload/read-audio-duration";
 import {
   CHORD_SHEET_FINGERPRINT_VERSION,
   computeChordSheetBaseFingerprint,
@@ -149,10 +204,13 @@ import { Address } from "../src/core/shared/domain/value-objects/address.vo";
 import { Money } from "../src/core/shared/domain/value-objects/money.vo";
 import { Location } from "../src/core/shared/domain/value-objects/location.vo";
 import { PriceRange } from "../src/core/shared/domain/value-objects/price-range.vo";
+import { StageTechSpec } from "../src/core/shared/domain/value-objects/stage-tech-spec.vo";
 import { AesGcmEncryptionService } from "../src/core/shared/infra/crypto/aes-gcm-encryption.service";
 import { GetChordSheetForMusicLibraryUseCase } from "../src/core/synced-lyrics/application/use-cases/get-chord-sheet-for-music-library/get-chord-sheet-for-music-library.use-case";
 import { LrcParser } from "../src/core/synced-lyrics/domain/value-objects/lrc.vo";
 import { ChordSheetPrismaReadModel } from "../src/core/synced-lyrics/infra/db/prisma/chord-sheet-prisma.read-model";
+
+import { buildEstablishmentAnalyticsSeries } from "./seed-analytics-series";
 
 // ── bootstrap ────────────────────────────────────────────────────────────────
 
@@ -248,6 +306,70 @@ async function reset() {
   await prisma.audience.deleteMany();
   await prisma.musicianProfile.deleteMany();
   await prisma.musician.deleteMany();
+
+  await purgeSeedStorage();
+}
+
+/**
+ * Apaga TUDO que o seed escreveu no bucket de mídia — e só isso.
+ *
+ * 🔴 **O `--reset` limpa o BANCO; sem isto o bucket vira lixão.** A chave de
+ * cada envio é um uuid novo (o CDN cacheia por caminho), então cada rodada
+ * deixaria mais um WAV de ~1,5 MB sem nada apontando para ele.
+ *
+ * 🔴 **Varre o prefixo `seed/`, NUNCA `musicians/`.** O bucket é o mesmo que o
+ * app usa: em R2 ele já guarda avatares e cardápios enviados pelas telas, e um
+ * áudio subido pelo app para teste tem chave idêntica à do seed. Apagar por
+ * `musicians/*` levaria junto o que não é nosso; apagar por `seed/` é exato.
+ *
+ * Degrada em silêncio: storage fora do ar não pode impedir o reset do banco.
+ */
+async function purgeSeedStorage(): Promise<void> {
+  const media = await createSeedMusicianStorage();
+  if (!media.available || !media.s3) return;
+
+  try {
+    let token: string | undefined;
+    let removed = 0;
+
+    do {
+      const page = await media.s3.send(
+        new ListObjectsV2Command({
+          Bucket: media.bucket,
+          Prefix: SEED_STORAGE_PREFIX,
+          ContinuationToken: token,
+        }),
+      );
+
+      const keys = (page.Contents ?? [])
+        .map((object) => object.Key)
+        .filter((key): key is string => !!key);
+
+      if (keys.length > 0) {
+        // `DeleteObjects` aceita até 1000 chaves por chamada — o mesmo teto da
+        // página do `ListObjectsV2`, então uma página nunca estoura o limite.
+        await media.s3.send(
+          new DeleteObjectsCommand({
+            Bucket: media.bucket,
+            Delete: { Objects: keys.map((Key) => ({ Key })) },
+          }),
+        );
+        removed += keys.length;
+      }
+
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+
+    console.log(
+      removed > 0
+        ? `   🧹 ${removed} objeto(s) removido(s) de ${media.bucket}/${SEED_STORAGE_PREFIX}`
+        : `   🧹 ${media.bucket}/${SEED_STORAGE_PREFIX} já estava vazio.`,
+    );
+  } catch (error) {
+    console.warn(
+      `   ⚠️ Não foi possível limpar ${SEED_STORAGE_PREFIX} (${(error as Error).message}).`,
+    );
+  }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -337,12 +459,47 @@ function buildLrc(lines: [number, string][]): string {
     .join("\n");
 }
 
+// CPF válido determinístico (mesmo motivo do `cnpjFromBase`): a emissão do
+// contrato exige documento, o VO confere os dígitos e a coluna é UNIQUE.
+function cpfFromBase(base9: string): string {
+  const digits = base9.split("").map(Number);
+  const calc = (nums: number[]) => {
+    const sum = nums.reduce((acc, n, i) => acc + n * (nums.length + 1 - i), 0);
+    const mod = (sum * 10) % 11;
+    return mod === 10 ? 0 : mod;
+  };
+  const d1 = calc(digits);
+  const d2 = calc([...digits, d1]);
+  return `${base9}${d1}${d2}`;
+}
+
+// 🔴 TODA data do seed é relativa ao instante em que ele roda — nunca uma data
+// fixa. Rodar `npm run seed -- --reset` de novo recoloca tudo no futuro certo.
+// (A única data fixa que existia vinha do `Contract.fake()`, que carimbava
+// "12 de setembro de 2026" em todo contrato; ver seção 21.)
 const daysFromNow = (days: number, hour = 20) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(hour, 0, 0, 0);
   return d;
 };
+
+// Para o que precisa estar "acontecendo agora" independentemente da hora em
+// que o seed roda. `daysFromNow(0, 19)` deixava o evento ao vivo no FUTURO para
+// quem semeava de manhã e já encerrado para quem semeava depois das 23h.
+const hoursFromNow = (hours: number) =>
+  new Date(Date.now() + hours * 60 * 60 * 1000);
+
+// Primeiro `weekday` (0 = domingo) a partir de `minDays` dias. Para propostas
+// que o app vai CONFIRMAR: `ConfirmBookingUseCase` revalida a agenda do alvo, e
+// uma data fora das regras semanais faria o botão falhar com "indisponível".
+const nextWeekday = (minDays: number, weekday: number, hour: number) => {
+  const d = daysFromNow(minDays, hour);
+  d.setDate(d.getDate() + ((weekday - d.getDay() + 7) % 7));
+  return d;
+};
+const plusHours = (date: Date, hours: number) =>
+  new Date(date.getTime() + hours * 60 * 60 * 1000);
 
 // ── usuários Keycloak de teste ───────────────────────────────────────────────
 
@@ -355,7 +512,11 @@ type KeycloakSeedUser = {
   // §87). A diferença não está aqui: é que o `sub` NÃO vira o id do aggregate
   // do estabelecimento — ele tem UUID próprio, e quem autoriza é o claim
   // `establishment_ids`, escrito logo após a seção 2.
-  role: "musician" | "audience" | "establishment";
+  //
+  // `admin` é o único papel SEM aggregate correspondente: é papel de operação,
+  // não persona de produto. `support` existe no realm e fica de fora até haver
+  // rota que o exija — semear login sem rota é dado que ninguém consegue usar.
+  role: "musician" | "audience" | "establishment" | "admin";
 };
 
 // Cliente admin do realm. Extraído de seedKeycloakUsers porque o vínculo de
@@ -463,6 +624,329 @@ async function seedKeycloakUsers(
   return subs;
 }
 
+/**
+ * Gera um WAV PCM de ~35s — o áudio de apresentação dos músicos semeados.
+ *
+ * **Por que sintetizar em vez de commitar um arquivo:** um MP3 de verdade no
+ * repositório é binário versionado, com dono e licença a resolver, para um dado
+ * de desenvolvimento. O WAV nasce aqui, é determinístico e não entra no git.
+ *
+ * PCM 16-bit mono a 22,05 kHz dá ~1,5 MB em 35s — dentro do teto de 10 MB do
+ * upload, e o `file-type` identifica o cabeçalho RIFF como `audio/wav`, que
+ * está na allowlist. **É o mesmo caminho do upload de verdade**: o seed grava
+ * este buffer num arquivo temporário, roda os MESMOS helpers do controller
+ * (magic bytes + duração) e chama o use-case real.
+ *
+ * O conteúdo é um arpejo simples com harmônico e envelope por nota — não é
+ * música, e não precisa ser: o que ele exercita é o player, a CSP, a política
+ * do bucket e o cálculo de duração.
+ */
+function synthesizePresentationWav(seed: number): Buffer {
+  const sampleRate = 22050;
+  const durationSeconds = 35;
+  const totalSamples = sampleRate * durationSeconds;
+
+  // Três arpejos diferentes, escolhidos pelo índice do músico: dois cartões
+  // tocando exatamente o mesmo áudio esconderiam justamente o bug de estar
+  // tocando o áudio do vizinho.
+  const scales = [
+    [196.0, 246.94, 293.66, 392.0], // Sol maior
+    [220.0, 261.63, 329.63, 440.0], // Lá menor
+    [174.61, 220.0, 261.63, 349.23], // Fá maior
+  ];
+  const notes = scales[seed % scales.length]!;
+
+  const header = Buffer.alloc(44);
+  const dataBytes = totalSamples * 2;
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + dataBytes, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16); // tamanho do bloco fmt
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  header.writeUInt16LE(2, 32); // block align
+  header.writeUInt16LE(16, 34); // bits por amostra
+  header.write("data", 36);
+  header.writeUInt32LE(dataBytes, 40);
+
+  const pcm = Buffer.alloc(dataBytes);
+  const noteSamples = Math.floor(sampleRate * 0.5);
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / sampleRate;
+    const noteIndex = Math.floor(i / noteSamples) % notes.length;
+    const freq = notes[noteIndex]!;
+    const inNote = (i % noteSamples) / noteSamples;
+    // Envelope por nota (ataque curto, decaimento longo) + fade nos extremos do
+    // arquivo: um corte seco vira estalo alto no fone de quem testar.
+    const envelope = Math.min(1, inNote * 12) * Math.pow(1 - inNote, 1.4);
+    const fade = Math.min(1, t / 0.4, (durationSeconds - t) / 1.2);
+    const wave =
+      Math.sin(2 * Math.PI * freq * t) * 0.6 +
+      Math.sin(2 * Math.PI * freq * 2 * t) * 0.22 +
+      Math.sin(2 * Math.PI * freq * 3 * t) * 0.08;
+    const value = Math.max(-1, Math.min(1, wave * envelope * fade * 0.7));
+    pcm.writeInt16LE(Math.round(value * 32767), i * 2);
+  }
+
+  return Buffer.concat([header, pcm]);
+}
+
+/**
+ * Tudo que o seed escreve no bucket de mídia vive sob este prefixo.
+ *
+ * 🔴 **É o que torna a limpeza do `--reset` segura.** O bucket é COMPARTILHADO
+ * com o que o app grava de verdade — hoje, no R2 deste projeto, ele já tem
+ * avatares de músico e PDFs de cardápio enviados pelas telas. Varrer
+ * `musicians/<id>/presentation-audio/` apagaria junto o áudio que alguém subiu
+ * pelo app para testar, e pela chave o seed não tem como distinguir um do
+ * outro. Com prefixo próprio, "apagar o que o seed criou" é operação exata.
+ */
+const SEED_STORAGE_PREFIX = "seed/";
+
+/**
+ * Envelopa um storage real prefixando TODA chave com `seed/`.
+ *
+ * Decorator, e não um parâmetro no use-case: o caminho do objeto
+ * (`musicians/<id>/presentation-audio/<uuid>.<ext>`) é decisão de domínio e
+ * continua igual para o app. Quem desloca é o chamador — assim o seed exercita
+ * o use-case real, byte a byte, sem que o domínio saiba que existe seed.
+ */
+function withSeedPrefix(inner: IMusicianStorage): IMusicianStorage {
+  return {
+    putObject: (input) =>
+      inner.putObject({
+        ...input,
+        object_key: `${SEED_STORAGE_PREFIX}${input.object_key}`,
+      }),
+    deleteObject: (input) =>
+      inner.deleteObject({
+        object_key: `${SEED_STORAGE_PREFIX}${input.object_key}`,
+      }),
+    getPublicUrl: (objectKey) =>
+      inner.getPublicUrl(`${SEED_STORAGE_PREFIX}${objectKey}`),
+  };
+}
+
+/**
+ * Storage de mídia do músico para o seed.
+ *
+ * 🔴 **Segue o MESMO `ESTABLISHMENT_STORAGE_PROVIDER` que o app** — correção de
+ * 17/set/2026. A primeira versão só escrevia em MinIO e descartava o resto,
+ * copiando `createSeedContractStorage`. Lá a regra faz sentido: o PDF é
+ * derivado, e o contrato continua íntegro sem ele. Aqui não — neste ambiente o
+ * provider é **`cloudflare_r2`**, então o seed não gravava nada, nenhum músico
+ * ficava com áudio, e a feature era intestável pelo app. Semear sem escrever é
+ * o oposto do motivo de semear.
+ *
+ * O que torna aceitável gravar no bucket real é o `seed/` na frente de toda
+ * chave: o que o seed cria fica isolado do que o app grava, e o `--reset` apaga
+ * só o que criou.
+ *
+ * ⚠️ **Política de bucket é assunto de MinIO, não de R2.** O MinIO nasce
+ * privado (`grep PutBucketPolicy` no repo não retornava nada) e o áudio é o
+ * primeiro objeto que o BROWSER busca direto — sem liberar o prefixo, 403 e
+ * player mudo. No R2 o acesso público vem do domínio `r2.dev`/custom já
+ * configurado em `CLOUDFLARE_R2_PUBLIC_BASE_URL`; não há política a aplicar.
+ */
+async function createSeedMusicianStorage(): Promise<{
+  storage: IMusicianStorage;
+  s3: S3Client | null;
+  bucket: string;
+  available: boolean;
+  label: string;
+}> {
+  const discard: IMusicianStorage = {
+    putObject: async () => undefined,
+    deleteObject: async () => undefined,
+    getPublicUrl: () => null,
+  };
+  const unavailable = {
+    storage: discard,
+    s3: null,
+    bucket: "",
+    available: false,
+    label: "indisponível",
+  };
+
+  const provider = loadEnvValue("ESTABLISHMENT_STORAGE_PROVIDER", "minio");
+  const region = loadEnvValue("AWS_REGION", "us-east-1");
+
+  if (provider === "cloudflare_r2") {
+    const bucket = loadEnvValue("CLOUDFLARE_R2_BUCKET", "");
+    const endpoint = loadEnvValue("CLOUDFLARE_R2_ENDPOINT", "");
+    const accessKeyId = loadEnvValue("CLOUDFLARE_R2_ACCESS_KEY_ID", "");
+    const secretAccessKey = loadEnvValue("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "");
+    const publicBaseUrl = loadEnvValue("CLOUDFLARE_R2_PUBLIC_BASE_URL", "");
+
+    if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
+      console.warn(
+        "   ⚠️ R2 sem credenciais completas — músicos ficam sem áudio de apresentação.",
+      );
+      return unavailable;
+    }
+
+    /*
+     * Sem URL pública não adianta subir: o use-case recusa
+     * (`ExternalServiceError`) justamente para não gravar uma URL que o player
+     * não toca. Avisar aqui é mais claro que ver três falhas em sequência.
+     */
+    if (!publicBaseUrl) {
+      console.warn(
+        "   ⚠️ CLOUDFLARE_R2_PUBLIC_BASE_URL ausente — o áudio subiria sem URL tocável.",
+      );
+      return unavailable;
+    }
+
+    const s3 = new S3Client({
+      region,
+      endpoint,
+      credentials: { accessKeyId, secretAccessKey },
+      forcePathStyle: true,
+    });
+
+    return {
+      storage: withSeedPrefix(new S3MusicianStorage(s3, bucket, publicBaseUrl)),
+      s3,
+      bucket,
+      available: true,
+      label: `Cloudflare R2 · ${bucket}/${SEED_STORAGE_PREFIX}`,
+    };
+  }
+
+  const bucket = loadEnvValue("MINIO_BUCKET", "soundmeet-media");
+  // Endpoint PÚBLICO nas duas pontas: o seed roda no host (onde o nome de
+  // serviço `minio` não resolve) e a URL gravada é a que o BROWSER vai buscar.
+  const publicEndpoint = loadEnvValue("MINIO_PUBLIC_ENDPOINT", "localhost");
+  const publicPort = loadEnvValue("MINIO_PUBLIC_PORT", "9000");
+  const endpoint = `http://${publicEndpoint}:${publicPort}`;
+
+  const s3 = new S3Client({
+    region,
+    endpoint,
+    credentials: {
+      accessKeyId: loadEnvValue("MINIO_ACCESS_KEY", "soundmeet"),
+      secretAccessKey: loadEnvValue("MINIO_SECRET_KEY", "soundmeet123"),
+    },
+    forcePathStyle: true,
+  });
+
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+  } catch {
+    try {
+      await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+      console.log(`   🪣 Bucket ${bucket} criado no MinIO.`);
+    } catch (error) {
+      console.warn(
+        `   ⚠️ MinIO indisponível (${(error as Error).message}) — músicos ficam sem áudio de apresentação.`,
+      );
+      return unavailable;
+    }
+  }
+
+  try {
+    await s3.send(
+      new PutBucketPolicyCommand({
+        Bucket: bucket,
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Sid: "PublicReadSeedPresentationAudio",
+              Effect: "Allow",
+              Principal: { AWS: ["*"] },
+              Action: ["s3:GetObject"],
+              Resource: [
+                `arn:aws:s3:::${bucket}/${SEED_STORAGE_PREFIX}musicians/*/presentation-audio/*`,
+                // Avatar é `<img>` direto do bucket no web — mesmo 403 sem isto.
+                `arn:aws:s3:::${bucket}/${SEED_STORAGE_PREFIX}musicians/*/avatar/*`,
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+  } catch (error) {
+    console.warn(
+      `   ⚠️ Não foi possível liberar a leitura do prefixo no MinIO (${(error as Error).message}) — o player vai receber 403.`,
+    );
+  }
+
+  return {
+    storage: withSeedPrefix(
+      new S3MusicianStorage(s3, bucket, `${endpoint}/${bucket}`),
+    ),
+    s3,
+    bucket,
+    available: true,
+    label: `MinIO · ${bucket}/${SEED_STORAGE_PREFIX}`,
+  };
+}
+
+/**
+ * Storage do PDF do contrato para a emissão semeada.
+ *
+ * O seed emite pelo `IssueContractUseCase` de verdade (seção 21), que grava o
+ * PDF antes de persistir. Em desenvolvimento o provider é o MinIO, e o bucket
+ * `soundmeet-contracts` NÃO é criado por ninguém — sem esta função nem a
+ * emissão pelo próprio app funciona em dev (`NoSuchBucket` no `putObject`).
+ *
+ * Só toca MinIO local. Com R2/S3 configurado o seed NÃO escreve em bucket
+ * remoto: descarta o PDF e avisa. O contrato continua íntegro (snapshot +
+ * hash); só o download do documento responde 404.
+ */
+async function createSeedContractStorage(): Promise<{
+  storage: IContractStorage;
+  pdfAvailable: boolean;
+}> {
+  const discard: IContractStorage = {
+    putObject: async () => undefined,
+    getObject: async () => null,
+    deleteObject: async () => undefined,
+  };
+
+  const provider = loadEnvValue("CONTRACT_STORAGE_PROVIDER", "minio");
+  if (provider !== "minio") {
+    console.warn(
+      `   ⚠️ CONTRACT_STORAGE_PROVIDER=${provider}: o seed não grava em bucket remoto — PDFs descartados.`,
+    );
+    return { storage: discard, pdfAvailable: false };
+  }
+
+  // Endpoint PÚBLICO: o seed roda no host, onde `minio` (nome do serviço no
+  // compose) não resolve. O app, dentro da rede do compose, lê o mesmo bucket.
+  const bucket = loadEnvValue("CONTRACT_STORAGE_BUCKET", "soundmeet-contracts");
+  const s3 = new S3Client({
+    region: loadEnvValue("AWS_REGION", "us-east-1"),
+    endpoint: `http://${loadEnvValue("MINIO_PUBLIC_ENDPOINT", "localhost")}:${loadEnvValue("MINIO_PUBLIC_PORT", "9000")}`,
+    credentials: {
+      accessKeyId: loadEnvValue("MINIO_ACCESS_KEY", "soundmeet"),
+      secretAccessKey: loadEnvValue("MINIO_SECRET_KEY", "soundmeet123"),
+    },
+    forcePathStyle: true,
+  });
+
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+  } catch {
+    try {
+      await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+      console.log(`   🪣 Bucket ${bucket} criado no MinIO.`);
+    } catch (error) {
+      console.warn(
+        `   ⚠️ MinIO indisponível (${(error as Error).message}) — contratos emitidos sem PDF (download responde 404).`,
+      );
+      return { storage: discard, pdfAvailable: false };
+    }
+  }
+
+  return { storage: new S3ContractStorage(s3, bucket), pdfAvailable: true };
+}
+
 // ── seed ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -541,6 +1025,16 @@ async function main() {
       { email: "rest1@seed-soundmeet.com", name: "Restaurante Maresia", role: "establishment" },
       { email: "club1@seed-soundmeet.com", name: "Lapa Music Hall", role: "establishment" },
       { email: "bar2@seed-soundmeet.com", name: "Savassi Jazz Bar", role: "establishment" },
+      // 🔴 Admin: 12 rotas `@Roles("admin")` não tinham como ser exercidas —
+      // takedown de cifra da comunidade (o kill-switch de emergência do Bloco
+      // 8), as 4 rotas de gestão de badges e a anulação de contrato, entre
+      // outras. A role sempre existiu no realm; faltava alguém com ela.
+      //
+      // Não tem aggregate correspondente DE PROPÓSITO: admin é papel de
+      // operação, não persona de produto. Nada em `src/` procura um
+      // `Musician`/`Audience` pelo sub de um admin, então a ausência de linha
+      // no banco é o estado correto, não uma lacuna.
+      { email: "admin@seed-soundmeet.com", name: "Admin SoundMeet", role: "admin" },
     ]);
   } catch (error) {
     const message = axios.isAxiosError(error)
@@ -571,6 +1065,12 @@ async function main() {
       // real — true de propósito, senão a busca/hiring-dashboard aparecem
       // vazios pra quem testar o app logo após rodar o seed.
       openToGigs: true as boolean | null,
+      pushToken: { token: "ExponentPushToken[seed-joao-do-blues]", platform: "android" as const },
+      // Documento + subconta de custódia: sem CPF a emissão do contrato volta
+      // `missing: ["contratado.cpf"]`, e sem subconta `CreateBookingEscrowUseCase`
+      // recusa com `no_subaccount`. Ver seções 21 e 22.
+      cpf: cpfFromBase("390533447"),
+      escrowSubaccount: true,
     },
     {
       name: "Maria Voz", stage: "Maria Bossa", tier: MusicianPlanTier.ESSENTIAL,
@@ -583,6 +1083,13 @@ async function main() {
       // false explícito — opt-out consciente, pra QA validar que ela NÃO
       // aparece em nenhuma busca mesmo tendo perfil completo.
       openToGigs: false as boolean | null,
+      pushToken: { token: "ExponentPushToken[seed-maria-bossa]", platform: "ios" as const },
+      cpf: cpfFromBase("285471360"),
+      escrowSubaccount: true,
+      // Chave PIX trocada AGORA: o saque dela cai na carência antifraude
+      // (`PIX_KEY_CHANGE_COOLDOWN_HOURS`, 24h) mesmo com saldo acima do mínimo
+      // do ESSENTIAL. É o único jeito de ver o bloqueio sem trocar a chave na mão.
+      pixKeyJustChanged: true,
     },
     {
       name: "Carlos Teclas", stage: "Carlão do Piano", tier: MusicianPlanTier.PRO,
@@ -595,6 +1102,14 @@ async function main() {
       // null — ainda não decidiu (estado tri-state default). Cobre o caso
       // "músico recém-criado, some da busca até decidir".
       openToGigs: null as boolean | null,
+      pushToken: { token: "ExponentPushToken[seed-carlao-do-piano]", platform: "android" as const },
+      // Único músico que RECUSA pedido fora do repertório (migration
+      // 20260909120000). Ver a justificativa da escolha no laço abaixo.
+      acceptsRequestsOutsideRepertoire: false,
+      // MEI com CPF: o CPF é o que o qualifica como LÍDER no contrato da
+      // Carlão Trio (banda contrata pelo líder pessoa física, mesmo com MEI).
+      cpf: cpfFromBase("620384915"),
+      cnpj: cnpjFromBase("334445550001"),
     },
 
     // ── Elenco de busca (W3.1, soundmeet-web) ────────────────────────────────
@@ -646,6 +1161,10 @@ async function main() {
       ],
       openToGigs: true as boolean | null,
       ratingProjection: { average: 4.2, total: 11 },
+      // MEI SEM CPF cadastrado: exercita o ramo "CPF OU CNPJ" da emissão e a
+      // variante de pessoa jurídica de `tributos` (sem retenção previdenciária).
+      cnpj: cnpjFromBase("556667770001"),
+      escrowSubaccount: true,
     },
     {
       name: "Beatriz Cordas", stage: "Bia Viola", tier: MusicianPlanTier.ESSENTIAL,
@@ -659,6 +1178,18 @@ async function main() {
       ranges: [new PriceRange({ model: "per_event", min: 400, max: 900 })],
       openToGigs: true as boolean | null,
       ratingProjection: { average: 3.6, total: 5 },
+      // Modo turnê (7.13d): base em Guarulhos, de passagem pelo Rio. Aparece
+      // na busca por raio a partir da Lapa sem perder a base de SP. Sem CPF de
+      // propósito — é o show confirmado que NÃO gera contrato (seção 21).
+      touring: {
+        location: new Location({
+          city: "Rio de Janeiro", state: "RJ",
+          latitude: -22.9068, longitude: -43.1729,
+          street: "Rua do Lavradio", number: "100",
+          neighborhood: "Lapa", zip_code: "20230070",
+        }),
+        days: 10,
+      },
     },
     {
       name: "Diego Eletrônico", stage: "DJ Diego", tier: MusicianPlanTier.FREE,
@@ -685,6 +1216,8 @@ async function main() {
       ranges: [new PriceRange({ model: "per_hour", min: 300, max: 600 })],
       openToGigs: true as boolean | null,
       ratingProjection: { average: 5.0, total: 3 },
+      // PRO em TRIAL (e não `active`): único `SubscriptionStatus.TRIAL` do seed.
+      trialDays: 14,
     },
   ];
 
@@ -698,12 +1231,19 @@ async function main() {
       .withGenres(spec.genres)
       .withInstruments(spec.instruments)
       .withExperienceYears(8)
-      .withOpenToGigs(spec.openToGigs);
+      .withOpenToGigs(spec.openToGigs)
+      .withCpf("cpf" in spec && spec.cpf ? spec.cpf : null)
+      .withCnpj("cnpj" in spec && spec.cnpj ? spec.cnpj : null);
     const musicianSub = keycloakSubs.get(spec.email);
     if (musicianSub) {
       musicianBuilder.withMusicianId(new MusicianId(musicianSub));
     }
     const musician = musicianBuilder.build();
+    // CPF/CNPJ inválido NÃO lança: vira notificação e o campo fica null — e o
+    // sintoma apareceria só lá na frente, como contrato que não é emitido.
+    if (("cpf" in spec && spec.cpf && !musician.cpf) || ("cnpj" in spec && spec.cnpj && !musician.cnpj)) {
+      throw new Error(`Documento inválido no seed (${spec.name}): ${JSON.stringify(musician.notification.toJSON())}`);
+    }
 
     /*
      * Projeção de nota, para `sort=rating` na busca (W3.1) ter o que ordenar.
@@ -738,6 +1278,52 @@ async function main() {
       }),
     );
     profile.changeSocialLinks({ instagram: `@${spec.stage.toLowerCase().replace(/\s/g, "")}` });
+    if ("touring" in spec && spec.touring) {
+      profile.setTouringLocation(spec.touring.location, daysFromNow(spec.touring.days, 23));
+      if (profile.notification.hasErrors()) {
+        throw new Error(`Turnê inválida no seed (${spec.name}): ${JSON.stringify(profile.notification.toJSON())}`);
+      }
+    }
+
+    /*
+     * Token de push nos três primeiros músicos.
+     *
+     * Sem token nenhum, TODO handler de `notifications-module` sai cedo
+     * (`if (!musician?.push_token) return`) e a notificação de pedido, de
+     * booking e de mensagem não tinha como ser exercitada — nem para falhar.
+     * O formato é o que `RegisterPushTokenInput` valida
+     * (`ExponentPushToken[...]`); o valor é fictício, então o envio chega ao
+     * serviço de push e falha LÁ, que é o ponto observável — e é melhor que
+     * não chegar.
+     *
+     * Os outros cinco ficam sem token de propósito: é o estado real de quem
+     * criou a conta e ainda não abriu o app.
+     */
+    if ("pushToken" in spec && spec.pushToken) {
+      musician.registerPushToken(spec.pushToken.token, spec.pushToken.platform);
+    }
+
+    /*
+     * Escopo do pedido musical (migration 20260909120000).
+     *
+     * A coluna nasce `true` e os 8 músicos ficariam todos no default, deixando
+     * o ramo restrito de `CreateRequestUseCase` — o `InvalidOperationError`
+     * "só aceita pedidos do próprio repertório" — sem ninguém que o dispare.
+     *
+     * 🔴 Carlos é o escolhido porque é o único, além do João, com biblioteca
+     * semeada (Fly Me to the Moon, Águas de Março, Garota de Ipanema).
+     * Restringir um músico SEM repertório tornaria todo pedido a ele
+     * impossível: testaria a mensagem de erro e nada do produto.
+     *
+     * João continua permissivo de propósito — é o alvo dos 10 pedidos da
+     * seção 8 e o caminho principal de quem abre o app depois do seed.
+     */
+    if (
+      "acceptsRequestsOutsideRepertoire" in spec &&
+      spec.acceptsRequestsOutsideRepertoire === false
+    ) {
+      musician.setAcceptsRequestsOutsideRepertoire(false);
+    }
 
     await musicianRepo.insert(musician);
     musicians.push(musician);
@@ -751,15 +1337,43 @@ async function main() {
     // A chave semeada não deve nascer em carência (A1 camada 2): sem isto, um
     // saque logo após o seed cairia no bloqueio de "chave recém-trocada". No
     // mundo real a carência conta da troca de verdade; aqui a chave já é antiga.
-    wallet.pix_key_changed_at = null;
-    // Só o João tem extrato no seed (gorjetas da seção 9 + transações da 14).
-    // Carteira zerada com extrato cheio é o tipo de incoerência que faz perder
-    // tempo achando que a tela de carteira está quebrada. Líquidos = bruto − 9%
-    // (taxa do tier FREE): 25 → 22,75 e 50 → 45,50; saldo final R$ 8,25.
+    // A Maria é a exceção deliberada — é o lado negativo da carência.
+    if (!("pixKeyJustChanged" in spec && spec.pixKeyJustChanged)) {
+      wallet.pix_key_changed_at = null;
+    }
+
+    // Subconta na instituição de pagamento + Conta Escrow ligada. É o
+    // pré-requisito de toda custódia (seção 22). Credenciais obviamente falsas;
+    // a `api_key` vai cifrada em repouso pelo mapper, como a real.
+    if ("escrowSubaccount" in spec && spec.escrowSubaccount) {
+      const slug = spec.email.split("@")[0];
+      wallet.linkSubaccount({
+        wallet_id: `seed-asaas-wallet-${slug}`,
+        api_key: `seed-asaas-api-key-${slug}-nao-e-credencial-real`,
+        account_status: "APPROVED",
+      });
+      wallet.enableEscrow();
+    }
+
+    // Só o João tem extrato de gorjeta no seed (seção 9 + transações da 14).
+    //
+    // 🔴 Gorjeta NÃO vira saldo sacável (corrigido 14/set/2026). O João tem
+    // Mercado Pago vinculado, então a gorjeta dele liquida NA CONTA DELE
+    // (`settlement: "beneficiary"`) e o domínio chama `recordExternalEarning`:
+    // cresce `total_earned`, `balance` fica intacto. O seed anterior creditava
+    // as gorjetas com `receiveFunds` para liberar o saque — produzindo o saldo
+    // sacável que a regra existe para impedir (dinheiro que a plataforma nunca
+    // recebeu saindo do caixa dela no saque).
+    //
+    // O saldo sacável legítimo é CACHÊ liberado da custódia, e é de lá que ele
+    // vem agora (seção 22): R$720 liberados, menos os saques → R$510, acima do
+    // mínimo de R$110 do FREE. Líquidos das gorjetas = bruto − 9% (tier FREE):
+    //   25 → 22,75 · 50 → 45,50 · 30 → 27,30 · 20 → 18,20 · 120 → 109,20
+    //   destaque pago 10 → 9,10 · anônima 15 → 13,65
     if (spec.email === "musico1@seed-soundmeet.com") {
-      wallet.receiveFunds(22.75);
-      wallet.receiveFunds(45.5);
-      wallet.withdrawFunds(60);
+      for (const net of [22.75, 45.5, 27.3, 18.2, 109.2, 9.1, 13.65]) {
+        wallet.recordExternalEarning(net);
+      }
 
       /*
        * 🔴 Vínculo de Mercado Pago semeado por causa do DRILL DE RESTAURAÇÃO,
@@ -793,38 +1407,247 @@ async function main() {
         plan_tier: spec.tier,
         persona: "musician",
         billing_cycle: BillingCycle.MONTHLY,
+        // Com `trial_ends_at` o agregado nasce `trial` e sem `expires_at`.
+        trial_ends_at:
+          "trialDays" in spec && spec.trialDays ? daysFromNow(spec.trialDays, 23) : undefined,
       });
       await subscriptionRepo.insert(subscription);
     }
   }
+
+  // Histórico de assinatura encerrada — os dois estados terminais. Rafael
+  // (PRO ativo hoje) veio de um ESSENTIAL que ELE cancelou; Diego (FREE) teve
+  // um ESSENTIAL que venceu sem renovar. Nenhum dos dois muda o tier efetivo:
+  // `findActiveMusicianSubscription` só lê `active`/`trial`.
+  const pastMusicianSubs = [
+    { musician: musicians[4], end: "cancel" as const },
+    { musician: musicians[6], end: "expire" as const },
+  ];
+  for (const spec of pastMusicianSubs) {
+    const past = Subscription.create({
+      musician_id: spec.musician.musician_id.id,
+      plan_tier: MusicianPlanTier.ESSENTIAL,
+      persona: "musician",
+      billing_cycle: BillingCycle.MONTHLY,
+    });
+    if (spec.end === "cancel") past.cancel();
+    else past.expire();
+    await subscriptionRepo.insert(past);
+  }
   const [m1, m2] = musicians;
+
+  // ── 1b. Áudio de apresentação (preview de contratação) ────────────────────
+  /*
+   * 🔴 Sobe pelo `UploadMusicianPresentationAudioUseCase` DE VERDADE, com os
+   * mesmos helpers do controller (magic bytes + duração). Mesmo princípio dos
+   * contratos, que desde 14/set são emitidos pelo use-case real em vez de
+   * `Contract.fake()`: o que o seed grava passa pelas mesmas regras que um
+   * upload do app, então um bug de allowlist, de duração ou de URL pública
+   * aparece aqui, rodando o seed, e não na primeira vez que um músico envia.
+   *
+   * Só TRÊS dos oito recebem áudio, e isso é a regra dos "dois lados" deste
+   * arquivo: sem músico sem áudio, o estado vazio do cartão da grade — que é o
+   * caso mais comum em produção — nunca é exercitado.
+   */
+  console.log("🎧 Áudio de apresentação…");
+  const musicianMedia = await createSeedMusicianStorage();
+  const withPresentationAudio: string[] = [];
+
+  if (musicianMedia.available) {
+    const uploadPresentationAudio = new UploadMusicianPresentationAudioUseCase(
+      musicianRepo,
+      musicianMedia.storage,
+    );
+
+    // João (blues), Rafa (sax) e DJ Diego (eletrônica): personas distintas o
+    // bastante para a grade mostrar o player em contextos diferentes. Os
+    // índices seguem `musicianSpecs` — o mesmo cruzamento que o bloco 1c
+    // (fotos) descreve.
+    const alvos = [0, 4, 6];
+
+    for (const [ordem, indice] of alvos.entries()) {
+      const musician = musicians[indice];
+      if (!musician) continue;
+
+      const wav = synthesizePresentationWav(ordem);
+      const tmpPath = join(
+        tmpdir(),
+        `seed-presentation-${musician.musician_id.id}.wav`,
+      );
+
+      try {
+        await writeFile(tmpPath, wav);
+
+        // Os MESMOS helpers do controller — é isso que faz o seed exercitar o
+        // caminho real em vez de uma versão simplificada dele.
+        const contentType = await detectFileMime(tmpPath);
+        const durationSeconds = await readAudioDurationSeconds(tmpPath);
+
+        await uploadPresentationAudio.execute({
+          musician_id: musician.musician_id.id,
+          data: wav,
+          content_type: contentType ?? "",
+          file_size: wav.byteLength,
+          duration_seconds: durationSeconds,
+        });
+
+        withPresentationAudio.push(musician.stage_name ?? musician.name);
+      } catch (error) {
+        console.warn(
+          `   ⚠️ ${musician.name} ficou sem áudio de apresentação (${(error as Error).message}).`,
+        );
+      } finally {
+        await unlink(tmpPath).catch(() => undefined);
+      }
+    }
+
+    console.log(
+      `   🎵 ${withPresentationAudio.length} com áudio (${withPresentationAudio.join(", ")}) · ${musicians.length - withPresentationAudio.length} sem — os dois lados na grade do web.`,
+    );
+    console.log(`   📦 destino: ${musicianMedia.label}`);
+  } else {
+    // Sem isto a ausência de áudio parece decisão do seed, e não falta de
+    // storage — quem abrir a grade do web veria cartões sem player sem nenhuma
+    // pista do porquê.
+    console.warn(
+      "   ⚠️ Storage de mídia indisponível: nenhum músico recebeu áudio de apresentação.",
+    );
+  }
+
+  // ── 1c. Foto de perfil ────────────────────────────────────────────────────
+  /*
+   * Mesmo caminho do áudio: `UploadMusicianAvatarUseCase` real, mesmo storage,
+   * prefixo `seed/` (o `--reset` varre). URL externa gravada direto no campo
+   * NÃO serviria: a CSP do web só libera o host do bucket no `img-src`, então
+   * a foto sairia quebrada lá e inteira no mobile.
+   *
+   * CINCO dos oito têm foto, cruzados com o áudio de propósito para a grade
+   * mostrar as quatro combinações: foto+áudio (João, Rafa), só foto (Maria,
+   * Carlão, Bia), só áudio (DJ Diego) e nenhum dos dois (Ana, Helena) — o
+   * fallback de iniciais é o que a maioria dos cadastros novos vai exibir.
+   *
+   * As imagens são FIXTURE versionada em `prisma/seed-assets/avatars/`, não
+   * download a cada rodada: o seed é determinístico e roda offline. Origem:
+   * geradas por IA (pollinations.ai, modelo flux, seeds fixos), sem pessoa real
+   * retratada; recortadas para tirar a marca d'água e sem EXIF.
+   */
+  console.log("🖼️ Fotos de perfil…");
+  const withAvatar: string[] = [];
+
+  if (musicianMedia.available) {
+    const uploadAvatar = new UploadMusicianAvatarUseCase(
+      musicianRepo,
+      musicianMedia.storage,
+    );
+
+    // índice em `musicians` → arquivo (nomeado pelo e-mail `musicoN@`).
+    const fotos: Array<[number, string]> = [
+      [0, "musico1.jpg"],
+      [1, "musico2.jpg"],
+      [2, "musico3.jpg"],
+      [4, "musico5.jpg"],
+      [5, "musico6.jpg"],
+    ];
+
+    for (const [indice, arquivo] of fotos) {
+      const musician = musicians[indice];
+      if (!musician) continue;
+
+      const path = resolve(__dirname, "seed-assets/avatars", arquivo);
+      try {
+        const data = readFileSync(path);
+        await uploadAvatar.execute({
+          musician_id: musician.musician_id.id,
+          data,
+          // Pelos bytes, como o controller — não pela extensão do arquivo.
+          content_type: (await detectFileMime(path)) ?? "",
+          file_size: data.byteLength,
+        });
+        withAvatar.push(musician.stage_name ?? musician.name);
+      } catch (error) {
+        console.warn(
+          `   ⚠️ ${musician.name} ficou sem foto (${(error as Error).message}).`,
+        );
+      }
+    }
+
+    console.log(
+      `   📸 ${withAvatar.length} com foto (${withAvatar.join(", ")}) · ${musicians.length - withAvatar.length} com fallback de iniciais.`,
+    );
+  } else {
+    console.warn(
+      "   ⚠️ Storage de mídia indisponível: todos os músicos ficam com o fallback de iniciais.",
+    );
+  }
 
   // ── 2. Estabelecimentos (com endereço + lat/lng p/ busca por raio) ────────
   console.log("🏢 Estabelecimentos…");
+  // 🔴 `operatingHours.timezone` NÃO é decoração: é de onde a emissão do
+  // contrato tira o fuso (`?? "UTC"`). Sem ele, um show às 20h de Brasília sai
+  // no contrato às 23h. As três casas com show semeado têm o fuso; a Lapa fica
+  // sem horário cadastrado de propósito (estado de quem ainda não preencheu).
+  // Abertas TODOS os dias: as datas dos shows são relativas ao dia do seed e
+  // caem em qualquer dia da semana — com folga semanal, algum show apareceria
+  // marcado num dia em que a própria casa está fechada.
+  const nightlyHours = (open: string, close: string) => ({
+    timezone: "America/Sao_Paulo",
+    weekly: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, [{ start: open, end: close }]])),
+  });
   const establishmentSpecs = [
     {
       name: "Bar do Zé", type: "bar" as const, email: "bar1@seed-soundmeet.com",
       street: "Rua Augusta", number: "1024", neighborhood: "Consolação",
       city: "São Paulo", state: "SP", cep: "01304001", lat: -23.5537, lng: -46.6524,
       genres: ["Blues", "Rock"],
+      legalRepresentative: { name: "José Carvalho", cpf: cpfFromBase("418229637") },
+      operatingHours: nightlyHours("18:00", "23:59"),
+      // Única casa com ficha técnica: seleciona a variante de estrutura com
+      // Anexo I no contrato. As outras cobrem a variante sem anexo.
+      stageTechSpec: StageTechSpec.fromJSON({
+        hasPa: true,
+        mixerChannels: 16,
+        monitors: 4,
+        hasMicrophones: 6,
+        backline: ["bateria", "amplificador de baixo", "cubo de guitarra"],
+        dimensions: { widthM: 5, depthM: 3, heightM: 2.5 },
+        power: { outlets: 8, voltage: "220V" },
+        hasParking: false,
+        hasSoundEngineer: true,
+        soundcheckWindow: "18:00-19:00",
+        notes: "Palco a 40 cm do chão; carga e descarga pela Rua Augusta.",
+      }),
+      verified: true,
     },
     {
       name: "Restaurante Maresia", type: "restaurant" as const, email: "rest1@seed-soundmeet.com",
       street: "Rua dos Pinheiros", number: "320", neighborhood: "Pinheiros",
       city: "São Paulo", state: "SP", cep: "05422001", lat: -23.5662, lng: -46.6825,
       genres: ["MPB", "Bossa Nova"],
+      legalRepresentative: { name: "Marina Toledo", cpf: cpfFromBase("731594208") },
+      operatingHours: nightlyHours("12:00", "23:59"),
+      stageTechSpec: null,
+      verified: true,
     },
     {
       name: "Lapa Music Hall", type: "club" as const, email: "club1@seed-soundmeet.com",
       street: "Avenida Mem de Sá", number: "23", neighborhood: "Lapa",
       city: "Rio de Janeiro", state: "RJ", cep: "20230150", lat: -22.9133, lng: -43.1809,
       genres: ["Samba", "Pagode"],
+      legalRepresentative: null,
+      operatingHours: null,
+      stageTechSpec: null,
+      // Único NÃO verificado: o selo é dado de tela nos dois lados.
+      verified: false,
     },
     {
       name: "Savassi Jazz Bar", type: "bar" as const, email: "bar2@seed-soundmeet.com",
       street: "Rua Pernambuco", number: "1000", neighborhood: "Savassi",
       city: "Belo Horizonte", state: "MG", cep: "30130151", lat: -19.9352, lng: -43.9345,
       genres: ["Jazz", "Blues"],
+      legalRepresentative: { name: "Otávio Figueiredo", cpf: cpfFromBase("856207314") },
+      operatingHours: nightlyHours("19:00", "23:59"),
+      stageTechSpec: null,
+      verified: true,
     },
   ];
 
@@ -842,6 +1665,8 @@ async function main() {
       )
       .withPreferredGenres(spec.genres)
       .withAmenities(["Palco", "Som próprio", "Estacionamento"])
+      .withOperatingHours(spec.operatingHours)
+      .withStageTechSpec(spec.stageTechSpec)
       .build();
 
     const establishment = Establishment.fake()
@@ -849,10 +1674,15 @@ async function main() {
       .withName(spec.name)
       .withEmail(spec.email)
       .withCnpj(cnpjFromBase(`1122233300${String(establishments.length + 10)}`))
+      // Nome E CPF: a emissão exige os dois (`contratante.representante_legal`).
+      .withLegalRepresentative(spec.legalRepresentative?.name ?? null, spec.legalRepresentative?.cpf ?? null)
       .withEstablishmentType(spec.type)
-      .withIsVerified(true)
+      .withIsVerified(spec.verified)
       .withProfile(profile)
       .build();
+    if (spec.legalRepresentative && !establishment.legal_representative_document) {
+      throw new Error(`Representante legal inválido no seed (${spec.name}): ${JSON.stringify(establishment.notification.toJSON())}`);
+    }
 
     await establishmentRepo.insert(establishment);
     establishments.push(establishment);
@@ -889,31 +1719,90 @@ async function main() {
 
   // ── 3. Fãs (audience) ──────────────────────────────────────────────────────
   console.log("🙋 Fãs…");
+  // 🔴 Preferências da taxonomia REAL. O fake builder usa "Guitar"/"Piano" e
+  // "Pop"/"Electronic" — nenhum músico do seed tem esses valores, e a busca é
+  // `hasSome` exato em gênero E instrumento. O carrossel "Pra você"
+  // (`GET /audiences/:id/recommendations/musicians`) nascia VAZIO para os dois
+  // fãs, sem erro nenhum. Os valores abaixo casam com músicos `open_to_gigs`:
+  //   Ana   → João (Blues/Violão) e Rafael (Blues/Saxofone)
+  //   Bruno → Ana Batuque (Samba/Percussão) e Bia Viola (Sertanejo/Violão)
+  // Gênero do fã é validado contra `VALID_GENRES` (422 fora dela) — todos
+  // estes estão lá; instrumento é texto livre.
   const fan1Builder = Audience.fake().aAudience()
-    .withName("Ana Fã").withEmail("fa1@seed-soundmeet.com").withNickname("aninha");
+    .withName("Ana Fã").withEmail("fa1@seed-soundmeet.com").withNickname("aninha")
+    .withFavoriteGenres(["Blues", "Rock", "MPB"])
+    .withFavoriteInstruments(["Violão", "Saxofone"]);
   const fan1Sub = keycloakSubs.get("fa1@seed-soundmeet.com");
   if (fan1Sub) fan1Builder.withId(new AudienceId(fan1Sub));
   const fan1 = fan1Builder.build();
   const fan2Builder = Audience.fake().aTopFan()
-    .withName("Bruno Superfã").withEmail("fa2@seed-soundmeet.com").withNickname("brunao");
+    .withName("Bruno Superfã").withEmail("fa2@seed-soundmeet.com").withNickname("brunao")
+    .withFavoriteGenres(["Samba", "Pagode", "Sertanejo"])
+    .withFavoriteInstruments(["Percussão", "Violão"]);
   const fan2Sub = keycloakSubs.get("fa2@seed-soundmeet.com");
   if (fan2Sub) fan2Builder.withId(new AudienceId(fan2Sub));
   const fan2 = fan2Builder.build();
   await audienceRepo.insert(fan1);
   await audienceRepo.insert(fan2);
 
+  // ── 3b. E-mail confirmado (coluna de INFRA, fora do agregado) ─────────────
+  //
+  // 🔴 Sem isto NENHUM músico saca. `WithdrawToPixUseCase` consulta
+  // `IEmailVerificationChecker` ANTES da validação de valor e antes de
+  // `reserve()`, e a porta é fail-closed: `email_verified_at` NULL vira 403
+  // `EMAIL_NOT_VERIFIED` para todo mundo, com carteira cheia ou vazia.
+  //
+  // O seed já criava o usuário no Keycloak com `emailVerified: true`, o que
+  // dava a impressão de e-mail confirmado — mas o gate lê a COLUNA DA APP, não
+  // o Keycloak. Eram duas verdades diferentes sobre o mesmo fato.
+  //
+  // Vai direto no Prisma porque o campo não pertence ao agregado (o porquê
+  // está em `shared/domain/email-verification.checker.ts`); é o mesmo caminho
+  // que `verify-email.service.ts` usa ao confirmar de verdade.
+  //
+  // Helena (musico8) fica de FORA de propósito — é o único jeito de exercitar
+  // o lado negativo do gate. Como a checagem roda antes de tudo, ela devolve
+  // EMAIL_NOT_VERIFIED mesmo com saldo suficiente.
+  //
+  // ⚠️ Escopado ao domínio do seed: sem o `endsWith`, rodar sem `--reset` num
+  // banco de desenvolvimento com dados próprios confirmaria o e-mail de linhas
+  // que não são do seed — o seed não tem negócio escrevendo nelas.
+  const UNVERIFIED_MUSICIAN_EMAIL = "musico8@seed-soundmeet.com";
+  const seedEmail = { endsWith: "@seed-soundmeet.com" };
+  await prisma.musician.updateMany({
+    where: { AND: [{ email: seedEmail }, { email: { not: UNVERIFIED_MUSICIAN_EMAIL } }] },
+    data: { email_verified_at: new Date() },
+  });
+  // Estabelecimento e fã não têm gate hoje (a porta só expõe
+  // `isMusicianEmailVerified`), mas deixá-los NULL manteria a mesma divergência
+  // com o Keycloak à espera do primeiro consumidor.
+  await prisma.establishment.updateMany({
+    where: { email: seedEmail },
+    data: { email_verified_at: new Date() },
+  });
+  await prisma.audience.updateMany({
+    where: { email: seedEmail },
+    data: { email_verified_at: new Date() },
+  });
+
   // ── 4. Eventos (todos os EventStatus) ─────────────────────────────────────
   console.log("🎤 Eventos…");
   const eventSpecs = [
     { est: e1, name: "Noite do Blues", start: daysFromNow(3), status: "scheduled" },
-    { est: e1, name: "Sarau ao Vivo", start: daysFromNow(0, 19), status: "active" },
+    // Janela centrada no AGORA, e não "hoje às 19h": o set ao vivo, os pedidos
+    // e o check-in do fã dependem de o evento estar de fato em andamento.
+    // ⚠️ `AutoFinishEventsJob` (a cada 10 min) encerra evento ativo cujo fim
+    // passou — o cenário "ao vivo" dura ~6h após o seed.
+    { est: e1, name: "Sarau ao Vivo", start: hoursFromNow(-1), end: hoursFromNow(5), status: "active" },
     { est: e2, name: "Jantar com Bossa", start: daysFromNow(-7), status: "completed" },
     { est: e2, name: "Feijoada com Samba", start: daysFromNow(5, 13), status: "cancelled" },
+    // Palco da Carlão Trio (seção 17b): evento com BANDA no line-up.
+    { est: establishments[3], name: "Jazz na Savassi", start: daysFromNow(6, 21), status: "scheduled" },
   ] as const;
 
   const events: Event[] = [];
   for (const spec of eventSpecs) {
-    const end = new Date(spec.start.getTime() + 4 * 60 * 60 * 1000);
+    const end = "end" in spec ? spec.end : new Date(spec.start.getTime() + 4 * 60 * 60 * 1000);
     const event = Event.fake()
       .anEvent()
       .withEstablishmentId(spec.est.establishment_id)
@@ -925,7 +1814,7 @@ async function main() {
     await eventRepo.insert(event);
     events.push(event);
   }
-  const [evScheduled, evActive, evCompleted] = events;
+  const [evScheduled, evActive, evCompleted, , evSavassi] = events;
 
   // ── 5. Agenda do músico 1: regras semanais + férias ───────────────────────
   console.log("📅 Disponibilidade…");
@@ -947,75 +1836,248 @@ async function main() {
     .build();
   await availabilityRepo.insert(availability);
 
-  // ── 6. Bookings (pending/confirmed/cancelled/completed) + inquiries ───────
+  // ── 6. Bookings (os 5 status + check-in, contestação, origem) + inquiries ─
   console.log("🗓️ Bookings e inquiries…");
   const now = new Date();
 
-  const bookingPending = Booking.fake().aBooking()
-    .withEstablishmentId(new Uuid(e1.establishment_id.id))
-    .withMusicianId(new Uuid(m1.musician_id.id))
-    .withStartAt(daysFromNow(11, 20)).withEndAt(daysFromNow(11, 23))
-    .withExpiresAt(daysFromNow(2)).build();
+  const assertValid = (
+    label: string,
+    entity: { notification: { hasErrors(): boolean; toJSON(): unknown } },
+  ) => {
+    if (entity.notification.hasErrors()) {
+      throw new Error(`${label} inválido no seed: ${JSON.stringify(entity.notification.toJSON())}`);
+    }
+  };
 
-  const bookingConfirmed = Booking.fake().aBooking()
-    .withEstablishmentId(new Uuid(e1.establishment_id.id))
-    .withMusicianId(new Uuid(m1.musician_id.id))
-    .withEventId(new Uuid(evScheduled.event_id.id))
-    .withStartAt(daysFromNow(4, 20)).withEndAt(daysFromNow(4, 23))
-    .withExpiresAt(daysFromNow(2)).build();
-  bookingConfirmed.confirm(now);
+  /*
+   * `new Booking` + `validate()`, e não o fake builder: o builder não expõe
+   * `fee`, `proposed_by` nem `created_at`, e os três importam.
+   *   - Sem `fee`, a emissão do contrato devolve `missing: ["booking.cache"]` e
+   *     a custódia recusa com `no_fee` — todo booking do seed nascia sem cachê,
+   *     enquanto o contrato semeado dizia R$1.500 e a custódia R$900.
+   *   - `proposed_by` é o que o cliente usa para oferecer "confirmar" só à
+   *     contraparte.
+   *   - `created_at` no passado é o que permite `expires_at` no passado sem
+   *     violar `expires_at > created_at`.
+   * As TRANSIÇÕES continuam passando pelos métodos do agregado, com data
+   * explícita — nenhum status é escrito à mão.
+   */
+  const seedBooking = (spec: {
+    est: Establishment;
+    musician?: Musician;
+    band?: Band;
+    event?: Event;
+    start: Date;
+    end: Date;
+    fee: number;
+    proposed_by: "establishment" | "musician" | "band";
+    created_at: Date;
+    expires_at: Date;
+  }): Booking => {
+    const booking = new Booking({
+      establishment_id: spec.est.establishment_id.id,
+      musician_id: spec.musician?.musician_id.id ?? null,
+      band_id: spec.band?.band_id.id ?? null,
+      event_id: spec.event?.event_id.id ?? null,
+      start_at: spec.start,
+      end_at: spec.end,
+      fee: spec.fee,
+      proposed_by: spec.proposed_by,
+      expires_at: spec.expires_at,
+      created_at: spec.created_at,
+      updated_at: spec.created_at,
+    });
+    booking.validate();
+    return booking;
+  };
 
-  const bookingCancelled = Booking.fake().aBooking()
-    .withEstablishmentId(new Uuid(e2.establishment_id.id))
-    .withMusicianId(new Uuid(m2.musician_id.id))
-    .withStartAt(daysFromNow(9, 19)).withEndAt(daysFromNow(9, 22))
-    .withExpiresAt(daysFromNow(2)).build();
-  bookingCancelled.confirm(now);
-  bookingCancelled.cancel(now, "establishment", "Reforma na casa");
+  // pending — proposta do Bar do Zé esperando o João. Num SÁBADO (a agenda dele
+  // libera sábado inteiro) e antes das férias. ⚠️ `ExpirePendingBookingsJob`
+  // (a cada minuto) expira a proposta em 7 dias.
+  const pendingStart = nextWeekday(10, 6, 20);
+  const bookingPending = seedBooking({
+    est: e1, musician: m1,
+    start: pendingStart, end: plusHours(pendingStart, 3), fee: 1200,
+    proposed_by: "establishment", created_at: hoursFromNow(-20), expires_at: daysFromNow(7),
+  });
 
-  const bookingCompleted = Booking.fake().aBooking()
-    .withEstablishmentId(new Uuid(e2.establishment_id.id))
-    .withMusicianId(new Uuid(m2.musician_id.id))
-    .withEventId(new Uuid(evCompleted.event_id.id))
-    .withStartAt(daysFromNow(-7, 19)).withEndAt(daysFromNow(-7, 22))
-    .withExpiresAt(daysFromNow(-9)).build();
-  bookingCompleted.confirm(daysFromNow(-10));
-  bookingCompleted.complete(daysFromNow(-6));
+  // pending no SENTIDO INVERSO — a Ana Batuque propôs; quem confirma é o Bar do
+  // Zé, pelo web. Ela não tem CPF: ao confirmar, o contrato NÃO é emitido e o
+  // painel mostra a pendência. É o fluxo inteiro ao vivo, a um clique.
+  const bookingProposedByMusician = seedBooking({
+    est: e1, musician: musicians[3],
+    start: daysFromNow(14, 20), end: daysFromNow(14, 23), fee: 450,
+    proposed_by: "musician", created_at: hoursFromNow(-3), expires_at: daysFromNow(5),
+  });
+
+  // confirmed — o show da Noite do Blues, na MESMA data do evento (antes o
+  // booking caía um dia depois do evento a que estava ligado).
+  const bookingConfirmed = seedBooking({
+    est: e1, musician: m1, event: evScheduled,
+    start: evScheduled.start_at, end: new Date(evScheduled.start_at.getTime() + 3 * 3600_000), fee: 900,
+    proposed_by: "establishment", created_at: daysFromNow(-6), expires_at: daysFromNow(-3),
+  });
+  bookingConfirmed.confirm(daysFromNow(-5));
+
+  // confirmed com custódia AGUARDANDO pagamento (seção 22) e nascido de um
+  // inquiry convertido (abaixo).
+  const bookingConfirmedLater = seedBooking({
+    est: e1, musician: m1,
+    start: daysFromNow(18, 20), end: daysFromNow(18, 23), fee: 700,
+    proposed_by: "establishment", created_at: daysFromNow(-2), expires_at: daysFromNow(2),
+  });
+  bookingConfirmedLater.confirm(daysFromNow(-1));
+
+  // confirmed SEM contrato — Bia Viola não tem CPF nem CNPJ. É o caso
+  // `{ issued: false, missing: ["contratado.cpf"] }` que o painel do Maresia mostra.
+  const bookingPendingQualification = seedBooking({
+    est: e2, musician: musicians[5],
+    start: daysFromNow(6, 13), end: daysFromNow(6, 16), fee: 600,
+    proposed_by: "establishment", created_at: daysFromNow(-3), expires_at: daysFromNow(-1),
+  });
+  bookingPendingQualification.confirm(daysFromNow(-2));
+
+  // cancelled — confirmado e depois cancelado pela casa, fora da janela de
+  // multa. A custódia dele foi ESTORNADA e o contrato ANULADO (seções 21/22).
+  const bookingCancelled = seedBooking({
+    est: e2, musician: m2,
+    start: daysFromNow(9, 19), end: daysFromNow(9, 22), fee: 700,
+    proposed_by: "establishment", created_at: daysFromNow(-8), expires_at: daysFromNow(-5),
+  });
+  bookingCancelled.confirm(daysFromNow(-7));
+  bookingCancelled.cancel(daysFromNow(-2), "establishment", "Reforma na casa");
+
+  // expired — proposta que o Diego deixou vencer. `expire()` só age com
+  // `expires_at` no passado, que é o que o job faria.
+  const bookingExpired = seedBooking({
+    est: e1, musician: musicians[6],
+    start: daysFromNow(8, 21), end: daysFromNow(8, 23), fee: 600,
+    proposed_by: "establishment", created_at: daysFromNow(-5), expires_at: daysFromNow(-2),
+  });
+  bookingExpired.expire(now);
+
+  // completed — os dois shows do Jantar com Bossa. COM check-in: é a primeira
+  // das duas condições que liberam a custódia (a outra é não haver contestação).
+  const pastShowStart = evCompleted.start_at;
+  const pastShowEnd = daysFromNow(-7, 22);
+  const bookingCompleted = seedBooking({
+    est: e2, musician: m2, event: evCompleted,
+    start: pastShowStart, end: pastShowEnd, fee: 1200,
+    proposed_by: "establishment", created_at: daysFromNow(-14), expires_at: daysFromNow(-11),
+  });
+  bookingCompleted.confirm(daysFromNow(-12));
+  bookingCompleted.checkIn({ at: new Date(pastShowStart.getTime() + 10 * 60_000), by: "musician" });
+  bookingCompleted.complete(daysFromNow(-6, 23));
 
   // Booking concluído do João no mesmo evento passado. Sem ele o currículo
   // verificado (F4) mostra 0 shows para o João mesmo com a apresentação
   // registrada na seção 19: `shows_completed` conta BOOKING `completed`, não
   // performance. E é ele que dá contexto legítimo às avaliações da seção 20 —
   // `context_type: "booking"` exige um id de booking de verdade.
-  const bookingCompletedJoao = Booking.fake().aBooking()
-    .withEstablishmentId(new Uuid(e2.establishment_id.id))
-    .withMusicianId(new Uuid(m1.musician_id.id))
-    .withEventId(new Uuid(evCompleted.event_id.id))
-    .withStartAt(daysFromNow(-7, 19)).withEndAt(daysFromNow(-7, 22))
-    .withExpiresAt(daysFromNow(-9)).build();
-  bookingCompletedJoao.confirm(daysFromNow(-10));
-  bookingCompletedJoao.complete(daysFromNow(-6));
+  const bookingCompletedJoao = seedBooking({
+    est: e2, musician: m1, event: evCompleted,
+    start: pastShowStart, end: pastShowEnd, fee: 800,
+    proposed_by: "establishment", created_at: daysFromNow(-14), expires_at: daysFromNow(-11),
+  });
+  bookingCompletedJoao.confirm(daysFromNow(-12));
+  bookingCompletedJoao.checkIn({ at: new Date(pastShowStart.getTime() + 5 * 60_000), by: "musician" });
+  bookingCompletedJoao.complete(daysFromNow(-6, 23));
 
-  for (const booking of [
+  // completed + CONTESTADO, sem check-in — "o artista não apareceu". Congela a
+  // custódia do Rafael (seção 22). Contestar não exige check-in de propósito.
+  const bookingDisputed = seedBooking({
+    est: e1, musician: musicians[4],
+    start: daysFromNow(-3, 21), end: daysFromNow(-3, 23), fee: 1500,
+    proposed_by: "establishment", created_at: daysFromNow(-15), expires_at: daysFromNow(-12),
+  });
+  bookingDisputed.confirm(daysFromNow(-13));
+  bookingDisputed.complete(daysFromNow(-2, 23));
+  bookingDisputed.dispute({
+    reason: "O artista não compareceu no horário combinado e a casa ficou sem show.",
+    at: daysFromNow(-1, 10),
+  });
+
+  const soloBookings = [
     bookingPending,
+    bookingProposedByMusician,
     bookingConfirmed,
+    bookingConfirmedLater,
+    bookingPendingQualification,
     bookingCancelled,
+    bookingExpired,
     bookingCompleted,
     bookingCompletedJoao,
-  ]) {
+    bookingDisputed,
+  ];
+  for (const booking of soloBookings) {
+    assertValid("Booking", booking);
     await bookingRepo.insert(booking);
   }
+
+  // Inquiries nos cinco status. `new Inquiry` pelo mesmo motivo do booking
+  // (datas no passado); transições pelos métodos do agregado.
+  const seedInquiry = (spec: {
+    est: Establishment;
+    musician: Musician;
+    subject: string;
+    message: string;
+    created_at: Date;
+    expires_at: Date;
+  }): Inquiry =>
+    new Inquiry({
+      establishment_id: spec.est.establishment_id.id,
+      musician_id: spec.musician.musician_id.id,
+      subject: spec.subject,
+      initial_message: spec.message,
+      expires_at: spec.expires_at,
+      created_at: spec.created_at,
+      updated_at: spec.created_at,
+    });
 
   const inquiryOpen = Inquiry.fake().anInquiry()
     .withEstablishmentId(new Uuid(e1.establishment_id.id))
     .withMusicianId(new Uuid(m1.musician_id.id))
     .build();
-  await inquiryRepo.insert(inquiryOpen);
 
-  // ── 7. Chat: conversa (inquiry aberto) + mensagens ────────────────────────
+  const inquiryAccepted = seedInquiry({
+    est: e2, musician: m2, subject: "Bossa aos domingos",
+    message: "Queremos uma residência de bossa nova aos domingos no almoço.",
+    created_at: daysFromNow(-4), expires_at: daysFromNow(3),
+  });
+  inquiryAccepted.accept(daysFromNow(-3));
+
+  const inquiryRejected = seedInquiry({
+    est: e1, musician: musicians[6], subject: "Festa de fim de ano",
+    message: "Precisamos de DJ para a festa de fim de ano da casa.",
+    created_at: daysFromNow(-6), expires_at: daysFromNow(1),
+  });
+  inquiryRejected.reject(daysFromNow(-5), "Agenda de dezembro já fechada");
+
+  const inquiryExpired = seedInquiry({
+    est: establishments[2], musician: musicians[3], subject: "Roda de samba",
+    message: "Topa uma roda de samba numa sexta?",
+    created_at: daysFromNow(-10), expires_at: daysFromNow(-3),
+  });
+  inquiryExpired.expire(now);
+
+  const inquiryConverted = seedInquiry({
+    est: e1, musician: m1, subject: "Mais uma data",
+    message: "O público pediu bis: fecha mais uma noite com a gente?",
+    created_at: daysFromNow(-4), expires_at: daysFromNow(3),
+  });
+  inquiryConverted.accept(daysFromNow(-3));
+  inquiryConverted.convert(daysFromNow(-1), new Uuid(bookingConfirmedLater.booking_id.id));
+
+  for (const inquiry of [inquiryOpen, inquiryAccepted, inquiryRejected, inquiryExpired, inquiryConverted]) {
+    assertValid("Inquiry", inquiry);
+    await inquiryRepo.insert(inquiry);
+  }
+
+  // ── 7. Chat: as DUAS portas da negociação + mensagens ─────────────────────
   console.log("💬 Conversas…");
   const conversation = Conversation.create({
     inquiry_id: inquiryOpen.inquiry_id.id,
+    booking_id: null,
     establishment_id: e1.establishment_id.id,
     musician_id: m1.musician_id.id,
     band_id: null,
@@ -1031,6 +2093,52 @@ async function main() {
     await messageRepo.insert(
       Message.create({
         conversation_id: conversation.conversation_id.id,
+        sender_id: msg.sender,
+        sender_type: msg.type,
+        content: msg.text,
+      }),
+    );
+  }
+
+  /*
+   * 🔴 A SEGUNDA porta: conversa nascida de uma PROPOSTA DE SHOW.
+   *
+   * Desde 17/set/2026 `BookingProposedEvent` também abre canal, e sem uma linha
+   * assim o caminho inteiro fica intestável pelo app: nenhuma conversa teria
+   * `booking_id`, o cartão de contexto do web nunca renderizaria o ramo de
+   * booking, e a regressão só apareceria em produção. É a mesma lição que o
+   * `CLAUDE.md` já registra — "o que o seed NÃO escreve vira feature
+   * intestável, em silêncio".
+   *
+   * ⚠️ O booking escolhido é o `bookingPending` (Bar do Zé → João), porque é o
+   * único estado em que a conversa tem razão de existir na tela: proposta
+   * aberta, aguardando o artista, com cachê ainda negociável.
+   */
+  const bookingConversation = Conversation.create({
+    inquiry_id: null,
+    booking_id: bookingPending.booking_id.id,
+    establishment_id: e1.establishment_id.id,
+    musician_id: m1.musician_id.id,
+    band_id: null,
+  });
+  await conversationRepo.insert(bookingConversation);
+
+  const bookingChatMessages = [
+    {
+      sender: e1.establishment_id.id,
+      type: "establishment",
+      text: "Mandei a proposta pra sexta, das 20h às 23h. O cachê tá de acordo?",
+    },
+    {
+      sender: m1.musician_id.id,
+      type: "musician",
+      text: "Show! Só consigo começar 20h30 por causa da passagem de som — fecha assim?",
+    },
+  ] as const;
+  for (const msg of bookingChatMessages) {
+    await messageRepo.insert(
+      Message.create({
+        conversation_id: bookingConversation.conversation_id.id,
         sender_id: msg.sender,
         sender_type: msg.type,
         content: msg.text,
@@ -1076,13 +2184,18 @@ async function main() {
   // destinatário. Com tudo no evento ao vivo, o relatório do show ENCERRADO
   // nasceria zerado — e um relatório sem dinheiro nenhum não exercita a parte
   // da tela que mais importa para o músico.
+  // `at` = minutos desde o início do show. 🔴 As gorjetas do show ENCERRADO
+  // precisam cair DENTRO dele: o relatório pós-show atribui gorjeta a música
+  // por horário (`tips_during_song`), e com `created_at` = hora do seed nenhuma
+  // casava com música nenhuma — a coluna saía zerada no relatório inteiro.
   const tipSpecs = [
-    { fan: fan1, status: "completed" as const, amount: 25, event: evActive },
-    { fan: fan2, status: "completed" as const, amount: 50, event: evActive },
-    { fan: fan1, status: "pending" as const, amount: 10, event: evActive },
-    { fan: fan2, status: "failed" as const, amount: 15, event: evActive },
-    { fan: fan1, status: "completed" as const, amount: 30, event: evCompleted },
-    { fan: fan2, status: "completed" as const, amount: 20, event: evCompleted },
+    { fan: fan1, status: "completed" as const, amount: 25, event: evActive, at: 20 },
+    { fan: fan2, status: "completed" as const, amount: 50, event: evActive, at: 35 },
+    { fan: fan1, status: "pending" as const, amount: 10, event: evActive, at: 50 },
+    { fan: fan2, status: "failed" as const, amount: 15, event: evActive, at: 52 },
+    { fan: fan1, status: "completed" as const, amount: 30, event: evCompleted, at: 5 },
+    { fan: fan2, status: "completed" as const, amount: 20, event: evCompleted, at: 28 },
+    { fan: fan2, status: "completed" as const, amount: 120, event: evCompleted, at: 62 },
   ];
   for (const spec of tipSpecs) {
     const tip = Tip.fake().aTip()
@@ -1092,11 +2205,26 @@ async function main() {
       // amount explícito: o default do fake builder gera Money com >2 casas
       // decimais (chance.floating) e estoura a validação do VO
       .withAmount(new Money(spec.amount))
+      .withCreatedAt(new Date(spec.event.start_at.getTime() + spec.at * 60_000))
       .build();
     if (spec.status === "completed") tip.complete(`seed-tx-${Math.random().toString(36).slice(2, 10)}`);
     if (spec.status === "failed") tip.fail();
     await tipRepo.insert(tip);
   }
+
+  // Gorjeta ANÔNIMA com mensagem: `is_anonymous` esconde o nome na exibição,
+  // mas a identidade continua gravada (a FK de `audience_id` é obrigatória).
+  const anonymousTip = Tip.create({
+    audience_id: fan2.audience_id.id,
+    musician_id: m1.musician_id.id,
+    event_id: evActive.event_id.id,
+    amount: 15,
+    message: "Toca Raul! 🤘",
+    is_anonymous: true,
+    payment_method: PaymentMethod.PIX,
+  });
+  anonymousTip.complete(`seed-tx-${anonymousTip.tip_id.id.slice(0, 8)}`);
+  await tipRepo.insert(anonymousTip);
 
   // ── 9b. Pedidos com DESTAQUE pago (gorjeta acoplada ao pedido) ───────────
   //
@@ -1105,10 +2233,18 @@ async function main() {
   // ela. É a mesma ordem que `RespondToRequestUseCase` segue em produção — o
   // banco não deixa fazer diferente.
   //
-  // Os três estados que a UI precisa exercitar:
+  // Os cinco estados do `RequestBoost`:
   //   promised          → o card do fã antes do músico responder
   //   awaiting_payment  → o banner "conclua o PIX" e a folha do QR
   //   paid              → o selo "confirmado" e a dedicatória no palco
+  //   expired           → aceito, mas o fã não pagou na janela: perde o
+  //                       destaque, o pedido continua `accepted`
+  //   cancelled         → recusado ainda em `promised`: nenhuma cobrança nasce
+  //
+  // ⚠️ `awaiting_payment` VENCE SOZINHO: `ExpireRequestBoostsJob` roda a cada
+  // 5 min e expira o que passou de `REQUEST_BOOST_PAYMENT_WINDOW_MINUTES`
+  // (15 min) desde o aceite. Com o backend no ar, esse estado dura ~20 min
+  // depois do seed — por isso o `expired` existe semeado, e não só "esperando".
   console.log("⚡ Pedidos com destaque…");
   const boostSpecs = [
     {
@@ -1135,7 +2271,30 @@ async function main() {
       dedication: null,
       state: "promised" as const,
     },
-  ];
+    {
+      fan: fan2,
+      song: "Pais e Filhos",
+      artist: "Legião Urbana",
+      amount: 8,
+      dedication: "Pra minha irmã que tá na plateia",
+      state: "expired" as const,
+    },
+    {
+      fan: fan1,
+      song: "Asa Branca",
+      artist: "Luiz Gonzaga",
+      amount: 12,
+      dedication: null,
+      state: "cancelled" as const,
+    },
+  ] as {
+    fan: Audience;
+    song: string;
+    artist: string;
+    amount: number;
+    dedication: string | null;
+    state: "paid" | "awaiting_payment" | "promised" | "expired" | "cancelled";
+  }[];
 
   for (const spec of boostSpecs) {
     const request = Request.create({
@@ -1150,7 +2309,11 @@ async function main() {
       }),
     });
 
-    if (spec.state !== "promised") {
+    if (spec.state === "cancelled") {
+      // Recusa em `promised`: o próprio `reject()` cancela o destaque
+      // ("request_rejected"). Nenhuma gorjeta é criada — não houve cobrança.
+      request.reject("Não toco essa no formato voz e violão");
+    } else if (spec.state !== "promised") {
       // A cobrança nasce no ACEITE — nunca antes. Semear `awaiting_payment`
       // sem passar pelo aceite produziria um estado que o domínio não gera.
       request.accept();
@@ -1177,6 +2340,11 @@ async function main() {
       if (spec.state === "paid") {
         request.markBoostPaid();
       }
+      if (spec.state === "expired") {
+        // A cobrança fica `pending` para sempre — ninguém pagou. É o mesmo
+        // rastro que o job deixa.
+        request.markBoostExpired();
+      }
     }
 
     await requestRepo.insert(request);
@@ -1194,6 +2362,10 @@ async function main() {
     // João também tocou no evento passado: é o que dá histórico ao currículo
     // verificado (F4) e ao setlist inteligente (F5), que cruzam por LOCAL.
     { event: evCompleted, musician: m1, status: "confirmed" as const, fee: 800 },
+    // Único `cancelled` do line-up: saiu da Noite do Blues. Continua listado
+    // para a casa, mas NÃO passa em `MusicianMustBePerformerPolicy` (pedido) nem
+    // na elegibilidade de abrir set.
+    { event: evScheduled, musician: musicians[4], status: "cancelled" as const, fee: 500 },
   ];
   for (const spec of lineupSpecs) {
     const eventMusician = EventMusician.fake().aEventMusician()
@@ -1222,7 +2394,7 @@ async function main() {
     const attendee = EventAttendee.fake().anEventAttendee()
       .withEventId(new Uuid(spec.event.event_id.id))
       .withAudienceId(new Uuid(spec.fan.audience_id.id))
-      .withJoinedAt(daysFromNow(spec.left ? -7 : 0, 19))
+      .withJoinedAt(new Date(spec.event.start_at.getTime() + 10 * 60_000))
       .withLeftAt(spec.left ? daysFromNow(-7, 23) : null)
       .withIsActive(!spec.left)
       .build();
@@ -1283,39 +2455,66 @@ async function main() {
     await userBadgeRepo.insert(userBadge);
   }
 
-  // Ledger (UserScore = fonte de verdade) + projeção (UserPoints = resumo) —
-  // números coerentes entre si de propósito, pros dois lados do modelo
-  // poderem ser validados no app (GamificationScreen + Leaderboard).
+  // Ledger (UserScore = fonte de verdade) + projeção (UserPoints = resumo).
+  //
+  // 🔴 Pontos pelo mapa CANÔNICO (`gamification-points.ts`): scan 10, pedido
+  // 25, pedido aceito 50, gorjeta 1/real, presença 20, indicação 15,
+  // compartilhamento 10. O seed anterior dava 5 ao pedido e 15 à presença, e
+  // gravava "nível 2" com 45 pontos — que é nível 1. Agora a projeção e o
+  // ranking são CALCULADOS a partir do ledger abaixo, em vez de escritos à mão.
+  //
+  // `reference` só importa para os dois tipos com dedupe (Bloco 16): o crédito
+  // é único por (usuário, tipo, referência). Os formatos são os do use-case —
+  // `<musician_id>:<establishment_id>` na indicação e `<content_type>:<id>` no
+  // compartilhamento — então repetir a MESMA indicação/compartilhamento no app
+  // exercita o "já creditado", e uma nova credita.
   const scoreSpecs = [
     { fan: fan1, type: ScoreTypeEnum.QR_SCAN, points: 10, description: "Scan no show do João" },
-    { fan: fan1, type: ScoreTypeEnum.REQUEST_SENT, points: 5, description: "Pediu Evidências" },
+    { fan: fan1, type: ScoreTypeEnum.REQUEST_SENT, points: 25, description: "Pediu Evidências" },
+    { fan: fan1, type: ScoreTypeEnum.REQUEST_ACCEPTED, points: 50, description: "Trem-Bala foi aceito" },
+    { fan: fan1, type: ScoreTypeEnum.TIP_GIVEN, points: 25, description: "Gorjeta de R$ 25" },
+    { fan: fan1, type: ScoreTypeEnum.TIP_GIVEN, points: 30, description: "Gorjeta de R$ 30" },
+    { fan: fan1, type: ScoreTypeEnum.EVENT_ATTENDANCE, points: 20, description: "Presença no Jantar com Bossa" },
+    { fan: fan1, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou João do Blues ao Maresia", reference: `${m1.musician_id.id}:${e2.establishment_id.id}` },
+    { fan: fan1, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou Maria Bossa ao Maresia", reference: `${m2.musician_id.id}:${e2.establishment_id.id}` },
+    { fan: fan1, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou Carlão do Piano ao Bar do Zé", reference: `${musicians[2].musician_id.id}:${e1.establishment_id.id}` },
+    { fan: fan1, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou Helena Cordas ao Bar do Zé", reference: `${musicians[7].musician_id.id}:${e1.establishment_id.id}` },
     { fan: fan2, type: ScoreTypeEnum.QR_SCAN, points: 10, description: "Scan no show do João" },
-    { fan: fan2, type: ScoreTypeEnum.TIP_GIVEN, points: 20, description: "Gorjeta de R$ 50" },
-    { fan: fan2, type: ScoreTypeEnum.EVENT_ATTENDANCE, points: 15, description: "Presença no Jantar com Bossa" },
-  ];
+    { fan: fan2, type: ScoreTypeEnum.REQUEST_SENT, points: 25, description: "Pediu Wonderwall" },
+    { fan: fan2, type: ScoreTypeEnum.REQUEST_ACCEPTED, points: 50, description: "Wonderwall foi aceito" },
+    { fan: fan2, type: ScoreTypeEnum.TIP_GIVEN, points: 50, description: "Gorjeta de R$ 50" },
+    { fan: fan2, type: ScoreTypeEnum.TIP_GIVEN, points: 20, description: "Gorjeta de R$ 20" },
+    { fan: fan2, type: ScoreTypeEnum.TIP_GIVEN, points: 120, description: "Gorjeta de R$ 120" },
+    { fan: fan2, type: ScoreTypeEnum.EVENT_ATTENDANCE, points: 20, description: "Presença no Jantar com Bossa" },
+    { fan: fan2, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou Maria Bossa ao Maresia", reference: `${m2.musician_id.id}:${e2.establishment_id.id}` },
+    { fan: fan2, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou Carlão do Piano ao Bar do Zé", reference: `${musicians[2].musician_id.id}:${e1.establishment_id.id}` },
+    { fan: fan2, type: ScoreTypeEnum.INDICATION, points: 15, description: "Indicou Bia Viola ao Bar do Zé", reference: `${musicians[5].musician_id.id}:${e1.establishment_id.id}` },
+    { fan: fan2, type: ScoreTypeEnum.SOCIAL_SHARE, points: 10, description: "Compartilhou o QR do João", reference: `qr_code:${m1.musician_id.id}` },
+  ] as { fan: Audience; type: ScoreTypeEnum; points: number; description: string; reference?: string }[];
   for (const spec of scoreSpecs) {
-    const score = UserScore.fake().aUserScore()
+    const builder = UserScore.fake().aUserScore()
       .withUserId(new Uuid(spec.fan.audience_id.id))
       .withScoreType(spec.type)
       .withPoints(spec.points)
-      .withDescription(spec.description)
-      .build();
-    await userScoreRepo.insert(score);
+      .withDescription(spec.description);
+    if (spec.reference) builder.withReferenceId(spec.reference);
+    await userScoreRepo.insert(builder.build());
   }
 
-  const pointsSpecs = [
-    { fan: fan1, total: 15, scans: 1, requests: 1, tips: 0, level: 1 },
-    { fan: fan2, total: 45, scans: 1, requests: 0, tips: 1, level: 2 },
-  ];
-  for (const spec of pointsSpecs) {
+  const ledgerTotals = new Map<string, number>();
+  for (const fan of [fan1, fan2]) {
+    const mine = scoreSpecs.filter((s) => s.fan === fan);
+    const count = (type: ScoreTypeEnum) => mine.filter((s) => s.type === type).length;
+    const total = mine.reduce((acc, s) => acc + s.points, 0);
+    ledgerTotals.set(fan.audience_id.id, total);
     const points = UserPoints.fake().aUserPoints()
-      .withUserId(new Uuid(spec.fan.audience_id.id))
-      .withTotalPoints(spec.total)
-      .withTotalScans(spec.scans)
-      .withTotalRequests(spec.requests)
-      .withTotalTips(spec.tips)
-      .withTotalSocialShares(0)
-      .withCurrentLevel(spec.level)
+      .withUserId(new Uuid(fan.audience_id.id))
+      .withTotalPoints(total)
+      .withTotalScans(count(ScoreTypeEnum.QR_SCAN))
+      .withTotalRequests(count(ScoreTypeEnum.REQUEST_SENT))
+      .withTotalTips(count(ScoreTypeEnum.TIP_GIVEN))
+      .withTotalSocialShares(count(ScoreTypeEnum.SOCIAL_SHARE))
+      .withCurrentLevel(UserLevel.getLevelByPoints(total).level)
       .build();
     await userPointsRepo.insert(points);
   }
@@ -1335,14 +2534,29 @@ async function main() {
 
   // ── 14. Transações (histórico financeiro do músico 1) ─────────────────────
   console.log("🧾 Transações…");
+  // Extrato espelha EXATAMENTE o que mexeu na carteira do João (seções 1 e 22):
+  // as sete gorjetas pagas (liquidadas no Mercado Pago, só `total_earned`) e os
+  // três saques. Os saques debitam a carteira de verdade na seção 22 — inclusive
+  // o `pending`, porque o saque é RESERVA → PROVEDOR: o dinheiro sai do saldo
+  // antes da transferência confirmar.
   const transactionSpecs = [
-    { type: TransactionType.TIP, amount: 25, fee: 2.25, status: TransactionStatus.COMPLETED, fan: fan1 },
-    { type: TransactionType.TIP, amount: 50, fee: 4.5, status: TransactionStatus.COMPLETED, fan: fan2 },
-    { type: TransactionType.WITHDRAWAL, amount: 60, fee: 0, status: TransactionStatus.COMPLETED, fan: null },
-    // 5 e não 40: o saldo do João depois do saque concluído é R$ 8,25 — um
-    // saque pendente maior que o saldo não existiria na app.
-    { type: TransactionType.WITHDRAWAL, amount: 5, fee: 0, status: TransactionStatus.PENDING, fan: null },
-  ];
+    { type: TransactionType.TIP, amount: 25, fee: 2.25, status: TransactionStatus.COMPLETED, fan: fan1, daysAgo: 0 },
+    { type: TransactionType.TIP, amount: 50, fee: 4.5, status: TransactionStatus.COMPLETED, fan: fan2, daysAgo: 0 },
+    { type: TransactionType.TIP, amount: 15, fee: 1.35, status: TransactionStatus.COMPLETED, fan: fan2, daysAgo: 0 },
+    { type: TransactionType.TIP, amount: 10, fee: 0.9, status: TransactionStatus.COMPLETED, fan: fan1, daysAgo: 0 },
+    { type: TransactionType.TIP, amount: 30, fee: 2.7, status: TransactionStatus.COMPLETED, fan: fan1, daysAgo: 7 },
+    { type: TransactionType.TIP, amount: 20, fee: 1.8, status: TransactionStatus.COMPLETED, fan: fan2, daysAgo: 7 },
+    { type: TransactionType.TIP, amount: 120, fee: 10.8, status: TransactionStatus.COMPLETED, fan: fan2, daysAgo: 7 },
+    { type: TransactionType.WITHDRAWAL, amount: 60, fee: 0, status: TransactionStatus.COMPLETED, fan: null, daysAgo: 2 },
+    // Aguardando o webhook do provedor — o saldo já saiu (reserva).
+    { type: TransactionType.WITHDRAWAL, amount: 150, fee: 0, status: TransactionStatus.PENDING, fan: null, daysAgo: 1 },
+    // Recusado pelo provedor e ESTORNADO: `refundWithdrawal` devolveu saldo e
+    // `total_withdrawn`, e o motivo fica em `metadata.failure_reason`.
+    { type: TransactionType.WITHDRAWAL, amount: 200, fee: 0, status: TransactionStatus.FAILED, fan: null, daysAgo: 1, failure: "Chave PIX de destino recusada pelo banco recebedor" },
+  ] as {
+    type: TransactionType; amount: number; fee: number; status: TransactionStatus;
+    fan: Audience | null; daysAgo: number; failure?: string;
+  }[];
   for (const spec of transactionSpecs) {
     const transaction = Transaction.fake().aTransaction()
       .withMusicianId(new Uuid(m1.musician_id.id))
@@ -1350,9 +2564,11 @@ async function main() {
       .withType(spec.type)
       .withAmount(new Money(spec.amount))
       .withFee(new Money(spec.fee))
-      .withNetAmount(new Money(spec.amount - spec.fee))
+      .withNetAmount(new Money(spec.amount).subtract(new Money(spec.fee)))
       .withStatus(spec.status)
+      .withCreatedAt(spec.daysAgo === 0 ? hoursFromNow(-1) : daysFromNow(-spec.daysAgo, 15))
       .build();
+    if (spec.failure) transaction.fail(spec.failure);
     await transactionRepo.insert(transaction);
   }
 
@@ -1547,6 +2763,12 @@ async function main() {
   )) {
     repertoireM3.addSong(RepertoireSong.create({ music_library_id: item.music_library_id.id }));
   }
+  // Compartilhamento (link com token) + convite nominal ao João — as duas
+  // formas de `repertoire_sharing`, recurso do ESSENTIAL/PRO. Sem isto a tabela
+  // `repertoire_invitees` nunca tinha linha e o "repertórios compartilhados
+  // comigo" do João abria vazio. ⚠️ O token do link vence em 7 dias (`share()`).
+  repertoireM3.share();
+  repertoireM3.inviteMusician(m1.musician_id.id);
   await repertoireRepo.insert(repertoireM3);
 
   // ── 16. Assinaturas de estabelecimento (gates 4C.7 / campanhas / QRs) ─────
@@ -1564,6 +2786,23 @@ async function main() {
     });
     await subscriptionRepo.insert(subscription);
   }
+  // Estados terminais do lado estabelecimento — Savassi CANCELOU o GROWTH,
+  // Maresia deixou VENCER. Os dois seguem FREE na prática (só `active`/`trial`
+  // contam), então o 402 do analytics no Maresia continua exercitável.
+  for (const spec of [
+    { est: establishments[3], end: "cancel" as const },
+    { est: establishments[1], end: "expire" as const },
+  ]) {
+    const past = Subscription.create({
+      establishment_id: spec.est.establishment_id.id,
+      plan_tier: EstablishmentPlanTier.GROWTH,
+      persona: "establishment",
+      billing_cycle: BillingCycle.MONTHLY,
+    });
+    if (spec.end === "cancel") past.cancel();
+    else past.expire();
+    await subscriptionRepo.insert(past);
+  }
 
   // ── 17. Bandas (opt-in de radar + convite com estado, jul/2026) ───────────
   console.log("🥁 Bandas…");
@@ -1576,6 +2815,8 @@ async function main() {
     .withName("Carlão Trio")
     .withDescription("Trio de jazz e samba para eventos")
     .withGenres(["Jazz", "Samba"])
+    // Tempo de estrada longo — o caso em que o selo pesa na decisão da casa.
+    .withFormedIn(2011)
     .withMembers([
       { musician_id: new Uuid(musicians[2].musician_id.id), role: "leader", instrument: "Piano", status: "accepted", joined_at: daysFromNow(-90), responded_at: daysFromNow(-90) },
       { musician_id: new Uuid(m1.musician_id.id), role: "member", instrument: "Guitarra", status: "accepted", joined_at: daysFromNow(-60), responded_at: daysFromNow(-60) },
@@ -1604,6 +2845,17 @@ async function main() {
     .withName("Blues Duo")
     .withDescription("Duo de blues e rock para bares")
     .withGenres(["Blues", "Rock"])
+    /*
+     * 🔴 SEM `formed_in`, de propósito — e é a banda do João justamente porque
+     * ele é quem tem login real: é o único jeito de exercitar, pelo app, o
+     * caminho de DECLARAR o ano (e de apagá-lo depois).
+     *
+     * Do lado do estabelecimento cobre o outro lado do par: a ausência do selo
+     * de tempo de estrada, que é diferente de "zero anos". Semear as quatro
+     * bandas com ano deixaria o ramo "não informado" da UI sem ninguém para
+     * exercitá-lo — o padrão que o seed já registrou em `accepts_requests_
+     * outside_repertoire` e em `email_verified_at`.
+     */
     .withMembers([
       { musician_id: new Uuid(m1.musician_id.id), role: "leader", instrument: "Violão", status: "accepted", joined_at: daysFromNow(-20), responded_at: daysFromNow(-20) },
       { musician_id: new Uuid(m2.musician_id.id), role: "member", instrument: "Voz", status: "pending", joined_at: daysFromNow(-1), responded_at: null },
@@ -1629,6 +2881,7 @@ async function main() {
       name: "Elétrica Coletivo",
       description: "Banda de rock e pop para casas noturnas",
       genres: ["Rock", "Pop"],
+      formed_in: 2018,
       // ~3 km do Bar do Zé — entra em raio curto.
       location: new Location({
         city: "São Paulo", state: "SP",
@@ -1645,6 +2898,9 @@ async function main() {
       name: "Raízes do Sul",
       description: "Sertanejo raiz e viola caipira",
       genres: ["Sertanejo", "Forró"],
+      // Formada este ano: o extremo oposto do Carlão Trio, e o valor que
+      // prova na tela que "1 ano" não sai escrito como "1 anos".
+      formed_in: new Date().getFullYear(),
       // Guarulhos — fora de um raio de 10 km, dentro de 50 km. Espelha a
       // Beatriz, para o filtro de raio dar o mesmo resultado nas duas abas.
       location: new Location({
@@ -1665,6 +2921,7 @@ async function main() {
         .withName(spec.name)
         .withDescription(spec.description)
         .withGenres(spec.genres)
+        .withFormedIn(spec.formed_in)
         .withMembers(spec.members)
         .withOpenToGigs(true)
         .withAddress(spec.location)
@@ -1695,6 +2952,67 @@ async function main() {
       }
     }
   }
+
+  // ── 17b. Agenda e shows das bandas ────────────────────────────────────────
+  //
+  // Depois das bandas por causa da FK `bookings.bandId -> bands.id`.
+  console.log("🥁 Agenda e shows das bandas…");
+
+  // Agenda da Blues Duo — a tela "Disponibilidade da banda" do líder abria
+  // vazia: `band_calendar_settings`/`band_availability_rules`/`band_unavailability`
+  // não tinham uma linha sequer. A agenda da banda é independente da dos
+  // membros (a proposta de banda não consulta a agenda de ninguém).
+  await availabilityRepo.insert(
+    Availability.fake()
+      .aAvailability()
+      .withMusicianId(null)
+      .withBandId(new Uuid(bandJoao.band_id.id))
+      .withTimezone("America/Sao_Paulo")
+      .withDefaultBufferMinutes(45)
+      .withMaxShowsPerDay(1)
+      .withWeeklyRules([
+        { weekday: 4, start_time: "19:00", end_time: "23:59" }, // quintas
+        { weekday: 5, start_time: "19:00", end_time: "23:59" }, // sextas
+      ])
+      .withUnavailabilities([
+        { start_at: daysFromNow(12, 0), end_at: daysFromNow(13, 23), reason: "Gravação do EP" },
+      ])
+      .build(),
+  );
+
+  // pending de BANDA — só o LÍDER (João) confirma; claim `band_ids` não basta.
+  // Numa SEXTA, dentro da agenda da banda acima.
+  const bandPendingStart = nextWeekday(20, 5, 20);
+  const bookingBandPending = seedBooking({
+    est: e1, band: bandJoao,
+    start: bandPendingStart, end: plusHours(bandPendingStart, 3), fee: 1500,
+    proposed_by: "establishment", created_at: hoursFromNow(-6), expires_at: daysFromNow(6),
+  });
+
+  // confirmed de BANDA, com evento e contrato (seção 21). O contratado é o
+  // líder pessoa física (Carlos, CPF), com os integrantes NOMEADOS no objeto.
+  const bookingBandConfirmed = seedBooking({
+    est: establishments[3], band, event: evSavassi,
+    start: evSavassi.start_at, end: new Date(evSavassi.start_at.getTime() + 2.5 * 3600_000), fee: 2000,
+    proposed_by: "establishment", created_at: daysFromNow(-4), expires_at: daysFromNow(-2),
+  });
+  bookingBandConfirmed.confirm(daysFromNow(-3));
+
+  for (const booking of [bookingBandPending, bookingBandConfirmed]) {
+    assertValid("Booking de banda", booking);
+    await bookingRepo.insert(booking);
+  }
+
+  // Line-up com BANDA (e não músico): `band_id` preenchido, `musician_id` nulo.
+  await eventMusicianRepo.insert(
+    EventMusician.fake().aEventMusician()
+      .withEventId(new Uuid(evSavassi.event_id.id))
+      .withMusicianId(null)
+      .withBandId(new Uuid(band.band_id.id))
+      .withStatus("confirmed")
+      .withFee(2000)
+      .build(),
+  );
 
   // ── 18. Cifras pessoais (Bloco 8) — overlay de edições, nunca cópia ────────
   //
@@ -1807,6 +3125,30 @@ async function main() {
   ipanemaSheet.changeNotes("Harmonia de bossa mais próxima do original.");
   ipanemaSheet.share("community");
   await personalChordSheetRepo.insert(ipanemaSheet);
+
+  // 4) Fly Me to the Moon do Carlos, compartilhada só com a BANDA — o terceiro
+  //    escopo, que faltava. O João lê porque é membro `accepted` da Carlão Trio;
+  //    a Maria (convite `pending` na Blues Duo, sem vínculo com o Carlos) não.
+  //    As `notes` continuam redigidas para o João: não é o dono.
+  const flyCarlos = libraryOf(musicians[2], "Fly Me to the Moon");
+  const flyBase = await fingerprintOf(musicians[2], flyCarlos);
+  const flySheet = PersonalChordSheet.create({
+    musician_id: musicians[2].musician_id.id,
+    music_library_id: flyCarlos.music_library_id.id,
+    base_fingerprint: flyBase.fingerprint,
+    base_pipeline_version: CHORD_SHEET_FINGERPRINT_VERSION,
+  });
+  if (flyBase.timeline.length >= 2) {
+    flySheet.addEdit(
+      ChordEdit.annotate({
+        at_ms: flyBase.timeline[1].startMs,
+        text: "Guitarra entra aqui com a levada de swing.",
+      }),
+    );
+  }
+  flySheet.changeNotes("Tom do ensaio de quinta — não mudar sem avisar a banda.");
+  flySheet.share("band");
+  await personalChordSheetRepo.insert(flySheet);
 
   // ── 19. Apresentações ao vivo (Bloco 11) ──────────────────────────────────
   //
@@ -1944,6 +3286,124 @@ async function main() {
     await reviewRepo.insert(review);
   }
 
+  /*
+   * ── 20a. Ledger que sustenta a nota exibida ──────────────────────────────
+   *
+   * 🔴 DOIS defeitos de seed que este bloco fecha, e os dois eram invisíveis:
+   *
+   * 1. **Projeção sem lastro.** Ana, Rafa, Bia e Helena recebiam a nota por
+   *    `syncRatingProjection` na seção 1, com ZERO linhas em `reviews`. O
+   *    comentário de lá já avisava que a primeira avaliação real apagaria o
+   *    número — a projeção é recalculada sobre o ledger inteiro. Ou seja: a
+   *    nota do seed era uma afirmação que o banco não sustentava.
+   * 2. **João tinha o inverso.** Ele ganhou duas avaliações de verdade no
+   *    bloco acima (casa 5 + fã 5) e continuava com `rating = 0`, porque
+   *    `reviewRepo.insert` NÃO recalcula projeção — só o `SubmitReviewUseCase`
+   *    faz. O cartão dele dizia "Sem avaliações" enquanto
+   *    `GET /musicians/:id/ratings` devolvia duas.
+   *
+   * A correção é a mesma para os dois: semear o LEDGER e derivar a projeção
+   * dele, na mesma ordem que o use-case real usa. Depois deste bloco, nota
+   * exibida e avaliações listadas contam a mesma história.
+   *
+   * ⚠️ As notas foram escolhidas para que a média CONTINUE caindo nos valores
+   * já documentados (4.8 / 4.2 / 3.6 / 5.0) — o número do seed segue sendo
+   * reconhecível, agora com lastro.
+   *
+   * ⚠️ E cada músico recebe avaliação de PÚBLICO **e** de ESTABELECIMENTO, de
+   * propósito: é o que dá dado a `GET /musicians/:id/ratings/summary` (a
+   * quebra por tipo de autor). Semear só um dos lados deixaria metade da tela
+   * sem nada para mostrar — o padrão "o que o seed não escreve vira feature
+   * intestável, em silêncio".
+   *
+   * ⚠️ `author_id` e `context_id` aqui são UUIDs sintéticos: nenhuma das duas
+   * colunas tem FK, e a prova de vínculo (`ReviewEligibilityService`) só roda
+   * na ESCRITA por HTTP. São avaliações históricas de gente que não precisa
+   * existir como linha — o que não vale para as três acima, que referenciam
+   * booking e evento reais de propósito.
+   */
+  const ratingLedgerSpecs = [
+    // Ana Batuque — 4.8 (27): a melhor avaliada da busca, e FREE.
+    { musician: musicians[3], establishment: [5, 5, 5, 5, 4, 5], audience: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4] },
+    // Rafa Sax — 4.2 (11): PRO, e é o contraste que interessa na faixa
+    // "Em destaque" (aparece destacado com nota MENOR que a da Ana).
+    { musician: musicians[4], establishment: [5, 4, 4, 3], audience: [5, 5, 4, 4, 4, 4, 4] },
+    // Bia Viola — 3.6 (5): o caso do print, e o que mais precisa da quebra —
+    // 3,5 do público contra 3,5 das casas conta uma história diferente de
+    // "3,6 de todo mundo".
+    { musician: musicians[5], establishment: [4, 3], audience: [5, 4, 2] },
+    // Helena Cordas — 5.0 (3): nota cheia com amostra pequena. É o caso que
+    // justifica a quebra vir SEMPRE com o total ao lado.
+    { musician: musicians[7], establishment: [5], audience: [5, 5] },
+  ];
+
+  for (const spec of ratingLedgerSpecs) {
+    const targetId = spec.musician.musician_id.id;
+    const rows = [
+      ...spec.establishment.map((rating) => ({ rating, author_type: "establishment" as const, context_type: "booking" as const })),
+      ...spec.audience.map((rating) => ({ rating, author_type: "audience" as const, context_type: "event" as const })),
+    ];
+    for (const row of rows) {
+      await reviewRepo.insert(
+        Review.create({
+          target_type: "musician", target_id: targetId,
+          author_type: row.author_type, author_id: new Uuid().id,
+          rating: row.rating,
+          context_type: row.context_type, context_id: new Uuid().id,
+        }),
+      );
+    }
+  }
+
+  /*
+   * Projeção derivada do ledger — a MESMA ordem do `SubmitReviewUseCase`:
+   * agrega no banco, grava na projeção. Escrever a média à mão aqui
+   * reintroduziria a divergência que este bloco existe para fechar.
+   *
+   * 🔴 RECARREGA o agregado antes de gravar — é o que o use-case real também
+   * faz (`findById` → `syncRatingProjection` → `update`). As instâncias do
+   * array `musicians` são de ANTES dos uploads de áudio e foto: os use-cases
+   * de upload carregam uma cópia própria pelo repositório e salvam nela, então
+   * o objeto do array continua com `avatar`/`presentation_audio` nulos. Gravar
+   * aquela instância zerava a mídia de todo músico COM avaliação (João, Rafa,
+   * Bia perdiam a foto; João e Rafa, o áudio), sem erro nenhum — e a grade de
+   * `/dashboard/artistas` não mostrava foto nenhuma, porque os únicos que
+   * sobravam com avatar (Maria e Carlão) não aparecem nela. Achado em
+   * 18/set/2026 comparando o banco com a lista de fotos do bloco 1c.
+   */
+  for (const seeded of musicians) {
+    const { average, total } = await reviewRepo.aggregateForTarget({
+      target_type: "musician",
+      target_id: seeded.musician_id.id,
+    });
+    if (total === 0) continue;
+    const musician = await musicianRepo.findById(seeded.musician_id);
+    if (!musician) continue;
+    musician.syncRatingProjection(average, total);
+    await musicianRepo.update(musician);
+  }
+
+  // O estabelecimento avaliado pelo músico também precisa da projeção — sem
+  // isto a nota do Maresia fica 0 com uma avaliação no ledger, que é o mesmo
+  // defeito do João, do outro lado.
+  {
+    const { average, total } = await reviewRepo.aggregateForTarget({
+      target_type: "establishment",
+      target_id: e2.establishment_id.id,
+    });
+    if (total > 0) {
+      // Recarregado, não o `e2` do array: mesma armadilha do laço de músico
+      // acima. Hoje nada escreve no Maresia entre a criação e aqui (capa fica
+      // NULL nos quatro), mas o `update` grava o modelo INTEIRO — a primeira
+      // capa semeada por use-case seria apagada em silêncio.
+      const establishment = await establishmentRepo.findById(e2.establishment_id);
+      if (establishment) {
+        establishment.syncRatingProjection(average, total);
+        await establishmentRepo.update(establishment);
+      }
+    }
+  }
+
   // ── 20b. Indicações de talento (28/set/2026) — os três estados da caixa ───
   //
   // Antes desta tabela a indicação era DESCARTADA: `IndicateMusicianUseCase` só
@@ -1972,6 +3432,29 @@ async function main() {
   });
   archivedIndication.archive();
 
+  // Bar do Zé (`bar1@`) — a conta de estabelecimento usada por padrão no web.
+  // Só o Maresia tinha linhas, e quem entrava como bar1 via a caixa vazia.
+  // Artistas que NÃO tocam no Zé (o João, a Ana, o DJ Diego e o Rafa — este
+  // com show contestado por não comparecer — já têm booking lá). O Carlão com
+  // DUAS vozes NOVAS é o caso que o Maresia não cobre: lá as duas vozes da
+  // Maria Bossa já foram vista/arquivada, então nada de "mais pedido" com recado
+  // novo no letreiro. Cada linha tem o lançamento INDICATION casado no ledger
+  // (seção 12) — indicação sem os 15 pontos seria dado que o app nunca produz.
+  const barSeenIndication = Indication.create({
+    audience_id: fan2.audience_id.id,
+    musician_id: musicians[5].musician_id.id,
+    establishment_id: e1.establishment_id.id,
+    message: "A Bia faz um forró que levanta até quem veio só pra beber.",
+  });
+  barSeenIndication.markAsSeen();
+
+  const barArchivedIndication = Indication.create({
+    audience_id: fan1.audience_id.id,
+    musician_id: musicians[7].musician_id.id,
+    establishment_id: e1.establishment_id.id,
+  });
+  barArchivedIndication.archive();
+
   for (const indication of [
     // `new` é o que alimenta o badge da caixa.
     Indication.create({
@@ -1982,88 +3465,256 @@ async function main() {
     }),
     seenIndication,
     archivedIndication,
+    Indication.create({
+      audience_id: fan1.audience_id.id,
+      musician_id: musicians[2].musician_id.id,
+      establishment_id: e1.establishment_id.id,
+      message: "O Carlão toca um blues no piano que parece de outro tempo. Ia encaixar demais nas noites do Zé.",
+    }),
+    Indication.create({
+      audience_id: fan2.audience_id.id,
+      musician_id: musicians[2].musician_id.id,
+      establishment_id: e1.establishment_id.id,
+      message: "Vi num sarau e fiquei até o fim. Traz ele pra cá!",
+    }),
+    barSeenIndication,
+    barArchivedIndication,
   ]) {
     await indicationRepo.insert(indication);
   }
 
-  // ── 21. Contratos digitais (Bloco 10) — os três estados que a UI mostra ───
+  // ── 21. Contratos digitais (Bloco 10) — emitidos pelo use-case real ──────
   //
-  // Emitido → assinado por uma parte → assinado pelas duas. É o ciclo que as
-  // duas telas (web B3 e mobile B4) filtram: "aguardando você" só aparece se
-  // existir um contrato em que a SUA parte ainda não assinou.
+  // 🔴 Emitidos pelo `IssueContractUseCase`, e não pelo `Contract.fake()`.
+  // O fake carimba variáveis FIXAS — show em "12 de setembro de 2026", emitido
+  // em "1 de agosto de 2026", partes "Bar do Zé Ltda."/"Ana Ribeiro", cachê
+  // R$1.500 — em TODO contrato. Era a data que "vencia" no fim de semana: rodar
+  // o seed de novo não mudava nada, porque não vinha de `daysFromNow`. E o
+  // contrato nem batia com o próprio booking (que não tinha cachê nenhum).
+  //
+  // Pelo use-case, data, horário (no fuso da casa), partes, cachê, variante de
+  // cláusula e hash saem do booking real — o mesmo caminho do
+  // `ContractIssuanceHandler`. `clock` = data da confirmação, que é quando o
+  // evento real dispararia a emissão.
+  //
+  // Os quatro status (`issued`, `partially_signed` nos DOIS sentidos, `signed`,
+  // `annulled`), as variantes que dependem do cadastro (ficha técnica com Anexo
+  // I, banda com integrantes nomeados, MEI como pessoa jurídica) e a pendência
+  // de qualificação (show confirmado que NÃO gera contrato).
   console.log("📄 Contratos…");
   const contractRepo = new ContractPrismaRepository(prisma);
+  const contractStorage = await createSeedContractStorage();
+  const contractRenderer = new ReactPdfContractRenderer();
+  const clauseCatalog = new ClauseCatalog();
 
-  const contractsSpec = [
-    { booking: bookingConfirmed, est: e1, musician: m1, sign: [] as ("contractor" | "contracted")[] },
-    { booking: bookingCompletedJoao, est: e2, musician: m1, sign: ["contractor"] as ("contractor" | "contracted")[] },
-    { booking: bookingCompleted, est: e2, musician: m2, sign: ["contractor", "contracted"] as ("contractor" | "contracted")[] },
+  type ContractRole = "contractor" | "contracted";
+  const contractsSpec: {
+    label: string;
+    booking: Booking;
+    est: Establishment;
+    // Quem assina pelo contratado: o músico, ou o LÍDER em show de banda.
+    contractedSigner: Musician;
+    expect: "issued" | "missing";
+    sign?: { role: ContractRole; at: Date }[];
+    annul?: { reason: string; at: Date };
+  }[] = [
+    { label: "Noite do Blues — João × Bar do Zé (Anexo I)", booking: bookingConfirmed, est: e1, contractedSigner: m1, expect: "issued" },
+    { label: "Data extra — João × Bar do Zé", booking: bookingConfirmedLater, est: e1, contractedSigner: m1, expect: "issued" },
+    {
+      label: "Jazz na Savassi — Carlão Trio (líder assinou, falta a casa)",
+      booking: bookingBandConfirmed, est: establishments[3], contractedSigner: musicians[2], expect: "issued",
+      sign: [{ role: "contracted", at: daysFromNow(-2, 11) }],
+    },
+    {
+      label: "Jantar com Bossa — João × Maresia (casa assinou, falta o João)",
+      booking: bookingCompletedJoao, est: e2, contractedSigner: m1, expect: "issued",
+      sign: [{ role: "contractor", at: daysFromNow(-11, 10) }],
+    },
+    {
+      label: "Jantar com Bossa — Maria × Maresia (assinado)",
+      booking: bookingCompleted, est: e2, contractedSigner: m2, expect: "issued",
+      sign: [
+        { role: "contractor", at: daysFromNow(-11, 10) },
+        { role: "contracted", at: daysFromNow(-11, 18) },
+      ],
+    },
+    {
+      label: "Show contestado — Rafa Sax (MEI) × Bar do Zé (assinado)",
+      booking: bookingDisputed, est: e1, contractedSigner: musicians[4], expect: "issued",
+      sign: [
+        { role: "contractor", at: daysFromNow(-12, 10) },
+        { role: "contracted", at: daysFromNow(-12, 14) },
+      ],
+    },
+    {
+      label: "Show cancelado — Maria × Maresia (anulado)",
+      booking: bookingCancelled, est: e2, contractedSigner: m2, expect: "issued",
+      annul: { reason: "Show cancelado pelo estabelecimento antes das assinaturas (reforma na casa).", at: daysFromNow(-2, 12) },
+    },
+    { label: "Bia Viola × Maresia", booking: bookingPendingQualification, est: e2, contractedSigner: musicians[5], expect: "missing" },
   ];
 
-  for (const [index, spec] of contractsSpec.entries()) {
-    const contract = Contract.fake().aContract()
-      .withBookingId(spec.booking.entity_id.id)
-      .withEstablishmentId(spec.est.establishment_id.id)
-      .withMusicianId(spec.musician.musician_id.id)
-      .build();
+  const contractSummary: string[] = [];
+  for (const spec of contractsSpec) {
+    const issuedAt = spec.booking.confirmed_at ?? now;
+    const issueContract = new IssueContractUseCase({
+      contractRepo,
+      bookingRepo,
+      establishmentRepo,
+      musicianRepo,
+      bandRepo,
+      catalog: clauseCatalog,
+      renderer: contractRenderer,
+      storage: contractStorage.storage,
+      // Mesmas envs e defaults do `contract.providers.ts`.
+      issuer: {
+        legal_name: loadEnvValue("CONTRACT_ISSUER_LEGAL_NAME", "SoundMeet"),
+        document: loadEnvValue("CONTRACT_ISSUER_DOCUMENT", "00000000000000"),
+      },
+      verificationBaseUrl: loadEnvValue("CONTRACT_VERIFICATION_BASE_URL", "https://soundmeet.com.br/contrato"),
+      escrow: {
+        enabled: loadEnvValue("ESCROW_ENABLED", "false") === "true",
+        custodian_legal_name: loadEnvValue("ESCROW_CUSTODIAN_LEGAL_NAME", ""),
+      },
+      clock: { now: () => issuedAt },
+    });
 
-    for (const role of spec.sign) {
+    // `null` = caminho do sistema (o handler do evento), sem ator HTTP.
+    const result = await issueContract.execute({
+      booking_id: spec.booking.booking_id.id,
+      requesting_participant_ids: null,
+    });
+
+    if (!result.issued) {
+      if (spec.expect !== "missing") {
+        throw new Error(`Contrato "${spec.label}" não foi emitido: faltou ${result.missing.join(", ")}`);
+      }
+      contractSummary.push(`${spec.label}: SEM contrato — pendência ${result.missing.join(", ")}`);
+      continue;
+    }
+    if (spec.expect === "missing") {
+      throw new Error(`Contrato "${spec.label}" deveria ficar pendente e foi emitido — a pendência de qualificação perdeu cobertura.`);
+    }
+
+    const contract = (await contractRepo.findCurrentByBookingId(spec.booking.booking_id.id))!;
+    for (const signature of spec.sign ?? []) {
       contract.sign({
-        role,
+        role: signature.role,
         // `sub` de quem assinou: o estabelecimento assina pela conta que opera
-        // a casa; o músico, pela dele. Não é o id do aggregate do
-        // estabelecimento — é o usuário autenticado.
+        // a casa; o contratado, pela dele (o líder, em banda). Não é o id do
+        // aggregate do estabelecimento — é o usuário autenticado.
         signer_user_id:
-          role === "contractor"
+          signature.role === "contractor"
             ? (keycloakSubs.get(spec.est.email.value) ?? spec.est.establishment_id.id)
-            : spec.musician.musician_id.id,
-        signed_at: daysFromNow(-2 - index),
+            : spec.contractedSigner.musician_id.id,
+        signed_at: signature.at,
         ip: "203.0.113.10",
         ip_source: "direct",
         user_agent: "SoundMeetSeed/1.0",
       });
     }
-
-    await contractRepo.insert(contract);
+    if (spec.annul) contract.annul(spec.annul.reason, spec.annul.at);
+    assertValid(`Contrato "${spec.label}"`, contract);
+    if (spec.sign?.length || spec.annul) await contractRepo.update(contract);
+    contractSummary.push(`${spec.label}: ${contract.status} · código ${contract.verification_code}`);
   }
 
-  // ── 22. Custódia do cachê (F1.3a) — estados locais, sem gateway ───────────
+  // ── 22. Custódia do cachê (F1.3a) — os cinco estados, sem gateway ─────────
   //
   // 🔴 `held_balance` é ESPELHO do que está retido na subconta do músico na
   // instituição de pagamento, nunca fonte. O seed escreve os dois lados juntos
   // (custódia + carteira) porque é assim que o fluxo real deixa o sistema;
   // escrever só a custódia daria uma tela de carteira mentindo sobre o retido.
+  //
+  // Toda custódia é de booking CONFIRMADO: ela nasce no `BookingConfirmedEvent`.
+  // O seed anterior pendurava uma custódia `pending` num booking PENDENTE —
+  // estado que o domínio nunca produz (`booking_not_confirmed`).
+  //
+  // Comissão de 10% (`booking_fee_percentage`, igual nos três tiers).
   console.log("🔒 Custódia do cachê…");
   const escrowRepo = new BookingEscrowPrismaRepository(prisma);
+  const walletOf = async (musician: Musician) => {
+    const wallet = await walletRepo.findByMusicianId(musician.musician_id.id);
+    if (!wallet) throw new Error(`Carteira não encontrada no seed (${musician.name})`);
+    return wallet;
+  };
 
-  const escrowHeld = BookingEscrow.create({
-    booking_id: bookingConfirmed.entity_id.id,
-    musician_id: m1.musician_id.id,
-    amount: 900,
-    platform_fee_percentage: 10,
-  });
-  escrowHeld.markHeld({
-    external_id: "seed-asaas-escrow-001",
-    expires_at: daysFromNow(30),
-  });
-  await escrowRepo.insert(escrowHeld);
+  const escrowSpecs: {
+    booking: Booking;
+    musician: Musician;
+    flow: "pending" | "held" | "released" | "refunded" | "disputed";
+    // Liberação pelo job: D+5 do fim do show no FREE, D+2 nos pagos.
+    releaseAfterDays?: number;
+  }[] = [
+    // Cobrança gerada, casa ainda não pagou.
+    { booking: bookingConfirmedLater, musician: m1, flow: "pending" },
+    // Pago e retido; show ainda vai acontecer — sem check-in, o job não libera.
+    { booking: bookingConfirmed, musician: m1, flow: "held" },
+    // Show feito, check-in registrado, prazo cumprido → liberado. É daqui que
+    // sai o saldo SACÁVEL do João e da Maria.
+    { booking: bookingCompletedJoao, musician: m1, flow: "released", releaseAfterDays: 5 },
+    { booking: bookingCompleted, musician: m2, flow: "released", releaseAfterDays: 2 },
+    // Show cancelado pela casa → devolvido. Nunca passa pelo saldo do músico.
+    { booking: bookingCancelled, musician: m2, flow: "refunded" },
+    // Contestado pela casa → congelado para mediação humana. O Rafael fica com
+    // valor retido, o que também torna testável a recusa de `disableEscrow`.
+    { booking: bookingDisputed, musician: musicians[4], flow: "disputed" },
+  ];
 
-  const escrowPending = BookingEscrow.create({
-    booking_id: bookingPending.entity_id.id,
-    musician_id: m1.musician_id.id,
-    amount: 1200,
-    platform_fee_percentage: 10,
-  });
-  await escrowRepo.insert(escrowPending);
+  for (const [index, spec] of escrowSpecs.entries()) {
+    const booking = spec.booking;
+    const escrow = BookingEscrow.create({
+      booking_id: booking.booking_id.id,
+      musician_id: spec.musician.musician_id.id,
+      amount: booking.fee!,
+      platform_fee_percentage: 10,
+    });
+    const reference = `seed-asaas-escrow-${String(index + 1).padStart(3, "0")}`;
+    const confirmedAt = booking.confirmed_at!;
+    escrow.attachCharge({ external_id: reference, expires_at: null, at: plusHours(confirmedAt, 1) });
 
-  // Espelha o retido na carteira do João. O valor é o LÍQUIDO (net_amount):
-  // a comissão só vira receita da plataforma na liberação, então ela nunca
-  // aparece como retido do músico.
-  const joaoWallet = await walletRepo.findByMusicianId(m1.musician_id.id);
-  if (joaoWallet) {
-    joaoWallet.holdFunds(escrowHeld.net_amount.amount);
-    await walletRepo.update(joaoWallet);
+    const wallet = await walletOf(spec.musician);
+    const net = escrow.net_amount.amount;
+
+    if (spec.flow !== "pending") {
+      escrow.markHeld({
+        external_id: reference,
+        // Garantia ativa por 30 dias após o fim do show (`null` = garantia
+        // inativa, que o job trata como erro).
+        expires_at: new Date(booking.end_at.getTime() + 30 * 24 * 3600_000),
+        at: plusHours(confirmedAt, 20),
+      });
+      wallet.holdFunds(net);
+    }
+    if (spec.flow === "released") {
+      escrow.release({ at: new Date(booking.end_at.getTime() + spec.releaseAfterDays! * 24 * 3600_000) });
+      wallet.releaseHeldFunds(net);
+    }
+    if (spec.flow === "refunded") {
+      escrow.refund({ reason: "Show cancelado pelo estabelecimento (reforma na casa).", at: booking.cancelled_at! });
+      wallet.refundHeldFunds(net);
+    }
+    if (spec.flow === "disputed") {
+      escrow.dispute({ reason: booking.dispute_reason!, at: booking.disputed_at! });
+    }
+
+    assertValid("Custódia", escrow);
+    assertValid("Carteira", wallet);
+    await escrowRepo.insert(escrow);
+    await walletRepo.update(wallet);
   }
+
+  // Saques do João DEPOIS da liberação — é dela que vem o saldo sacável.
+  // Espelham as três transações de saque da seção 14:
+  //   720 liberados − 60 (concluído) − 150 (pendente, já reservado) = R$510
+  //   200 recusados pelo provedor: debitados e ESTORNADOS (saldo e total_withdrawn)
+  const joaoWallet = await walletOf(m1);
+  joaoWallet.withdrawFunds(60);
+  joaoWallet.withdrawFunds(150);
+  joaoWallet.withdrawFunds(200);
+  joaoWallet.refundWithdrawal(200);
+  assertValid("Carteira do João", joaoWallet);
+  await walletRepo.update(joaoWallet);
 
   // ── 23. Jobs de IA (ai-cifra e ai-audio) em todos os estados ──────────────
   //
@@ -2085,6 +3736,10 @@ async function main() {
     object_key: `ai-cifra/${m1.musician_id.id}/seed-tempo-perdido/original.mp3`,
     upload_method: "direct",
   });
+  // O upload acompanha o job: antes ficava `uploaded` com o job a 45%, par que
+  // o worker nunca produz.
+  cifraUpload.markAnalysisQueued();
+  cifraUpload.markAnalyzing();
   await aiCifraUploadRepo.insert(cifraUpload);
 
   // Em ANDAMENTO de propósito: é o estado que a tela de análise mostra e que
@@ -2098,6 +3753,69 @@ async function main() {
   cifraJob.start();
   cifraJob.updateProgress({ progress_percent: 45, progress_stage: "separating" });
   await aiCifraJobRepo.insert(cifraJob);
+
+  // CONCLUÍDA — o histórico de análises do João não pode ter só o "em
+  // andamento". Aponta para "Evidências", que TEM cifra na seção 15 (é o que
+  // uma análise concluída deixa materializado). O resultado casa com a
+  // biblioteca: mesmo tom, mesmo andamento.
+  const cifraUploadDone = AiCifraUpload.create({
+    musician_id: m1.musician_id.id,
+    music_library_id: libraryOf(m1, "Evidências").entity_id.id,
+    original_filename: "evidencias.mp3",
+    content_type: "audio/mpeg",
+    file_size: 4_194_304,
+    object_key: `ai-cifra/${m1.musician_id.id}/seed-evidencias/original.mp3`,
+    upload_method: "direct",
+  });
+  cifraUploadDone.markAnalysisQueued();
+  cifraUploadDone.markAnalyzing();
+  cifraUploadDone.markAnalyzed();
+  await aiCifraUploadRepo.insert(cifraUploadDone);
+  const cifraJobDone = AiCifraAnalysisJob.create({
+    ai_cifra_upload_id: cifraUploadDone.entity_id.id,
+    musician_id: m1.musician_id.id,
+    model_id: "chordformer-v24",
+  });
+  cifraJobDone.start();
+  cifraJobDone.complete(
+    new AiCifraAnalysisResult({
+      bpm: 132,
+      key: "G",
+      time_signature: "4/4",
+      chords: [
+        { start_seconds: 0, end_seconds: 1.82, chord: "G:maj", confidence: 0.93 },
+        { start_seconds: 1.82, end_seconds: 3.64, chord: "E:min", confidence: 0.91 },
+        { start_seconds: 3.64, end_seconds: 5.45, chord: "C:maj", confidence: 0.9 },
+        { start_seconds: 5.45, end_seconds: 7.27, chord: "D:maj", confidence: 0.92 },
+      ],
+      segments: [{ start_seconds: 0, end_seconds: 7.27, label: "Intro", confidence: 0.88 }],
+    }),
+  );
+  await aiCifraJobRepo.insert(cifraJobDone);
+
+  // FALHOU — o card de erro com motivo, na biblioteca do Carlos ("Águas de
+  // Março", que segue sem cifra justamente por isso).
+  const cifraUploadFailed = AiCifraUpload.create({
+    musician_id: musicians[2].musician_id.id,
+    music_library_id: libraryOf(musicians[2], "Águas de Março").entity_id.id,
+    original_filename: "aguas-de-marco.m4a",
+    content_type: "audio/mp4",
+    file_size: 3_145_728,
+    object_key: `ai-cifra/${musicians[2].musician_id.id}/seed-aguas-de-marco/original.m4a`,
+    upload_method: "direct",
+  });
+  cifraUploadFailed.markAnalysisQueued();
+  cifraUploadFailed.markAnalyzing();
+  cifraUploadFailed.markAnalysisFailed("Não foi possível decodificar o áudio enviado.");
+  await aiCifraUploadRepo.insert(cifraUploadFailed);
+  const cifraJobFailed = AiCifraAnalysisJob.create({
+    ai_cifra_upload_id: cifraUploadFailed.entity_id.id,
+    musician_id: musicians[2].musician_id.id,
+    model_id: "chordformer-v24",
+  });
+  cifraJobFailed.start();
+  cifraJobFailed.fail("audio_decode_failed", "Não foi possível decodificar o áudio enviado.");
+  await aiCifraJobRepo.insert(cifraJobFailed);
 
   // ai-audio: um job CONCLUÍDO (Modo Ensaio utilizável sem GPU) e um EXPIRADO
   // (prazo de retenção vencido — o estado que prova que `expired` != `failed`).
@@ -2187,19 +3905,93 @@ async function main() {
   audioJobExpired.expireStems();
   await aiAudioJobRepo.update(audioJobExpired);
 
+  // NA FILA — separação pedida, worker ainda não pegou. É o "aguardando" do
+  // Modo Ensaio, distinto do "separando".
+  const audioUploadQueued = AiAudioUpload.create({
+    musician_id: m1.musician_id.id,
+    music_library_id: libraryOf(m1, "Garota de Ipanema").entity_id.id,
+    original_filename: "garota-de-ipanema.mp3",
+    content_type: "audio/mpeg",
+    file_size: 5_767_168,
+    object_key: `ai-audio/${m1.musician_id.id}/seed-ipanema/original.mp3`,
+    upload_method: "from_source",
+  });
+  audioUploadQueued.markSeparationQueued();
+  await aiAudioUploadRepo.insert(audioUploadQueued);
+  await aiAudioJobRepo.insert(
+    AiAudioSeparationJob.create({
+      ai_audio_upload_id: audioUploadQueued.entity_id.id,
+      musician_id: m1.musician_id.id,
+      model_id: "htdemucs_4stems",
+      output_prefix: `ai-audio/${m1.musician_id.id}/seed-ipanema/stems`,
+      output_format: "mp3",
+    }),
+  );
+
+  // FALHOU — no Carlos, para o erro não se misturar com os três estados do João.
+  const audioUploadFailed = AiAudioUpload.create({
+    musician_id: musicians[2].musician_id.id,
+    music_library_id: libraryOf(musicians[2], "Fly Me to the Moon").entity_id.id,
+    original_filename: "fly-me-to-the-moon.mp3",
+    content_type: "audio/mpeg",
+    file_size: 4_718_592,
+    object_key: `ai-audio/${musicians[2].musician_id.id}/seed-fly-me/original.mp3`,
+    upload_method: "from_source",
+  });
+  audioUploadFailed.markSeparationQueued();
+  audioUploadFailed.markSeparating();
+  audioUploadFailed.markSeparationFailed("Tempo limite do worker de separação excedido.");
+  await aiAudioUploadRepo.insert(audioUploadFailed);
+  const audioJobFailed = AiAudioSeparationJob.create({
+    ai_audio_upload_id: audioUploadFailed.entity_id.id,
+    musician_id: musicians[2].musician_id.id,
+    model_id: "htdemucs_4stems",
+    output_prefix: `ai-audio/${musicians[2].musician_id.id}/seed-fly-me/stems`,
+    output_format: "mp3",
+  });
+  await aiAudioJobRepo.insert(audioJobFailed);
+  audioJobFailed.start();
+  audioJobFailed.fail("worker_timeout", "Tempo limite do worker de separação excedido.");
+  await aiAudioJobRepo.update(audioJobFailed);
+
   // ── 24. Campanhas do estabelecimento ──────────────────────────────────────
   console.log("📣 Campanhas…");
   const campaignRepo = new CampaignPrismaRepository(prisma);
+  // Sem mês no texto: "as quintas de setembro" envelhecia junto com a data.
   const campaignActive = Campaign.create({
     establishment_id: e1.establishment_id.id,
     title: "Quintas de Blues",
-    description: "Procuramos trio de blues para as quintas de setembro.",
-    start_date: daysFromNow(1),
+    description: "Procuramos trio de blues para as quintas do próximo mês.",
+    start_date: daysFromNow(-2),
     end_date: daysFromNow(30),
     target_genres: ["Blues", "Rock"],
   });
   campaignActive.activate();
   await campaignRepo.insert(campaignActive);
+
+  // Os dois status terminais: enviada (já foi) e cancelada.
+  const campaignSent = Campaign.create({
+    establishment_id: e1.establishment_id.id,
+    title: "Festival de Rock da Augusta",
+    description: "Convocatória encerrada — obrigado a quem se inscreveu.",
+    start_date: daysFromNow(-40),
+    end_date: daysFromNow(-10),
+    target_genres: ["Rock"],
+  });
+  campaignSent.activate();
+  campaignSent.markSent();
+  await campaignRepo.insert(campaignSent);
+
+  const campaignCancelled = Campaign.create({
+    establishment_id: e1.establishment_id.id,
+    title: "Carnaval fora de época",
+    description: "Cancelada: a casa entra em reforma no período.",
+    start_date: daysFromNow(15),
+    end_date: daysFromNow(20),
+    target_genres: ["Samba", "Axé"],
+  });
+  campaignCancelled.cancel();
+  await campaignRepo.insert(campaignCancelled);
 
   // Rascunho: a lista do painel filtra por status, e com um só a UI não mostra
   // a diferença.
@@ -2223,27 +4015,27 @@ async function main() {
   // impressão falsa de que a tela do músico depende dela.
   console.log("📈 Projeções, ranking e Spotify…");
   const establishmentAnalyticsRepo = new EstablishmentAnalyticsPrismaRepository(prisma);
-  for (let i = 1; i <= 3; i++) {
-    await establishmentAnalyticsRepo.insert(
-      new EstablishmentAnalytics({
-        establishment_id: e1.establishment_id,
-        date: daysFromNow(-i),
-        events_hosted: 1,
-        total_attendees: 60 + i * 15,
-        musicians_hired: 1,
-        total_spent: 800 + i * 100,
-        avg_rating: 4.5,
-      }),
-    );
-  }
+  // 180 dias do Bar do Zé (`bar1@`, GROWTH): o maior período da tela é 90, e a
+  // comparação "contra os 90 anteriores" precisa de outros 90 atrás dele. Eram
+  // três linhas, e o painel não tinha como mostrar tendência, ritmo da semana
+  // nem a diferença entre 7, 30 e 90 dias. ⚠️ É projeção sintética — ver o
+  // cabeçalho de `seed-analytics-series.ts`. O Maresia (FREE) continua SEM
+  // linhas: é ele que exercita o 402.
+  await establishmentAnalyticsRepo.bulkInsert(
+    buildEstablishmentAnalyticsSeries({ days: 180 }).map(
+      (day) => new EstablishmentAnalytics({ establishment_id: e1.establishment_id, ...day }),
+    ),
+  );
 
   const rankingRepo = new RankingPrismaRepository(prisma);
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0));
-  const rankingSpecs = [
-    { fan: fan2, position: 1, score: 320 },
-    { fan: fan1, position: 2, score: 145 },
-  ];
+  // Score = total do ledger (seção 12), não número à parte: ranking, projeção e
+  // leaderboard contam a mesma história.
+  const rankingSpecs = [fan1, fan2]
+    .map((fan) => ({ fan, score: ledgerTotals.get(fan.audience_id.id) ?? 0 }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry, index) => ({ ...entry, position: index + 1 }));
   for (const spec of rankingSpecs) {
     await rankingRepo.insert(
       Ranking.create({
@@ -2276,22 +4068,42 @@ async function main() {
   console.log("\n✅ Seed concluído!");
   console.log(`   Músicos:          ${musicians.map((m) => `${m.stage_name} <${m.email.value}> (${m.musician_id.id})`).join("\n                     ")}`);
   console.log("   Opt-in de radar:  João=true, Maria=false, Carlos=null (ainda não decidiu)");
-  console.log(`   Estabelecimentos: ${establishments.map((e) => e.name).join(", ")}`);
-  console.log("   Bandas:           Carlão Trio (líder Carlos, open_to_gigs=true, com endereço) · Blues Duo (líder João, open_to_gigs=null, Maria pending / Carlos declined) · Elétrica Coletivo e Raízes do Sul (open_to_gigs=true, elenco da busca W3.1)");
-  console.log("   Busca (W3.1):     6 dos 8 músicos e 3 das 4 bandas têm open_to_gigs=true. Raio a partir do Bar do Zé (-23.5537,-46.6524): 10 km pega SP; 50 km inclui Guarulhos; Campinas e Curitiba ficam sempre de fora.");
-  console.log(`   Fãs:              ${fan1.email.value}, ${fan2.email.value}`);
+  console.log("   Documentos:       João/Maria CPF · Carlos CPF+MEI · Rafael só MEI · demais sem documento (contrato não emite)");
+  console.log(`   Estabelecimentos: ${establishments.map((e) => e.name).join(", ")} — Lapa NÃO verificada e sem horário; só o Bar do Zé tem ficha técnica`);
+  console.log("   Bandas:           Carlão Trio (líder Carlos, open_to_gigs=true, com endereço) · Blues Duo (líder João, open_to_gigs=null, Maria pending / Carlos declined, COM agenda própria) · Elétrica Coletivo e Raízes do Sul (open_to_gigs=true, elenco da busca W3.1)");
+  console.log("   Busca (W3.1):     6 dos 8 músicos e 3 das 4 bandas têm open_to_gigs=true. Raio a partir do Bar do Zé (-23.5537,-46.6524): 10 km pega SP; 50 km inclui Guarulhos; Campinas e Curitiba ficam sempre de fora. Bia Viola em TURNÊ no Rio (aparece a partir da Lapa).");
+  console.log(`   Fãs:              ${fan1.email.value}, ${fan2.email.value} — preferências da taxonomia real, "Pra você" com resultado para os dois`);
+  console.log("   Bookings:         pending (João, e Ana→Bar do Zé proposto PELO MÚSICO) · confirmed (3 do João/banda, 1 da Bia sem contrato) · cancelled · expired (Diego) · completed com check-in (João, Maria) · completed CONTESTADO (Rafael) · banda pending (Blues Duo) e confirmed (Carlão Trio)");
+  console.log("   Inquiries:        open (com chat) · accepted · rejected · expired · converted (virou booking)");
   console.log("   Cifras (Play Mode): Evidências, Wonderwall e Garota de Ipanema com acordes + letra sincronizada; Tempo Perdido e Águas de Março sem análise (caso 'ainda não processada')");
   console.log("   Modo Ensaio:      as 5 músicas com cifra têm source=youtube + source_id fictício — a separação chega até o provider e falha limpa (422 da fonte), em vez de 422 por falta de dado");
-  console.log("   Shows:            João encerrado no Maresia (6 músicas, com bis e 1 fora da biblioteca) + AO VIVO no Sarau de hoje (3ª música tocando) · Maria encerrada no Maresia");
+  console.log("   Shows:            João encerrado no Maresia (6 músicas, com bis e 1 fora da biblioteca, gorjetas DENTRO das músicas) + AO VIVO no Sarau (3ª música tocando) · Maria encerrada no Maresia");
+  console.log("   Pedidos:          pending/accepted/rejected/played · destaque promised/awaiting_payment/paid/expired/cancelled");
   console.log("   Avaliações:       estabelecimento→músico (5), músico→estabelecimento (4) e fã→músico (5, sem comentário)");
-  console.log("   Indicações:       3 para o Maresia — nova (com motivo), vista e arquivada; alimenta /dashboard/indicacoes no web");
-  console.log("   Contratos:        3 estados — emitido (ninguém assinou) · parcial (só o estabelecimento) · assinado pelos dois");
-  console.log("   Custódia:         R$900 retidos (held, líquido R$810 espelhado em held_balance) + R$1200 pendentes");
-  console.log("   Jobs de IA:       ai-cifra analisando 'Tempo Perdido' (45%) · ai-audio concluído em 'Wonderwall' (4 stems) e EXPIRADO em 'Evidências'");
+  console.log("   Indicações:       3 para o Maresia e 4 para o Bar do Zé (Carlão com duas vozes) — nova, vista e arquivada; alimenta /dashboard/indicacoes no web");
+  console.log(`   Contratos:        ${contractStorage.pdfAvailable ? "PDF no MinIO" : "⚠️ sem PDF (download 404)"}\n                     ${contractSummary.join("\n                     ")}`);
+  console.log("   Custódia:         pending (João, cobrança aberta) · held R$900 (João, R$810 em held_balance) · released (João R$720, Maria R$1.080) · refunded (Maria) · disputed (Rafael, R$1.350 retidos)");
+  console.log("   Carteira do João: saldo R$510 (cachê liberado − saques), retido R$810 — gorjetas só em total_earned (liquidadas no Mercado Pago). Saques: concluído, pendente e recusado+estornado");
+  console.log("   Saque bloqueado:  Helena (musico8) → 403 EMAIL_NOT_VERIFIED · Maria (musico2) → carência de chave PIX recém-trocada");
+  console.log("   Escopo do pedido: Carlos (musico3) RECUSA pedido fora do repertório; os outros 7 aceitam (default)");
+  console.log("   Push:             token Expo fictício em musico1/2/3; os outros 5 sem token, como quem ainda não abriu o app");
+  console.log("   Assinaturas:      active (Maria, Carlos, Rafael, Bia, Bar do Zé, Lapa) · trial (Helena) · cancelled (Rafael antigo, Savassi) · expired (Diego antigo, Maresia)");
+  console.log("   Jobs de IA:       ai-cifra analisando 'Tempo Perdido' (45%), concluído 'Evidências', falhou 'Águas de Março' · ai-audio concluído 'Wonderwall' (4 stems), na fila 'Garota de Ipanema', EXPIRADO 'Evidências', falhou 'Fly Me to the Moon'");
   console.log("   ⚠️ Os stems apontam para object_keys que NÃO existem no storage — a tela e a mesa funcionam, tocar não. Para ouvir, rode uma separação real pelo app.");
-  console.log("   Campanhas:        1 ativa (Quintas de Blues) + 1 rascunho");
-  console.log("   Extras:           analytics do Bar do Zé (3 dias), ranking mensal de fãs (Bruno 1º, Ana 2º), Spotify vinculado à Ana (token fictício)");
-  console.log("   Cifras pessoais:  João 2/3 (Wonderwall privada c/ edições + base_updated · Evidências na comunidade) · Carlos: Garota de Ipanema na comunidade, pronta pro João importar");
+  console.log("   Campanhas:        active · draft · sent · cancelled (todas do Bar do Zé)");
+  console.log(`   Gamificação:      ledger canônico com indicação e compartilhamento (dedupe por referência); ${[fan1, fan2].map((f) => `${f.nickname} ${ledgerTotals.get(f.audience_id.id)} pts`).join(", ")}`);
+  console.log("   Extras:           analytics do Bar do Zé (3 dias), Spotify vinculado à Ana (token fictício), repertório do Carlos compartilhado por link + convite ao João");
+  console.log("   Cifras pessoais:  João 2/3 (Wonderwall privada c/ edições + base_updated · Evidências na comunidade) · Carlos: Garota de Ipanema na comunidade (pronta pro João importar) e Fly Me to the Moon só para a BANDA");
+  console.log("");
+  console.log("   ⏳ O QUE VENCE SOZINHO (datas são relativas a agora; rode `npm run seed -- --reset` para renovar tudo):");
+  console.log("      ~20 min  destaque awaiting_payment → expired (ExpireRequestBoostsJob, janela de 15 min)");
+  console.log("      ~6 h     Sarau ao Vivo → completed (AutoFinishEventsJob); pedido/check-in de fã deixam de passar");
+  console.log("      24 h     carência da chave PIX da Maria");
+  console.log("      1 dia    token Spotify da Ana (o refresh falha com token falso; o vínculo continua)");
+  console.log("      3 dias   stems de 'Wonderwall' → expired (PurgeExpiredAiAudioStemsJob); Noite do Blues acontece");
+  console.log("      ~4 dias  booking da Noite do Blues → completed (CompleteConfirmedBookingsJob, 24h após o fim)");
+  console.log("      5–7 dias propostas pendentes → expired (ExpirePendingBookingsJob); link do repertório do Carlos; inquiry aberto");
+  console.log("      10 dias  turnê da Bia · 14 dias trial da Helena · 1 mês assinaturas mensais e ranking do mês");
   if (keycloakSubs.size > 0) {
     // AUTH-1 (31/ago/2026): `POST /auth/login` não existe mais. O login é
     // Authorization Code + PKCE contra o Keycloak — no app, pelo botão
@@ -2300,6 +4112,7 @@ async function main() {
     console.log("      músicos:          musico1..musico8@seed-soundmeet.com");
     console.log("      fãs:              fa1@ e fa2@seed-soundmeet.com");
     console.log("      estabelecimentos: bar1@ rest1@ club1@ bar2@seed-soundmeet.com (claim establishment_ids escrito — o painel web funciona)");
+    console.log("      admin:            admin@seed-soundmeet.com (12 rotas @Roles(\"admin\"): takedown de cifra, badges, anular contrato)");
   } else {
     console.log("   ⚠️ Lembre: crie/vincule os usuários Keycloak correspondentes para logar no app.");
   }
