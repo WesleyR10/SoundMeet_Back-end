@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Menor privilégio explícito. Sem esta linha o token do job herda a permissão
+# padrão do repositório, que em repositório antigo ainda pode ser read/write —
+# um workflow de CI não tem por que poder escrever no repositório.
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Typecheck · Lint · Testes · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22 para bater com o ambiente de desenvolvimento (v22.22.3) e com o
+          # CI do soundmeet-web. Divergência de major entre CI e máquina local
+          # produz falha que não reproduz.
+          #
+          # ⚠️ O Dockerfile de produção usa node:20-alpine. A diferença é
+          # conhecida e está registrada em Docs/ops/backup-restore.md §6 — o job
+          # `docker` abaixo é o que exercita o Node 20 de verdade.
+          node-version: "22"
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # Precisa vir antes de qualquer typecheck: `@prisma/client` só existe
+      # depois do generate, e sem ele o tsc falha em ~todo repositório Prisma
+      # com "has no exported member".
+      - name: Gerar Prisma Client
+        run: npm run prisma:generate
+
+      # Ordem de custo crescente: o feedback mais barato falha primeiro. Nenhum
+      # passo tem `continue-on-error` — gate informativo treina a ignorar CI.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # 🔴 Gate próprio, não redundante com o de cima: `prisma/seed.ts` fica FORA
+      # do `include` do tsconfig principal, então nem build nem lint o enxergam.
+      # Foi assim que ele quebrou em silêncio quando a assinatura de um
+      # repositório mudou (ver CLAUDE.md, "Seed de desenvolvimento").
+      - name: Typecheck do seed
+        run: npm run typecheck:seed
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes unitários
+        run: npm test -- --ci
+
+      - name: Build de produção
+        run: npm run build
+
+  docker:
+    name: Imagem de produção
+    runs-on: ubuntu-latest
+    # Independe do job `quality`: uma quebra de Dockerfile e uma quebra de teste
+    # são diagnósticos diferentes e vale saber das duas no mesmo push.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint do Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          # `info` e `style` viram ruído num Dockerfile multi-stage já maduro;
+          # o que interessa aqui é warning para cima.
+          failure-threshold: warning
+
+      - name: Build da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: production
+          push: false
+          load: true
+          tags: soundmeet-backend:ci
+          # Sem cache remoto: sem registry configurado ainda (§11 do roadmap-web
+          # tem "Deploy — Vercel vs. Docker" em aberto). O cache do GitHub
+          # Actions cobre o suficiente enquanto isso.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Roda aqui, e não no job de segurança, porque a imagem já está carregada
+      # neste runner — exportá-la entre jobs custaria mais que o próprio scan.
+      - name: Vulnerabilidades da imagem (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: soundmeet-backend:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          # Só CVE com correção publicada é acionável num gate bloqueante. CVE
+          # sem patch upstream vira dívida rastreada em Docs/ops, não build
+          # vermelho que ninguém consegue resolver.
+          ignore-unfixed: true

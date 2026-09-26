@@ -1,0 +1,17 @@
+{
+  "$comment": [
+    "Exceções do gate de auditoria de dependências de RUNTIME (scripts/audit-gate.mjs).",
+    "Cada entrada precisa de motivo e data de revisão. O gate falha se a exceção vencer",
+    "E TAMBÉM se ela deixar de corresponder a um aviso real — exceção que não protege",
+    "mais nada é a mesma armadilha da variante de cláusula que ninguém emite: parece",
+    "cobertura e não é. Ver CLAUDE.md, 'Contrato digital de show'."
+  ],
+  "allow": [
+    {
+      "id": "GHSA-ggr8-5vv4-36mx",
+      "package": "deepmerge-ts",
+      "reason": "Chega por prisma -> @prisma/config -> deepmerge-ts. O único 'fix' que o npm oferece é prisma 6.12.0, ou seja, DOWNGRADE de major a partir do 7.10.0 instalado — trocaria uma exaustão de pilha ao mesclar grafo recursivo (caminho de CLI/config, não de request) por uma quebra de client e de schema. O caminho afetado não é alcançável por entrada de usuário: @prisma/config só lê prisma.config.ts em tempo de CLI.",
+      "review_by": "2026-11-30"
+    }
+  ]
+}

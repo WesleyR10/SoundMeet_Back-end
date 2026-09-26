@@ -1,0 +1,147 @@
+name: Segurança
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master, develop]
+  schedule:
+    # Segunda, 06:00 UTC (03:00 BRT). Aviso de dependência aparece sem ninguém
+    # ter feito push — sem o agendamento, um CVE publicado numa sexta só seria
+    # descoberto no próximo commit.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dependencias:
+    name: Auditoria de dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # `npm run audit:gate` e não `npm audit --audit-level=high` direto: o gate
+      # tem allowlist com motivo e prazo (scripts/npm-audit-allowlist.json) e
+      # reprova também exceção VENCIDA ou OBSOLETA. Ver scripts/audit-gate.mjs.
+      - name: Gate de auditoria (runtime)
+        run: npm run audit:gate
+
+      # SBOM em CycloneDX — o `npm sbom` é nativo do npm 10+, sem dependência
+      # nova. Fica como artefato porque a pergunta que ele responde ("esta
+      # versão continha a lib X?") só aparece DEPOIS, quando um CVE sai.
+      - name: Gerar SBOM
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cyclonedx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend-${{ github.sha }}
+          path: sbom.cyclonedx.json
+          retention-days: 90
+
+  segredos:
+    name: Varredura de segredos
+    runs-on: ubuntu-latest
+    steps:
+      # `fetch-depth: 0` porque o scan abaixo percorre um INTERVALO de commits,
+      # e o clone raso do Actions não teria o ancestral comum.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Escopo deliberado: os commits DESTE push/PR, não o histórico inteiro.
+      #
+      # O que previne vazamento novo é barrar o commit que o traz. Reexaminar o
+      # histórico a cada execução só repete um achado já conhecido e já
+      # decidido — e transforma o gate em vermelho permanente, que é como se
+      # ensina um time a ignorar CI.
+      #
+      # 🔴 O histórico deste repositório TEM um segredo real (RESEND_API_KEY em
+      # envs/.env.e2e, alcançável de origin/develop, repositório público). Isso
+      # é um INCIDENTE, não um item de CI: rotação de chave, não regex. O
+      # procedimento está em Docs/ops/incident-response.md §"Segredo exposto".
+      - name: Gitleaks
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Monta o escopo em bash, e não em expressão do GitHub: `github.event`
+          # muda de forma entre push, pull_request e schedule, e expressão
+          # aninhada nesses três casos é frágil de ler e pior de depurar.
+          ARGS=(detect --source=/repo --redact --verbose --exit-code=1)
+
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "${BASE_SHA:-}" ]; then
+            ARGS+=(--log-opts="$BASE_SHA..$HEAD_SHA")
+          elif [ "$EVENT_NAME" = "push" ] && [ -n "${BEFORE_SHA:-}" ] \
+               && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            ARGS+=(--log-opts="$BEFORE_SHA..$HEAD_SHA")
+          else
+            # Branch nova ou execução agendada: sem intervalo, varre a árvore de
+            # trabalho — ainda pega segredo que esteja num arquivo presente.
+            ARGS+=(--no-git)
+          fi
+
+          echo "Escopo: ${ARGS[*]}"
+          docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:latest "${ARGS[@]}"
+
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      # Regras da comunidade, sem SEMGREP_APP_TOKEN — nada sai do runner.
+      #
+      # `--severity=ERROR` no gate bloqueante: WARNING e INFO num codebase
+      # NestJS deste tamanho produzem dezenas de achados de estilo na primeira
+      # execução, e gate que nasce com dezenas de achados não é lido. Os demais
+      # níveis ficam no relatório do passo seguinte.
+      - name: Semgrep (bloqueante — apenas ERROR)
+        run: semgrep scan --config=p/typescript --config=p/nodejs --config=p/secrets --severity=ERROR --error --metrics=off
+
+      - name: Semgrep (relatório completo)
+        if: always()
+        run: semgrep scan --config=p/typescript --config=p/nodejs --config=p/secrets --json --output=semgrep.json --metrics=off || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-backend-${{ github.sha }}
+          path: semgrep.json
+          retention-days: 30
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Necessária para publicar o resultado na aba Security. Gratuita em
+      # repositório público — que é o caso deste.
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"

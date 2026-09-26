@@ -1,0 +1,60 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    # `develop` e não `master`: é onde o fluxo do projeto integra
+    # (Docs/workflow/git-workflow.md). PR de bump direto em master pularia a
+    # integração inteira.
+    target-branch: develop
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "chore(project)"
+    # Agrupar é o que torna isto sustentável para um time de uma pessoa: sem
+    # grupo, uma semana normal abre 20+ PRs e o resultado prático é ninguém
+    # olhar nenhum. Major fica FORA dos grupos de propósito — é o único tipo que
+    # precisa de leitura individual de changelog.
+    groups:
+      producao-compativel:
+        applies-to: version-updates
+        dependency-type: production
+        update-types: [minor, patch]
+      desenvolvimento-compativel:
+        applies-to: version-updates
+        dependency-type: development
+        update-types: [minor, patch]
+      # Atualização de SEGURANÇA agrupada à parte: chega junta, mas nunca
+      # misturada com bump de rotina, senão o PR que corrige CVE espera o
+      # review de um bump de tipagem.
+      seguranca:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+      timezone: America/Sao_Paulo
+    target-branch: develop
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: monthly
+      timezone: America/Sao_Paulo
+    target-branch: develop
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: "chore(docker)"
