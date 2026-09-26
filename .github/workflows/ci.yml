@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # 22 para bater com o ambiente de desenvolvimento (v22.22.3) e com o
           # CI do soundmeet-web. Divergência de major entre CI e máquina local
@@ -72,10 +72,10 @@ jobs:
     # Independe do job `quality`: uma quebra de Dockerfile e uma quebra de teste
     # são diagnósticos diferentes e vale saber das duas no mesmo push.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Lint do Dockerfile (hadolint)
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: Dockerfile
           # `info` e `style` viram ruído num Dockerfile multi-stage já maduro;
@@ -83,7 +83,7 @@ jobs:
           failure-threshold: warning
 
       - name: Build da imagem
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: production
@@ -99,7 +99,7 @@ jobs:
       # Roda aqui, e não no job de segurança, porque a imagem já está carregada
       # neste runner — exportá-la entre jobs custaria mais que o próprio scan.
       - name: Vulnerabilidades da imagem (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: soundmeet-backend:ci
           format: table
