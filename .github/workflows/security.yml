@@ -23,8 +23,8 @@ jobs:
     name: Auditoria de dependências
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -43,7 +43,7 @@ jobs:
       - name: Gerar SBOM
         run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cyclonedx.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom-backend-${{ github.sha }}
           path: sbom.cyclonedx.json
@@ -55,7 +55,7 @@ jobs:
     steps:
       # `fetch-depth: 0` porque o scan abaixo percorre um INTERVALO de commits,
       # e o clone raso do Actions não teria o ancestral comum.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -104,7 +104,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Regras da comunidade, sem SEMGREP_APP_TOKEN — nada sai do runner.
       #
@@ -119,7 +119,7 @@ jobs:
         if: always()
         run: semgrep scan --config=p/typescript --config=p/nodejs --config=p/secrets --json --output=semgrep.json --metrics=off || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: semgrep-backend-${{ github.sha }}
@@ -135,13 +135,13 @@ jobs:
       # repositório público — que é o caso deste.
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           queries: security-extended
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:javascript-typescript"
