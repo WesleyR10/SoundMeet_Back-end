@@ -6,6 +6,7 @@ import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memor
 import { CancelBookingUseCase } from "../../../core/scheduling/application/use-cases/cancel-booking/cancel-booking.use-case";
 import { CheckInBookingUseCase } from "../../../core/scheduling/application/use-cases/check-in-booking/check-in-booking.use-case";
 import { ConfirmBookingUseCase } from "../../../core/scheduling/application/use-cases/confirm-booking/confirm-booking.use-case";
+import { ReviseBookingProposalUseCase } from "../../../core/scheduling/application/use-cases/revise-booking-proposal/revise-booking-proposal.use-case";
 import { DisputeBookingUseCase } from "../../../core/scheduling/application/use-cases/dispute-booking/dispute-booking.use-case";
 import { GetBookingUseCase } from "../../../core/scheduling/application/use-cases/get-booking/get-booking.use-case";
 import { ListBookingsUseCase } from "../../../core/scheduling/application/use-cases/list-bookings/list-bookings.use-case";
@@ -77,6 +78,7 @@ describe("BookingsController — check-in e contestação (F1.3a)", () => {
           GetBookingUseCase,
           ProposeBookingUseCase,
           ConfirmBookingUseCase,
+          ReviseBookingProposalUseCase,
           CancelBookingUseCase,
         ].map((useCase) => ({ provide: useCase, useValue: {} })),
       ],

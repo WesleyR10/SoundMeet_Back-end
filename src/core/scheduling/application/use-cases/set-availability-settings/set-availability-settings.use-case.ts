@@ -11,15 +11,18 @@ import {
 } from "../common/availability-output";
 import { SetAvailabilitySettingsInput } from "./set-availability-settings.input";
 
-export class SetAvailabilitySettingsUseCase
-  implements IUseCase<SetAvailabilitySettingsInput, AvailabilityOutput>
-{
+export class SetAvailabilitySettingsUseCase implements IUseCase<
+  SetAvailabilitySettingsInput,
+  AvailabilityOutput
+> {
   constructor(private readonly availabilityRepo: IAvailabilityRepository) {}
 
   async execute(
     input: SetAvailabilitySettingsInput,
   ): Promise<AvailabilityOutput> {
-    let entity = await this.availabilityRepo.findByMusicianId(input.musician_id);
+    let entity = await this.availabilityRepo.findByMusicianId(
+      input.musician_id,
+    );
 
     if (!entity) {
       entity = Availability.create({ musician_id: input.musician_id });

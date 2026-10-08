@@ -38,7 +38,6 @@ import {
 } from "../auth-module";
 import { AuthenticatedUser } from "../auth-module/interfaces/authenticated-user.interface";
 import { BookingPresenter } from "./booking.presenter";
-import { AcceptInquiryDto } from "./dto/accept-inquiry.dto";
 import { ConvertInquiryToBookingDto } from "./dto/convert-inquiry-to-booking.dto";
 import { CreateInquiryDto } from "./dto/create-inquiry.dto";
 import { RejectInquiryDto } from "./dto/reject-inquiry.dto";
@@ -47,6 +46,7 @@ import {
   InquiryCollectionPresenter,
   InquiryPresenter,
 } from "./inquiry.presenter";
+import { deriveActorSide } from "./negotiation-actor-side";
 
 @ApiTags("Scheduling")
 @ApiBearerAuth("JWT-auth")
@@ -121,7 +121,6 @@ export class InquiriesController {
   @ApiResponse({ status: 200, type: InquiryPresenter })
   async accept(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
-    @Body() _dto: AcceptInquiryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     const output = await this.acceptInquiryUseCase.execute({
@@ -162,7 +161,7 @@ export class InquiriesController {
   @ApiOperation({
     summary: "Converter inquiry em booking",
     description:
-      "Cria booking pending a partir de inquiry aceita e marca inquiry como convertida.",
+      "Cria booking pending a partir de inquiry aberta ou aceita e marca inquiry como convertida. A contraparte responde no booking (confirm/cancel).",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: BookingPresenter })
@@ -183,6 +182,8 @@ export class InquiriesController {
         requesting_participant_ids: resolveParticipantIds(user),
         requesting_musician_id: user?.userId,
         is_admin: user.isAdmin,
+        // Quem converteu é quem propôs: é o que diz de quem é a vez.
+        proposed_by: deriveActorSide(user),
       }),
     );
     return InquiriesController.serializeBooking(output);

@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -8,6 +8,7 @@ import { BookingStatusEnum } from "../../../../shared/domain/value-objects/booki
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 import { IBookingRepository } from "../../../domain/booking.repository";
 import { BookingOutput, BookingOutputMapper } from "../common/booking-output";
+import { assertNegotiationParticipant } from "../common/negotiation-actor";
 import { CancelBookingInput } from "./cancel-booking.input";
 
 export class CancelBookingUseCase implements IUseCase<
@@ -18,6 +19,7 @@ export class CancelBookingUseCase implements IUseCase<
     private readonly bookingRepo: IBookingRepository,
     private readonly clock: IClock = { now: () => new Date() },
     private readonly domainEventMediator?: DomainEventMediator,
+    private readonly bandRepo?: IBandRepository,
   ) {}
 
   async execute(input: CancelBookingInput): Promise<CancelBookingOutput> {
@@ -27,17 +29,16 @@ export class CancelBookingUseCase implements IUseCase<
       throw new NotFoundError(input.booking_id, Booking);
     }
 
-    if (input.requesting_user_id && !input.is_admin) {
-      const isOwner =
-        entity.establishment_id.id === input.requesting_user_id ||
-        entity.musician_id?.id === input.requesting_user_id ||
-        entity.band_id?.id === input.requesting_user_id;
-      if (!isOwner) {
-        throw new ForbiddenException(
-          "Você não tem permissão para cancelar este booking.",
-        );
-      }
-    }
+    await assertNegotiationParticipant(
+      input,
+      {
+        establishment_id: entity.establishment_id.id,
+        musician_id: entity.musician_id?.id ?? null,
+        band_id: entity.band_id?.id ?? null,
+      },
+      "cancelar este booking",
+      this.bandRepo,
+    );
 
     const now = this.clock.now();
 

@@ -9,14 +9,13 @@ import {
 } from "../common/availability-output";
 import { RemoveUnavailabilityInput } from "./remove-unavailability.input";
 
-export class RemoveUnavailabilityUseCase
-  implements IUseCase<RemoveUnavailabilityInput, AvailabilityOutput>
-{
+export class RemoveUnavailabilityUseCase implements IUseCase<
+  RemoveUnavailabilityInput,
+  AvailabilityOutput
+> {
   constructor(private readonly availabilityRepo: IAvailabilityRepository) {}
 
-  async execute(
-    input: RemoveUnavailabilityInput,
-  ): Promise<AvailabilityOutput> {
+  async execute(input: RemoveUnavailabilityInput): Promise<AvailabilityOutput> {
     const entity = await this.availabilityRepo.findByMusicianId(
       input.musician_id,
     );

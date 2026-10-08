@@ -9,7 +9,8 @@ import {
 
 export type AcceptInquiryInputConstructorProps = {
   inquiry_id: string;
-  requesting_user_id?: string | null;
+  requesting_participant_ids?: string[] | null;
+  requesting_musician_id?: string | null;
   is_admin?: boolean;
 };
 
@@ -19,10 +20,17 @@ export class AcceptInquiryInput {
   @IsUUID()
   inquiry_id: string;
 
-  @IsString()
+  // Identidade do ator: `sub` + claims `establishment_ids`/`band_ids`. Um id só
+  // não serve — estabelecimento e banda têm UUID próprio, distinto do `sub`.
+  @IsUUID("4", { each: true })
+  @IsOptional()
+  requesting_participant_ids?: string[] | null;
+
+  // `sub` do JWT, separado dos claims: representar a banda não é decidir por
+  // ela — a liderança é checada contra este id (ver negotiation-actor.ts).
   @IsUUID()
   @IsOptional()
-  requesting_user_id?: string | null;
+  requesting_musician_id?: string | null;
 
   @IsBoolean()
   @IsOptional()
@@ -31,7 +39,8 @@ export class AcceptInquiryInput {
   constructor(props: AcceptInquiryInputConstructorProps) {
     if (!props) return;
     this.inquiry_id = props.inquiry_id;
-    this.requesting_user_id = props.requesting_user_id;
+    this.requesting_participant_ids = props.requesting_participant_ids;
+    this.requesting_musician_id = props.requesting_musician_id;
     this.is_admin = props.is_admin ?? false;
   }
 }

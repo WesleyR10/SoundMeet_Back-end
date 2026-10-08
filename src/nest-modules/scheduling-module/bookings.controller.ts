@@ -25,6 +25,7 @@ import { GetBookingUseCase } from "../../core/scheduling/application/use-cases/g
 import { ListBookingsUseCase } from "../../core/scheduling/application/use-cases/list-bookings/list-bookings.use-case";
 import { ProposeBookingInput } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.input";
 import { ProposeBookingUseCase } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.use-case";
+import { ReviseBookingProposalUseCase } from "../../core/scheduling/application/use-cases/revise-booking-proposal/revise-booking-proposal.use-case";
 import {
   AuthGuard,
   CurrentUser,
@@ -41,23 +42,9 @@ import {
 import { CancelBookingDto } from "./dto/cancel-booking.dto";
 import { DisputeBookingDto } from "./dto/dispute-booking.dto";
 import { ProposeBookingDto } from "./dto/propose-booking.dto";
+import { ReviseBookingProposalDto } from "./dto/revise-booking-proposal.dto";
 import { SearchBookingsDto } from "./dto/search-bookings.dto";
-
-/**
- * Lado da negociação em que o autenticado está agindo.
- *
- * Serve a `cancelled_by` (quem cancelou) e a `proposed_by` (quem propôs) — é a
- * mesma pergunta feita em dois momentos, então é uma função só. Sempre derivada
- * do JWT, nunca do corpo: os dois campos descrevem autoria, e autoria vinda de
- * input do cliente é forjável.
- */
-function deriveActorSide(
-  user: AuthenticatedUser,
-): "establishment" | "musician" | "band" {
-  if (user.roles.includes("musician")) return "musician";
-  if (user.roles.includes("band")) return "band";
-  return "establishment";
-}
+import { deriveActorSide } from "./negotiation-actor-side";
 
 @ApiTags("Scheduling")
 @ApiBearerAuth("JWT-auth")
@@ -69,6 +56,9 @@ export class BookingsController {
 
   @Inject(ConfirmBookingUseCase)
   private confirmUseCase: ConfirmBookingUseCase;
+
+  @Inject(ReviseBookingProposalUseCase)
+  private reviseUseCase: ReviseBookingProposalUseCase;
 
   @Inject(CancelBookingUseCase)
   private cancelUseCase: CancelBookingUseCase;
@@ -154,6 +144,53 @@ export class BookingsController {
         proposed_by: deriveActorSide(user),
       }),
     );
+    return new BookingPresenter(output);
+  }
+
+  /**
+   * Nova proposta sobre a MESMA negociação — a contraproposta feita no chat.
+   *
+   * Não cria booking: um booking novo emitiria `BookingProposedEvent` e o chat
+   * abriria uma segunda conversa, partindo a negociação em dois fios. Aqui os
+   * termos são reescritos no mesmo booking, a vez de responder passa para a
+   * contraparte (`proposed_by`) e o prazo recomeça.
+   *
+   * Vale para proposta pendente, vencida ou recusada — desde que NUNCA tenha
+   * sido confirmada (confirmada tem contrato). A contraparte responde pelas
+   * rotas de sempre: `confirm` e `cancel`.
+   */
+  @Post(":id/revise")
+  @Roles("establishment", "musician", "admin")
+  @ApiOperation({
+    summary: "Revisar proposta (contraproposta)",
+    description:
+      "Reescreve data, horário, cachê e observações de uma proposta que nunca foi confirmada (pendente, vencida ou recusada) e a devolve para a contraparte responder, com prazo novo de 48h. Não abre conversa nova.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: BookingPresenter })
+  @ApiResponse({ status: 403, description: "Não é parte da negociação" })
+  @ApiResponse({
+    status: 422,
+    description:
+      "Proposta já confirmada, data no passado, ou artista indisponível no novo horário.",
+  })
+  async revise(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: ReviseBookingProposalDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const output = await this.reviseUseCase.execute({
+      booking_id: id,
+      start_at: dto.start_at,
+      end_at: dto.end_at,
+      fee: dto.fee ?? null,
+      notes: dto.notes ?? null,
+      // Autoria e identidade depois do corpo, sempre do JWT.
+      proposed_by: deriveActorSide(user),
+      requesting_participant_ids: resolveParticipantIds(user),
+      requesting_musician_id: user?.userId,
+      is_admin: user.isAdmin,
+    });
     return new BookingPresenter(output);
   }
 

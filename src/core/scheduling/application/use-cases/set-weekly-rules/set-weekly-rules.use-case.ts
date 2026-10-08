@@ -8,13 +8,16 @@ import {
 } from "../common/availability-output";
 import { SetWeeklyRulesInput } from "./set-weekly-rules.input";
 
-export class SetWeeklyRulesUseCase
-  implements IUseCase<SetWeeklyRulesInput, AvailabilityOutput>
-{
+export class SetWeeklyRulesUseCase implements IUseCase<
+  SetWeeklyRulesInput,
+  AvailabilityOutput
+> {
   constructor(private readonly availabilityRepo: IAvailabilityRepository) {}
 
   async execute(input: SetWeeklyRulesInput): Promise<AvailabilityOutput> {
-    let entity = await this.availabilityRepo.findByMusicianId(input.musician_id);
+    let entity = await this.availabilityRepo.findByMusicianId(
+      input.musician_id,
+    );
 
     if (!entity) {
       entity = Availability.create({ musician_id: input.musician_id });

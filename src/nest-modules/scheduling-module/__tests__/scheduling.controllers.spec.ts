@@ -110,6 +110,46 @@ describe("Scheduling Controllers Unit Tests", () => {
       expect(presenter.status).toBe("pending");
     });
 
+    it("🔴 revise derives authorship from the JWT, never from the body", async () => {
+      const execute = inject(
+        controller,
+        "reviseUseCase",
+        jest.fn().mockResolvedValue(bookingOutput()),
+      );
+
+      await controller.revise(
+        "44444444-4444-4444-8444-444444444444",
+        {
+          start_at: now,
+          end_at: new Date("2026-06-19T14:00:00.000Z"),
+          fee: 900,
+          // Um cliente tentando se passar pelo artista: o campo não existe no
+          // DTO (o whitelist o removeria) e, mesmo que chegasse, o controller
+          // escreve a autoria depois.
+          proposed_by: "musician",
+        } as any,
+        {
+          userId: "99999999-9999-4999-8999-999999999999",
+          roles: ["establishment"],
+          establishmentIds: ["22222222-2222-4222-8222-222222222222"],
+          bandIds: [],
+          isAdmin: false,
+        },
+      );
+
+      expect(execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          booking_id: "44444444-4444-4444-8444-444444444444",
+          fee: 900,
+          proposed_by: "establishment",
+          requesting_participant_ids: [
+            "99999999-9999-4999-8999-999999999999",
+            "22222222-2222-4222-8222-222222222222",
+          ],
+        }),
+      );
+    });
+
     // Bloco 9.2 — o escopo vem do token, nunca da query.
     describe("leitura escopada", () => {
       const OWNER = {
@@ -255,7 +295,6 @@ describe("Scheduling Controllers Unit Tests", () => {
 
       const presenter = await controller.accept(
         "44444444-4444-4444-8444-444444444444",
-        {} as any,
         currentUser,
       );
 

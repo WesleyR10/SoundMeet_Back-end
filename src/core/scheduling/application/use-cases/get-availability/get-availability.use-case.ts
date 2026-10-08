@@ -8,9 +8,10 @@ import {
 } from "../common/availability-output";
 import { GetAvailabilityInput } from "./get-availability.input";
 
-export class GetAvailabilityUseCase
-  implements IUseCase<GetAvailabilityInput, AvailabilityOutput>
-{
+export class GetAvailabilityUseCase implements IUseCase<
+  GetAvailabilityInput,
+  AvailabilityOutput
+> {
   constructor(private readonly availabilityRepo: IAvailabilityRepository) {}
 
   async execute(input: GetAvailabilityInput): Promise<AvailabilityOutput> {

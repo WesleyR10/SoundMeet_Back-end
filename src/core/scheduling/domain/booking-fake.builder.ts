@@ -122,6 +122,11 @@ export class BookingFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withFee(valueOrFactory: PropOrFactory<number | null>) {
+    this._fee = valueOrFactory;
+    return this;
+  }
+
   withExpiresAt(valueOrFactory: PropOrFactory<Date | null>) {
     this._expires_at = valueOrFactory;
     return this;

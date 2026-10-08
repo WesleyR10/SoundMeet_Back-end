@@ -22,6 +22,7 @@ import { ListBookingsUseCase } from "../../core/scheduling/application/use-cases
 import { ListInquiriesUseCase } from "../../core/scheduling/application/use-cases/list-inquiries/list-inquiries.use-case";
 import { ProposeBookingUseCase } from "../../core/scheduling/application/use-cases/propose-booking/propose-booking.use-case";
 import { RejectInquiryUseCase } from "../../core/scheduling/application/use-cases/reject-inquiry/reject-inquiry.use-case";
+import { ReviseBookingProposalUseCase } from "../../core/scheduling/application/use-cases/revise-booking-proposal/revise-booking-proposal.use-case";
 import { RemoveUnavailabilityUseCase } from "../../core/scheduling/application/use-cases/remove-unavailability/remove-unavailability.use-case";
 import { SetAvailabilitySettingsUseCase } from "../../core/scheduling/application/use-cases/set-availability-settings/set-availability-settings.use-case";
 import { SetWeeklyRulesUseCase } from "../../core/scheduling/application/use-cases/set-weekly-rules/set-weekly-rules.use-case";
@@ -274,6 +275,34 @@ export const USE_CASES = {
       domainEventMediator: DomainEventMediator,
     ) => {
       return new ConfirmBookingUseCase(
+        bookingRepo,
+        dateTimeService,
+        availabilityRepo,
+        bandRepo,
+        clock,
+        domainEventMediator,
+      );
+    },
+    inject: [
+      REPOSITORIES.BOOKING_REPOSITORY.provide,
+      SERVICES.DATE_TIME_SERVICE.provide,
+      REPOSITORIES.AVAILABILITY_REPOSITORY.provide,
+      REPOSITORIES.BAND_REPOSITORY.provide,
+      SERVICES.CLOCK.provide,
+      EVENTS.DOMAIN_EVENT_MEDIATOR.provide,
+    ],
+  },
+  REVISE_BOOKING_PROPOSAL_USE_CASE: {
+    provide: ReviseBookingProposalUseCase,
+    useFactory: (
+      bookingRepo: IBookingRepository,
+      dateTimeService: IDateTimeService,
+      availabilityRepo: IAvailabilityRepository,
+      bandRepo: IBandRepository,
+      clock: IClock,
+      domainEventMediator: DomainEventMediator,
+    ) => {
+      return new ReviseBookingProposalUseCase(
         bookingRepo,
         dateTimeService,
         availabilityRepo,

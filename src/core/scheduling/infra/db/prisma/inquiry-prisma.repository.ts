@@ -191,6 +191,20 @@ export class InquiryPrismaRepository implements IInquiryRepository {
       };
     }
 
+    // Ver BookingPrismaRepository.buildWhereClause — mesma semântica.
+    if (filter.participant_ids) {
+      const ids = filter.participant_ids.filter(Boolean);
+      if (ids.length === 0) {
+        where.id = { in: [] };
+      } else {
+        where.OR = [
+          { establishmentId: { in: ids } },
+          { musicianId: { in: ids } },
+          { bandId: { in: ids } },
+        ];
+      }
+    }
+
     return where;
   }
 

@@ -81,3 +81,76 @@ describe("Booking Unit Tests", () => {
     expect(booking.notification.hasErrors()).toBe(true);
   });
 });
+
+describe("Booking.reviseProposal — a contraproposta sobre a mesma negociação", () => {
+  const HOUR = 60 * 60 * 1000;
+  const now = new Date();
+  const later = (hours: number) => new Date(now.getTime() + hours * HOUR);
+
+  const terms = {
+    start_at: later(72),
+    end_at: later(75),
+    fee: 800,
+    notes: null,
+    proposed_by: "establishment" as const,
+    expires_at: later(48),
+    now,
+  };
+
+  test("emits BookingProposalRevisedEvent — NUNCA BookingProposedEvent, que abriria outra conversa", () => {
+    const booking = Booking.fake().aBooking().pending().build();
+    booking.clearEvents();
+
+    booking.reviseProposal(terms);
+
+    const names = Array.from(booking.events).map((e) => e.constructor.name);
+    expect(names).toEqual(["BookingProposalRevisedEvent"]);
+  });
+
+  test("narrates the previous status, so the artist can be told what happened", () => {
+    const booking = Booking.fake().aBooking().expired().build();
+    booking.clearEvents();
+
+    booking.reviseProposal(terms);
+
+    const [event] = Array.from(booking.events) as unknown as Array<{
+      previous_status: string;
+    }>;
+    expect(event.previous_status).toBe("expired");
+    expect(booking.status.value).toBe("pending");
+  });
+
+  test("keeps the parties: only terms, authorship and deadline change", () => {
+    const booking = Booking.fake().aBooking().pending().build();
+    const establishment = booking.establishment_id.id;
+    const musician = booking.musician_id?.id ?? null;
+    const band = booking.band_id?.id ?? null;
+
+    booking.reviseProposal(terms);
+
+    expect(booking.establishment_id.id).toBe(establishment);
+    expect(booking.musician_id?.id ?? null).toBe(musician);
+    expect(booking.band_id?.id ?? null).toBe(band);
+    expect(booking.proposed_by).toBe("establishment");
+    expect(booking.fee).toBe(800);
+  });
+
+  test("🔴 refuses a completed show", () => {
+    const booking = Booking.fake().aBooking().completed().build();
+
+    booking.reviseProposal(terms);
+
+    expect(booking.notification.hasErrors()).toBe(true);
+    expect(booking.status.value).toBe("completed");
+  });
+
+  test("refuses end before start, without emitting anything", () => {
+    const booking = Booking.fake().aBooking().pending().build();
+    booking.clearEvents();
+
+    booking.reviseProposal({ ...terms, end_at: later(70) });
+
+    expect(booking.notification.hasErrors()).toBe(true);
+    expect(booking.events.size).toBe(0);
+  });
+});

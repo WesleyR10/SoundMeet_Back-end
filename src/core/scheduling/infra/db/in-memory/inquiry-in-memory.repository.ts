@@ -73,6 +73,17 @@ export class InquiryInMemoryRepository
         matches = matches && inquiry.created_at <= filter.created_at_lte;
       }
 
+      // Espelho do OR do repositório Prisma (fail-closed em lista vazia).
+      if (filter.participant_ids) {
+        const ids = filter.participant_ids.filter(Boolean);
+        const isParticipant = [
+          inquiry.establishment_id.id,
+          inquiry.musician_id?.id,
+          inquiry.band_id?.id,
+        ].some((id) => !!id && ids.includes(id));
+        matches = matches && isParticipant;
+      }
+
       return matches;
     });
   }

@@ -161,11 +161,25 @@ export class Inquiry extends AggregateRoot {
     );
   }
 
+  /**
+   * A pergunta vira oferta: nasce um booking com data e cachê.
+   *
+   * 🔴 Aceita `open` além de `accepted` desde 18/set/2026. A regra antiga
+   * exigia o "aceitar conversa" do artista antes de qualquer oferta, e isso
+   * travava o fluxo que o chat existe para servir: os dois conversam, chegam a
+   * um acordo e o estabelecimento manda a proposta ali mesmo — mas o artista
+   * respondeu por mensagem e nunca tocou no botão, então a conversão levava 422.
+   *
+   * O consentimento do artista NÃO é pulado, ele muda de lugar: o booking
+   * nasce `pending` e só vira show quando a contraparte confirma. Recusada ou
+   * vencida continua não convertendo — ali o artista já disse não, ou o prazo
+   * passou.
+   */
   convert(now: Date, booking_id: Uuid): void {
     this.expire(now);
-    if (!this.status.isAccepted()) {
+    if (!this.status.isAccepted() && !this.status.isOpen()) {
       this.notification.addError(
-        "Only accepted inquiries can be converted",
+        "Only open or accepted inquiries can be converted",
         "status",
       );
       return;

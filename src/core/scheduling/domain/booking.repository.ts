@@ -17,6 +17,21 @@ export type BookingFilter = {
   start_at_lte?: Date | null;
   end_at_gte?: Date | null;
   end_at_lte?: Date | null;
+  /**
+   * Escopo de leitura (Bloco 9.2): TODAS as identidades do usuário — `sub` +
+   * claims `establishment_ids`/`band_ids`. Casa em OR contra
+   * `establishment_id`/`musician_id`/`band_id` do booking, porque o lado pelo
+   * qual a pessoa participa depende do papel: um id só não dá conta.
+   *
+   * Combina em AND com os demais filtros: `status=confirmed` + escopo devolve
+   * os confirmados **do usuário**, nunca os de todo mundo.
+   *
+   * ⚠️ Array vazio significa "nenhuma identidade" e **tem** que resultar em
+   * zero linhas. Descartá-lo aqui (ou nos repositórios) devolveria a agenda de
+   * todos os usuários — é exatamente o vazamento que já aconteceu em
+   * `repertoire`/`transaction`/`musician-wallet`.
+   */
+  participant_ids?: string[] | null;
 };
 
 export class BookingSearchParams extends DefaultSearchParams<BookingFilter> {
@@ -54,6 +69,15 @@ export class BookingSearchParams extends DefaultSearchParams<BookingFilter> {
         _value.start_at_lte && { start_at_lte: _value.start_at_lte }),
       ...(_value && _value.end_at_gte && { end_at_gte: _value.end_at_gte }),
       ...(_value && _value.end_at_lte && { end_at_lte: _value.end_at_lte }),
+      // Array — NÃO pode passar pela coerção `${...}` usada nos escalares
+      // acima, que o transformaria em "id-a,id-b" e nunca casaria com nada.
+      // `[]` é preservado de propósito (ver comentário em BookingFilter).
+      ...(_value &&
+        Array.isArray(_value.participant_ids) && {
+          participant_ids: _value.participant_ids.filter(
+            (id): id is string => typeof id === "string" && id.length > 0,
+          ),
+        }),
     };
 
     this._filter = Object.keys(filter).length === 0 ? null : (filter as any);
@@ -72,6 +96,8 @@ export interface IBookingRepository extends ISearchableRepository<
   findPendingExpired(now: Date): Promise<Booking[]>;
 
   expirePendingExpired(now: Date): Promise<number>;
+
+  findConfirmedPastCompletionWindow(threshold: Date): Promise<Booking[]>;
 
   updateWithStatus(
     entity: Booking,

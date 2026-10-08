@@ -49,6 +49,9 @@ function corpoValido(extra: Record<string, unknown> = {}) {
     musician_id: MUSICO_ID,
     start_at: START_ISO,
     end_at: END_ISO,
+    // Obrigatório desde 25/set/2026 — sem ele o corpo seria recusado pelo
+    // cachê, e os 422 abaixo passariam pela razão errada.
+    fee: 800,
     ...extra,
   };
 }

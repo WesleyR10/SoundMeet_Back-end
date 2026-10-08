@@ -1,4 +1,3 @@
-import { ForbiddenException } from "@nestjs/common";
 import { Band, BandId } from "../../../../musician/domain/band.aggregate";
 import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
@@ -13,6 +12,7 @@ import { IAvailabilityRepository } from "../../../domain/availability.repository
 import { Booking, BookingId } from "../../../domain/booking.aggregate";
 import { IBookingRepository } from "../../../domain/booking.repository";
 import { BookingOutput, BookingOutputMapper } from "../common/booking-output";
+import { assertNegotiationParticipant } from "../common/negotiation-actor";
 import { ConfirmBookingInput } from "./confirm-booking.input";
 
 export class ConfirmBookingUseCase implements IUseCase<
@@ -35,17 +35,16 @@ export class ConfirmBookingUseCase implements IUseCase<
       throw new NotFoundError(input.booking_id, Booking);
     }
 
-    if (input.requesting_user_id && !input.is_admin) {
-      const isOwner =
-        entity.establishment_id.id === input.requesting_user_id ||
-        entity.musician_id?.id === input.requesting_user_id ||
-        entity.band_id?.id === input.requesting_user_id;
-      if (!isOwner) {
-        throw new ForbiddenException(
-          "Você não tem permissão para confirmar este booking.",
-        );
-      }
-    }
+    await assertNegotiationParticipant(
+      input,
+      {
+        establishment_id: entity.establishment_id.id,
+        musician_id: entity.musician_id?.id ?? null,
+        band_id: entity.band_id?.id ?? null,
+      },
+      "confirmar este booking",
+      this.bandRepo,
+    );
 
     const now = this.clock.now();
     entity.expire(now);
@@ -206,14 +205,13 @@ export class ConfirmBookingUseCase implements IUseCase<
       band_member_ids?: string[],
     ) => Promise<{ success: boolean; conflictFound: boolean }>;
 
-    const atomicConfirm = (this.bookingRepo as any)
-      .confirmAtomically as AtomicConfirmFn | undefined;
+    const atomicConfirm = (this.bookingRepo as any).confirmAtomically as
+      | AtomicConfirmFn
+      | undefined;
 
     if (typeof atomicConfirm === "function") {
       const conflictTargetType = entity.musician_id ? "musician" : "band";
-      const conflictTargetId = (
-        entity.musician_id ?? entity.band_id!
-      ).id;
+      const conflictTargetId = (entity.musician_id ?? entity.band_id!).id;
 
       const result = await atomicConfirm(
         entityToUpdate,
@@ -226,7 +224,8 @@ export class ConfirmBookingUseCase implements IUseCase<
       );
 
       if (result.conflictFound) {
-        const field = conflictTargetType === "musician" ? "conflict" : "conflict";
+        const field =
+          conflictTargetType === "musician" ? "conflict" : "conflict";
         entityToUpdate.notification.addError(
           conflictTargetType === "musician"
             ? "Musician already has a confirmed booking for this period"
@@ -259,10 +258,9 @@ export class ConfirmBookingUseCase implements IUseCase<
       if (bandMembers && this.availabilityRepo) {
         await Promise.all(
           bandMembers.map(async (member) => {
-            const availability =
-              await this.availabilityRepo!.findByMusicianId(
-                member.musician_id.id,
-              );
+            const availability = await this.availabilityRepo!.findByMusicianId(
+              member.musician_id.id,
+            );
 
             if (!availability) {
               const newAvailability = Availability.create({

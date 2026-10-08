@@ -3,6 +3,7 @@ import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { IDateTimeService } from "../../../../shared/domain";
+import { InvalidOperationError } from "../../../../shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -10,6 +11,7 @@ import { IAvailabilityRepository } from "../../../domain/availability.repository
 import { Booking } from "../../../domain/booking.aggregate";
 import { IBookingRepository } from "../../../domain/booking.repository";
 import { BookingOutput, BookingOutputMapper } from "../common/booking-output";
+import { assertNegotiationParticipant } from "../common/negotiation-actor";
 import { ProposeBookingInput } from "./propose-booking.input";
 
 export class ProposeBookingUseCase implements IUseCase<
@@ -27,6 +29,15 @@ export class ProposeBookingUseCase implements IUseCase<
   ) {}
 
   async execute(input: ProposeBookingInput): Promise<ProposeBookingOutput> {
+    // O proponente tem que ser um dos lados da proposta — caso contrário
+    // qualquer conta autenticada agendava show em nome de terceiros.
+    await assertNegotiationParticipant(
+      input,
+      input,
+      "propor este booking",
+      this.bandRepo,
+    );
+
     const now = this.clock.now();
     const expires_at =
       input.expires_at ?? this.dateTimeService.addHours(now, 48);
@@ -51,6 +62,7 @@ export class ProposeBookingUseCase implements IUseCase<
       end_at: input.end_at,
       fee: input.fee ?? null,
       notes: input.notes ?? null,
+      proposed_by: input.proposed_by ?? null,
       buffer_minutes,
       expires_at,
       ...(this.bookingDefaultFreeCancellationHours !== undefined
@@ -160,6 +172,14 @@ export class ProposeBookingUseCase implements IUseCase<
         );
         if (!band) {
           throw new NotFoundError(entity.band_id.id, Band);
+        }
+        // Banda dissolvida continua existindo (arquivada) para os shows que
+        // já fez — e por isso precisa ser recusada aqui, senão quem guardou o
+        // id seguiria propondo show a uma banda que não toca mais.
+        if (band.isArchived) {
+          throw new InvalidOperationError(
+            "Esta banda foi dissolvida e não recebe novas propostas.",
+          );
         }
       }
     }

@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
@@ -12,7 +13,6 @@ import {
   ValidateNested,
   validateSync,
 } from "class-validator";
-import { Type } from "class-transformer";
 
 export class WeeklyRuleItem {
   @IsInt()

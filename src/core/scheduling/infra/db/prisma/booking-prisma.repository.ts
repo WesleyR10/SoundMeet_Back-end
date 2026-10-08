@@ -266,6 +266,18 @@ export class BookingPrismaRepository implements IBookingRepository {
     return result.count;
   }
 
+  async findConfirmedPastCompletionWindow(threshold: Date): Promise<Booking[]> {
+    const models = await this.prisma.booking.findMany({
+      where: {
+        status: "confirmed",
+        end_at: {
+          lte: threshold,
+        },
+      },
+    });
+    return models.map((m) => BookingModelMapper.toEntity(m as any));
+  }
+
   async updateWithStatus(
     entity: Booking,
     expected_statuses: BookingStatusEnum[],
@@ -468,6 +480,23 @@ export class BookingPrismaRepository implements IBookingRepository {
         ...(filter.end_at_gte && { gte: filter.end_at_gte }),
         ...(filter.end_at_lte && { lte: filter.end_at_lte }),
       };
+    }
+
+    // Escopo do usuário: OR entre os três lados possíveis, em AND com tudo
+    // acima (o Prisma compõe `{ status, OR: [...] }` exatamente assim).
+    if (filter.participant_ids) {
+      const ids = filter.participant_ids.filter(Boolean);
+      if (ids.length === 0) {
+        // Nenhuma identidade → condição impossível, NUNCA "sem filtro".
+        // Omitir a cláusula aqui devolveria a agenda de todos os usuários.
+        where.id = { in: [] };
+      } else {
+        where.OR = [
+          { establishmentId: { in: ids } },
+          { musicianId: { in: ids } },
+          { bandId: { in: ids } },
+        ];
+      }
     }
 
     return where;

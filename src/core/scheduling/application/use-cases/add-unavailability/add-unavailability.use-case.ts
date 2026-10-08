@@ -8,13 +8,16 @@ import {
 } from "../common/availability-output";
 import { AddUnavailabilityInput } from "./add-unavailability.input";
 
-export class AddUnavailabilityUseCase
-  implements IUseCase<AddUnavailabilityInput, AvailabilityOutput>
-{
+export class AddUnavailabilityUseCase implements IUseCase<
+  AddUnavailabilityInput,
+  AvailabilityOutput
+> {
   constructor(private readonly availabilityRepo: IAvailabilityRepository) {}
 
   async execute(input: AddUnavailabilityInput): Promise<AvailabilityOutput> {
-    let entity = await this.availabilityRepo.findByMusicianId(input.musician_id);
+    let entity = await this.availabilityRepo.findByMusicianId(
+      input.musician_id,
+    );
 
     if (!entity) {
       entity = Availability.create({ musician_id: input.musician_id });

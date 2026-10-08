@@ -53,6 +53,14 @@ export class BookingInMemoryRepository
     return expired;
   }
 
+  async findConfirmedPastCompletionWindow(threshold: Date): Promise<Booking[]> {
+    const thresholdMs = threshold.getTime();
+    return this.items.filter((booking) => {
+      if (!booking.status.isConfirmed()) return false;
+      return booking.end_at.getTime() <= thresholdMs;
+    });
+  }
+
   async updateWithStatus(
     entity: Booking,
     expected_statuses: BookingStatusEnum[],
@@ -185,6 +193,18 @@ export class BookingInMemoryRepository
 
       if (filter.end_at_lte) {
         matches = matches && booking.end_at <= filter.end_at_lte;
+      }
+
+      // Espelho do OR do repositório Prisma. Lista vazia → nenhum booking
+      // casa (fail-closed), nunca "sem filtro".
+      if (filter.participant_ids) {
+        const ids = filter.participant_ids.filter(Boolean);
+        const isParticipant = [
+          booking.establishment_id.id,
+          booking.musician_id?.id,
+          booking.band_id?.id,
+        ].some((id) => !!id && ids.includes(id));
+        matches = matches && isParticipant;
       }
 
       return matches;

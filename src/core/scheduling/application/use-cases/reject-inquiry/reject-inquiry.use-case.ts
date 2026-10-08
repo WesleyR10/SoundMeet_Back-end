@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { IBandRepository } from "../../../../musician/domain/band.repository";
 import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -7,6 +7,7 @@ import { EntityValidationError } from "../../../../shared/domain/validators/vali
 import { Inquiry, InquiryId } from "../../../domain/inquiry.aggregate";
 import { IInquiryRepository } from "../../../domain/inquiry.repository";
 import { InquiryOutput, InquiryOutputMapper } from "../common/inquiry-output";
+import { assertNegotiationParticipant } from "../common/negotiation-actor";
 import { RejectInquiryInput } from "./reject-inquiry.input";
 
 export class RejectInquiryUseCase implements IUseCase<
@@ -17,6 +18,7 @@ export class RejectInquiryUseCase implements IUseCase<
     private readonly inquiryRepo: IInquiryRepository,
     private readonly clock: IClock = { now: () => new Date() },
     private readonly domainEventMediator?: DomainEventMediator,
+    private readonly bandRepo?: IBandRepository,
   ) {}
 
   async execute(input: RejectInquiryInput): Promise<InquiryOutput> {
@@ -26,16 +28,17 @@ export class RejectInquiryUseCase implements IUseCase<
       throw new NotFoundError(input.inquiry_id, Inquiry);
     }
 
-    if (input.requesting_user_id && !input.is_admin) {
-      const isOwner =
-        entity.musician_id?.id === input.requesting_user_id ||
-        entity.band_id?.id === input.requesting_user_id;
-      if (!isOwner) {
-        throw new ForbiddenException(
-          "Você não tem permissão para rejeitar esta inquiry.",
-        );
-      }
-    }
+    // Só o lado contratado rejeita — o estabelecimento é quem propôs. Sendo
+    // banda, só o líder: recusar um show é decisão que fecha a porta para todos.
+    await assertNegotiationParticipant(
+      input,
+      {
+        musician_id: entity.musician_id?.id ?? null,
+        band_id: entity.band_id?.id ?? null,
+      },
+      "rejeitar esta inquiry",
+      this.bandRepo,
+    );
 
     entity.reject(this.clock.now(), input.reason ?? null);
     if (entity.notification.hasErrors()) {

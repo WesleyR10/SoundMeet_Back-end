@@ -7,6 +7,22 @@ import { BookingId } from "../booking.aggregate";
 
 export type BookingProposedEventProps = {
   booking_id: BookingId;
+  /**
+   * 🔴 A inquiry que virou este booking, quando ele veio de uma conversão.
+   *
+   * `ConvertInquiryToBookingUseCase` também chama `Booking.create`, então ele
+   * emite este MESMO evento — e a inquiry de origem **já tem uma conversa
+   * aberta**. Sem este campo, o handler do chat abriria uma segunda, e a
+   * negociação ficaria partida em dois fios: o histórico num, a proposta
+   * convertida no outro, sem nada ligando os dois nem erro em lugar nenhum.
+   *
+   * `null` é o caso normal: proposta direta, sem inquiry por trás.
+   *
+   * ⚠️ NÃO é coluna do agregado. O vínculo persistido mora em
+   * `Inquiry.bookingId`; aqui ele é parte do FATO que o evento narra ("foi
+   * proposto, e veio daquela negociação").
+   */
+  from_inquiry_id?: string | null;
   establishment_id: string;
   musician_id: string | null;
   band_id: string | null;
@@ -75,6 +91,8 @@ export class BookingProposedEvent implements IDomainEvent {
   readonly occurred_on: Date;
   readonly event_version: number;
 
+  /** Ver `BookingProposedEventProps.from_inquiry_id`. */
+  readonly from_inquiry_id: string | null;
   readonly establishment_id: string;
   readonly musician_id: string | null;
   readonly band_id: string | null;
@@ -89,6 +107,7 @@ export class BookingProposedEvent implements IDomainEvent {
 
   constructor(props: BookingProposedEventProps) {
     this.aggregate_id = props.booking_id;
+    this.from_inquiry_id = props.from_inquiry_id ?? null;
     this.establishment_id = props.establishment_id;
     this.musician_id = props.musician_id;
     this.band_id = props.band_id;

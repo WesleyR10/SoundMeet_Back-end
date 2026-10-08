@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsDate,
   IsNotEmpty,
@@ -6,7 +7,6 @@ import {
   IsUUID,
   validateSync,
 } from "class-validator";
-import { Type } from "class-transformer";
 
 export type AddUnavailabilityInputConstructorProps = {
   musician_id: string;
