@@ -565,7 +565,7 @@ describe("ContractsController Integration Tests", () => {
   });
 
   /**
-   * As duas rotas que o `contract-digital.md` §10 dizia estarem cobertas e não
+   * As duas rotas que o `contrato-digital.md` §10 dizia estarem cobertas e não
    * estavam — e a que faltava era justamente a que não tinha autorização.
    */
   describe("POST /contracts/issue", () => {

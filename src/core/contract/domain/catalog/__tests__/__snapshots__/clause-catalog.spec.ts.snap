@@ -1,0 +1,363 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ClauseCatalog redação congelada assinatura_eletronica.padrao.formal 1`] = `
+"As partes reconhecem expressamente a validade, a autenticidade e a eficácia da assinatura eletrônica deste instrumento, realizada por meio da plataforma SoundMeet, nos termos do art. 10, §2º, da Medida Provisória nº 2.200-2/2001, dispensando-se assinatura física, certificação ICP-Brasil e a presença de testemunhas para os fins aqui ajustados.
+
+Parágrafo primeiro. Considera-se assinatura o aceite eletrônico manifestado de forma expressa e inequívoca por cada parte, mediante identificação autenticada, registrando-se data, hora, endereço de rede e agente de acesso, na forma do Anexo II — Certificado de Assinatura.
+
+Parágrafo segundo. A integridade do conteúdo é aferível pelo resumo criptográfico (SHA-256) registrado no Anexo II e pelo código de verificação ABC123XYZ, consultável em https://soundmeet.com.br/contrato/ABC123XYZ. Qualquer alteração no conteúdo produz resumo distinto e é, por isso, detectável.
+
+Parágrafo terceiro. As partes reconhecem que este instrumento constitui prova escrita da obrigação, apta a instruir ação monitória nos termos do art. 700 do Código de Processo Civil."
+`;
+
+exports[`ClauseCatalog redação congelada ausencia_vinculo.padrao.formal 1`] = `
+"As partes ajustam prestação de serviços artísticos de natureza civil, nos termos dos arts. 593 e seguintes do Código Civil, não se estabelecendo entre elas relação de emprego.
+
+Parágrafo primeiro. O CONTRATADO define o repertório, a técnica e os meios de execução da apresentação, podendo fazer-se substituir na forma prevista neste instrumento.
+
+Parágrafo segundo. Não há exclusividade entre as partes, que podem contratar livremente com terceiros."
+`;
+
+exports[`ClauseCatalog redação congelada cache_pagamento.com_custodia.formal 1`] = `
+"Pela prestação dos serviços descritos neste instrumento, o CONTRATANTE pagará ao CONTRATADO a quantia de R$ 300,00 (trezentos reais).
+
+Parágrafo primeiro. O pagamento será realizado integral e antecipadamente, antes da data da apresentação, no prazo informado pela SoundMeet às partes e vigente na data de emissão deste instrumento, permanecendo o valor em custódia junto a Asaas, instituição de pagamento, até a liberação tratada na cláusula de custódia e liberação.
+
+Parágrafo segundo. O valor custodiado não integra o patrimônio da SoundMeet, não é por ela mantido em conta própria e dele não pode dispor em proveito próprio.
+
+Parágrafo terceiro. Não realizado o pagamento no prazo, a contratação poderá ser cancelada sem ônus para qualquer das partes, hipótese que não se confunde com o cancelamento tratado em cláusula própria e não gera a multa nela prevista.
+
+Parágrafo quarto. O valor acima é a obrigação integral do CONTRATANTE e não é reduzido pela remuneração devida à SoundMeet. Esta remuneração, pelos serviços de aproximação, formalização e custódia, é devida pelo CONTRATADO, deduz-se do valor no momento da liberação e corresponde ao percentual que lhe foi informado antes do aceite deste instrumento e vigente na data de sua emissão. Alteração posterior não alcança esta contratação.
+
+Parágrafo quinto. O valor acima é BRUTO. Eventuais retenções tributárias exigidas por lei do CONTRATANTE serão deduzidas dele, e o CONTRATADO receberá o líquido resultante, com o comprovante da retenção.
+
+Parágrafo sexto. Havendo divergência entre o valor expresso em algarismos e o valor por extenso, prevalecerá este último."
+`;
+
+exports[`ClauseCatalog redação congelada cache_pagamento.direto.direto 1`] = `
+"O CONTRATANTE paga ao CONTRATADO R$ 300,00 (trezentos reais), em até 2 (dois) dias úteis após a apresentação.
+
+O pagamento é feito diretamente entre as partes. A SoundMeet não recebe, não retém e não garante esse dinheiro — apenas registra o valor combinado.
+
+Esse valor é BRUTO: se a lei obrigar o CONTRATANTE a reter algum tributo, a retenção sai dele e o CONTRATADO recebe o líquido, com o comprovante. Sem retenção obrigatória, o bruto é o que o CONTRATADO recebe.
+
+Se o valor em número e o valor por extenso não baterem, vale o por extenso. Atraso no pagamento gera correção monetária e juros de 1% ao mês, proporcionais aos dias."
+`;
+
+exports[`ClauseCatalog redação congelada cache_pagamento.direto.formal 1`] = `
+"Pela prestação dos serviços descritos neste instrumento, o CONTRATANTE pagará ao CONTRATADO a quantia de R$ 300,00 (trezentos reais), em até 2 (dois) dias úteis após a apresentação.
+
+Parágrafo primeiro. O pagamento será realizado diretamente entre as partes, pelo meio que acordarem. A SoundMeet não intermedia, não retém e não garante este pagamento, limitando-se a registrar o valor acordado.
+
+Parágrafo segundo. O valor acima é BRUTO. Eventuais retenções tributárias exigidas por lei do CONTRATANTE serão deduzidas dele, e o CONTRATADO receberá o líquido resultante, com o comprovante da retenção. Não havendo retenção legalmente exigível, o valor bruto é o valor a receber.
+
+Parágrafo terceiro. Havendo divergência entre o valor expresso em algarismos e o valor por extenso, prevalecerá este último.
+
+Parágrafo quarto. O atraso no pagamento sujeitará o CONTRATANTE a correção monetária e juros de mora de 1% (um por cento) ao mês, calculados pro rata die."
+`;
+
+exports[`ClauseCatalog redação congelada camarim_alimentacao.basica.formal 1`] = `"O CONTRATANTE disponibilizará ao CONTRATADO espaço reservado para preparação e guarda de pertences, bem como água potável durante toda a permanência no local."`;
+
+exports[`ClauseCatalog redação congelada camarim_alimentacao.completa.formal 1`] = `
+"O CONTRATANTE disponibilizará ao CONTRATADO :
+
+(a) camarim ou espaço reservado, com acesso restrito, para preparação e guarda de pertences;
+
+(b) água potável durante toda a permanência no local;
+
+(c) refeição ou lanche compatível com o horário, considerada a duração de 2h30 da apresentação e o tempo de montagem e desmontagem."
+`;
+
+exports[`ClauseCatalog redação congelada cancelamento_remarcacao.padrao.direto 1`] = `
+"Qualquer das partes pode cancelar, avisando a outra por escrito.
+
+Cancelou com 72 (setenta e duas) horas ou mais de antecedência: sem multa.
+
+Cancelou com menos que isso: paga à outra parte 30% do valor contratado, ou seja, R$ 90,00.
+
+Remarcar de comum acordo, por escrito e antes do horário de início, cancela a multa. Caso fortuito e força maior também.
+
+A multa é compensatória e nunca passa do valor do contrato (CC art. 412)."
+`;
+
+exports[`ClauseCatalog redação congelada cancelamento_remarcacao.padrao.formal 1`] = `
+"Qualquer das partes poderá cancelar a apresentação mediante comunicação escrita à outra, observadas as seguintes condições:
+
+(a) cancelamento comunicado com antecedência igual ou superior a 72 (setenta e duas) horas do horário de início não gera penalidade a nenhuma das partes;
+
+(b) cancelamento comunicado com antecedência inferior a 72 (setenta e duas) horas sujeita a parte que cancelou ao pagamento, à outra, de multa compensatória equivalente a 30% do valor contratado, isto é, R$ 90,00.
+
+Parágrafo primeiro. A remarcação consensual para nova data, formalizada por escrito antes do horário de início, afasta a multa prevista na alínea (b).
+
+Parágrafo segundo. A multa prevista neste instrumento tem natureza compensatória e está limitada ao valor da obrigação principal, nos termos do art. 412 do Código Civil.
+
+Parágrafo terceiro. Não incide multa nas hipóteses de caso fortuito ou força maior tratadas neste instrumento."
+`;
+
+exports[`ClauseCatalog redação congelada cancelamento_remarcacao.rigorosa.rigoroso 1`] = `
+"Qualquer das partes poderá cancelar a apresentação mediante comunicação escrita à outra, observadas as seguintes condições:
+
+(a) cancelamento comunicado com antecedência igual ou superior a 72 (setenta e duas) horas do horário de início não gera penalidade;
+
+(b) cancelamento comunicado com antecedência inferior sujeita a parte que cancelou ao pagamento, à outra, de multa compensatória de 30% do valor contratado, isto é, R$ 90,00;
+
+(c) o não comparecimento sem comunicação prévia equipara-se ao cancelamento previsto na alínea (b), acrescido da obrigação de ressarcimento das despesas comprovadamente incorridas pela parte prejudicada em razão da apresentação frustrada.
+
+Parágrafo primeiro. A remarcação consensual para nova data, formalizada por escrito antes do horário de início, afasta as penalidades acima.
+
+Parágrafo segundo. A soma da multa com o ressarcimento previsto na alínea (c) está limitada ao valor da obrigação principal, nos termos do art. 412 do Código Civil.
+
+Parágrafo terceiro. Não incidem penalidades nas hipóteses de caso fortuito ou força maior tratadas neste instrumento."
+`;
+
+exports[`ClauseCatalog redação congelada caso_fortuito.ao_ar_livre.formal 1`] = `
+"Nenhuma das partes responderá por descumprimento decorrente de caso fortuito ou força maior, nos termos do art. 393 do Código Civil, compreendidas, entre outras hipóteses, a interdição do local por autoridade competente, a interrupção do fornecimento de energia elétrica não imputável ao CONTRATANTE, a determinação de autoridade pública que impeça a realização do evento, a decretação de luto oficial e a impossibilidade de comparecimento por motivo de saúde grave devidamente comprovado.
+
+Parágrafo primeiro. Tratando-se de apresentação em área descoberta, condições climáticas que ofereçam risco à integridade física dos presentes ou aos equipamentos — notadamente chuva, descargas atmosféricas ou ventos fortes — autorizam a suspensão ou o cancelamento da apresentação sem penalidade a qualquer das partes.
+
+Parágrafo segundo. A decisão de suspender por motivo climático caberá conjuntamente às partes; havendo divergência, prevalecerá a recusa fundada em risco à segurança.
+
+Parágrafo terceiro. Verificada a hipótese, as partes buscarão de boa-fé a remarcação da apresentação; não sendo possível, o contrato será resolvido sem ônus para qualquer delas, restituindo-se eventuais valores já pagos."
+`;
+
+exports[`ClauseCatalog redação congelada caso_fortuito.padrao.formal 1`] = `
+"Nenhuma das partes responderá por descumprimento decorrente de caso fortuito ou força maior, nos termos do art. 393 do Código Civil, compreendidas, entre outras hipóteses, a interdição do local por autoridade competente, a interrupção do fornecimento de energia elétrica não imputável ao CONTRATANTE, a determinação de autoridade pública que impeça a realização do evento, a decretação de luto oficial e a impossibilidade de comparecimento por motivo de saúde grave devidamente comprovado.
+
+Parágrafo primeiro. A parte impossibilitada comunicará a outra tão logo tome conhecimento do fato, com a respectiva comprovação.
+
+Parágrafo segundo. Verificada a hipótese, as partes buscarão de boa-fé a remarcação da apresentação; não sendo possível, o contrato será resolvido sem ônus para qualquer delas, restituindo-se eventuais valores já pagos."
+`;
+
+exports[`ClauseCatalog redação congelada conduta.rigorosa.rigoroso 1`] = `
+"O CONTRATADO obriga-se a executar a apresentação em condições plenas de desempenho e a tratar com urbanidade o público, os funcionários do estabelecimento e os demais profissionais envolvidos.
+
+Parágrafo primeiro. O CONTRATANTE obriga-se, reciprocamente, a assegurar ao CONTRATADO ambiente de trabalho respeitoso e livre de assédio ou discriminação de qualquer natureza, cabendo-lhe adotar as providências necessárias diante de conduta abusiva de terceiros.
+
+Parágrafo segundo. A interrupção da apresentação por conduta que exponha a risco a integridade física do CONTRATADO ou de seus integrantes não configura descumprimento contratual e não autoriza retenção do valor devido."
+`;
+
+exports[`ClauseCatalog redação congelada custodia_liberacao.padrao.formal 1`] = `
+"O valor pago pelo CONTRATANTE permanece em custódia junto a Asaas e é liberado ao CONTRATADO após a realização da apresentação, observadas as condições desta cláusula.
+
+Parágrafo primeiro. A liberação depende, cumulativamente, do registro da realização da apresentação pelo CONTRATADO na plataforma SoundMeet e do decurso do prazo de contestação, contado do término da apresentação, informado às partes e vigente na data de emissão deste instrumento.
+
+Parágrafo segundo. Decorrido o prazo de contestação sem manifestação do CONTRATANTE, a liberação é automática, independentemente de nova autorização de qualquer das partes ou de ato discricionário da SoundMeet.
+
+Parágrafo terceiro. A contestação apresentada pelo CONTRATANTE dentro do prazo suspende a liberação e instaura a mediação prevista na cláusula de resolução de conflitos, limitada ao valor custodiado. A suspensão não constitui condição para o acesso às vias judiciais, que permanece franqueado a qualquer das partes.
+
+Parágrafo quarto. Não realizada a apresentação, o valor custodiado responde pelas consequências previstas na cláusula de cancelamento, restituindo-se o que dela sobejar à parte a quem couber.
+
+Parágrafo quinto. A ausência de contestação e a consequente liberação não implicam quitação de eventual pretensão indenizatória por vício na execução, apurável pelas vias próprias.
+
+Parágrafo sexto. A obrigação da SoundMeet quanto ao valor custodiado limita-se a determinar a sua liberação quando verificadas as condições acima, não abrangendo garantia de realização da apresentação nem de solvência de qualquer das partes."
+`;
+
+exports[`ClauseCatalog redação congelada data_horario_duracao.padrao.direto 1`] = `
+"Data: 12 de setembro de 2026 (sábado). Horário: das 21:00 às 23:30, fuso de America/Sao_Paulo. Local: Rua das Flores, 100 — Centro — São Paulo/SP — CEP 01000-000.
+
+O CONTRATADO chega com antecedência para montar e testar os equipamentos. Há tolerância de 15 (quinze) minutos no início, sem penalidade — o término é adiado na mesma medida.
+
+Tocar além do horário só com o aceite do CONTRATADO, e custa R$ 300,00 por hora adicional ou fração."
+`;
+
+exports[`ClauseCatalog redação congelada data_horario_duracao.padrao.formal 1`] = `
+"A apresentação ocorrerá no dia 12 de setembro de 2026 (sábado), com início às 21:00 e término previsto para 23:30, considerado o fuso horário de America/Sao_Paulo, no endereço Rua das Flores, 100 — Centro — São Paulo/SP — CEP 01000-000.
+
+Parágrafo primeiro. O CONTRATADO deverá comparecer ao local com antecedência suficiente para montagem, conferência e ajuste de equipamentos.
+
+Parágrafo segundo. Admite-se tolerância de 15 (quinze) minutos para o início da apresentação, sem qualquer penalidade, hipótese em que o término será postergado na mesma medida.
+
+Parágrafo terceiro. A prorrogação da apresentação além do tempo contratado dependerá de concordância expressa do CONTRATADO e será remunerada à razão de R$ 300,00 por hora adicional ou fração, paga nas mesmas condições do valor principal."
+`;
+
+exports[`ClauseCatalog redação congelada direito_imagem.reciproca.formal 1`] = `
+"As partes autorizam-se reciprocamente, de forma gratuita e não exclusiva, a captar e utilizar imagem, voz e nome uma da outra em registros da apresentação, exclusivamente para finalidade de divulgação institucional das próprias atividades, em meios digitais e impressos, em território nacional, pelo prazo de 12 (doze) meses contados da data da apresentação.
+
+Parágrafo primeiro. A autorização abrange a divulgação da apresentação de Ana Ribeiro em Bar do Zé e não alcança o uso em publicidade paga de terceiros, o licenciamento a terceiros, a comercialização de qualquer registro nem a associação a marcas, o que dependerá de autorização específica e escrita.
+
+Parágrafo segundo. Nenhuma das partes poderá utilizar os registros de forma que exponha a outra a situação vexatória, ofensiva ou que distorça o contexto original."
+`;
+
+exports[`ClauseCatalog redação congelada direitos_autorais_ecad.padrao.formal 1`] = `
+"A execução pública de obras musicais no estabelecimento constitui obrigação do CONTRATANTE, na qualidade de promotor do evento, nos termos do art. 68 da Lei nº 9.610/1998, cabendo-lhe exclusivamente a obtenção das autorizações necessárias e o recolhimento dos direitos autorais devidos ao ECAD — Escritório Central de Arrecadação e Distribuição.
+
+Parágrafo primeiro. O CONTRATANTE isenta o CONTRATADO de qualquer responsabilidade, cobrança, multa ou ônus decorrente da execução pública das obras, obrigando-se a reembolsá-lo de imediato caso venha a ser acionado a esse título.
+
+Parágrafo segundo. A SoundMeet não intermedia, não recolhe e não fiscaliza direitos autorais, não lhe cabendo qualquer responsabilidade a esse título.
+
+Parágrafo terceiro. O CONTRATADO declara que as obras de sua autoria eventualmente executadas são de sua titularidade ou que possui a devida autorização para executá-las."
+`;
+
+exports[`ClauseCatalog redação congelada disposicoes_gerais.padrao.formal 1`] = `
+"Este instrumento, com seus anexos, representa a integralidade do ajuste entre as partes quanto à apresentação nele descrita, substituindo quaisquer tratativas anteriores, verbais ou escritas.
+
+Parágrafo primeiro. Os anexos que acompanham este instrumento integram-no para todos os fins de direito.
+
+Parágrafo segundo. A eventual nulidade ou ineficácia de qualquer disposição não prejudica as demais, que permanecem em pleno vigor.
+
+Parágrafo terceiro. A tolerância de qualquer das partes quanto ao descumprimento de obrigação pela outra constitui mera liberalidade, não implicando novação, renúncia ou alteração do ajustado.
+
+Parágrafo quarto. Alterações a este contrato somente terão validade se formalizadas por termo aditivo aceito por ambas as partes pelo mesmo meio eletrônico, preservando-se a integridade do instrumento original, emitido em 1 de agosto de 2026."
+`;
+
+exports[`ClauseCatalog redação congelada equipamentos_danos.padrao.formal 1`] = `
+"Cada parte responde pelos danos que causar, por si ou por seus prepostos, aos equipamentos e instalações da outra, obrigando-se ao reparo ou à indenização correspondente.
+
+Parágrafo primeiro. O CONTRATANTE não assume a guarda dos instrumentos e equipamentos do CONTRATADO, salvo mediante acordo escrito específico que delimite período e condições.
+
+Parágrafo segundo. O CONTRATADO obriga-se a utilizar os equipamentos disponibilizados pelo CONTRATANTE de forma diligente e conforme sua destinação, respondendo por danos decorrentes de uso inadequado."
+`;
+
+exports[`ClauseCatalog redação congelada estrutura_tecnica.com_anexo.formal 1`] = `
+"O CONTRATANTE declara que Bar do Zé dispõe da estrutura técnica descrita no Anexo I — Ficha Técnica do Palco, que integra este instrumento para todos os fins, e obriga-se a disponibilizá-la em condições de uso na data da apresentação.
+
+Parágrafo primeiro. Resumo da estrutura declarada: PA, 4 retornos, 12 canais, backline de bateria. O detalhamento completo consta do Anexo I.
+
+Parágrafo segundo. Cabe ao CONTRATADO o instrumental próprio e tudo o que não estiver expressamente declarado no Anexo I.
+
+Parágrafo terceiro. A ausência, no dia da apresentação, de item declarado no Anexo I constitui inadimplemento do CONTRATANTE e não autoriza desconto no valor contratado."
+`;
+
+exports[`ClauseCatalog redação congelada estrutura_tecnica.sem_anexo.formal 1`] = `
+"O CONTRATANTE obriga-se a informar ao CONTRATADO, por escrito e com antecedência mínima de 5 (cinco) dias da apresentação, a estrutura técnica disponível em Bar do Zé, incluindo sistema de sonorização, retornos de palco, microfones, equipamento de palco disponível e alimentação elétrica.
+
+Parágrafo primeiro. Cabe ao CONTRATADO o instrumental próprio e tudo o que não for expressamente informado como disponível pelo CONTRATANTE.
+
+Parágrafo segundo. Não prestada a informação no prazo, o CONTRATADO poderá rescindir este contrato sem qualquer penalidade, comunicando o CONTRATANTE."
+`;
+
+exports[`ClauseCatalog redação congelada exclusividade_raio.opt_in.formal 1`] = `
+"Como contrapartida do valor de R$ 300,00 ora ajustado, o CONTRATADO obriga-se a não realizar apresentação musical aberta ao público, com a mesma formação, em raio de 10 (dez) quilômetros de Bar do Zé, no período de 7 (sete) dias anteriores e 7 (sete) dias posteriores à data da apresentação.
+
+Parágrafo primeiro. A restrição é limitada em tempo, espaço e atividade, não alcançando ensaios, gravações, aulas, apresentações privadas, participações como convidado nem qualquer outra atividade profissional do CONTRATADO.
+
+Parágrafo segundo. Compromissos já assumidos pelo CONTRATADO antes da celebração deste contrato ficam expressamente ressalvados."
+`;
+
+exports[`ClauseCatalog redação congelada lgpd.padrao.formal 1`] = `
+"As partes tratam os dados pessoais constantes deste instrumento exclusivamente para a execução do contrato e o cumprimento de obrigações legais e regulatórias, com fundamento no art. 7º, incisos II e V, da Lei nº 13.709/2018, limitando-se aos dados necessários à qualificação das partes e à comprovação do ajuste.
+
+Parágrafo primeiro. As partes obrigam-se a não compartilhar tais dados com terceiros para finalidade diversa, salvo por determinação legal ou de autoridade competente, e a adotar medidas de segurança compatíveis.
+
+Parágrafo segundo. Cada parte é controladora dos dados pessoais que recebe da outra para a execução deste contrato, respondendo pelo tratamento que der a eles.
+
+Parágrafo terceiro. A SoundMeet é controladora dos dados que trata para as finalidades próprias da plataforma, entre elas a geração, a guarda, a disponibilização e a verificação de integridade deste instrumento e da respectiva trilha de auditoria, que mantém pelo prazo de 5 (cinco) anos contados da data da apresentação, e envia cópia do instrumento assinado às partes."
+`;
+
+exports[`ClauseCatalog redação congelada licencas_seguranca.padrao.formal 1`] = `
+"É de responsabilidade exclusiva do CONTRATANTE manter Bar do Zé em situação regular perante as autoridades competentes, incluindo alvará de funcionamento, autorização para realização de música ao vivo, observância dos limites municipais de emissão sonora, condições de segurança, prevenção de incêndio, controle de lotação e fornecimento regular de energia elétrica.
+
+Parágrafo primeiro. A impossibilidade de realização da apresentação por irregularidade do local, interdição, embargo ou reclamação de vizinhança é imputável ao CONTRATANTE e equipara-se a cancelamento por ele promovido, com as consequências previstas na cláusula de cancelamento.
+
+Parágrafo segundo. O CONTRATADO não responde por danos causados a terceiros no local da apresentação, salvo quando decorrentes de conduta dolosa ou culposa comprovadamente sua ou de seus integrantes."
+`;
+
+exports[`ClauseCatalog redação congelada objeto.banda.direto 1`] = `
+"O grupo Trio Maré fará 1 (uma) apresentação musical ao vivo em Bar do Zé, com 2h30 de duração, na formação: Ana Ribeiro, Bruno Costa e Carla Dias.
+
+O CONTRATADO responde pelos próprios integrantes, inclusive por qualquer obrigação trabalhista, previdenciária ou fiscal entre eles — nada disso pode ser cobrado do CONTRATANTE.
+
+A apresentação pode ser dividida em blocos, desde que o tempo total seja cumprido."
+`;
+
+exports[`ClauseCatalog redação congelada objeto.banda.formal 1`] = `
+"O presente instrumento particular tem por objeto a prestação de serviços artísticos musicais pelo CONTRATADO ao CONTRATANTE, consistente na realização de 1 (uma) apresentação musical ao vivo em Bar do Zé, com duração de 2h30, pelo grupo musical Trio Maré, com a seguinte formação: Ana Ribeiro, Bruno Costa e Carla Dias.
+
+Parágrafo primeiro. Os serviços são prestados em caráter autônomo, eventual e sem exclusividade, com meios, técnica, instrumental e repertório de livre escolha do CONTRATADO.
+
+Parágrafo segundo. O CONTRATADO responde perante o CONTRATANTE pela atuação de todos os integrantes indicados, bem como por quaisquer obrigações trabalhistas, previdenciárias, fiscais ou de qualquer outra natureza decorrentes da relação entre o CONTRATADO e seus integrantes, nada podendo ser exigido do CONTRATANTE a esse título.
+
+Parágrafo terceiro. A apresentação poderá ser executada em blocos, com intervalos, desde que observado o tempo total de execução ora contratado."
+`;
+
+exports[`ClauseCatalog redação congelada objeto.solo.direto 1`] = `
+"O CONTRATADO fará 1 (uma) apresentação musical ao vivo em Bar do Zé, com 2h30 de duração.
+
+O CONTRATADO é profissional autônomo: escolhe o próprio repertório, usa os próprios meios e não tem exclusividade com o CONTRATANTE. A apresentação pode ser dividida em blocos, desde que o tempo total seja cumprido."
+`;
+
+exports[`ClauseCatalog redação congelada objeto.solo.formal 1`] = `
+"O presente instrumento particular tem por objeto a prestação de serviços artísticos musicais pelo CONTRATADO ao CONTRATANTE, consistente na realização de 1 (uma) apresentação musical ao vivo em Bar do Zé, com duração de 2h30.
+
+Parágrafo primeiro. Os serviços são prestados em caráter autônomo, eventual e sem exclusividade, com meios, técnica, instrumental e repertório de livre escolha do CONTRATADO, respeitado o perfil do estabelecimento previamente informado.
+
+Parágrafo segundo. A apresentação poderá ser executada em blocos, com intervalos, desde que observado o tempo total de execução ora contratado."
+`;
+
+exports[`ClauseCatalog redação congelada papel_da_plataforma.com_custodia.formal 1`] = `
+"Este contrato é celebrado exclusivamente entre CONTRATANTE e CONTRATADO. A SoundMeet, inscrita no CNPJ sob o nº 00.000.000/0001-00, atua como provedora da ferramenta tecnológica que aproximou as partes, gerou este instrumento, guarda o respectivo registro e determina, verificadas as condições ajustadas, a liberação do valor mantido em custódia junto a Asaas.
+
+Parágrafo primeiro. A SoundMeet não é parte deste contrato, não é empregadora, agente, empresária ou representante de qualquer das partes, não garante a realização da apresentação, o seu resultado artístico ou o comparecimento de público, e não responde pelas obrigações aqui assumidas.
+
+Parágrafo segundo. O valor do cachê é custodiado por Asaas, instituição de pagamento, e não integra o patrimônio da SoundMeet nem é mantido em conta de sua titularidade.
+
+Parágrafo terceiro. São obrigações próprias da SoundMeet, perante as partes: determinar a liberação do valor custodiado quando verificadas as condições da cláusula de custódia e liberação; manter o instrumento e a respectiva trilha de auditoria íntegros e disponíveis; e disponibilizar canal de mediação prévia em caso de divergência. Estas obrigações decorrem dos serviços efetivamente prestados e não são afastadas por este contrato.
+
+Parágrafo quarto. A remuneração da SoundMeet é devida somente na liberação do valor custodiado. Não realizada a apresentação, não há liberação e nenhuma remuneração lhe é devida por esta contratação.
+
+Parágrafo quinto. A verificação de documentos apresentados pelas partes limita-se à consistência formal, não implicando conferência de veracidade, capacidade civil ou poderes de representação."
+`;
+
+exports[`ClauseCatalog redação congelada papel_da_plataforma.sem_custodia.formal 1`] = `
+"Este contrato é celebrado exclusivamente entre CONTRATANTE e CONTRATADO. A SoundMeet, inscrita no CNPJ sob o nº 00.000.000/0001-00, atua unicamente como provedora da ferramenta tecnológica que aproximou as partes, gerou este instrumento e guarda o respectivo registro.
+
+Parágrafo primeiro. A SoundMeet não é parte deste contrato, não é empregadora, agente, empresária ou representante de qualquer das partes, não intermedia o pagamento, não garante a realização da apresentação, o seu resultado artístico ou o comparecimento de público, e não responde pelas obrigações aqui assumidas.
+
+Parágrafo segundo. São obrigações próprias da SoundMeet, perante as partes: manter o instrumento e a respectiva trilha de auditoria íntegros e disponíveis, e disponibilizar canal de mediação prévia em caso de divergência.
+
+Parágrafo terceiro. A verificação de documentos apresentados pelas partes limita-se à consistência formal, não implicando conferência de veracidade, capacidade civil ou poderes de representação."
+`;
+
+exports[`ClauseCatalog redação congelada passagem_som.com_janela.formal 1`] = `
+"O CONTRATANTE disponibilizará o palco, os equipamentos de sonorização e, quando houver, o operador de som para a passagem de som no dia 12 de setembro de 2026, na janela das 18:00-19:00.
+
+Parágrafo único. A não disponibilização da passagem de som na janela acordada não autoriza o CONTRATANTE a exigir do CONTRATADO qualquer compensação por eventual atraso ou prejuízo técnico dela decorrente."
+`;
+
+exports[`ClauseCatalog redação congelada passagem_som.sem_janela.formal 1`] = `
+"O CONTRATANTE disponibilizará o palco, os equipamentos de sonorização e, quando houver, o operador de som para a passagem de som no dia 12 de setembro de 2026, em horário anterior ao início da apresentação, a ser informado ao CONTRATADO com antecedência mínima de 48 (quarenta e oito) horas.
+
+Parágrafo único. A não disponibilização da passagem de som não autoriza o CONTRATANTE a exigir do CONTRATADO qualquer compensação por eventual atraso ou prejuízo técnico dela decorrente."
+`;
+
+exports[`ClauseCatalog redação congelada resolucao_conflitos_foro.padrao.formal 1`] = `
+"Havendo divergência quanto à execução deste contrato, as partes procurarão resolvê-la de boa-fé, podendo utilizar o canal de mediação disponibilizado pela SoundMeet, cuja adesão é facultativa e não constitui condição para o acesso às vias judiciais.
+
+Parágrafo único. Persistindo a divergência, fica eleito o foro da comarca de São Paulo/SP, local da apresentação, com renúncia a qualquer outro, por mais privilegiado que seja."
+`;
+
+exports[`ClauseCatalog redação congelada substituicao_integrantes.banda.formal 1`] = `
+"O CONTRATADO poderá substituir integrantes do grupo Trio Maré indicados neste instrumento, desde que mantidos a formação instrumental, o repertório e o padrão técnico contratados.
+
+Parágrafo primeiro. A substituição será comunicada ao CONTRATANTE com antecedência mínima de 24 (vinte e quatro) horas do início da apresentação, salvo caso fortuito ou força maior, hipótese em que a comunicação será imediata.
+
+Parágrafo segundo. A substituição da maioria dos integrantes indicados depende de anuência expressa do CONTRATANTE; recusada a anuência, o contrato poderá ser resolvido sem penalidade para qualquer das partes.
+
+Parágrafo terceiro. O CONTRATADO permanece integralmente responsável perante o CONTRATANTE pela atuação dos integrantes substitutos."
+`;
+
+exports[`ClauseCatalog redação congelada tributos.contratado_pj.formal 1`] = `
+"Cada parte é responsável pelos tributos que lhe sejam legalmente atribuídos em razão deste contrato.
+
+Parágrafo primeiro. Sendo o CONTRATADO pessoa jurídica, a remuneração será paga contra a emissão do documento fiscal correspondente, cabendo ao próprio CONTRATADO o recolhimento dos tributos incidentes sobre sua atividade, na forma do regime a que estiver submetido. Não há retenção de contribuição previdenciária na fonte, por não se tratar de contratação de contribuinte individual.
+
+Parágrafo segundo. Eventual retenção de Imposto Sobre Serviços observará a legislação do município do local da apresentação, quando exigível do CONTRATANTE.
+
+Parágrafo terceiro. A emissão de documento fiscal compete ao CONTRATADO, não cabendo à SoundMeet emiti-lo, recolher tributos ou prestar informação fiscal por qualquer das partes."
+`;
+
+exports[`ClauseCatalog redação congelada tributos.contratante_pf.formal 1`] = `
+"Cada parte é responsável pelos tributos que lhe sejam legalmente atribuídos em razão deste contrato, arcando o CONTRATADO com a tributação incidente sobre a remuneração recebida.
+
+Parágrafo único. A emissão de documento fiscal, quando exigível, compete a quem a legislação atribuir, não cabendo à SoundMeet emiti-lo, recolher tributos ou prestar informação fiscal por qualquer das partes."
+`;
+
+exports[`ClauseCatalog redação congelada tributos.contratante_pj.formal 1`] = `
+"Cada parte é responsável pelos tributos que lhe sejam legalmente atribuídos em razão deste contrato.
+
+Parágrafo primeiro. Sendo o CONTRATANTE pessoa jurídica e o CONTRATADO contribuinte individual, o CONTRATANTE efetuará as retenções na fonte exigidas pela legislação vigente, notadamente a contribuição previdenciária, deduzindo-as do valor a ser pago e recolhendo-as nos prazos legais, com a devida comprovação ao CONTRATADO.
+
+Parágrafo segundo. Eventual retenção de Imposto Sobre Serviços observará a legislação do município do local da apresentação.
+
+Parágrafo terceiro. A emissão de documento fiscal, quando exigível, compete a quem a legislação atribuir, não cabendo à SoundMeet emiti-lo, recolher tributos ou prestar informação fiscal por qualquer das partes."
+`;
