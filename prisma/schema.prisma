@@ -135,11 +135,15 @@ model Musician {
   stage_name                          String?
   bio                                 String?
   avatar                              String?
+  // Chave do objeto da foto (out/2026). NULL = URL que não é objeto nosso
+  // (foto do Google, ou subida antes da coluna existir) — não há o que apagar.
+  avatar_key                          String?
   // Áudio de apresentação (até 40s) — o trecho que o estabelecimento ouve antes
   // de contratar. ⚠️ `presentation_audio_key` NÃO é redundância da URL: sem a
   // chave do objeto, trocar o áudio deixaria o arquivo anterior no bucket sem
-  // nada apontando para ele, pago para sempre. É o defeito que `avatar` tem e
-  // que o par `cover`/`cover_key` do estabelecimento resolveu.
+  // nada apontando para ele, pago para sempre. Era o defeito que `avatar`
+  // tinha até ganhar `avatar_key`, e que o par `cover`/`cover_key` do
+  // estabelecimento já havia resolvido.
   presentation_audio_url              String?
   presentation_audio_key              String?
   presentation_audio_duration_seconds Int?
@@ -155,6 +159,9 @@ model Musician {
   qr_foreground_color                 String?
   qr_background_color                 String?
   qr_logo_url                         String?
+  // Chave do objeto do logo — mesmo papel de `avatar_key`. Fica fora da
+  // customização do QR (que é pública) de propósito.
+  qr_logo_key                         String?
   qr_label                            String?
   push_token                          String?
   push_token_platform                 String?
