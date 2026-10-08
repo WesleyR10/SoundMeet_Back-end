@@ -9,6 +9,7 @@ import {
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 
 export type AddEventPerformerInput = {
@@ -31,6 +32,8 @@ export class AddEventPerformerUseCase implements IUseCase<
   constructor(
     private readonly eventRepo: IEventRepository,
     private readonly eventMusicianRepo: IEventMusicianRepository,
+    /** Publica `EventPerformerConfirmedEvent` — avisa quem segue o músico. */
+    private readonly domainEventMediator?: DomainEventMediator,
   ) {}
 
   async execute(
@@ -57,5 +60,6 @@ export class AddEventPerformerUseCase implements IUseCase<
     }
 
     await this.eventMusicianRepo.insert(performer);
+    await this.domainEventMediator?.publish(performer);
   }
 }

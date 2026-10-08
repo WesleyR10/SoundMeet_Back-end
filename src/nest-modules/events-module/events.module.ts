@@ -14,6 +14,7 @@ import { EventsDiscoveryController } from "./events-discovery.controller";
   providers: [
     AutoFinishEventsJob,
     ...Object.values(EVENTS_PROVIDERS.REPOSITORIES),
+    ...Object.values(EVENTS_PROVIDERS.PRESENCE),
     ...Object.values(EVENTS_PROVIDERS.USE_CASES),
     ...Object.values(EVENTS_PROVIDERS.EVENTS),
   ],
@@ -21,6 +22,8 @@ import { EventsDiscoveryController } from "./events-discovery.controller";
     EVENTS_PROVIDERS.REPOSITORIES.EVENT_REPOSITORY.provide,
     EVENTS_PROVIDERS.REPOSITORIES.EVENT_ATTENDEE_REPOSITORY.provide,
     EVENTS_PROVIDERS.REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
+    EVENTS_PROVIDERS.PRESENCE.VENUE_LOCATION.provide,
+    EVENTS_PROVIDERS.PRESENCE.PRESENCE_VERIFIER.provide,
     EVENTS_PROVIDERS.USE_CASES.ADD_EVENT_ATTENDEE_USE_CASE.provide,
     EVENTS_PROVIDERS.USE_CASES.ADD_EVENT_PERFORMER_USE_CASE.provide,
     EVENTS_PROVIDERS.EVENTS.DOMAIN_EVENT_MEDIATOR.provide,

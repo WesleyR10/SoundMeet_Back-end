@@ -8,6 +8,7 @@ import {
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import {
   EventMusicianOutput,
@@ -30,6 +31,8 @@ export class UpdateEventMusicianStatusUseCase implements IUseCase<
   constructor(
     private readonly eventRepo: IEventRepository,
     private readonly eventMusicianRepo: IEventMusicianRepository,
+    /** Publica `EventPerformerConfirmedEvent` na transição para confirmado. */
+    private readonly domainEventMediator?: DomainEventMediator,
   ) {}
 
   async execute(
@@ -59,6 +62,7 @@ export class UpdateEventMusicianStatusUseCase implements IUseCase<
     }
 
     await this.eventMusicianRepo.update(eventMusician);
+    await this.domainEventMediator?.publish(eventMusician);
     return EventMusicianOutputMapper.toOutput(eventMusician);
   }
 }

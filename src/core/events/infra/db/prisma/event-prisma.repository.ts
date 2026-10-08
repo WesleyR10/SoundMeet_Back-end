@@ -4,16 +4,16 @@ import {
   PrismaClient,
 } from "@prisma/client";
 
+import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import {
   boundingBoxForRadius,
   haversineKm,
 } from "../../../../shared/domain/geo.utils";
-import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
-import { Event, EventId } from "../../../domain";
+import { AttendeePresence, Event, EventId } from "../../../domain";
 import {
   EventFilter,
   EventSearchParams,
@@ -293,7 +293,16 @@ export class EventPrismaRepository implements IEventRepository {
     event_id: EventId,
     audience_id: string,
     now: Date = new Date(),
+    presence?: AttendeePresence,
   ): Promise<void> {
+    const presenceData = presence
+      ? {
+          presenceVerifiedAt: presence.verified_at,
+          presenceMethod: presence.method,
+          presenceDistanceM: presence.distance_m,
+        }
+      : {};
+
     try {
       await this.prisma.$transaction(async (tx) => {
         const existing = await tx.eventAttendee.findUnique({
@@ -306,14 +315,41 @@ export class EventPrismaRepository implements IEventRepository {
           select: { is_active: true },
         });
 
-        if (existing?.is_active) return;
+        // Já presente: renova só a verificação, sem tocar na lotação.
+        if (existing?.is_active) {
+          if (presence) {
+            await tx.eventAttendee.update({
+              where: {
+                eventId_audienceId: {
+                  eventId: event_id.id,
+                  audienceId: audience_id,
+                },
+              },
+              data: presenceData,
+            });
+          }
+          return;
+        }
 
         // Atomic increment with capacity constraint — 0 rows = full
+        //
+        // ⚠️ Duas correções verificadas contra o banco real em 14/ago/2026
+        // (toda chamada a `addAttendee` quebrava com 500 antes desta versão):
+        //  1. `id` NÃO leva `::uuid`: `Event.id` é `String @id @default(uuid())`
+        //     no schema, sem `@db.Uuid()` — a coluna real no Postgres é `text`,
+        //     não `uuid` nativo. Cast explícito do parâmetro produzia
+        //     "operator does not exist: text = uuid".
+        //  2. `maxCapacity`/`currentCapacity` são camelCase no schema
+        //     (`Event.maxCapacity`, `Event.currentCapacity`, sem `@map`), logo
+        //     são camelCase E case-sensitive no Postgres — precisam de aspas
+        //     duplas em SQL raw. `current_capacity`/`max_capacity` (snake_case,
+        //     sem aspas) produzia "column does not exist" — só `created_at`/
+        //     `updated_at` são snake_case de verdade neste model.
         const affected = await tx.$executeRaw`
           UPDATE events
-          SET current_capacity = current_capacity + 1, updated_at = ${now}
-          WHERE id = ${event_id.id}::uuid
-          AND (max_capacity IS NULL OR current_capacity < max_capacity)
+          SET "currentCapacity" = "currentCapacity" + 1, updated_at = ${now}
+          WHERE id = ${event_id.id}
+          AND ("maxCapacity" IS NULL OR "currentCapacity" < "maxCapacity")
         `;
 
         if (affected === 0) {
@@ -329,8 +365,12 @@ export class EventPrismaRepository implements IEventRepository {
               audienceId: audience_id,
             },
           },
-          update: { is_active: true, leftAt: null },
-          create: { eventId: event_id.id, audienceId: audience_id },
+          update: { is_active: true, leftAt: null, ...presenceData },
+          create: {
+            eventId: event_id.id,
+            audienceId: audience_id,
+            ...presenceData,
+          },
         });
       });
     } catch (e: any) {
@@ -373,21 +413,39 @@ export class EventPrismaRepository implements IEventRepository {
           data: { is_active: false, leftAt: now },
         });
 
-        // Atomic decrement guarded against going below 0
+        // Atomic decrement guarded against going below 0.
+        // Mesmas duas correções do `addAttendee` acima: sem `::uuid` (`Event.id`
+        // é `text`) e `"currentCapacity"` entre aspas (camelCase real da coluna).
         await tx.$executeRaw`
           UPDATE events
-          SET current_capacity = GREATEST(current_capacity - 1, 0), updated_at = ${now}
-          WHERE id = ${event_id.id}::uuid
+          SET "currentCapacity" = GREATEST("currentCapacity" - 1, 0), updated_at = ${now}
+          WHERE id = ${event_id.id}
         `;
       });
     } catch (e: any) {
-      if (e instanceof NotFoundError || e instanceof EntityValidationError) throw e;
+      if (e instanceof NotFoundError || e instanceof EntityValidationError)
+        throw e;
       throw mapPrismaErrorToDomainError(e, {
         entityClass: Event,
         id: event_id.id,
         operation: "event.removeAttendee",
       });
     }
+  }
+
+  async findActiveEndedBefore(threshold: Date): Promise<Event[]> {
+    const models = await this.prisma.event.findMany({
+      where: {
+        // `cancelled` fica de fora: cancelado não vira concluído.
+        status: { in: ["scheduled", "active"] },
+        endTime: { lt: threshold },
+      },
+      // Teto defensivo: o job roda a cada 15min e não deve puxar a base
+      // inteira se acumular atraso — o restante sai na próxima passada.
+      take: 200,
+      orderBy: { endTime: "asc" },
+    });
+    return models.map((m) => EventModelMapper.toEntity(m as any));
   }
 
   async isAudienceAttendee(

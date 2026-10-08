@@ -342,7 +342,7 @@ export class EventsController {
   @ApiOperation({
     summary: "Adicionar attendee",
     description:
-      "Registra presença. Audiences são registrados pelo próprio JWT; establishment/admin podem especificar audience_id no body.",
+      "Registra presença. Audiences são registrados pelo próprio JWT e precisam enviar `location` (GPS no raio da casa, evento ao vivo); establishment/admin especificam audience_id no body e não passam pela verificação.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiParam({ name: "event_id", required: true, format: "uuid" })
@@ -355,9 +355,8 @@ export class EventsController {
     @CurrentUser() currentUser?: AuthenticatedUser,
   ) {
     // Audience é sempre ele mesmo; establishment/admin precisam dizer quem.
-    const audienceId = currentUser?.roles.includes("audience")
-      ? currentUser.userId
-      : dto.audience_id;
+    const isAudience = !!currentUser?.roles.includes("audience");
+    const audienceId = isAudience ? currentUser!.userId : dto.audience_id;
     if (!audienceId) {
       throw new UnprocessableEntityException(
         "audience_id é obrigatório para establishment/admin",
@@ -367,6 +366,9 @@ export class EventsController {
       establishment_id: id,
       event_id,
       audience_id: audienceId,
+      // O fã prova presença com GPS; a casa é dona do evento e libera na mão.
+      registered_by: isAudience ? "audience" : "establishment",
+      location: dto.location ?? null,
     });
     return new EventPresenter(output);
   }

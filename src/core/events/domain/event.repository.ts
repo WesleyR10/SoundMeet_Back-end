@@ -5,6 +5,7 @@ import {
 } from "../../shared/domain/repository/search-params";
 import { SearchResult as DefaultSearchResult } from "../../shared/domain/repository/search-result";
 import { Event, EventId, EventStatus } from "./event.aggregate";
+import { AttendeePresence } from "./presence/venue-location.port";
 
 export type EventFilter = {
   establishment_id?: string | null;
@@ -86,8 +87,29 @@ export interface IEventRepository extends ISearchableRepository<
   EventSearchParams,
   EventSearchResult
 > {
+  /**
+   * Eventos que ainda constam como `scheduled`/`active` mas cujo `end_at` já
+   * passou (Bloco 9.4b). Evento "ativo" de ontem polui a busca, o badge de ao
+   * vivo e o atalho de QR — e nada garante que o dono lembre de finalizar.
+   */
+  findActiveEndedBefore(threshold: Date): Promise<Event[]>;
+
   isAudienceAttendee(event_id: EventId, audience_id: string): Promise<boolean>;
   isMusicianPerformer(event_id: EventId, musician_id: string): Promise<boolean>;
-  addAttendee(event_id: EventId, audience_id: string, now?: Date): Promise<void>;
-  removeAttendee(event_id: EventId, audience_id: string, now?: Date): Promise<void>;
+  /**
+   * Registra (ou reativa) a presença. Com o fã já presente, só atualiza
+   * `presence` — o check-in refeito no local renova a verificação sem contar
+   * a pessoa duas vezes na lotação.
+   */
+  addAttendee(
+    event_id: EventId,
+    audience_id: string,
+    now?: Date,
+    presence?: AttendeePresence,
+  ): Promise<void>;
+  removeAttendee(
+    event_id: EventId,
+    audience_id: string,
+    now?: Date,
+  ): Promise<void>;
 }

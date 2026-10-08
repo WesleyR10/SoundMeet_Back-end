@@ -43,7 +43,9 @@ describe("EventPrismaRepository — searchByProximity (7.13b)", () => {
       .mockResolvedValueOnce([
         {
           id: eventId,
-          establishment: { profile: { location_lat: -23.561, location_lng: -46.656 } },
+          establishment: {
+            profile: { location_lat: -23.561, location_lng: -46.656 },
+          },
         },
       ])
       .mockResolvedValueOnce([baseModel]);
@@ -62,8 +64,14 @@ describe("EventPrismaRepository — searchByProximity (7.13b)", () => {
     expect(candidateWhere.establishment).toEqual({
       profile: {
         is: {
-          location_lat: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
-          location_lng: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+          location_lat: expect.objectContaining({
+            gte: expect.any(Number),
+            lte: expect.any(Number),
+          }),
+          location_lng: expect.objectContaining({
+            gte: expect.any(Number),
+            lte: expect.any(Number),
+          }),
         },
       },
     });
@@ -79,7 +87,9 @@ describe("EventPrismaRepository — searchByProximity (7.13b)", () => {
         // Dentro da bounding box, mas fora do raio circular exato
         {
           id: "far-event",
-          establishment: { profile: { location_lat: -23.9, location_lng: -46.9 } },
+          establishment: {
+            profile: { location_lat: -23.9, location_lng: -46.9 },
+          },
         },
       ])
       .mockResolvedValueOnce([]);

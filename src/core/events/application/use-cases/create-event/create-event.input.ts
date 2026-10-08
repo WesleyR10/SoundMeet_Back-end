@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsDate,
@@ -37,9 +38,19 @@ export class CreateEventInput {
   @MaxLength(2000)
   description?: string | null;
 
+  // @Type(() => Date) é obrigatório: o ValidationPipe global NÃO usa
+  // enableImplicitConversion, então sem isso o corpo JSON chega com a data
+  // como string e @IsDate rejeita TUDO com 422 ("start_at must be a Date
+  // instance"). Era o estado real desta rota — verificado por HTTP em
+  // 08/ago/2026, antes do W2: criar evento era impossível pela API, ainda que
+  // o use case e o agregado estivessem completos. Mesmo bug do
+  // GET /gamification/leaderboard (roadmap 7.17) e mesma correção já aplicada
+  // em scheduling (`propose-booking.input.ts`).
+  @Type(() => Date)
   @IsDate()
   start_at: Date;
 
+  @Type(() => Date)
   @IsDate()
   end_at: Date;
 

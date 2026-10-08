@@ -47,6 +47,29 @@ export class EventAttendeeInMemoryRepository
     return this.items.filter((item) => item.event_id.id === event_id.id);
   }
 
+  async countDistinctAudienceByEvents(event_ids: string[]): Promise<number> {
+    if (event_ids.length === 0) return 0;
+
+    const wanted = new Set(event_ids);
+    const audiences = new Set(
+      this.items
+        .filter((item) => wanted.has(item.event_id.id))
+        .map((item) => item.audience_id.id),
+    );
+
+    return audiences.size;
+  }
+
+  async countByEvents(event_ids: string[]): Promise<Map<string, number>> {
+    const wanted = new Set(event_ids);
+    const counts = new Map<string, number>();
+    for (const item of this.items) {
+      const id = item.event_id.id;
+      if (wanted.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   protected async applyFilter(
     items: EventAttendee[],
     filter: EventAttendeeFilter | null,

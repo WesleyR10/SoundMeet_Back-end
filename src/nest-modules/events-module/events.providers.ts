@@ -1,3 +1,4 @@
+import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { ActivateEventUseCase } from "../../core/events/application/use-cases/activate-event/activate-event.use-case";
@@ -20,12 +21,15 @@ import {
   IEventAttendeeRepository,
   IEventMusicianRepository,
   IEventRepository,
+  IVenueLocationPort,
+  PresenceVerifier,
 } from "../../core/events/domain";
 import {
   EventAttendeePrismaRepository,
   EventMusicianPrismaRepository,
   EventPrismaRepository,
 } from "../../core/events/infra/db/prisma";
+import { VenueLocationPrismaAdapter } from "../../core/events/infra/venue-location";
 import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 
@@ -65,13 +69,40 @@ export const REPOSITORIES = {
   },
 };
 
+/**
+ * Presença verificada no show. Exportados pelo módulo (que é `@Global`) para
+ * que `CreateRequestUseCase` reverifique com a MESMA regra e a MESMA config do
+ * check-in — duas instâncias configuradas em lugares diferentes seriam duas
+ * regras de presença que divergem em silêncio.
+ */
+export const PRESENCE = {
+  VENUE_LOCATION: {
+    provide: VenueLocationPrismaAdapter,
+    useFactory: (prismaService: PrismaService) =>
+      new VenueLocationPrismaAdapter(prismaService),
+    inject: [PrismaService],
+  },
+  PRESENCE_VERIFIER: {
+    provide: PresenceVerifier,
+    useFactory: (config: ConfigService) =>
+      new PresenceVerifier({
+        radius_m: config.get<number>("PRESENCE_RADIUS_METERS") ?? 250,
+        accuracy_tolerance_cap_m:
+          config.get<number>("PRESENCE_ACCURACY_TOLERANCE_CAP_METERS") ?? 150,
+        max_accuracy_m:
+          config.get<number>("PRESENCE_MAX_ACCURACY_METERS") ?? 500,
+      }),
+    inject: [ConfigService],
+  },
+};
+
 export const USE_CASES = {
   CREATE_EVENT_USE_CASE: {
     provide: CreateEventUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new CreateEventUseCase(repo);
+    useFactory: (repo: IEventRepository, mediator: DomainEventMediator) => {
+      return new CreateEventUseCase(repo, mediator);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [REPOSITORIES.EVENT_REPOSITORY.provide, DomainEventMediator],
   },
   UPDATE_EVENT_USE_CASE: {
     provide: UpdateEventUseCase,
@@ -118,10 +149,10 @@ export const USE_CASES = {
   },
   CANCEL_EVENT_USE_CASE: {
     provide: CancelEventUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new CancelEventUseCase(repo);
+    useFactory: (repo: IEventRepository, mediator: DomainEventMediator) => {
+      return new CancelEventUseCase(repo, mediator);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [REPOSITORIES.EVENT_REPOSITORY.provide, DomainEventMediator],
   },
   FINISH_EVENT_USE_CASE: {
     provide: FinishEventUseCase,
@@ -132,10 +163,18 @@ export const USE_CASES = {
   },
   ADD_EVENT_ATTENDEE_USE_CASE: {
     provide: AddEventAttendeeUseCase,
-    useFactory: (repo: IEventRepository) => {
-      return new AddEventAttendeeUseCase(repo);
+    useFactory: (
+      repo: IEventRepository,
+      venueLocation: IVenueLocationPort,
+      presenceVerifier: PresenceVerifier,
+    ) => {
+      return new AddEventAttendeeUseCase(repo, venueLocation, presenceVerifier);
     },
-    inject: [REPOSITORIES.EVENT_REPOSITORY.provide],
+    inject: [
+      REPOSITORIES.EVENT_REPOSITORY.provide,
+      PRESENCE.VENUE_LOCATION.provide,
+      PRESENCE.PRESENCE_VERIFIER.provide,
+    ],
   },
   REMOVE_EVENT_ATTENDEE_USE_CASE: {
     provide: RemoveEventAttendeeUseCase,
@@ -175,12 +214,18 @@ export const USE_CASES = {
     useFactory: (
       repo: IEventRepository,
       eventMusicianRepo: IEventMusicianRepository,
+      mediator: DomainEventMediator,
     ) => {
-      return new UpdateEventMusicianStatusUseCase(repo, eventMusicianRepo);
+      return new UpdateEventMusicianStatusUseCase(
+        repo,
+        eventMusicianRepo,
+        mediator,
+      );
     },
     inject: [
       REPOSITORIES.EVENT_REPOSITORY.provide,
       REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
+      DomainEventMediator,
     ],
   },
   ADD_EVENT_PERFORMER_USE_CASE: {
@@ -188,12 +233,14 @@ export const USE_CASES = {
     useFactory: (
       repo: IEventRepository,
       eventMusicianRepo: IEventMusicianRepository,
+      mediator: DomainEventMediator,
     ) => {
-      return new AddEventPerformerUseCase(repo, eventMusicianRepo);
+      return new AddEventPerformerUseCase(repo, eventMusicianRepo, mediator);
     },
     inject: [
       REPOSITORIES.EVENT_REPOSITORY.provide,
       REPOSITORIES.EVENT_MUSICIAN_REPOSITORY.provide,
+      DomainEventMediator,
     ],
   },
   REMOVE_EVENT_PERFORMER_USE_CASE: {
@@ -223,6 +270,7 @@ export const EVENTS = {
 
 export const EVENTS_PROVIDERS = {
   REPOSITORIES,
+  PRESENCE,
   USE_CASES,
   EVENTS,
 };

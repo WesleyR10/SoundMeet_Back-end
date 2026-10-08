@@ -2,6 +2,7 @@ import { Event, EventId, IEventRepository } from "@core/events/domain";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { EventOutput, EventOutputMapper } from "../common/event-output";
 
@@ -14,7 +15,11 @@ export class CancelEventUseCase implements IUseCase<
   CancelEventInput,
   EventOutput
 > {
-  constructor(private readonly eventRepo: IEventRepository) {}
+  constructor(
+    private readonly eventRepo: IEventRepository,
+    /** Publica `EventCancelledEvent` — avisa quem soube do show pelos seguidores. */
+    private readonly domainEventMediator?: DomainEventMediator,
+  ) {}
 
   async execute(input: CancelEventInput): Promise<EventOutput> {
     const eventId = new EventId(input.event_id);
@@ -30,6 +35,7 @@ export class CancelEventUseCase implements IUseCase<
     }
 
     await this.eventRepo.update(entity);
+    await this.domainEventMediator?.publish(entity);
     return EventOutputMapper.toOutput(entity);
   }
 }

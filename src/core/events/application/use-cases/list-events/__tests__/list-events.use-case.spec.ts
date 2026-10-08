@@ -9,10 +9,7 @@ describe("ListEventsUseCase — 7.13b", () => {
 
   const now = new Date();
 
-  const buildEvent = (
-    establishment_id: string,
-    is_public: boolean,
-  ): Event =>
+  const buildEvent = (establishment_id: string, is_public: boolean): Event =>
     Event.create({
       establishment_id,
       name: is_public ? "Public Show" : "Private Show",
@@ -26,12 +23,33 @@ describe("ListEventsUseCase — 7.13b", () => {
     useCase = new ListEventsUseCase(repository);
   });
 
-  it("scopes to establishment_id when provided, preserving is_public as given", async () => {
+  // ⚠️ MUDANÇA DE COMPORTAMENTO DELIBERADA (Bloco 9.4d).
+  // Este teste antes se chamava "preserving is_public as given" e exigia que
+  // pinar establishment_id devolvesse TAMBÉM os eventos privados. Isso
+  // codificava um vazamento: a rota `/establishments/:id/events` é `@Public()`,
+  // então qualquer pessoa que soubesse o UUID do estabelecimento listava a
+  // agenda privada dele. Hoje só o dono (claim establishment_ids) ou admin veem.
+  // Cobertura completa em `__tests__/event-visibility.spec.ts`.
+  it("scopes to establishment_id and hides private events from non-owners", async () => {
     const establishmentId = new Uuid().id;
     await repository.insert(buildEvent(establishmentId, true));
     await repository.insert(buildEvent(establishmentId, false));
 
     const output = await useCase.execute({ establishment_id: establishmentId });
+
+    expect(output.items).toHaveLength(1);
+    expect(output.items[0].name).toBe("Public Show");
+  });
+
+  it("shows private events to the owner", async () => {
+    const establishmentId = new Uuid().id;
+    await repository.insert(buildEvent(establishmentId, true));
+    await repository.insert(buildEvent(establishmentId, false));
+
+    const output = await useCase.execute({
+      establishment_id: establishmentId,
+      requesting_establishment_ids: [establishmentId],
+    });
 
     expect(output.items).toHaveLength(2);
   });
@@ -52,7 +70,9 @@ describe("ListEventsUseCase — 7.13b", () => {
     await repository.insert(buildEvent(establishmentId, true));
     await repository.insert(buildEvent(establishmentId, false));
 
-    const output = await useCase.execute({ filter: { is_public: false } as any });
+    const output = await useCase.execute({
+      filter: { is_public: false } as any,
+    });
 
     expect(output.items).toHaveLength(1);
     expect(output.items[0].name).toBe("Public Show");

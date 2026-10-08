@@ -61,4 +61,27 @@ export interface IEventAttendeeRepository extends ISearchableRepository<
     audience_id: Uuid,
   ): Promise<EventAttendee | null>;
   findByEvent(event_id: Uuid): Promise<EventAttendee[]>;
+
+  /**
+   * Público distinto ao longo de vários eventos, contado NO banco.
+   *
+   * Existe para o currículo verificado (F4), que soma a audiência de dezenas de
+   * shows: `findByEvent` num laço seria um N+1 num endpoint de perfil público.
+   *
+   * **Distinto por pessoa, não soma de presenças** — o mesmo fã em cinco shows
+   * do artista é uma pessoa alcançada, e apresentá-lo como cinco inflaria o
+   * número justamente para quem tem público fiel, que é o oposto do que o
+   * currículo deve premiar.
+   *
+   * Lista vazia devolve 0 e nunca "todos": array vazio significa "nenhum
+   * evento", como em `BookingFilter.participant_ids`.
+   */
+  countDistinctAudienceByEvents(event_ids: string[]): Promise<number>;
+
+  /**
+   * Presenças POR evento (`event_id → n`), contadas no banco — a altura de cada
+   * noite no Analytics. Evento sem presença não aparece no mapa; lista vazia
+   * devolve mapa vazio.
+   */
+  countByEvents(event_ids: string[]): Promise<Map<string, number>>;
 }

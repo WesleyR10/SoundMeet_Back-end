@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsDate,
@@ -42,10 +43,14 @@ export class UpdateEventInput {
   @MaxLength(2000)
   description?: string | null;
 
+  // Ver `create-event.input.ts`: sem @Type, o PATCH com data em ISO 8601 é
+  // rejeitado com 422 pelo ValidationPipe global.
+  @Type(() => Date)
   @IsDate()
   @IsOptional()
   start_at?: Date;
 
+  @Type(() => Date)
   @IsDate()
   @IsOptional()
   end_at?: Date;

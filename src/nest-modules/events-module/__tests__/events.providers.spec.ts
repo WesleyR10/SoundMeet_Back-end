@@ -1,3 +1,4 @@
+import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Test, TestingModule } from "@nestjs/testing";
 
@@ -19,11 +20,16 @@ describe("Events providers", () => {
         controllers: [EventsController],
         providers: [
           ...Object.values(EVENTS_PROVIDERS.REPOSITORIES),
+          ...Object.values(EVENTS_PROVIDERS.PRESENCE),
           ...Object.values(EVENTS_PROVIDERS.USE_CASES),
           ...Object.values(EVENTS_PROVIDERS.EVENTS),
           {
             provide: PrismaService,
             useValue: {},
+          },
+          {
+            provide: ConfigService,
+            useValue: { get: () => undefined },
           },
           {
             provide: EventEmitter2,

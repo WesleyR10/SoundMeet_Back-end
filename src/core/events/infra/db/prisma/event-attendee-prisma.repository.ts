@@ -139,6 +139,32 @@ export class EventAttendeePrismaRepository implements IEventAttendeeRepository {
     return models.map((m) => EventAttendeeModelMapper.toEntity(m as any));
   }
 
+  async countDistinctAudienceByEvents(event_ids: string[]): Promise<number> {
+    // Array vazio nunca vira `where: {}` — isso contaria o público da
+    // plataforma inteira. Mesmo cuidado de `participant_ids`.
+    if (event_ids.length === 0) return 0;
+
+    const rows = await this.prisma.eventAttendee.findMany({
+      where: { eventId: { in: event_ids } },
+      distinct: ["audienceId"],
+      select: { audienceId: true },
+    });
+
+    return rows.length;
+  }
+
+  async countByEvents(event_ids: string[]): Promise<Map<string, number>> {
+    if (event_ids.length === 0) return new Map();
+
+    const rows = await this.prisma.eventAttendee.groupBy({
+      by: ["eventId"],
+      where: { eventId: { in: event_ids } },
+      _count: { _all: true },
+    });
+
+    return new Map(rows.map((row) => [row.eventId, row._count._all]));
+  }
+
   async search(
     props: EventAttendeeSearchParams,
   ): Promise<EventAttendeeSearchResult> {

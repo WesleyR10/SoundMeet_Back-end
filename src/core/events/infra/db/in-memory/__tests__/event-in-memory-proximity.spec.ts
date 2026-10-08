@@ -16,7 +16,10 @@ function establishmentAt(
   name: string,
   coords: { latitude: number; longitude: number } | null,
 ): Establishment {
-  const establishment = Establishment.fake().aEstablishment().withName(name).build();
+  const establishment = Establishment.fake()
+    .aEstablishment()
+    .withName(name)
+    .build();
   establishment.ensureProfile(
     new Address({
       street: "Rua Teste",
@@ -70,7 +73,11 @@ describe("EventInMemoryRepository — busca por raio (7.13b)", () => {
 
     const result = await repository.search(
       EventSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 5,
+        },
       }),
     );
 
@@ -85,7 +92,11 @@ describe("EventInMemoryRepository — busca por raio (7.13b)", () => {
 
     const result = await repository.search(
       EventSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 500 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 500,
+        },
       }),
     );
 
@@ -100,7 +111,11 @@ describe("EventInMemoryRepository — busca por raio (7.13b)", () => {
     await expect(
       repository.search(
         EventSearchParams.create({
-          filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+          filter: {
+            lat: PAULISTA.latitude,
+            lng: PAULISTA.longitude,
+            radius_km: 5,
+          },
         }),
       ),
     ).rejects.toThrow(
@@ -113,7 +128,9 @@ describe("EventInMemoryRepository — busca por raio (7.13b)", () => {
     await repository.insert(eventFor(paulista, "Show Paulista"));
 
     const result = await repository.search(
-      EventSearchParams.create({ filter: { establishment_id: paulista.establishment_id.id } }),
+      EventSearchParams.create({
+        filter: { establishment_id: paulista.establishment_id.id },
+      }),
     );
 
     expect(result.items.map((e) => e.name)).toStrictEqual(["Show Paulista"]);

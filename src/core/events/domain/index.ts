@@ -10,3 +10,4 @@ export * from "./event-musician.aggregate";
 export * from "./event-musician.repository";
 export * from "./event-musician.validator";
 export * from "./event-musician-fake.builder";
+export * from "./presence";

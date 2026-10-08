@@ -1,3 +1,5 @@
+import { EstablishmentId } from "../../../../establishment/domain/establishment.aggregate";
+import { IEstablishmentRepository } from "../../../../establishment/domain/establishment.repository";
 import { Uuid } from "../../../../shared/domain";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -5,9 +7,7 @@ import { haversineKm } from "../../../../shared/domain/geo.utils";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
-import { IEstablishmentRepository } from "../../../../establishment/domain/establishment.repository";
-import { EstablishmentId } from "../../../../establishment/domain/establishment.aggregate";
-import { Event, EventId } from "../../../domain";
+import { AttendeePresence, Event, EventId } from "../../../domain";
 import {
   EventFilter,
   EventSearchParams,
@@ -144,10 +144,14 @@ export class EventInMemoryRepository
       : super.applySort(items, "created_at", "desc");
   }
 
+  /** Presença gravada por evento → fã. Só para asserção em teste. */
+  presences = new Map<string, AttendeePresence>();
+
   async addAttendee(
     event_id: EventId,
     audience_id: string,
     now: Date = new Date(),
+    presence?: AttendeePresence,
   ): Promise<void> {
     const event = await this.findById(event_id);
     if (!event) {
@@ -157,6 +161,8 @@ export class EventInMemoryRepository
     const set = this.attendees.get(event_id.id) ?? new Set<string>();
     const alreadyActive = set.has(audience_id);
     if (alreadyActive) {
+      if (presence)
+        this.presences.set(`${event_id.id}:${audience_id}`, presence);
       return;
     }
 
@@ -173,6 +179,7 @@ export class EventInMemoryRepository
 
     set.add(audience_id);
     this.attendees.set(event_id.id, set);
+    if (presence) this.presences.set(`${event_id.id}:${audience_id}`, presence);
     await this.update(event);
   }
 
@@ -205,6 +212,17 @@ export class EventInMemoryRepository
     set.delete(audience_id);
     this.attendees.set(event_id.id, set);
     await this.update(event);
+  }
+
+  async findActiveEndedBefore(threshold: Date): Promise<Event[]> {
+    return this.items
+      .filter(
+        (e) =>
+          (e.status === "scheduled" || e.status === "active") &&
+          e.end_at < threshold,
+      )
+      .sort((a, b) => a.end_at.getTime() - b.end_at.getTime())
+      .slice(0, 200);
   }
 
   async isAudienceAttendee(

@@ -1,8 +1,8 @@
 import { Event, EventId, IEventRepository } from "@core/events/domain";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { InvalidOperationError } from "../../../../shared/domain/errors/invalid-operation.error";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 
 export type DeleteEventInput = {
   establishment_id: string;

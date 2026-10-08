@@ -1,6 +1,7 @@
 import { AggregateRoot, Uuid } from "../../shared/domain";
 import { EventMusicianValidatorFactory } from "./event-musician.validator";
 import { EventMusicianFakeBuilder } from "./event-musician-fake.builder";
+import { EventPerformerConfirmedEvent } from "./events/event-performer-confirmed.event";
 
 export type EventMusicianStatus = "confirmed" | "pending" | "cancelled";
 
@@ -63,6 +64,9 @@ export class EventMusician extends AggregateRoot {
       end_at: command.end_at ?? null,
     });
     entity.validate();
+    if (entity.status === "confirmed" && !entity.notification.hasErrors()) {
+      entity.applyConfirmedEvent();
+    }
     return entity;
   }
 
@@ -74,8 +78,22 @@ export class EventMusician extends AggregateRoot {
       );
       return;
     }
+    const wasConfirmed = this.status === "confirmed";
     this.status = "confirmed";
-    this.validate();
+    if (this.validate() && !wasConfirmed) {
+      this.applyConfirmedEvent();
+    }
+  }
+
+  private applyConfirmedEvent(): void {
+    this.applyEvent(
+      new EventPerformerConfirmedEvent({
+        event_musician_id: this.event_musician_id,
+        event_id: this.event_id.id,
+        musician_id: this.musician_id?.id ?? null,
+        band_id: this.band_id?.id ?? null,
+      }),
+    );
   }
 
   cancel(): void {
