@@ -13,7 +13,7 @@ import { ReactPdfContractRenderer } from "../src/core/contract/infra/renderer/re
  *
  * ## Por que um script, e não um teste
  *
- * O `legal-checklist.md` promete ao advogado "três amostras do documento gerado"
+ * O `checklist-juridico-do-contrato.md` promete ao advogado "três amostras do documento gerado"
  * e elas nunca existiram: não havia como produzi-las sem subir a aplicação
  * inteira e confirmar um booking real. Isso deixava a revisão jurídica
  * dependendo de um ambiente de pé, que é exatamente o atrito que faz o gate

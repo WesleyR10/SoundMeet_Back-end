@@ -1,0 +1,19 @@
+// Typecheck do seed. O tsconfig.json principal tem `include: ["src/**/*.ts"]`,
+// então prisma/seed.ts NUNCA é verificado pelo build nem pelo lint — foi assim
+// que ele ficou quebrado sem ninguém notar (assinatura de repositório mudou com
+// a criptografia SM-016 e só apareceria ao rodar `npm run seed`).
+//
+//   npx tsc -p tsconfig.seedcheck.json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": [
+    "prisma/seed.ts",
+    "prisma/seed-analytics-series.ts",
+    "prisma/seed-night-series.ts",
+    "prisma/backfill-sm016-field-encryption.ts"
+  ]
+}

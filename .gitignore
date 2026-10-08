@@ -179,3 +179,12 @@ graphify-out/
 
 # Music samples
 sample/
+# Documentação interna do fundador — NUNCA sobe para o repositório.
+# Colaboradores não têm estes arquivos; ver CONTRIBUTING.md.
+**/_privado/
+
+# Worker de IA (modelo, datasets, pesos — ~322 GB). É o ativo técnico mais
+# difícil de copiar e mora FORA de qualquer repositório compartilhado.
+# Não rastreado até 02/out/2026, mas também não ignorado: um `git add .`
+# num repositório novo o levaria inteiro.
+ai-cifra-mir-worker/

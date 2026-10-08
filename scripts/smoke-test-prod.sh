@@ -55,6 +55,10 @@ KEYCLOAK_REALM=soundmeet
 KEYCLOAK_CLIENT_ID=soundmeet-api
 KEYCLOAK_CLIENT_SECRET=$(openssl rand -hex 16)
 KEYCLOAK_MOBILE_CLIENT_ID=soundmeet-mobile
+# Obrigatória desde o AUTH-1 (31/ago/2026); o smoke passou pela última vez em
+# 26/ago e ficou para trás sem ninguém perceber — o app morria no Joi.
+KEYCLOAK_REGISTRATION_CLIENT_ID=soundmeet-registration
+KEYCLOAK_REGISTRATION_CLIENT_SECRET=$(openssl rand -hex 16)
 KEYCLOAK_VERIFY_AUDIENCE=true
 JWT_SECRET=$(openssl rand -hex 32)
 JWT_REFRESH_SECRET=$(openssl rand -hex 32)

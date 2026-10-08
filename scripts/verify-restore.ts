@@ -2,7 +2,7 @@
 /**
  * OPS-1 — verificação automatizada do drill de restauração.
  *
- * Executa os critérios do §4.3 de `Docs/ops/backup-restore.md` contra o banco
+ * Executa os critérios do §4.3 de `Docs/operacao/backup-e-restauracao.md` contra o banco
  * apontado por `DATABASE_URL`. Sai com código 1 se qualquer um falhar.
  *
  * ════════════════════════════════════════════════════════════════════════════
