@@ -47,7 +47,33 @@ export const GLOBAL_VALIDATION_PIPE_OPTIONS: ValidationPipeOptions = {
   validationError: { target: false, value: false },
 };
 
+/**
+ * Liga o parser de query "extended" (`qs`), que monta objeto aninhado.
+ *
+ * ⚠️ O Express 5 trocou o padrão para "simple" (querystring do Node): sem isto
+ * `?filter[status]=active` chega em `req.query` como a chave literal
+ * `"filter[status]"`, o `filter` do DTO fica `undefined`, e toda busca com
+ * filtro respondia 200 com a lista INTEIRA (verificado por HTTP em
+ * 08/ago/2026: `filter[name]=zzz` devolvia todos os músicos).
+ *
+ * 🔴 Mora AQUI, e não só no `bootstrap()`, desde out/2026. O `bootstrap()` é o
+ * único ponto do sistema que nenhum teste alcança, e os apps de teste
+ * (`startApp`) subiam com o parser padrão: um teste e2e de filtro aninhado
+ * exercitava um servidor que não era o de produção. Foi parte do motivo de o
+ * filtro de preço da busca de músicos passar meses sem filtrar — nenhum teste
+ * atravessava a fronteira HTTP com o parser certo.
+ */
+export function applyExtendedQueryParser(app: INestApplication) {
+  const expressApp = app as unknown as {
+    set?: (setting: string, value: string) => unknown;
+  };
+  if (typeof expressApp.set === "function") {
+    expressApp.set("query parser", "extended");
+  }
+}
+
 export function applyGlobalConfig(app: INestApplication) {
+  applyExtendedQueryParser(app);
   app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
   app.useGlobalInterceptors(
     new WrapperDataInterceptor(),

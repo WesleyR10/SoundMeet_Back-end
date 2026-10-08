@@ -20,27 +20,9 @@ class SwaggerDisabled extends Error {}
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  /*
-   * ⚠️ Express 5 trocou o parser de query padrão de "extended" (qs) para
-   * "simple" (querystring do Node), que NÃO monta objeto aninhado.
-   *
-   * Sem esta linha, `?filter[status]=active` chega em `req.query` como a chave
-   * literal `"filter[status]"`; o `filter` do DTO fica `undefined` e o
-   * `whitelist: true` do ValidationPipe descarta a chave estranha. Resultado:
-   * TODA busca com filtro aninhado da API respondia 200 com a lista INTEIRA,
-   * sem nenhum erro — falha silenciosa em `GET /musicians`, `GET
-   * /establishments/:id/events`, bookings, inquiries e na busca por raio
-   * (`filter[lat]/[lng]/[radius_km]`), que devolveria o país todo em vez do
-   * bairro.
-   *
-   * Verificado por HTTP em 08/ago/2026: `filter[status]=cancelled` devolvia o
-   * evento `active`, e `filter[name]=zzz` devolvia todos os músicos.
-   *
-   * Os testes unitários não pegavam porque montam `SearchParams` com objeto já
-   * pronto, pulando a fronteira HTTP — exatamente como o 422 de data dos DTOs
-   * de evento (ver `create-event.input.ts`).
-   */
-  app.set("query parser", "extended");
+  // O parser de query "extended" (filtro aninhado, `filter[x]=y`) é ligado em
+  // `applyGlobalConfig`, junto do ValidationPipe — para que os apps de teste
+  // subam com o MESMO parser de produção. Ver `applyExtendedQueryParser`.
 
   const configService = app.get(ConfigService);
 
