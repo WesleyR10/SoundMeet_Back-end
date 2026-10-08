@@ -1,4 +1,4 @@
-import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
+import { ListMyBandsUseCase } from "../../core/musician/application/use-cases/list-my-bands/list-my-bands.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
 import { IPersonalChordSheetReadModel } from "../../core/personal-chord-sheet/application/gateways/personal-chord-sheet-read-model.interface";
 import { ChordSheetOverlayApplier } from "../../core/personal-chord-sheet/application/services/chord-sheet-overlay-applier";
@@ -183,9 +183,9 @@ export const USE_CASES = {
    * o token do repositório é diff menor do que ampliar os exports de lá.
    * Serve só para resolver os pares de banda do leitor (share_scope "band").
    */
-  LIST_BANDS_USE_CASE: {
-    provide: ListBandsUseCase,
-    useFactory: (bandRepo: IBandRepository) => new ListBandsUseCase(bandRepo),
+  LIST_MY_BANDS_USE_CASE: {
+    provide: ListMyBandsUseCase,
+    useFactory: (bandRepo: IBandRepository) => new ListMyBandsUseCase(bandRepo),
     inject: ["BandRepository"],
   },
 };

@@ -1,7 +1,7 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 
-import { ListBandsUseCase } from "../../../core/musician/application/use-cases/list-bands/list-bands.use-case";
+import { ListMyBandsUseCase } from "../../../core/musician/application/use-cases/list-my-bands/list-my-bands.use-case";
 import { Band } from "../../../core/musician/domain/band.aggregate";
 import { IBandRepository } from "../../../core/musician/domain/band.repository";
 import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memory/band-in-memory.repository";
@@ -249,8 +249,8 @@ async function buildHarness(
         ),
       },
       {
-        provide: ListBandsUseCase,
-        useValue: new ListBandsUseCase(bandRepo),
+        provide: ListMyBandsUseCase,
+        useValue: new ListMyBandsUseCase(bandRepo),
       },
     ],
   });
@@ -477,47 +477,70 @@ describe("PersonalChordSheet HTTP Integration Tests", () => {
      * fora dela levava 403 num fork que é legitimamente dele para ler, e em
      * silêncio: daqui, truncamento e "não é seu par de banda" são a mesma coisa.
      */
-    it("varre todas as páginas de bandas ao resolver os pares", async () => {
-      const h = await buildHarness({ as: READER });
-
-      const bandPage = (musicians: string[], last_page: number) => ({
-        items: [
+    /*
+     * Os pares de banda vêm das bandas que o leitor INTEGRA de fato. As duas
+     * situações abaixo têm uma linha em `band_members` ligando leitor e autor
+     * — e em nenhuma delas isso pode valer como "é da minha banda".
+     */
+    const bandOf = (readerStatus: "accepted" | "pending") =>
+      Band.fake()
+        .aBand()
+        .withMembers([
           {
-            members: musicians.map((musician_id) => ({
-              musician_id,
-              status: "accepted",
-            })),
+            musician_id: new Uuid(OWNER),
+            role: "leader",
+            instrument: "guitarra",
+            status: "accepted",
+            joined_at: new Date(),
+            responded_at: new Date(),
           },
-        ],
-        total: last_page,
-        current_page: 1,
-        per_page: 100,
-        last_page,
-      });
+          {
+            musician_id: new Uuid(READER),
+            role: "member",
+            instrument: "baixo",
+            status: readerStatus,
+            joined_at: new Date(),
+            responded_at: readerStatus === "accepted" ? new Date() : null,
+          },
+        ])
+        .build();
 
-      // O dono do fork só aparece na SEGUNDA página.
-      const listBands = h.module.get(ListBandsUseCase);
-      const spy = jest
-        .spyOn(listBands, "execute")
-        .mockResolvedValueOnce(bandPage([READER], 2) as never)
-        .mockResolvedValueOnce(bandPage([READER, OWNER], 2) as never);
-
-      const sheet = PersonalChordSheet.fake()
+    const bandScopedSheet = () =>
+      PersonalChordSheet.fake()
         .aPersonalChordSheet()
         .withMusicianId(OWNER)
         .withMusicLibraryId(OWNER_MUSIC)
         .withShareScope("band")
         .build();
+
+    it("convite pendente não dá acesso ao fork compartilhado com a banda", async () => {
+      const h = await buildHarness({ as: READER });
+      await h.bandRepo.insert(bandOf("pending"));
+      const sheet = bandScopedSheet();
       await h.repo.insert(sheet);
 
-      const presenter = await h.community.findOne(
-        sheet.personal_chord_sheet_id.id,
-        { userId: READER, isAdmin: false } as never,
-      );
+      await expect(
+        h.community.findOne(sheet.personal_chord_sheet_id.id, {
+          userId: READER,
+          isAdmin: false,
+        } as never),
+      ).rejects.toThrow(ForbiddenException);
+    });
 
-      expect(presenter.musician_id).toBe(OWNER);
-      expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy.mock.calls[1][0]).toMatchObject({ page: 2 });
+    it("banda dissolvida deixa de ser um grupo com quem se compartilha cifra", async () => {
+      const h = await buildHarness({ as: READER });
+      const band = bandOf("accepted");
+      band.archive();
+      await h.bandRepo.insert(band);
+      const sheet = bandScopedSheet();
+      await h.repo.insert(sheet);
+
+      await expect(
+        h.community.findOne(sheet.personal_chord_sheet_id.id, {
+          userId: READER,
+          isAdmin: false,
+        } as never),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

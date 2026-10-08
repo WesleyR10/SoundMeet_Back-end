@@ -35,7 +35,7 @@ import {
        * Kill-switch da comunidade.
        *
        * Publicar cifra com letra é risco de licenciamento assumido
-       * conscientemente (Docs/AI-musician/chord-sheet.md registra que LRCLIB não
+       * conscientemente (Docs/ia-musical/folha-de-cifra.md registra que LRCLIB não
        * é licença de exibição). Poder desligar a vitrine sem deploy é a
        * mitigação barata: desligado, as rotas de comunidade respondem 404 e as
        * do dono seguem intactas — ninguém perde a própria cifra.

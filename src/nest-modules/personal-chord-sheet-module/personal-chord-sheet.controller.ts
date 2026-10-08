@@ -21,8 +21,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
-import { ListBandsInput } from "../../core/musician/application/use-cases/list-bands/list-bands.input";
-import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
+import { ListMyBandsUseCase } from "../../core/musician/application/use-cases/list-my-bands/list-my-bands.use-case";
 import {
   ApplyChordEditsUseCase,
   CheckPersonalChordSheetAccessUseCase,
@@ -68,9 +67,6 @@ import {
 import { PERSONAL_CHORD_SHEET_COMMUNITY_ENABLED } from "./personal-chord-sheet.providers";
 
 const UUID_PIPE = new ParseUUIDPipe({ errorHttpStatusCode: 422 });
-
-/** Tamanho de página ao varrer as bandas do leitor (ver resolveBandPeers). */
-const BAND_PEERS_PAGE_SIZE = 100;
 
 /**
  * ⚠️ O sub-recurso NUNCA se chama `:id`.
@@ -425,8 +421,8 @@ export class CommunityChordSheetController {
   @Inject(ImportCommunityChordSheetUseCase)
   private importUseCase: ImportCommunityChordSheetUseCase;
 
-  @Inject(ListBandsUseCase)
-  private listBandsUseCase: ListBandsUseCase;
+  @Inject(ListMyBandsUseCase)
+  private listMyBandsUseCase: ListMyBandsUseCase;
 
   @Inject(PERSONAL_CHORD_SHEET_COMMUNITY_ENABLED)
   private readonly communityEnabled: boolean;
@@ -567,35 +563,29 @@ export class CommunityChordSheetController {
   /**
    * Todos os músicos que dividem alguma banda com quem está lendo.
    *
-   * `filter.musician_id` é o caminho "minhas bandas" do ListBandsUseCase, que
-   * NÃO passa pelo gate de open_to_gigs — é o próprio músico vendo as bandas de
-   * que é membro aceito (ver comentário no use-case).
+   * Vem de `ListMyBandsUseCase` — as bandas do próprio músico, no radar ou
+   * não. Até out/2026 isto usava a busca PÚBLICA de bandas com
+   * `filter.musician_id`, que pulava o gate de `open_to_gigs` para qualquer
+   * chamador; esse atalho saiu da busca, e a pergunta "quais são as minhas
+   * bandas" passou a ter um caminho só.
+   *
+   * Três condições, e cada uma fecha um acesso que não deveria existir:
+   *  - a banda precisa ser MINHA de fato (`accepted`): convite pendente não dá
+   *    acesso a nada;
+   *  - o colega também precisa ter aceitado;
+   *  - a banda precisa estar ativa: banda dissolvida não é mais um grupo com
+   *    quem se compartilha cifra.
    */
   private async resolveBandPeers(musician_id: string): Promise<string[]> {
     const peers = new Set<string>();
+    const { items } = await this.listMyBandsUseCase.execute({ musician_id });
 
-    // Percorre TODAS as páginas. Com uma página só, o par que caísse fora dela
-    // levaria 403 num fork que é legitimamente dele para ler — e em silêncio,
-    // porque truncamento e "não é seu par de banda" são indistinguíveis daqui.
-    for (let page = 1; ; page++) {
-      const result = await this.listBandsUseCase.execute(
-        new ListBandsInput({
-          page,
-          per_page: BAND_PEERS_PAGE_SIZE,
-          filter: { musician_id },
-        }),
-      );
+    for (const { band, membership_status } of items) {
+      if (membership_status !== "accepted" || !band.is_active) continue;
 
-      for (const band of result.items) {
-        for (const member of band.members) {
-          // Só membro ACEITO conta: convite pendente não dá acesso a nada.
-          if (member.status === "accepted") peers.add(member.musician_id);
-        }
+      for (const member of band.members) {
+        if (member.status === "accepted") peers.add(member.musician_id);
       }
-
-      // items vazio também encerra: sem isso um last_page inconsistente daria
-      // laço infinito na thread que atende o request.
-      if (page >= result.last_page || result.items.length === 0) break;
     }
 
     return [...peers];
