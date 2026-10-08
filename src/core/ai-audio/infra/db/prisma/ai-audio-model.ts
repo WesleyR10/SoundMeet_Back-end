@@ -1,6 +1,7 @@
 export type AiAudioUploadModel = {
   id: string;
   musicianId: string;
+  musicLibraryId: string | null;
   original_filename: string;
   content_type: string;
   file_size: number;
@@ -41,6 +42,7 @@ export type AiAudioSeparationJobModel = {
   error_message: string | null;
   started_at: Date | null;
   finished_at: Date | null;
+  stems_expire_at: Date | null;
   created_at: Date;
   updated_at: Date;
   outputs?: AiAudioSeparationOutputModel[];

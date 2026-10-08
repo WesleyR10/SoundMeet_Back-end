@@ -11,6 +11,7 @@ export class AiAudioUploadModelMapper {
     const model = {
       id: entity.ai_audio_upload_id.id,
       musicianId: entity.musician_id.id,
+      musicLibraryId: entity.music_library_id?.id ?? null,
       original_filename: entity.original_filename,
       content_type: entity.content_type,
       file_size: entity.file_size,
@@ -40,7 +41,8 @@ export class AiAudioUploadModelMapper {
     const upload_method =
       model.upload_method === "direct" ||
       model.upload_method === "presigned" ||
-      model.upload_method === "multipart"
+      model.upload_method === "multipart" ||
+      model.upload_method === "from_source"
         ? model.upload_method
         : "direct";
 
@@ -57,6 +59,7 @@ export class AiAudioUploadModelMapper {
     return new AiAudioUpload({
       ai_audio_upload_id: new AiAudioUploadId(model.id),
       musician_id: model.musicianId,
+      music_library_id: model.musicLibraryId,
       original_filename: model.original_filename,
       content_type: model.content_type,
       file_size: model.file_size,

@@ -15,13 +15,15 @@ export class AiAudioUploadFakeBuilder<TBuild = any> extends FakeBuilderBase {
   private _ai_audio_upload_id: PropOrFactory<AiAudioUploadId> | undefined =
     undefined;
   private _musician_id: PropOrFactory<string> = (_index) => new Uuid().id;
+  private _music_library_id: PropOrFactory<string | null> = (_index) => null;
   private _original_filename: PropOrFactory<string> = (_index) => "song.mp3";
   private _content_type: PropOrFactory<string> = (_index) => "audio/mpeg";
   private _file_size: PropOrFactory<number> = (_index) => 1024 * 1024;
   private _object_key: PropOrFactory<string> = (_index) =>
     `ai-audio/${new Uuid().id}/original.mp3`;
-  private _upload_method: PropOrFactory<"direct" | "presigned" | "multipart"> =
-    (_index) => "direct";
+  private _upload_method: PropOrFactory<
+    "direct" | "presigned" | "multipart" | "from_source"
+  > = (_index) => "direct";
   private _multipart_upload_id: PropOrFactory<string | null> = (_index) => null;
   private _status: PropOrFactory<AiAudioUploadStatus> = (_index) => "uploaded";
   private _rejected_reason: PropOrFactory<string | null> = (_index) => null;
@@ -81,8 +83,23 @@ export class AiAudioUploadFakeBuilder<TBuild = any> extends FakeBuilderBase {
     return this;
   }
 
+  withMusicLibraryId(valueOrFactory: PropOrFactory<string | Uuid | null>) {
+    this._music_library_id =
+      typeof valueOrFactory === "function"
+        ? (index: number) => {
+            const result = valueOrFactory(index);
+            return result instanceof Uuid ? result.id : result;
+          }
+        : valueOrFactory instanceof Uuid
+          ? valueOrFactory.id
+          : valueOrFactory;
+    return this;
+  }
+
   withUploadMethod(
-    valueOrFactory: PropOrFactory<"direct" | "presigned" | "multipart">,
+    valueOrFactory: PropOrFactory<
+      "direct" | "presigned" | "multipart" | "from_source"
+    >,
   ) {
     this._upload_method = valueOrFactory;
     return this;
@@ -113,6 +130,7 @@ export class AiAudioUploadFakeBuilder<TBuild = any> extends FakeBuilderBase {
             ? undefined
             : this.callFactory(this._ai_audio_upload_id, index),
           musician_id: this.callFactory(this._musician_id, index),
+          music_library_id: this.callFactory(this._music_library_id, index),
           original_filename: this.callFactory(this._original_filename, index),
           content_type: this.callFactory(this._content_type, index),
           file_size: this.callFactory(this._file_size, index),

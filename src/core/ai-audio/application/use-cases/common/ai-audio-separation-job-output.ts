@@ -24,6 +24,11 @@ export type AiAudioSeparationJobOutput = {
   error_message: string | null;
   started_at: Date | null;
   finished_at: Date | null;
+  /**
+   * Quando os stems saem do storage. É o que permite ao app avisar "seu ensaio
+   * expira em X" em vez de deixar o músico descobrir com um 404 no palco.
+   */
+  stems_expire_at: Date | null;
   outputs: AiAudioSeparationOutputItem[];
   created_at: Date;
   updated_at: Date;
@@ -48,6 +53,7 @@ export class AiAudioSeparationJobOutputMapper {
       error_message: entity.error_message,
       started_at: entity.started_at,
       finished_at: entity.finished_at,
+      stems_expire_at: entity.stems_expire_at,
       outputs: entity.outputs.map((o) => ({
         id: o.ai_audio_separation_output_id.id,
         stem_name: o.stem_name,

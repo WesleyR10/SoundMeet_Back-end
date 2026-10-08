@@ -7,6 +7,15 @@ export type AiAudioSeparationJobStatus =
   | "queued"
   | "processing"
   | "completed"
+  /**
+   * Os stems existiram e foram APAGADOS do storage ao vencer o prazo de
+   * retenção. Estado distinto de `failed` de propósito: a separação deu certo,
+   * e o app precisa saber a diferença entre "deu erro, tente de novo" e "o
+   * prazo venceu, é só pedir de novo". Sem este estado o job continuaria
+   * `completed` com URLs que respondem 404 — a pior resposta possível para
+   * quem abriu o app para ensaiar.
+   */
+  | "expired"
   | "failed";
 
 export type AiAudioSeparationJobConstructorProps = {
@@ -23,6 +32,7 @@ export type AiAudioSeparationJobConstructorProps = {
   error_message?: string | null;
   started_at?: Date | null;
   finished_at?: Date | null;
+  stems_expire_at?: Date | null;
   outputs?: AiAudioSeparationOutput[];
   created_at?: Date;
   updated_at?: Date;
@@ -54,6 +64,8 @@ export class AiAudioSeparationJob extends AggregateRoot {
   error_message: string | null;
   started_at: Date | null;
   finished_at: Date | null;
+  /** Quando os stems devem sair do storage. Null enquanto não concluiu. */
+  stems_expire_at: Date | null;
   outputs: AiAudioSeparationOutput[];
   created_at: Date;
   updated_at: Date;
@@ -74,6 +86,7 @@ export class AiAudioSeparationJob extends AggregateRoot {
     this.error_message = props.error_message ?? null;
     this.started_at = props.started_at ?? null;
     this.finished_at = props.finished_at ?? null;
+    this.stems_expire_at = props.stems_expire_at ?? null;
     this.outputs = props.outputs ?? [];
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
@@ -150,12 +163,19 @@ export class AiAudioSeparationJob extends AggregateRoot {
     this.validate(["progress_percent", "progress_stage"]);
   }
 
-  complete(outputs: AiAudioSeparationOutput[]): void {
+  /**
+   * @param stems_expire_at quando os stems saem do storage. Obrigatório por
+   * desenho: concluir sem prazo criaria áudio retido para sempre, que é
+   * exatamente a política que o ai-cifra evita. Quem chama resolve o prazo a
+   * partir da configuração.
+   */
+  complete(outputs: AiAudioSeparationOutput[], stems_expire_at: Date): void {
     this.status = "completed";
     this.outputs = outputs;
     this.progress_percent = 100;
     this.progress_stage = "completed";
     this.finished_at = new Date();
+    this.stems_expire_at = stems_expire_at;
     this.updated_at = new Date();
     this.validate([
       "status",
@@ -163,6 +183,20 @@ export class AiAudioSeparationJob extends AggregateRoot {
       "progress_percent",
       "progress_stage",
     ]);
+  }
+
+  /**
+   * Prazo vencido: os objetos já saíram (ou vão sair) do storage, e o registro
+   * do job continua — o histórico de que a separação existiu não se apaga junto
+   * com o áudio.
+   */
+  expireStems(): void {
+    this.status = "expired";
+    this.outputs = [];
+    this.progress_stage = "expired";
+    this.stems_expire_at = null;
+    this.updated_at = new Date();
+    this.validate(["status", "progress_stage"]);
   }
 
   fail(error_code: string, error_message: string): void {
@@ -181,6 +215,7 @@ export class AiAudioSeparationJob extends AggregateRoot {
     this.error_message = error_message;
     this.started_at = null;
     this.finished_at = null;
+    this.stems_expire_at = null;
     this.outputs = [];
     this.progress_percent = 0;
     this.progress_stage = null;
@@ -208,6 +243,7 @@ export class AiAudioSeparationJob extends AggregateRoot {
       error_message: this.error_message,
       started_at: this.started_at,
       finished_at: this.finished_at,
+      stems_expire_at: this.stems_expire_at,
       outputs: this.outputs.map((o) => o.toJSON()),
       created_at: this.created_at,
       updated_at: this.updated_at,

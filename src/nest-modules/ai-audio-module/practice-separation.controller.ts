@@ -127,7 +127,7 @@ export class PracticeSeparationController {
     // `source_id` é o que a análise da cifra gravou. Sem ele não há de onde
     // buscar o áudio de novo — e inventar uma busca por título+artista traria
     // outra gravação (ao vivo, cover, remaster), justamente o erro que
-    // `spotify-track-matching.md` documenta como caro.
+    // `casamento-de-faixa-no-spotify.md` documenta como caro.
     if (song.source !== "youtube" || !song.source_id) {
       throw new UnprocessableEntityException(
         "Esta música não tem fonte de áudio conhecida. Só dá para ensaiar músicas analisadas pela IA de cifra.",

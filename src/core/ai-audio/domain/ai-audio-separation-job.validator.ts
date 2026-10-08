@@ -42,7 +42,9 @@ export class AiAudioSeparationJobRules {
   @IsString({ groups: ["output_format"] })
   output_format?: "wav" | "flac" | "mp3";
 
-  @IsIn(["queued", "processing", "completed", "failed"], { groups: ["status"] })
+  @IsIn(["queued", "processing", "completed", "expired", "failed"], {
+    groups: ["status"],
+  })
   @IsString({ groups: ["status"] })
   @IsNotEmpty({ groups: ["status"] })
   status: AiAudioSeparationJobStatus;

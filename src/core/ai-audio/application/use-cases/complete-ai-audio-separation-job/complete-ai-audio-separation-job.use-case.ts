@@ -1,3 +1,4 @@
+import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
@@ -9,6 +10,10 @@ import { IAiAudioSeparationJobRepository } from "../../../domain/ai-audio-separa
 import { AiAudioSeparationOutput } from "../../../domain/ai-audio-separation-output.child-entity";
 import { AiAudioUploadId } from "../../../domain/ai-audio-upload.aggregate";
 import { IAiAudioUploadRepository } from "../../../domain/ai-audio-upload.repository";
+import {
+  DEFAULT_STEMS_RETENTION_HOURS,
+  stemsExpiryFrom,
+} from "../../../domain/stems-retention";
 import { CompleteAiAudioSeparationJobInput } from "./complete-ai-audio-separation-job.input";
 
 export class CompleteAiAudioSeparationJobUseCase implements IUseCase<
@@ -18,6 +23,8 @@ export class CompleteAiAudioSeparationJobUseCase implements IUseCase<
   constructor(
     private readonly uploadRepo: IAiAudioUploadRepository,
     private readonly jobRepo: IAiAudioSeparationJobRepository,
+    private readonly stemsRetentionHours: number = DEFAULT_STEMS_RETENTION_HOURS,
+    private readonly clock: IClock = { now: () => new Date() },
   ) {}
 
   async execute(input: CompleteAiAudioSeparationJobInput): Promise<void> {
@@ -28,7 +35,14 @@ export class CompleteAiAudioSeparationJobUseCase implements IUseCase<
       throw new NotFoundError(input.job_id, AiAudioSeparationJob);
     }
 
-    if (job.status === "completed" || job.status === "failed") {
+    // `expired` entra aqui junto com os terminais: um worker atrasado que
+    // responda depois da varredura não pode ressuscitar um job cujos objetos
+    // já saíram do storage — apontaria para URLs que dão 404.
+    if (
+      job.status === "completed" ||
+      job.status === "expired" ||
+      job.status === "failed"
+    ) {
       return;
     }
 
@@ -52,7 +66,10 @@ export class CompleteAiAudioSeparationJobUseCase implements IUseCase<
         }),
     );
 
-    job.complete(outputs);
+    job.complete(
+      outputs,
+      stemsExpiryFrom(this.stemsRetentionHours, this.clock.now()),
+    );
     if (job.notification.hasErrors()) {
       throw new EntityValidationError(job.notification.toJSON());
     }

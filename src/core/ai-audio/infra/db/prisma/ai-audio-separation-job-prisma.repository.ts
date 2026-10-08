@@ -15,7 +15,14 @@ import {
 import { AiAudioSeparationJobModelMapper } from "./ai-audio-separation-job-model-mapper";
 
 export class AiAudioSeparationJobPrismaRepository implements IAiAudioSeparationJobRepository {
-  sortableFields: string[] = ["created_at", "updated_at", "status"];
+  sortableFields: string[] = [
+    "created_at",
+    "updated_at",
+    "status",
+    // A varredura de expiração ordena por aqui para tratar os mais vencidos
+    // primeiro; sem estar na lista o sort é descartado em silêncio.
+    "stems_expire_at",
+  ];
 
   constructor(private prisma: PrismaClient) {}
 
@@ -195,6 +202,9 @@ export class AiAudioSeparationJobPrismaRepository implements IAiAudioSeparationJ
         : {}),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.model_id ? { model_id: filter.model_id } : {}),
+      ...(filter.stems_expire_at_lte
+        ? { stems_expire_at: { lte: filter.stems_expire_at_lte } }
+        : {}),
     };
   }
 

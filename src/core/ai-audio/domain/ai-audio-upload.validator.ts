@@ -21,6 +21,10 @@ export class AiAudioUploadRules {
   @IsNotEmpty({ groups: ["musician_id"] })
   musician_id: string;
 
+  @IsUUID("4", { groups: ["music_library_id"] })
+  @IsOptional({ groups: ["music_library_id"] })
+  music_library_id?: string;
+
   @MaxLength(1024, { groups: ["original_filename"] })
   @IsString({ groups: ["original_filename"] })
   @IsNotEmpty({ groups: ["original_filename"] })
@@ -40,7 +44,9 @@ export class AiAudioUploadRules {
   @IsNotEmpty({ groups: ["object_key"] })
   object_key: string;
 
-  @IsIn(["direct", "presigned", "multipart"], { groups: ["upload_method"] })
+  @IsIn(["direct", "presigned", "multipart", "from_source"], {
+    groups: ["upload_method"],
+  })
   @IsString({ groups: ["upload_method"] })
   @IsNotEmpty({ groups: ["upload_method"] })
   upload_method: string;
@@ -72,6 +78,8 @@ export class AiAudioUploadRules {
 
   constructor(entity: AiAudioUpload | any) {
     this.musician_id = entity?.musician_id?.id ?? entity?.musician_id;
+    this.music_library_id =
+      entity?.music_library_id?.id ?? entity?.music_library_id ?? undefined;
     this.original_filename = entity?.original_filename;
     this.content_type = entity?.content_type;
     this.file_size = entity?.file_size;

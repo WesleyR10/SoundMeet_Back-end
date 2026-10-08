@@ -13,11 +13,12 @@ export type AiAudioUploadStatus =
 export type AiAudioUploadConstructorProps = {
   ai_audio_upload_id?: AiAudioUploadId;
   musician_id: string;
+  music_library_id?: string | null;
   original_filename: string;
   content_type: string;
   file_size: number;
   object_key: string;
-  upload_method: "direct" | "presigned" | "multipart";
+  upload_method: "direct" | "presigned" | "multipart" | "from_source";
   multipart_upload_id?: string | null;
   duration_seconds?: number | null;
   codec?: string | null;
@@ -32,11 +33,12 @@ export type AiAudioUploadConstructorProps = {
 export type AiAudioUploadCreateCommand = {
   ai_audio_upload_id?: AiAudioUploadId;
   musician_id: string;
+  music_library_id?: string | null;
   original_filename: string;
   content_type: string;
   file_size: number;
   object_key: string;
-  upload_method: "direct" | "presigned" | "multipart";
+  upload_method: "direct" | "presigned" | "multipart" | "from_source";
   multipart_upload_id?: string | null;
   status?: AiAudioUploadStatus;
 };
@@ -46,11 +48,17 @@ export class AiAudioUploadId extends Uuid {}
 export class AiAudioUpload extends AggregateRoot {
   ai_audio_upload_id: AiAudioUploadId;
   musician_id: Uuid;
+  /**
+   * Música da biblioteca que originou este áudio (Modo Ensaio). Espelha
+   * `AiCifraUpload.musicLibraryId`: é este elo que permite mostrar a cifra ao
+   * lado dos stems. Null quando o músico subiu um arquivo solto.
+   */
+  music_library_id: Uuid | null;
   original_filename: string;
   content_type: string;
   file_size: number;
   object_key: string;
-  upload_method: "direct" | "presigned" | "multipart";
+  upload_method: "direct" | "presigned" | "multipart" | "from_source";
   multipart_upload_id: string | null;
   duration_seconds: number | null;
   codec: string | null;
@@ -65,6 +73,9 @@ export class AiAudioUpload extends AggregateRoot {
     super();
     this.ai_audio_upload_id = props.ai_audio_upload_id ?? new AiAudioUploadId();
     this.musician_id = new Uuid(props.musician_id);
+    this.music_library_id = props.music_library_id
+      ? new Uuid(props.music_library_id)
+      : null;
     this.original_filename = props.original_filename;
     this.content_type = props.content_type;
     this.file_size = props.file_size;
@@ -146,6 +157,7 @@ export class AiAudioUpload extends AggregateRoot {
     return {
       id: this.ai_audio_upload_id.id,
       musician_id: this.musician_id.id,
+      music_library_id: this.music_library_id?.id ?? null,
       original_filename: this.original_filename,
       content_type: this.content_type,
       file_size: this.file_size,

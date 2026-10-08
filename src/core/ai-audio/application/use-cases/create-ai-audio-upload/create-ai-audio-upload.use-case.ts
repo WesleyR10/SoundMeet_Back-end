@@ -59,11 +59,12 @@ export class CreateAiAudioUploadUseCase implements IUseCase<
     const entity = AiAudioUpload.create({
       ai_audio_upload_id: uploadId,
       musician_id: input.musician_id,
+      music_library_id: input.music_library_id ?? null,
       original_filename: input.original_filename,
       content_type: input.content_type,
       file_size: input.file_size,
       object_key: objectKey,
-      upload_method: "direct",
+      upload_method: input.upload_method ?? "direct",
     });
 
     if (entity.notification.hasErrors()) {

@@ -18,7 +18,14 @@ export class AiAudioSeparationJobInMemoryRepository
   >
   implements IAiAudioSeparationJobRepository
 {
-  sortableFields: string[] = ["created_at", "updated_at", "status"];
+  sortableFields: string[] = [
+    "created_at",
+    "updated_at",
+    "status",
+    // A varredura de expiração ordena por aqui para tratar os mais vencidos
+    // primeiro; sem estar na lista o sort é descartado em silêncio.
+    "stems_expire_at",
+  ];
 
   async search(
     props: AiAudioSeparationJobSearchParams,
@@ -54,6 +61,15 @@ export class AiAudioSeparationJobInMemoryRepository
       }
       if (filter.model_id && item.model_id !== filter.model_id) {
         return false;
+      }
+      if (filter.stems_expire_at_lte) {
+        // Job sem prazo nunca é varrido: ninguém combinou retenção com ele.
+        if (
+          !item.stems_expire_at ||
+          item.stems_expire_at.getTime() > filter.stems_expire_at_lte.getTime()
+        ) {
+          return false;
+        }
       }
       return true;
     });

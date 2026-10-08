@@ -30,18 +30,23 @@ describe("AiAudioSeparationJob Unit Tests", () => {
     expect(entity.started_at).toBeInstanceOf(Date);
     expect(entity.progress_percent).toBeGreaterThan(0);
 
-    entity.complete([
-      new AiAudioSeparationOutput({
-        stem_name: "vocals",
-        object_key: "ai-audio/vocals.wav",
-        content_type: "audio/wav",
-        file_size: 1,
-      }),
-    ]);
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    entity.complete(
+      [
+        new AiAudioSeparationOutput({
+          stem_name: "vocals",
+          object_key: "ai-audio/vocals.wav",
+          content_type: "audio/wav",
+          file_size: 1,
+        }),
+      ],
+      expiresAt,
+    );
 
     expect(entity.status).toBe("completed");
     expect(entity.progress_percent).toBe(100);
     expect(entity.finished_at).toBeInstanceOf(Date);
+    expect(entity.stems_expire_at).toEqual(expiresAt);
     expect(entity.outputs).toHaveLength(1);
   });
 

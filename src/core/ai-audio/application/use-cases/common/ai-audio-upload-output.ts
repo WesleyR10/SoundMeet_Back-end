@@ -3,6 +3,7 @@ import { AiAudioUpload } from "../../../domain/ai-audio-upload.aggregate";
 export type AiAudioUploadOutput = {
   id: string;
   musician_id: string;
+  music_library_id: string | null;
   original_filename: string;
   content_type: string;
   file_size: number;
@@ -22,6 +23,7 @@ export class AiAudioUploadOutputMapper {
     return {
       id: entity.ai_audio_upload_id.id,
       musician_id: entity.musician_id.id,
+      music_library_id: entity.music_library_id?.id ?? null,
       original_filename: entity.original_filename,
       content_type: entity.content_type,
       file_size: entity.file_size,

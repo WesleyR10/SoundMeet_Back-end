@@ -26,6 +26,7 @@ export class AiAudioSeparationJobModelMapper {
       error_message: entity.error_message,
       started_at: entity.started_at,
       finished_at: entity.finished_at,
+      stems_expire_at: entity.stems_expire_at,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
@@ -51,6 +52,7 @@ export class AiAudioSeparationJobModelMapper {
       model.status === "queued" ||
       model.status === "processing" ||
       model.status === "completed" ||
+      model.status === "expired" ||
       model.status === "failed"
         ? model.status
         : "failed";
@@ -69,6 +71,7 @@ export class AiAudioSeparationJobModelMapper {
       error_message: model.error_message,
       started_at: model.started_at,
       finished_at: model.finished_at,
+      stems_expire_at: model.stems_expire_at,
       outputs: (model.outputs ?? []).map(
         (o) =>
           new AiAudioSeparationOutput({

@@ -1,3 +1,4 @@
+import { IClock } from "../../../../shared/application/clock.interface";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { DomainError } from "../../../../shared/domain/errors/domain.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -9,6 +10,10 @@ import { IAiAudioSeparationJobRepository } from "../../../domain/ai-audio-separa
 import { AiAudioSeparationOutput } from "../../../domain/ai-audio-separation-output.child-entity";
 import { AiAudioUploadId } from "../../../domain/ai-audio-upload.aggregate";
 import { IAiAudioUploadRepository } from "../../../domain/ai-audio-upload.repository";
+import {
+  DEFAULT_STEMS_RETENTION_HOURS,
+  stemsExpiryFrom,
+} from "../../../domain/stems-retention";
 import { IAiAudioSeparationClient } from "../../ports/ai-audio-separation-client.interface";
 import { ProcessAiAudioSeparationJobInput } from "./process-ai-audio-separation-job.input";
 
@@ -35,6 +40,8 @@ export class ProcessAiAudioSeparationJobUseCase implements IUseCase<
     private readonly uploadRepo: IAiAudioUploadRepository,
     private readonly jobRepo: IAiAudioSeparationJobRepository,
     private readonly client: IAiAudioSeparationClient,
+    private readonly stemsRetentionHours: number = DEFAULT_STEMS_RETENTION_HOURS,
+    private readonly clock: IClock = { now: () => new Date() },
   ) {}
 
   async execute(input: ProcessAiAudioSeparationJobInput): Promise<void> {
@@ -83,7 +90,10 @@ export class ProcessAiAudioSeparationJobUseCase implements IUseCase<
           }),
       );
 
-      job.complete(outputs);
+      job.complete(
+        outputs,
+        stemsExpiryFrom(this.stemsRetentionHours, this.clock.now()),
+      );
       upload.markSeparated();
 
       await this.jobRepo.update(job);

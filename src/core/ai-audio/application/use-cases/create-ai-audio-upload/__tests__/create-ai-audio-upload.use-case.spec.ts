@@ -10,6 +10,7 @@ describe("CreateAiAudioUploadUseCase Unit Tests", () => {
 
     const storage: IAiAudioStorage = {
       putObject: jest.fn().mockResolvedValue(undefined),
+      deleteObject: jest.fn().mockResolvedValue(undefined),
       getPublicUrl: jest.fn().mockReturnValue("https://cdn.test/file"),
     };
 
