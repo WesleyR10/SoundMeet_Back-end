@@ -35,9 +35,7 @@ export class SearchAiCifraCatalogUseCase implements IUseCase<
   ): Promise<SearchAiCifraCatalogOutput> {
     const query = String(input.query ?? "").trim();
     if (!query) {
-      throw new EntityValidationError([
-        { query: ["query é obrigatório."] },
-      ]);
+      throw new EntityValidationError([{ query: ["query é obrigatório."] }]);
     }
 
     const limit =

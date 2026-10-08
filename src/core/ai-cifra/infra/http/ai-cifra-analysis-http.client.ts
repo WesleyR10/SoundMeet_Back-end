@@ -19,11 +19,22 @@ export class AiCifraAnalysisHttpClient implements IAiCifraAnalysisClient {
     return response.data as AiCifraAnalysisClientResponse;
   }
 
-  static create(config: { baseURL: string; timeoutMs: number; path: string }) {
+  static create(config: {
+    baseURL: string;
+    timeoutMs: number;
+    path: string;
+    /** Shared secret enviado ao worker (A-10). Sem ele, o worker recusa. */
+    workerToken?: string;
+  }) {
     const http = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeoutMs,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(config.workerToken
+          ? { "x-ai-worker-token": config.workerToken }
+          : {}),
+      },
       maxBodyLength: Infinity,
     });
     return new AiCifraAnalysisHttpClient(http, config.path);

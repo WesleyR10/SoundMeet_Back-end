@@ -1,7 +1,9 @@
+import { Readable } from "node:stream";
+
 export interface IAiCifraStorage {
   putObject(input: {
     object_key: string;
-    data: Buffer | NodeJS.ReadableStream;
+    data: Buffer | Readable;
     content_type: string;
   }): Promise<void>;
 

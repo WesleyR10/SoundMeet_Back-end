@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { extname } from "path";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
@@ -8,6 +9,7 @@ import {
 } from "../../../domain/ai-cifra-upload.aggregate";
 import { IAiCifraUploadRepository } from "../../../domain/ai-cifra-upload.repository";
 import { IAiCifraStorage } from "../../ports/ai-cifra-storage.interface";
+import { IMusicLibraryOwnershipChecker } from "../../ports/music-library-ownership.interface";
 import {
   AiCifraUploadOutput,
   AiCifraUploadOutputMapper,
@@ -23,6 +25,7 @@ export class CreateAiCifraUploadUseCase implements IUseCase<
     private readonly storage: IAiCifraStorage,
     private readonly maxFileSizeBytes: number,
     private readonly allowedMimeTypes: string[],
+    private readonly musicLibraryOwnership?: IMusicLibraryOwnershipChecker,
   ) {}
 
   async execute(input: CreateAiCifraUploadInput): Promise<AiCifraUploadOutput> {
@@ -48,6 +51,19 @@ export class CreateAiCifraUploadUseCase implements IUseCase<
           ],
         },
       ]);
+    }
+
+    // O upload e o item de catálogo que ele alimenta têm que ser do mesmo dono.
+    if (input.music_library_id && this.musicLibraryOwnership) {
+      const owned = await this.musicLibraryOwnership.isOwnedBy(
+        input.music_library_id,
+        input.musician_id,
+      );
+      if (!owned) {
+        throw new ForbiddenException(
+          "Você não tem permissão para vincular este item da biblioteca musical.",
+        );
+      }
     }
 
     const uploadId = new AiCifraUploadId();

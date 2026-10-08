@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 import {
   IsNotEmpty,
   IsNumber,
@@ -13,7 +15,7 @@ export type CreateAiCifraUploadInput = {
   original_filename: string;
   content_type: string;
   file_size: number;
-  data: Buffer | NodeJS.ReadableStream;
+  data: Buffer | Readable;
 };
 
 export class CreateAiCifraUploadInputValidator {

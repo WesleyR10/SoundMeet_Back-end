@@ -1,3 +1,4 @@
+import { UpdateMusicLibraryUseCase } from "../../../../music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { DomainError } from "../../../../shared/domain/errors/domain.error";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -39,6 +40,31 @@ export class ProcessAiCifraAnalysisJobUseCase implements IUseCase<
     private readonly storage: IAiCifraStorage,
     private readonly musicLibraryLookup?: {
       findById(id: string): Promise<{ title?: string; artist?: string } | null>;
+    },
+    // Ponte pipeline -> catálogo (mesmo racional do item 6.5/roadmap.md,
+    // aplicado aqui pela primeira vez): SEM ISTO, este caminho -- o usado
+    // por padrão via AI_CIFRA_PROCESSING_TRANSPORT=http, o valor default em
+    // envs/.env.example -- nunca escrevia bpm/key/chords/structure_segments
+    // de volta em MusicLibrary, só no aggregate AiCifraAnalysisJob.result.
+    // GET .../chord-sheet lê direto de MusicLibrary, não do job -- ou seja,
+    // completar uma análise por este caminho nunca preenchia a cifra de
+    // verdade. O item 6.5 só corrigiu isso no caminho irmão
+    // (CompleteAiCifraAnalysisJobUseCase, usado pelo callback interno do
+    // worker) -- este aqui, o caminho síncrono/primário, tinha ficado de
+    // fora. Best-effort: falha aqui não desfaz a conclusão do job.
+    private readonly updateMusicLibraryUseCase?: UpdateMusicLibraryUseCase,
+    // Alinhamento forçado letra<->áudio (MMS_FA, ver
+    // Docs/ia-musical/folha-de-cifra.md) -- best-effort, chamado só se a letra
+    // JÁ estiver sincronizada nesse exato momento, porque upload.object_key
+    // está prestes a ser apagado do storage logo abaixo e não há retentativa
+    // depois. Se a letra ainda não existir, o use-case interno já faz no-op
+    // sozinho (ver AlignSyncedLyricsWordTimestampsUseCase) -- não precisa de
+    // checagem extra aqui.
+    private readonly alignSyncedLyricsUseCase?: {
+      execute(input: {
+        music_library_id: string;
+        audio_object_key: string;
+      }): Promise<void>;
     },
   ) {}
 
@@ -110,6 +136,29 @@ export class ProcessAiCifraAnalysisJobUseCase implements IUseCase<
       await this.jobRepo.update(job);
       await this.uploadRepo.update(upload);
 
+      if (this.updateMusicLibraryUseCase && upload.music_library_id) {
+        await this.updateMusicLibraryUseCase
+          .execute({
+            id: upload.music_library_id.id,
+            is_admin: true,
+            chords: result.chords,
+            structure_segments: result.segments,
+            bpm: result.bpm,
+            key: result.key,
+            duration_seconds: this.extractDurationSeconds(result.artifacts),
+          })
+          .catch(() => undefined);
+      }
+
+      if (this.alignSyncedLyricsUseCase && upload.music_library_id) {
+        await this.alignSyncedLyricsUseCase
+          .execute({
+            music_library_id: upload.music_library_id.id,
+            audio_object_key: upload.object_key,
+          })
+          .catch(() => undefined);
+      }
+
       await this.storage
         .deleteObject({ object_key: upload.object_key })
         .catch(() => undefined);
@@ -132,6 +181,20 @@ export class ProcessAiCifraAnalysisJobUseCase implements IUseCase<
           .catch(() => undefined);
       }
     }
+  }
+
+  // Worker devolve duration_seconds em artifacts tanto no /v1 quanto no
+  // /v2/analyze -- ver Docs/ia-musical/folha-de-cifra.md "duration_mismatch"
+  // (o fix de pontuação por duração no auto-sync de LRC ficava inerte sem
+  // isto, porque MusicLibrary.duration_seconds nunca era escrito por
+  // nenhum use-case do pipeline).
+  private extractDurationSeconds(
+    artifacts: Record<string, any> | null | undefined,
+  ): number | null {
+    const value = artifacts?.duration_seconds;
+    return typeof value === "number" && Number.isFinite(value) && value >= 0
+      ? value
+      : null;
   }
 
   private isTransientError(code: string): boolean {

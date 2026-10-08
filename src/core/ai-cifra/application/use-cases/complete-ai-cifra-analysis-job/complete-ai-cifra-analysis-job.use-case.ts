@@ -1,3 +1,4 @@
+import { ResolveSpotifyTrackUseCase } from "../../../../music-library/application/use-cases/resolve-spotify-track/resolve-spotify-track.use-case";
 import { UpdateMusicLibraryUseCase } from "../../../../music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -22,6 +23,20 @@ export class CompleteAiCifraAnalysisJobUseCase implements IUseCase<
     private readonly jobRepo: IAiCifraAnalysisJobRepository,
     private readonly storage: IAiCifraStorage,
     private readonly updateMusicLibraryUseCase?: UpdateMusicLibraryUseCase,
+    // Mesmo racional do gêmeo síncrono (ProcessAiCifraAnalysisJobUseCase) --
+    // ver comentário lá. Precisa estar aqui também porque este é o caminho
+    // de conclusão usado quando o worker chama de volta via
+    // POST /ai-cifra/internal/analyses/:id/complete.
+    private readonly alignSyncedLyricsUseCase?: {
+      execute(input: {
+        music_library_id: string;
+        audio_object_key: string;
+      }): Promise<void>;
+    },
+    // Último de propósito: os parâmetros deste construtor são posicionais e já
+    // têm chamadores. Inserir no meio reatribui silenciosamente os argumentos
+    // de quem já constrói a classe.
+    private readonly resolveSpotifyTrackUseCase?: ResolveSpotifyTrackUseCase,
   ) {}
 
   async execute(input: CompleteAiCifraAnalysisJobInput): Promise<void> {
@@ -81,6 +96,29 @@ export class CompleteAiCifraAnalysisJobUseCase implements IUseCase<
           structure_segments: result.segments,
           bpm: result.bpm,
           key: result.key,
+          duration_seconds: this.extractDurationSeconds(result.artifacts),
+        })
+        .catch(() => undefined);
+    }
+
+    // Faixa correspondente no Spotify — DEPOIS do update acima, que é quem
+    // grava `duration_seconds`. Invertido, o matcher rodaria sem o único sinal
+    // que separa estúdio de ao vivo e cairia no score neutro de duração.
+    //
+    // Best-effort pelo mesmo motivo dos vizinhos: o link é conveniência, a
+    // cifra é o produto. Spotify fora do ar não pode falhar uma análise que
+    // levou minutos de GPU.
+    if (this.resolveSpotifyTrackUseCase && upload.music_library_id) {
+      await this.resolveSpotifyTrackUseCase
+        .execute({ music_library_id: upload.music_library_id.id })
+        .catch(() => undefined);
+    }
+
+    if (this.alignSyncedLyricsUseCase && upload.music_library_id) {
+      await this.alignSyncedLyricsUseCase
+        .execute({
+          music_library_id: upload.music_library_id.id,
+          audio_object_key: upload.object_key,
         })
         .catch(() => undefined);
     }
@@ -88,5 +126,16 @@ export class CompleteAiCifraAnalysisJobUseCase implements IUseCase<
     await this.storage
       .deleteObject({ object_key: upload.object_key })
       .catch(() => undefined);
+  }
+
+  // Mesmo racional do gêmeo síncrono (ProcessAiCifraAnalysisJobUseCase) --
+  // ver comentário lá.
+  private extractDurationSeconds(
+    artifacts: Record<string, any> | null | undefined,
+  ): number | null {
+    const value = artifacts?.duration_seconds;
+    return typeof value === "number" && Number.isFinite(value) && value >= 0
+      ? value
+      : null;
   }
 }

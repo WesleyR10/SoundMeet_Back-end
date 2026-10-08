@@ -8,7 +8,11 @@ describe("SearchAiCifraCatalogUseCase", () => {
   it("busca via client com limit default quando não informado", async () => {
     const client: IAiCifraCatalogSearchClient = {
       searchVideos: jest.fn().mockResolvedValue([
-        { title: "Bohemian Rhapsody", artist: "Queen", youtube_video_id: "abc123" },
+        {
+          title: "Bohemian Rhapsody",
+          artist: "Queen",
+          youtube_video_id: "abc123",
+        },
       ]),
     };
     const useCase = new SearchAiCifraCatalogUseCase(client);
@@ -20,7 +24,11 @@ describe("SearchAiCifraCatalogUseCase", () => {
       limit: 15,
     });
     expect(result).toEqual([
-      { title: "Bohemian Rhapsody", artist: "Queen", youtube_video_id: "abc123" },
+      {
+        title: "Bohemian Rhapsody",
+        artist: "Queen",
+        youtube_video_id: "abc123",
+      },
     ]);
   });
 
