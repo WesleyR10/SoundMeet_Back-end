@@ -14,6 +14,7 @@ import { ExternalServiceError } from "../../../../shared/domain/errors/external-
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { CPF } from "../../../../shared/domain/value-objects/cpf.vo";
 import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
+import { IWelcomeNotifier } from "../../../infra/gateways/email-verification-issuer.interface";
 import {
   IdentityUser,
   IIdentityProviderGateway,
@@ -29,6 +30,12 @@ export class SocialSignupUseCase implements IUseCase<
     private readonly musicianRepo: IMusicianRepository,
     private readonly audienceRepo: IAudienceRepository,
     private readonly identityGateway: IIdentityProviderGateway,
+    /**
+     * Boas-vindas JÁ no cadastro: aqui o e-mail veio verificado pelo Google,
+     * não há link de confirmação a esperar. Best-effort — nunca derruba o
+     * cadastro.
+     */
+    private readonly welcomeNotifier?: IWelcomeNotifier,
   ) {}
 
   async execute(input: SocialSignupInput): Promise<SocialSignupOutput> {
@@ -44,6 +51,10 @@ export class SocialSignupUseCase implements IUseCase<
     await this.assignRole(input.user_id, input.role);
 
     const profileId = await this.createProfile(input, identityUser);
+
+    await this.welcomeNotifier
+      ?.sendWelcome(input.role, identityUser)
+      .catch(() => undefined);
 
     return { role: input.role, profile_id: profileId };
   }
@@ -77,9 +88,7 @@ export class SocialSignupUseCase implements IUseCase<
     if (!phone) return;
     const phoneOrError = Phone.create(phone);
     if (phoneOrError.isFail()) return;
-    const existing = await this.musicianRepo.findByPhone(
-      phoneOrError.ok.value,
-    );
+    const existing = await this.musicianRepo.findByPhone(phoneOrError.ok.value);
     if (existing) {
       throw new ConflictError("Celular já cadastrado");
     }

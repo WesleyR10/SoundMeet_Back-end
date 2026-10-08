@@ -2,8 +2,12 @@ import { ConfigService } from "@nestjs/config";
 
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
 import { AddRoleUseCase } from "../../core/auth/application/use-cases/add-role/add-role.use-case";
+import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
+import { LogoutUseCase } from "../../core/auth/application/use-cases/logout/logout.use-case";
+import { RefreshSessionUseCase } from "../../core/auth/application/use-cases/refresh-session/refresh-session.use-case";
 import { RegisterUseCase } from "../../core/auth/application/use-cases/register/register.use-case";
 import { RegisterEstablishmentUseCase } from "../../core/auth/application/use-cases/register-establishment/register-establishment.use-case";
+import { RequestPasswordResetUseCase } from "../../core/auth/application/use-cases/request-password-reset/request-password-reset.use-case";
 import { SocialSignupUseCase } from "../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { KeycloakAdminGateway } from "../../core/auth/infra/gateways/keycloak-admin.gateway";
 import { NoopIdentityClaimsWriter } from "../../core/auth/infra/gateways/noop-identity-claims.writer";
@@ -136,12 +140,44 @@ export const AUTH_USE_CASES = {
       musicianRepo: MusicianPrismaRepository,
       audienceRepo: AudiencePrismaRepository,
       identityGateway: KeycloakAdminGateway,
-    ) => new SocialSignupUseCase(musicianRepo, audienceRepo, identityGateway),
+      welcomeNotifier: VerifyEmailService,
+    ) =>
+      new SocialSignupUseCase(
+        musicianRepo,
+        audienceRepo,
+        identityGateway,
+        welcomeNotifier,
+      ),
     inject: [
       MusicianPrismaRepository,
       AudiencePrismaRepository,
       IDENTITY_PROVIDER_GATEWAY,
+      VerifyEmailService,
     ],
+  },
+  // AUTH-3: as quatro falam com o Keycloak pelo client CONFIDENCIAL, através
+  // do mesmo gateway (que também implementa IIdentitySessionGateway).
+  LOGIN_USE_CASE: {
+    provide: LoginUseCase,
+    useFactory: (gateway: KeycloakAdminGateway) => new LoginUseCase(gateway),
+    inject: [IDENTITY_PROVIDER_GATEWAY],
+  },
+  REFRESH_SESSION_USE_CASE: {
+    provide: RefreshSessionUseCase,
+    useFactory: (gateway: KeycloakAdminGateway) =>
+      new RefreshSessionUseCase(gateway),
+    inject: [IDENTITY_PROVIDER_GATEWAY],
+  },
+  LOGOUT_USE_CASE: {
+    provide: LogoutUseCase,
+    useFactory: (gateway: KeycloakAdminGateway) => new LogoutUseCase(gateway),
+    inject: [IDENTITY_PROVIDER_GATEWAY],
+  },
+  REQUEST_PASSWORD_RESET_USE_CASE: {
+    provide: RequestPasswordResetUseCase,
+    useFactory: (gateway: KeycloakAdminGateway) =>
+      new RequestPasswordResetUseCase(gateway),
+    inject: [IDENTITY_PROVIDER_GATEWAY],
   },
   ADD_ROLE_USE_CASE: {
     provide: AddRoleUseCase,

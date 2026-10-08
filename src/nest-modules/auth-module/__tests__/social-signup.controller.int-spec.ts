@@ -13,6 +13,7 @@ import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock
 import { AuthController } from "../auth.controller";
 import { SocialSignupDto } from "../dto/social-signup.dto";
 import { AuthenticatedUser } from "../interfaces/authenticated-user.interface";
+import { sessionUseCaseStubProviders } from "../testing/session-use-case.providers";
 import { VerifyEmailService } from "../verify-email.service";
 
 const GOOGLE_USER_ID = "9c8d7e6f-5a4b-4c2d-8e0f-1a2b3c4d5e6f";
@@ -54,6 +55,7 @@ describe("AuthController socialSignup() Integration Tests", () => {
     const moduleBuilder = Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        ...sessionUseCaseStubProviders(),
         { provide: VerifyEmailService, useValue: { verify: jest.fn() } },
         {
           provide: RegisterUseCase,

@@ -1,6 +1,9 @@
 import { Audience } from "../../../../../audience/domain/audience.aggregate";
 import { AudienceInMemoryRepository } from "../../../../../audience/infra/db/in-memory/audience-in-memory.repository";
-import { Musician, MusicianId } from "../../../../../musician/domain/musician.aggregate";
+import {
+  Musician,
+  MusicianId,
+} from "../../../../../musician/domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../../musician/infra/db/in-memory/musician-in-memory.repository";
 import { ConflictError } from "../../../../../shared/domain/errors/conflict.error";
 import { IIdentityProviderGateway } from "../../../../infra/gateways/identity-provider-gateway.interface";

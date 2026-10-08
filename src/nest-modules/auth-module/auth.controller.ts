@@ -21,10 +21,15 @@ import type { Response } from "express";
 
 import { AddRoleOutput } from "../../core/auth/application/use-cases/add-role/add-role.output";
 import { AddRoleUseCase } from "../../core/auth/application/use-cases/add-role/add-role.use-case";
+import { SessionTokensOutput } from "../../core/auth/application/use-cases/common/session-tokens.output";
+import { LoginUseCase } from "../../core/auth/application/use-cases/login/login.use-case";
+import { LogoutUseCase } from "../../core/auth/application/use-cases/logout/logout.use-case";
+import { RefreshSessionUseCase } from "../../core/auth/application/use-cases/refresh-session/refresh-session.use-case";
 import { RegisterOutput } from "../../core/auth/application/use-cases/register/register.output";
 import { RegisterUseCase } from "../../core/auth/application/use-cases/register/register.use-case";
 import { RegisterEstablishmentOutput } from "../../core/auth/application/use-cases/register-establishment/register-establishment.output";
 import { RegisterEstablishmentUseCase } from "../../core/auth/application/use-cases/register-establishment/register-establishment.use-case";
+import { RequestPasswordResetUseCase } from "../../core/auth/application/use-cases/request-password-reset/request-password-reset.use-case";
 import { SocialSignupOutput } from "../../core/auth/application/use-cases/social-signup/social-signup.output";
 import { SocialSignupUseCase } from "../../core/auth/application/use-cases/social-signup/social-signup.use-case";
 import { Public } from "./auth.decorators";
@@ -32,8 +37,12 @@ import { AuthGuard } from "./auth.guard";
 import { CurrentUserContextGuard } from "./current-user-context.guard";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { AddRoleDto } from "./dto/add-role.dto";
+import { LoginDto } from "./dto/login.dto";
+import { LogoutDto } from "./dto/logout.dto";
+import { RefreshSessionDto } from "./dto/refresh-session.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { RegisterEstablishmentDto } from "./dto/register-establishment.dto";
+import { RequestPasswordResetDto } from "./dto/request-password-reset.dto";
 import { ResendVerificationDto } from "./dto/resend-verification.dto";
 import { SocialSignupDto } from "./dto/social-signup.dto";
 import { VerifyEmailDto } from "./dto/verify-email.dto";
@@ -52,6 +61,10 @@ export class AuthController {
     private readonly registerEstablishmentUseCase: RegisterEstablishmentUseCase,
     private readonly socialSignupUseCase: SocialSignupUseCase,
     private readonly addRoleUseCase: AddRoleUseCase,
+    private readonly loginUseCase: LoginUseCase,
+    private readonly refreshSessionUseCase: RefreshSessionUseCase,
+    private readonly logoutUseCase: LogoutUseCase,
+    private readonly requestPasswordResetUseCase: RequestPasswordResetUseCase,
   ) {}
 
   @Post("register")
@@ -60,7 +73,7 @@ export class AuthController {
   @ApiOperation({
     summary: "Registro de novo usuário",
     description:
-      "Cria a conta no Keycloak, cria o aggregate mínimo (músico ou público) e já devolve a sessão. Única porta de entrada para novos usuários, já que registrationAllowed permanece false no realm. AUTH-1: os tokens saem de um grant de senha no client CONFIDENCIAL `soundmeet-registration` (secret só no backend), não no client público `soundmeet-mobile`, que desde 31/ago/2026 tem `directAccessGrantsEnabled: false`. O grant continua existindo aqui porque o usuário acabou de escolher a senha — mandá-lo à tela de login em seguida seria pedir para digitar duas vezes. Para LOGIN não há rota: é Authorization Code + PKCE direto no Keycloak.",
+      "Cria a conta no Keycloak, cria o aggregate mínimo (músico ou público) e já devolve a sessão. Única porta de entrada para novos usuários, já que registrationAllowed permanece false no realm. AUTH-1: os tokens saem de um grant de senha no client CONFIDENCIAL `soundmeet-registration` (secret só no backend), não no client público `soundmeet-mobile`, que desde 31/ago/2026 tem `directAccessGrantsEnabled: false`. O grant continua existindo aqui porque o usuário acabou de escolher a senha — mandá-lo à tela de login em seguida seria pedir para digitar duas vezes. O LOGIN usa o mesmo client confidencial, em POST /auth/login (AUTH-3).",
   })
   @ApiResponse({
     status: 201,
@@ -74,6 +87,100 @@ export class AuthController {
   })
   async register(@Body() dto: RegisterDto): Promise<RegisterOutput> {
     return this.registerUseCase.execute(dto);
+  }
+
+  /**
+   * 🔴 AUTH-3 (25/set/2026): o login por senha voltou para dentro do app, mas
+   * NÃO no desenho anterior ao AUTH-1. Lá o grant morava no client público e
+   * dava para pular esta rota indo direto ao Keycloak; aqui ele mora no client
+   * confidencial, então o `@Throttle` abaixo é a única porta.
+   *
+   * Duas camadas, cada uma cobrindo o que a outra não vê:
+   * - este throttle é por IP — segura o volume de uma origem (stuffing);
+   * - o brute force do Keycloak (`failureFactor: 5`, bloqueio temporário) é
+   *   por CONTA — segura o ataque distribuído contra uma pessoa.
+   * 20/min e não 5: CGNAT de operadora e o Wi-Fi do bar põem centenas de
+   * pessoas atrás do mesmo IP, justamente onde o app é usado.
+   */
+  @Post("login")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
+  @ApiOperation({
+    summary: "Login por e-mail e senha (app)",
+    description:
+      "Grant de senha no client CONFIDENCIAL `soundmeet-registration` (secret só no backend). Devolve a sessão; o papel vem das roles do JWT. Toda recusa — senha errada, conta inexistente, bloqueada ou desabilitada — responde o mesmo 401, para a rota não revelar quais e-mails têm conta.",
+  })
+  @ApiResponse({ status: 200, description: "Sessão aberta" })
+  @ApiResponse({ status: 401, description: "E-mail ou senha incorretos" })
+  @ApiResponse({ status: 422, description: "Dados inválidos" })
+  @ApiResponse({
+    status: 503,
+    description: "Provedor de identidade indisponível",
+  })
+  async login(@Body() dto: LoginDto): Promise<SessionTokensOutput> {
+    return this.loginUseCase.execute(dto);
+  }
+
+  /**
+   * O app não consegue renovar sozinho: o Keycloak só aceita o refresh token
+   * do client que o emitiu, e o secret desse client não pode ir para o APK.
+   * Vale também para a sessão do CADASTRO — que até aqui era recusada na
+   * primeira renovação.
+   */
+  @Post("refresh")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @ApiOperation({
+    summary: "Renova a sessão do login por senha ou do cadastro",
+    description:
+      "401 = sessão vencida ou revogada (o app deve encerrar a sessão local). 503 = provedor fora do ar (o app NÃO deve deslogar).",
+  })
+  @ApiResponse({ status: 200, description: "Sessão renovada" })
+  @ApiResponse({ status: 401, description: "Sessão expirada" })
+  @ApiResponse({
+    status: 503,
+    description: "Provedor de identidade indisponível",
+  })
+  async refresh(@Body() dto: RefreshSessionDto): Promise<SessionTokensOutput> {
+    return this.refreshSessionUseCase.execute(dto);
+  }
+
+  /**
+   * `@Public()` porque quem sai pode estar com o access token já vencido — e
+   * a credencial aqui é o próprio refresh token. Sempre 204.
+   */
+  @Post("logout")
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @ApiOperation({
+    summary: "Revoga a sessão do login por senha (inclusive a offline)",
+  })
+  @ApiResponse({ status: 204, description: "Sessão revogada (ou já inválida)" })
+  async logout(@Body() dto: LogoutDto): Promise<void> {
+    await this.logoutUseCase.execute(dto);
+  }
+
+  /**
+   * Throttle apertado pelo mesmo motivo de `resend-verification`: a rota
+   * dispara e-mail para um endereço que quem chama escolhe.
+   */
+  @Post("forgot-password")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @ApiOperation({
+    summary: "Envia o link de redefinição de senha",
+    description:
+      "Resposta idêntica exista ou não conta — e mesmo se o envio falhar —, para a rota não virar oráculo de cadastros. O link é do Keycloak; a senha nova nunca passa pela API.",
+  })
+  @ApiResponse({ status: 200, description: "Mensagem genérica" })
+  async forgotPassword(
+    @Body() dto: RequestPasswordResetDto,
+  ): Promise<{ message: string }> {
+    return this.requestPasswordResetUseCase.execute(dto);
   }
 
   @Post("register-establishment")

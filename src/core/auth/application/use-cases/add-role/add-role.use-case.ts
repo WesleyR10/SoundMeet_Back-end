@@ -65,16 +65,11 @@ export class AddRoleUseCase implements IUseCase<AddRoleInput, AddRoleOutput> {
       (role) => role === "musician" || role === "audience",
     );
     if (!hasProfileRole) {
-      throw new ConflictError(
-        "Usuário ainda não completou o cadastro inicial",
-      );
+      throw new ConflictError("Usuário ainda não completou o cadastro inicial");
     }
   }
 
-  private assertRoleNotOwned(
-    existingRoles: string[],
-    role: AddRoleRole,
-  ): void {
+  private assertRoleNotOwned(existingRoles: string[], role: AddRoleRole): void {
     if (existingRoles.includes(role)) {
       throw new ConflictError("Usuário já possui este papel");
     }
@@ -98,9 +93,7 @@ export class AddRoleUseCase implements IUseCase<AddRoleInput, AddRoleOutput> {
     if (!phone) return;
     const phoneOrError = Phone.create(phone);
     if (phoneOrError.isFail()) return;
-    const existing = await this.musicianRepo.findByPhone(
-      phoneOrError.ok.value,
-    );
+    const existing = await this.musicianRepo.findByPhone(phoneOrError.ok.value);
     if (existing) {
       throw new ConflictError("Celular já cadastrado");
     }

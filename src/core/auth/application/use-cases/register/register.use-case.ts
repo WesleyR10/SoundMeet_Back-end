@@ -86,9 +86,7 @@ export class RegisterUseCase implements IUseCase<
     if (!phone) return;
     const phoneOrError = Phone.create(phone);
     if (phoneOrError.isFail()) return;
-    const existing = await this.musicianRepo.findByPhone(
-      phoneOrError.ok.value,
-    );
+    const existing = await this.musicianRepo.findByPhone(phoneOrError.ok.value);
     if (existing) {
       throw new ConflictError("Celular já cadastrado");
     }

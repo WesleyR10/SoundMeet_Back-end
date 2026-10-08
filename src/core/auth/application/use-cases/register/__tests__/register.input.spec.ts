@@ -1,4 +1,5 @@
 import { validate } from "class-validator";
+
 import { RegisterInput } from "../register.input";
 
 function buildInput(overrides: Partial<RegisterInput> = {}): RegisterInput {

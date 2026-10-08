@@ -7,7 +7,7 @@ import { PrismaService } from "../database-module/prisma/prisma.service";
  * Adapter Prisma da porta `IEmailVerificationChecker`.
  *
  * Lê `email_verified_at` direto da tabela: o campo é infra-only por decisão
- * registrada em `Docs/email.md` — não pertence ao agregado e é gerenciado pelo
+ * registrada em `Docs/funcionalidades/emails-do-produto.md` — não pertence ao agregado e é gerenciado pelo
  * `VerifyEmailService`. É o mesmo motivo pelo qual a porta existe.
  */
 @Injectable()

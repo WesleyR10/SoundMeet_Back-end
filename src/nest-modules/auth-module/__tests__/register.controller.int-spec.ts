@@ -18,6 +18,7 @@ import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock
 import { AuthController } from "../auth.controller";
 import { RegisterDto } from "../dto/register.dto";
 import { RegisterEstablishmentDto } from "../dto/register-establishment.dto";
+import { sessionUseCaseStubProviders } from "../testing/session-use-case.providers";
 import { VerifyEmailService } from "../verify-email.service";
 
 describe("AuthController register() Integration Tests", () => {
@@ -34,7 +35,10 @@ describe("AuthController register() Integration Tests", () => {
     musicianRepo = new MusicianInMemoryRepository();
     audienceRepo = new AudienceInMemoryRepository();
     establishmentRepo = new EstablishmentInMemoryRepository();
-    claimsWriter = { addClaimValue: jest.fn().mockResolvedValue(undefined) };
+    claimsWriter = {
+      addClaimValue: jest.fn().mockResolvedValue(undefined),
+      removeClaimValue: jest.fn().mockResolvedValue(undefined),
+    };
     identityGateway = {
       createUser: jest
         .fn()
@@ -60,6 +64,7 @@ describe("AuthController register() Integration Tests", () => {
     const moduleBuilder = Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        ...sessionUseCaseStubProviders(),
         { provide: VerifyEmailService, useValue: { verify: jest.fn() } },
         {
           provide: RegisterUseCase,

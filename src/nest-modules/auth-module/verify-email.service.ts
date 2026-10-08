@@ -1,11 +1,24 @@
 import {
   BadRequestException,
+  ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { createHash, randomUUID } from "crypto";
 
-import { IEmailVerificationIssuer } from "../../core/auth/infra/gateways/email-verification-issuer.interface";
+import {
+  EmailVerificationSubjectType,
+  IEmailVerificationIssuer,
+  IWelcomeNotifier,
+} from "../../core/auth/infra/gateways/email-verification-issuer.interface";
+import {
+  IdentityProviderConflictError,
+  IIdentityEmailGateway,
+} from "../../core/auth/infra/gateways/identity-provider-gateway.interface";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { MailService } from "../mail-module/mail.service";
 
@@ -14,7 +27,10 @@ type ProfileType = "musician" | "establishment" | "audience";
 type TokenRecord = {
   type: ProfileType;
   id: string;
+  email: string;
+  name: string;
   email_pending: string | null;
+  email_verified_at: Date | null;
   email_token_expires_at: Date | null;
 };
 
@@ -34,12 +50,19 @@ export type VerifyEmailPeek =
   | { status: "invalid" };
 
 @Injectable()
-export class VerifyEmailService implements IEmailVerificationIssuer {
+export class VerifyEmailService
+  implements IEmailVerificationIssuer, IWelcomeNotifier
+{
   private readonly TOKEN_TTL_HOURS = 24;
+  private readonly logger = new Logger(VerifyEmailService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    // Literal e não `IDENTITY_PROVIDER_GATEWAY`: `auth.providers.ts` importa
+    // este arquivo, e importar de volta fecharia um ciclo de módulos.
+    @Inject("IdentityProviderGateway")
+    private readonly identity: IIdentityEmailGateway,
   ) {}
 
   // SM-016: o e-mail carrega o token em claro (é assim que o link de
@@ -84,6 +107,26 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
     });
   }
 
+  async sendWelcome(
+    type: EmailVerificationSubjectType,
+    recipient: { email: string; name: string },
+  ): Promise<void> {
+    try {
+      await this.mailService.sendWelcome(recipient.email, {
+        name: recipient.name,
+        role: type,
+        profileUrl:
+          type === "establishment"
+            ? this.mailService.buildEstablishmentProfileUrl()
+            : null,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Boas-vindas não enviadas (${type}): ${(error as Error).message}`,
+      );
+    }
+  }
+
   /**
    * URL da página do web que apresenta o resultado da verificação. Existe para
    * a rota GET legada poder redirecionar em vez de consumir o token.
@@ -107,6 +150,16 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
     }
 
     await this.confirmEmail(record);
+
+    // Primeira confirmação da conta: é aqui que o cadastro por senha passa a
+    // ser utilizável. Ver `IWelcomeNotifier`. Troca de e-mail de conta já
+    // confirmada não repete as boas-vindas.
+    if (!record.email_verified_at) {
+      await this.sendWelcome(record.type, {
+        email: record.email_pending ?? record.email,
+        name: record.name,
+      });
+    }
 
     return { message: "Email verificado com sucesso." };
   }
@@ -190,7 +243,10 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
       where,
       select: {
         id: true,
+        email: true,
+        name: true,
         email_pending: true,
+        email_verified_at: true,
         email_token_expires_at: true,
       },
     });
@@ -198,7 +254,10 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
       return {
         type: "musician",
         id: musician.id,
+        email: musician.email,
+        name: musician.name,
         email_pending: musician.email_pending,
+        email_verified_at: musician.email_verified_at,
         email_token_expires_at: musician.email_token_expires_at,
       };
     }
@@ -207,7 +266,10 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
       where,
       select: {
         id: true,
+        email: true,
+        name: true,
         email_pending: true,
+        email_verified_at: true,
         email_token_expires_at: true,
       },
     });
@@ -215,7 +277,10 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
       return {
         type: "establishment",
         id: establishment.id,
+        email: establishment.email,
+        name: establishment.name,
         email_pending: establishment.email_pending,
+        email_verified_at: establishment.email_verified_at,
         email_token_expires_at: establishment.email_token_expires_at,
       };
     }
@@ -224,7 +289,10 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
       where,
       select: {
         id: true,
+        email: true,
+        name: true,
         email_pending: true,
+        email_verified_at: true,
         email_token_expires_at: true,
       },
     });
@@ -232,7 +300,10 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
       return {
         type: "audience",
         id: audience.id,
+        email: audience.email,
+        name: audience.name,
         email_pending: audience.email_pending,
+        email_verified_at: audience.email_verified_at,
         email_token_expires_at: audience.email_token_expires_at,
       };
     }
@@ -240,39 +311,132 @@ export class VerifyEmailService implements IEmailVerificationIssuer {
     return null;
   }
 
+  /**
+   * Confirma o endereço. Para a TROCA de e-mail (`email_pending`), troca o
+   * login no Keycloak ANTES do banco.
+   *
+   * 🔴 Até out/2026 só o banco mudava: o perfil mostrava o e-mail novo e o
+   * login — e o "Esqueci a senha" — seguiam no antigo, para sempre.
+   *
+   * A ordem é Keycloak → banco porque o Keycloak é quem pode recusar (outra
+   * conta já usa o endereço, inclusive de OUTRO tipo: músico e público são
+   * usuários distintos no mesmo realm). Recusado, nada muda no banco. Se o
+   * banco falhar depois, o Keycloak é revertido.
+   */
   private async confirmEmail(record: TokenRecord): Promise<void> {
-    const clearFields = {
+    const newEmail =
+      record.email_pending && record.email_pending !== record.email
+        ? record.email_pending
+        : null;
+
+    const identityUserId = newEmail ? this.resolveIdentityUser(record) : null;
+
+    if (newEmail && identityUserId) {
+      try {
+        const updated = await this.identity.updateUserEmail(
+          identityUserId,
+          newEmail,
+        );
+        if (!updated) {
+          this.logger.warn(
+            `Troca de e-mail sem usuário no Keycloak: ${record.type} ${record.id}`,
+          );
+        }
+      } catch (error) {
+        if (error instanceof IdentityProviderConflictError) {
+          await this.discardPendingChange(record);
+          throw new ConflictException(
+            "Este e-mail já está em uso por outra conta SoundMeet. Peça a troca de novo com outro endereço.",
+          );
+        }
+        // Token preservado: o link volta a funcionar quando o Keycloak voltar.
+        this.logger.error(
+          `Keycloak indisponível ao confirmar troca de e-mail de ${record.type} ${record.id}: ${(error as Error).message}`,
+        );
+        throw new ServiceUnavailableException(
+          "Não foi possível confirmar agora. Tente o mesmo link de novo em alguns minutos.",
+        );
+      }
+    }
+
+    try {
+      await this.writeConfirmation(record, newEmail);
+    } catch (error) {
+      if (newEmail && identityUserId) {
+        await this.identity
+          .updateUserEmail(identityUserId, record.email)
+          .catch((revertError: Error) =>
+            this.logger.error(
+              `🔴 Keycloak ficou com ${newEmail} e o banco com ${record.email} (${record.type} ${record.id}): ${revertError.message}`,
+            ),
+          );
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        await this.discardPendingChange(record);
+        throw new ConflictException(
+          "Este e-mail já está em uso por outra conta SoundMeet. Peça a troca de novo com outro endereço.",
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Usuário de LOGIN cujo e-mail acompanha o do perfil.
+   *
+   * Músico e público: o id do agregado É o `sub`, e o e-mail do perfil é o de
+   * login. Estabelecimento: o e-mail é CONTATO do espaço — o painel diz isso
+   * no próprio campo ("muda o contato do espaço, não o e-mail de login") —, e
+   * o login é do dono, uma conta à parte. Trocar o login de quem administra a
+   * casa a partir de um campo de contato abriria um caminho de tomada de conta
+   * que a tela promete não existir.
+   */
+  private resolveIdentityUser(record: TokenRecord): string | null {
+    return record.type === "establishment" ? null : record.id;
+  }
+
+  private async writeConfirmation(
+    record: TokenRecord,
+    newEmail: string | null,
+  ): Promise<void> {
+    const data = {
+      ...(newEmail ? { email: newEmail } : {}),
       email_token: null,
       email_token_hash: null,
       email_token_expires_at: null,
       email_verified_at: new Date(),
       email_pending: null,
     };
+    const where = { id: record.id };
 
     if (record.type === "musician") {
-      await this.prisma.musician.update({
-        where: { id: record.id },
-        data: {
-          ...(record.email_pending ? { email: record.email_pending } : {}),
-          ...clearFields,
-        },
-      });
+      await this.prisma.musician.update({ where, data });
     } else if (record.type === "establishment") {
-      await this.prisma.establishment.update({
-        where: { id: record.id },
-        data: {
-          ...(record.email_pending ? { email: record.email_pending } : {}),
-          ...clearFields,
-        },
-      });
+      await this.prisma.establishment.update({ where, data });
     } else {
-      await this.prisma.audience.update({
-        where: { id: record.id },
-        data: {
-          ...(record.email_pending ? { email: record.email_pending } : {}),
-          ...clearFields,
-        },
-      });
+      await this.prisma.audience.update({ where, data });
+    }
+  }
+
+  /** Pedido de troca que não tem como concluir: o link morre, o e-mail fica. */
+  private async discardPendingChange(record: TokenRecord): Promise<void> {
+    const data = {
+      email_pending: null,
+      email_token: null,
+      email_token_hash: null,
+      email_token_expires_at: null,
+    };
+    const where = { id: record.id };
+
+    if (record.type === "musician") {
+      await this.prisma.musician.update({ where, data });
+    } else if (record.type === "establishment") {
+      await this.prisma.establishment.update({ where, data });
+    } else {
+      await this.prisma.audience.update({ where, data });
     }
   }
 }

@@ -1,6 +1,16 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 
+import {
+  IdentityProviderConflictError,
+  IdentityProviderUnavailableError,
+} from "../../../core/auth/infra/gateways/identity-provider-gateway.interface";
 import { VerifyEmailService } from "../verify-email.service";
 
 function hashOf(token: string): string {
@@ -10,6 +20,7 @@ function hashOf(token: string): string {
 describe("VerifyEmailService (SM-016 email token hash)", () => {
   let prisma: any;
   let mailService: any;
+  let identity: { updateUserEmail: jest.Mock };
   let service: VerifyEmailService;
 
   beforeEach(() => {
@@ -20,11 +31,18 @@ describe("VerifyEmailService (SM-016 email token hash)", () => {
     };
     mailService = {
       sendEmailVerification: jest.fn(),
+      sendWelcome: jest.fn(),
+      buildEstablishmentProfileUrl: jest.fn(
+        () => "https://app/dashboard/perfil",
+      ),
       buildVerificationUrl: jest.fn(
         (token: string) => `https://app/verify/${token}`,
       ),
     };
-    service = new VerifyEmailService(prisma, mailService);
+    identity = {
+      updateUserEmail: jest.fn().mockResolvedValue(true),
+    };
+    service = new VerifyEmailService(prisma, mailService, identity);
   });
 
   describe("issueVerificationToken", () => {
@@ -110,6 +128,190 @@ describe("VerifyEmailService (SM-016 email token hash)", () => {
       );
     });
   });
+  describe("troca de e-mail — o login no Keycloak acompanha", () => {
+    const pending = (overrides: Record<string, unknown> = {}) => ({
+      id: "musician-id-1",
+      email: "antigo@x.com",
+      email_pending: "novo@x.com",
+      email_token_expires_at: new Date(Date.now() + 3600_000),
+      ...overrides,
+    });
+
+    it("🔴 troca o e-mail no Keycloak ANTES do banco (músico: id do agregado é o sub)", async () => {
+      const order: string[] = [];
+      identity.updateUserEmail.mockImplementation(async () => {
+        order.push("keycloak");
+        return true;
+      });
+      prisma.musician.findFirst.mockResolvedValue(pending());
+      prisma.musician.update.mockImplementation(async () => {
+        order.push("db");
+        return {};
+      });
+
+      await service.verify("t");
+
+      expect(identity.updateUserEmail).toHaveBeenCalledWith(
+        "musician-id-1",
+        "novo@x.com",
+      );
+      expect(order).toEqual(["keycloak", "db"]);
+      expect(prisma.musician.update.mock.calls[0][0].data.email).toBe(
+        "novo@x.com",
+      );
+    });
+
+    it("verificação de cadastro (sem troca) não toca o Keycloak", async () => {
+      prisma.musician.findFirst.mockResolvedValue(
+        pending({ email_pending: null }),
+      );
+
+      await service.verify("t");
+
+      expect(identity.updateUserEmail).not.toHaveBeenCalled();
+      expect(
+        prisma.musician.update.mock.calls[0][0].data.email,
+      ).toBeUndefined();
+    });
+
+    it("🔴 e-mail já usado por outra conta: 409, banco intacto e pedido descartado", async () => {
+      identity.updateUserEmail.mockRejectedValue(
+        new IdentityProviderConflictError(),
+      );
+      prisma.musician.findFirst.mockResolvedValue(pending());
+
+      await expect(service.verify("t")).rejects.toThrow(ConflictException);
+
+      const writes = prisma.musician.update.mock.calls.map(
+        (c: any) => c[0].data,
+      );
+      expect(writes).toHaveLength(1);
+      expect(writes[0].email).toBeUndefined();
+      expect(writes[0].email_verified_at).toBeUndefined();
+      expect(writes[0].email_pending).toBeNull();
+    });
+
+    it("Keycloak fora do ar: 503 e NADA muda — o mesmo link funciona depois", async () => {
+      identity.updateUserEmail.mockRejectedValue(
+        new IdentityProviderUnavailableError(),
+      );
+      prisma.musician.findFirst.mockResolvedValue(pending());
+
+      await expect(service.verify("t")).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+      expect(prisma.musician.update).not.toHaveBeenCalled();
+    });
+
+    it("banco recusa (e-mail tomado na mesma tabela): reverte o Keycloak e responde 409", async () => {
+      prisma.musician.findFirst.mockResolvedValue(pending());
+      prisma.musician.update
+        .mockRejectedValueOnce(
+          new Prisma.PrismaClientKnownRequestError("unique", {
+            code: "P2002",
+            clientVersion: "x",
+          }),
+        )
+        .mockResolvedValue({});
+
+      await expect(service.verify("t")).rejects.toThrow(ConflictException);
+
+      expect(identity.updateUserEmail.mock.calls).toEqual([
+        ["musician-id-1", "novo@x.com"],
+        ["musician-id-1", "antigo@x.com"],
+      ]);
+    });
+
+    it("🔴 estabelecimento: e-mail é CONTATO — muda no banco, o login do dono não", async () => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(
+        pending({ id: "est-1" }),
+      );
+
+      await service.verify("t");
+
+      expect(identity.updateUserEmail).not.toHaveBeenCalled();
+      expect(prisma.establishment.update.mock.calls[0][0].data.email).toBe(
+        "novo@x.com",
+      );
+    });
+
+    it("público também tem o login trocado (id do agregado é o sub)", async () => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+      prisma.audience.findFirst.mockResolvedValue(pending({ id: "aud-1" }));
+
+      await service.verify("t");
+
+      expect(identity.updateUserEmail).toHaveBeenCalledWith(
+        "aud-1",
+        "novo@x.com",
+      );
+    });
+  });
+
+  describe("boas-vindas na PRIMEIRA confirmação", () => {
+    const record = (overrides: Record<string, unknown> = {}) => ({
+      id: "a1",
+      email: "fa@x.com",
+      name: "Fã",
+      email_pending: null,
+      email_verified_at: null,
+      email_token_expires_at: new Date(Date.now() + 3600_000),
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      prisma.musician.findFirst.mockResolvedValue(null);
+      prisma.establishment.findFirst.mockResolvedValue(null);
+    });
+
+    it("envia ao confirmar o cadastro — sem botão para quem usa o app", async () => {
+      prisma.audience.findFirst.mockResolvedValue(record());
+
+      await service.verify("t");
+
+      expect(mailService.sendWelcome).toHaveBeenCalledWith("fa@x.com", {
+        name: "Fã",
+        role: "audience",
+        profileUrl: null,
+      });
+    });
+
+    it("estabelecimento recebe o botão para o painel", async () => {
+      prisma.establishment.findFirst.mockResolvedValue(
+        record({ id: "e1", email: "bar@x.com", name: "Bar do Zé" }),
+      );
+
+      await service.verify("t");
+
+      expect(mailService.sendWelcome).toHaveBeenCalledWith("bar@x.com", {
+        name: "Bar do Zé",
+        role: "establishment",
+        profileUrl: "https://app/dashboard/perfil",
+      });
+    });
+
+    it("conta já confirmada (troca de e-mail) não repete as boas-vindas", async () => {
+      prisma.audience.findFirst.mockResolvedValue(
+        record({ email_verified_at: new Date(), email_pending: "novo@x.com" }),
+      );
+
+      await service.verify("t");
+
+      expect(mailService.sendWelcome).not.toHaveBeenCalled();
+    });
+
+    it("confirmação que falha não envia", async () => {
+      prisma.audience.findFirst.mockResolvedValue(
+        record({ email_token_expires_at: new Date(Date.now() - 1000) }),
+      );
+
+      await expect(service.verify("t")).rejects.toThrow(BadRequestException);
+      expect(mailService.sendWelcome).not.toHaveBeenCalled();
+    });
+  });
+
   describe("peek — consulta sem consumir", () => {
     /*
      * 🔴 A razão de `peek` existir. Gmail, Outlook Safe Links e antivírus

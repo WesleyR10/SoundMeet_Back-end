@@ -163,4 +163,59 @@ describe("SocialSignupUseCase Unit Tests", () => {
     );
     expect(identityGateway.deleteUser).not.toHaveBeenCalled();
   });
+
+  describe("boas-vindas", () => {
+    it("envia no cadastro pelo Google (e-mail já verificado pelo Google)", async () => {
+      const welcome = { sendWelcome: jest.fn().mockResolvedValue(undefined) };
+      const withWelcome = new SocialSignupUseCase(
+        musicianRepo,
+        audienceRepo,
+        identityGateway,
+        welcome,
+      );
+
+      await withWelcome.execute(baseInput("audience"));
+
+      expect(welcome.sendWelcome).toHaveBeenCalledWith("audience", {
+        email: "google-user@example.com",
+        name: "Google User",
+      });
+    });
+
+    it("falha no envio não derruba o cadastro", async () => {
+      const welcome = {
+        sendWelcome: jest.fn().mockRejectedValue(new Error("resend fora")),
+      };
+      const withWelcome = new SocialSignupUseCase(
+        musicianRepo,
+        audienceRepo,
+        identityGateway,
+        welcome,
+      );
+
+      await expect(withWelcome.execute(baseInput("audience"))).resolves.toEqual(
+        { role: "audience", profile_id: GOOGLE_USER_ID },
+      );
+    });
+
+    it("não envia quando o cadastro falha", async () => {
+      const welcome = { sendWelcome: jest.fn() };
+      const withWelcome = new SocialSignupUseCase(
+        musicianRepo,
+        audienceRepo,
+        identityGateway,
+        welcome,
+      );
+      jest
+        .spyOn(audienceRepo, "insert")
+        .mockRejectedValueOnce(
+          new ConflictError("Unique constraint violation"),
+        );
+
+      await expect(withWelcome.execute(baseInput("audience"))).rejects.toThrow(
+        ConflictError,
+      );
+      expect(welcome.sendWelcome).not.toHaveBeenCalled();
+    });
+  });
 });
