@@ -136,6 +136,15 @@ const ALLOWED_PUBLIC_HANDLERS: Record<string, string> = {
     "confirma o e-mail; a credencial é o próprio token, não há JWT a exigir",
   "AuthController.resendVerification":
     "reenvia o link; quem pede ainda não tem sessão (throttle 3/min)",
+  // AUTH-3: login por senha dentro do app, pelo client CONFIDENCIAL.
+  "AuthController.login":
+    "login por senha; recusa uniforme (401) e throttle 20/min por IP",
+  "AuthController.refresh":
+    "renova a sessão do client confidencial; a credencial é o refresh token",
+  "AuthController.logout":
+    "revoga a sessão; quem sai pode estar com o access token vencido",
+  "AuthController.forgotPassword":
+    "link de redefinição; resposta idêntica exista ou não conta (throttle 3/min)",
 
   // ── Webhooks e callbacks OAuth ─────────────────────────────────────────────
   // Autenticados por assinatura/token do provedor, nunca por JWT. Ficam em
@@ -162,6 +171,8 @@ const ALLOWED_PUBLIC_HANDLERS: Record<string, string> = {
   // soft-auth: com Bearer válido o dono vê os campos completos, sem token o
   // estranho vê a versão sem PII (ver `PublicMusicianPresenter`).
   "MusiciansController.findAll": "busca pública de músicos",
+  "MusiciansController.findFeatured":
+    "faixa de assinantes em destaque; serve o presenter público, sem PII nem plan_tier",
   "MusiciansController.findOne": "perfil público do músico (destino do QR)",
   "EstablishmentsController.findAll": "busca pública de estabelecimentos",
   "EstablishmentsController.findOne": "perfil público do local (CPF mascarado)",
@@ -177,6 +188,8 @@ const ALLOWED_PUBLIC_HANDLERS: Record<string, string> = {
   "RepertoirePublicController.getSharedChordSheet":
     "cifra de repertório compartilhado",
   "MusicianRatingsController.list": "avaliações públicas do músico",
+  "MusicianRatingsController.summary":
+    "nota do músico quebrada por tipo de autor; agrega o que `list` já serve, sem PII",
   "EstablishmentRatingsController.list": "avaliações públicas do local",
   "PlansController.listPlans": "catálogo de planos (paywall antes de assinar)",
 
@@ -269,6 +282,11 @@ describe("Cobertura de autenticação das rotas HTTP (AUTH-2)", () => {
       // Prova de posse de e-mail — ver EMAIL_PROOF_HANDLERS abaixo.
       "AuthController.confirmEmail",
       "AuthController.resendVerification",
+      "AuthController.forgotPassword",
+      // AUTH-3 — sessão do login por senha.
+      "AuthController.login",
+      "AuthController.refresh",
+      "AuthController.logout",
       "AsaasWebhookController.handleEvent",
       "MercadoPagoWebhookController.handleEvent",
       "AiAudioController.updateSeparationProgress",
@@ -358,6 +376,11 @@ describe("Cobertura de autenticação das rotas HTTP (AUTH-2)", () => {
       const SESSION_BIRTH_OR_PROVIDER = new Set([
         "AuthController.register",
         "AuthController.registerEstablishment",
+        // AUTH-3: login NASCE a sessão; refresh e logout a continuam e a
+        // encerram, com o próprio refresh token como credencial.
+        "AuthController.login",
+        "AuthController.refresh",
+        "AuthController.logout",
         "AsaasWebhookController.handleEvent",
         "MercadoPagoWebhookController.handleEvent",
       ]);
@@ -377,6 +400,9 @@ describe("Cobertura de autenticação das rotas HTTP (AUTH-2)", () => {
       const EMAIL_PROOF_HANDLERS = new Set([
         "AuthController.confirmEmail",
         "AuthController.resendVerification",
+        // Mesma postura: resposta idêntica exista ou não conta, e o link
+        // (do Keycloak) só serve a quem controla a caixa de entrada.
+        "AuthController.forgotPassword",
       ]);
 
       const publicWrites = handlers

@@ -93,11 +93,14 @@ describe("Fila do músico — ordenação por destaque (e2e, Postgres real)", ()
   async function seedRequest(opts: {
     songTitle: string;
     ageMinutes: number;
-    boost?: { amount: number; status: "promised" | "awaiting_payment" | "paid" | "expired" | "cancelled" };
+    boost?: {
+      amount: number;
+      status: "promised" | "awaiting_payment" | "paid" | "expired" | "cancelled" | "refund_pending";
+    };
   }) {
     const createdAt = new Date(Date.now() - opts.ageMinutes * 60 * 1000);
-    const needsCharge =
-      opts.boost?.status === "awaiting_payment" || opts.boost?.status === "paid";
+    const moneyIn = opts.boost?.status === "paid" || opts.boost?.status === "refund_pending";
+    const needsCharge = opts.boost?.status === "awaiting_payment" || moneyIn;
 
     let boostTipId: string | null = null;
     if (needsCharge) {
@@ -110,7 +113,7 @@ describe("Fila do músico — ordenação por destaque (e2e, Postgres real)", ()
           eventId,
           amount: opts.boost!.amount,
           paymentMethod: "pix",
-          status: opts.boost!.status === "paid" ? "completed" : "pending",
+          status: moneyIn ? "completed" : "pending",
         },
       });
     }
@@ -133,7 +136,7 @@ describe("Fila do músico — ordenação por destaque (e2e, Postgres real)", ()
               boostTipId,
               boostPromisedAt: createdAt,
               boostChargedAt: needsCharge ? createdAt : null,
-              boostPaidAt: opts.boost.status === "paid" ? createdAt : null,
+              boostPaidAt: moneyIn ? createdAt : null,
             }
           : {}),
       },
@@ -158,33 +161,23 @@ describe("Fila do músico — ordenação por destaque (e2e, Postgres real)", ()
     // Sem destaque, mas VELHOS: prioridade alta pela regra de idade.
     await seedRequest({ songTitle: "sem-destaque-antigo", ageMinutes: 120 });
     await seedRequest({ songTitle: "sem-destaque-medio", ageMinutes: 45 });
-    // Destaques vencidos/cancelados: pedido comum, não podem subir.
-    await seedRequest({
-      songTitle: "destaque-vencido",
-      ageMinutes: 90,
-      boost: { amount: 50, status: "expired" },
-    });
-    await seedRequest({
-      songTitle: "destaque-cancelado",
-      ageMinutes: 90,
-      boost: { amount: 99, status: "cancelled" },
-    });
-    // Destaques válidos, recém-criados: têm de vencer os velhos acima.
-    await seedRequest({
-      songTitle: "destaque-5",
-      ageMinutes: 1,
-      boost: { amount: 5, status: "promised" },
-    });
-    await seedRequest({
-      songTitle: "destaque-30",
-      ageMinutes: 1,
-      boost: { amount: 30, status: "paid" },
-    });
-    await seedRequest({
-      songTitle: "destaque-12",
-      ageMinutes: 1,
-      boost: { amount: 12, status: "awaiting_payment" },
-    });
+
+    /*
+     * 🔴 Tudo que NÃO está pago, recém-criado e com valor ALTO. Paga antes,
+     * destaca depois (28/set/2026): nenhum destes pode passar na frente dos
+     * pedidos comuns mais antigos. O valor alto está aqui de propósito — um
+     * `COALESCE("boostAmount", 0)` sem filtro de status os ordenaria pelo
+     * valor dentro dos pedidos comuns, e o teste falharia.
+     */
+    await seedRequest({ songTitle: "pix-nao-pago", ageMinutes: 1, boost: { amount: 99, status: "awaiting_payment" } });
+    await seedRequest({ songTitle: "promessa-antiga", ageMinutes: 1, boost: { amount: 80, status: "promised" } });
+    await seedRequest({ songTitle: "destaque-vencido", ageMinutes: 1, boost: { amount: 70, status: "expired" } });
+    await seedRequest({ songTitle: "destaque-cancelado", ageMinutes: 1, boost: { amount: 60, status: "cancelled" } });
+    await seedRequest({ songTitle: "a-reembolsar", ageMinutes: 1, boost: { amount: 55, status: "refund_pending" } });
+
+    // PAGOS, recém-criados: têm de vencer os velhos acima.
+    await seedRequest({ songTitle: "pago-5", ageMinutes: 1, boost: { amount: 5, status: "paid" } });
+    await seedRequest({ songTitle: "pago-30", ageMinutes: 1, boost: { amount: 30, status: "paid" } });
   });
 
   afterAll(async () => {
@@ -209,38 +202,25 @@ describe("Fila do músico — ordenação por destaque (e2e, Postgres real)", ()
     await prisma.$disconnect();
   });
 
-  it("põe os destaques no topo, do maior valor para o menor", async () => {
+  it("põe só os destaques PAGOS no topo, do maior valor para o menor", async () => {
     const titles = await titlesInOrder("desc");
-
-    expect(titles.slice(0, 3)).toEqual([
-      "destaque-30",
-      "destaque-12",
-      "destaque-5",
-    ]);
+    expect(titles.slice(0, 2)).toEqual(["pago-30", "pago-5"]);
   });
 
-  it("destaque recém-criado vence pedido antigo sem destaque", async () => {
+  it("destaque pago recém-criado vence pedido antigo sem destaque", async () => {
     const titles = await titlesInOrder("desc");
-
-    expect(titles.indexOf("destaque-5")).toBeLessThan(
-      titles.indexOf("sem-destaque-antigo"),
-    );
+    expect(titles.indexOf("pago-5")).toBeLessThan(titles.indexOf("sem-destaque-antigo"));
   });
 
-  /*
-   * `expired` e `cancelled` não destacam. O valor alto (R$50 e R$99) existe
-   * justamente para que um `COALESCE("boostAmount", 0)` sem o filtro de status
-   * os jogasse para o topo — e o teste falharia.
-   */
-  it("destaque vencido ou cancelado não sobe", async () => {
-    const titles = await titlesInOrder("desc");
-    const firstNonBoosted = titles.indexOf("destaque-vencido");
-
-    expect(firstNonBoosted).toBeGreaterThan(titles.indexOf("destaque-5"));
-    expect(titles.indexOf("destaque-cancelado")).toBeGreaterThan(
-      titles.indexOf("destaque-5"),
-    );
-  });
+  // 🔴 A brecha fechada: prometer/gerar PIX e não pagar não fura a fila.
+  it.each(["pix-nao-pago", "promessa-antiga", "destaque-vencido", "destaque-cancelado", "a-reembolsar"])(
+    "%s não passa na frente de pedido comum mais antigo",
+    async (title) => {
+      const titles = await titlesInOrder("desc");
+      expect(titles.indexOf(title)).toBeGreaterThan(titles.indexOf("sem-destaque-antigo"));
+      expect(titles.indexOf(title)).toBeGreaterThan(titles.indexOf("sem-destaque-medio"));
+    },
+  );
 
   /*
    * 🔴 O caso que a mudança de ordenação pode quebrar em silêncio: `sort_dir`
@@ -249,11 +229,6 @@ describe("Fila do músico — ordenação por destaque (e2e, Postgres real)", ()
    */
   it("sort_dir=asc não enterra os pedidos pagos", async () => {
     const titles = await titlesInOrder("asc");
-
-    expect(titles.slice(0, 3)).toEqual([
-      "destaque-30",
-      "destaque-12",
-      "destaque-5",
-    ]);
+    expect(titles.slice(0, 2)).toEqual(["pago-30", "pago-5"]);
   });
 });
