@@ -55,6 +55,19 @@ export type ChordSheetMetaOutput = {
   key: string | null;
 };
 
+/**
+ * Anotação livre do músico ancorada num ponto da música ("aqui entra o solo").
+ * Só é preenchida quando a folha vem de uma cifra pessoal (Bloco 8); o artefato
+ * canônico da IA nunca tem anotações.
+ */
+export type ChordSheetAnnotationOutput = {
+  atMs: number;
+  text: string;
+  sectionIndex: number;
+  lineIndex: number;
+  tokenIndex: number;
+};
+
 export type ChordSheetOutput = {
   music_library_id: string;
   musician_id: string;
@@ -64,5 +77,7 @@ export type ChordSheetOutput = {
   chords: ChordSheetChordsOutput;
   alignment: ChordSheetAlignmentOutput;
   meta: ChordSheetMetaOutput;
+  /** Presente apenas na visão pessoal — ver ChordSheetOverlayApplier. */
+  annotations?: ChordSheetAnnotationOutput[];
   updated_at: Date;
 };

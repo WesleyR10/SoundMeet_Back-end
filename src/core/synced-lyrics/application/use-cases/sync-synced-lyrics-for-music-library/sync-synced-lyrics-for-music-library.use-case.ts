@@ -95,7 +95,11 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
 
     if (!lyrics && !cachedNotFound) {
       try {
-        const fallback = await this.searchFallback(entity.title, entity.artist);
+        const fallback = await this.searchFallback(
+          entity.title,
+          entity.artist,
+          entity.duration_seconds,
+        );
         const lastError: any = fallback.lastError;
 
         lyrics = fallback.lyrics;
@@ -104,7 +108,7 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
           await this.cache.set(
             cachedKey,
             { found: true, lyrics, provider: lyricsProvider },
-            60 * 60,
+            60 * 60 * 1000, // TTL em ms (cache-manager v6+ / Keyv)
           );
         }
 
@@ -201,7 +205,7 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
             await this.cache.set(
               cachedKey,
               { found: true, lyrics, provider: lyricsProvider },
-              60 * 60,
+              60 * 60 * 1000, // TTL em ms (cache-manager v6+ / Keyv)
             );
           } else if (
             fallback.hadConsultError ||
@@ -216,35 +220,33 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
               },
             });
           } else {
+            // Genius entra só como "link-out" (Docs/ia-musical/folha-de-cifra.md:
+            // "Apenas metadados/anotações | Uso comercial de letra completa não
+            // permitido sem licença" — e a ordem de fallback documentada termina
+            // em "link-out para a página do provedor, sem trazer o texto", não
+            // num scrape). Não há evidência de licença Genius neste projeto
+            // (nenhuma env var de licenciamento), então o texto raspado da
+            // página NUNCA é usado pra montar/persistir uma LRC sintética —
+            // isso violaria a própria regra de compliance do projeto. Só a
+            // metadata (song_id/url/full_title) é capturada, como citação.
+            let geniusLinkOut: {
+              song_id: number;
+              url: string;
+              full_title?: string;
+            } | null = null;
+
             try {
               const plain = await this.genius?.findPlainLyrics({
                 title: entity.title,
                 artist: entity.artist,
               });
 
-              if (plain?.lyrics) {
-                const raw = this.plainLyricsToSyntheticLrc(plain.lyrics, {
-                  title: entity.title,
-                  artist: entity.artist,
-                  duration_seconds: null,
-                });
-
-                lyrics = {
-                  syncedLyrics: raw,
-                  meta: {
-                    genius_song_id: plain.meta.song_id,
-                    genius_url: plain.meta.url,
-                    genius_full_title: plain.meta.full_title,
-                    genius_primary_artist_name: plain.meta.primary_artist_name,
-                    matched_by: "genius:search+scrape",
-                  },
+              if (plain?.meta?.url) {
+                geniusLinkOut = {
+                  song_id: plain.meta.song_id,
+                  url: plain.meta.url,
+                  full_title: plain.meta.full_title,
                 };
-                lyricsProvider = "genius";
-                await this.cache.set(
-                  cachedKey,
-                  { found: true, lyrics, provider: lyricsProvider },
-                  60 * 60,
-                );
               }
             } catch (e: any) {
               this.debugLog("genius_error", {
@@ -258,11 +260,14 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
             }
 
             if (!lyrics) {
-              await this.cache.set(cachedKey, { found: false }, 5 * 60);
+              await this.cache.set(cachedKey, { found: false }, 5 * 60 * 1000);
               throw new EntityValidationError([
                 {
                   lrc_raw: ["Synced lyrics não encontrado para este título"],
                 },
+                ...(geniusLinkOut
+                  ? [{ external_link: [geniusLinkOut.url] }]
+                  : []),
               ]);
             }
           }
@@ -299,6 +304,16 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
 
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());
+    }
+
+    // upsertFromRaw() reseta lrc_quality_flags só com o que o parser LRC
+    // detecta (out_of_order etc.) — a checagem de duração acontece num nível
+    // acima (candidatos vindos do LRCLIB), por isso o flag é somado aqui,
+    // depois do upsert, em vez de dentro do parser.
+    if (lyrics.durationMismatch === true) {
+      if (!entity.lrc_quality_flags.includes("duration_mismatch")) {
+        entity.lrc_quality_flags.push("duration_mismatch");
+      }
     }
 
     await this.repo.update(entity);
@@ -362,8 +377,13 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
   private async searchFallback(
     title: string,
     artist: string,
+    desiredDurationSeconds: number | null,
   ): Promise<{
-    lyrics: { syncedLyrics: string; meta: Record<string, unknown> } | null;
+    lyrics: {
+      syncedLyrics: string;
+      meta: Record<string, unknown>;
+      durationMismatch: boolean;
+    } | null;
     hadConsultError: boolean;
     lastError: any | null;
   }> {
@@ -426,7 +446,12 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
         });
         continue;
       }
-      const best = this.pickBestLyrics(result, c.title, acceptableArtists);
+      const best = this.pickBestLyrics(
+        result,
+        c.title,
+        acceptableArtists,
+        desiredDurationSeconds,
+      );
       if (best) {
         this.debugLog("lrclib_best_pick", {
           original_title: title,
@@ -436,7 +461,13 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
         });
         const confirmed = await this.tryConfirmWithGet(best.meta);
         return {
-          lyrics: confirmed ?? best,
+          // confirmed é um re-fetch "get" do MESMO candidato já pontuado
+          // (mesmo trackName/artistName de best.meta) — o sinal de
+          // durationMismatch calculado em cima de best continua válido
+          // pra ele, tryConfirmWithGet não pontua nada por conta própria.
+          lyrics: confirmed
+            ? { ...confirmed, durationMismatch: best.durationMismatch }
+            : best,
           hadConsultError,
           lastError,
         };
@@ -474,7 +505,12 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
         });
         return { lyrics: null, hadConsultError, lastError };
       }
-      const best = this.pickBestLyrics(result, looseTitle, acceptableArtists);
+      const best = this.pickBestLyrics(
+        result,
+        looseTitle,
+        acceptableArtists,
+        desiredDurationSeconds,
+      );
       if (best) {
         this.debugLog("lrclib_best_pick", {
           original_title: title,
@@ -484,7 +520,13 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
         });
         const confirmed = await this.tryConfirmWithGet(best.meta);
         return {
-          lyrics: confirmed ?? best,
+          // confirmed é um re-fetch "get" do MESMO candidato já pontuado
+          // (mesmo trackName/artistName de best.meta) — o sinal de
+          // durationMismatch calculado em cima de best continua válido
+          // pra ele, tryConfirmWithGet não pontua nada por conta própria.
+          lyrics: confirmed
+            ? { ...confirmed, durationMismatch: best.durationMismatch }
+            : best,
           hadConsultError,
           lastError,
         };
@@ -501,11 +543,18 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
       });
       try {
         const result = await this.lrclib.searchLyrics({ q: looseTitle });
-        const best = this.pickBestLyrics(result, looseTitle, []);
+        const best = this.pickBestLyrics(
+          result,
+          looseTitle,
+          [],
+          desiredDurationSeconds,
+        );
         if (best) {
           const confirmed = await this.tryConfirmWithGet(best.meta);
           return {
-            lyrics: confirmed ?? best,
+            lyrics: confirmed
+              ? { ...confirmed, durationMismatch: best.durationMismatch }
+              : best,
             hadConsultError,
             lastError,
           };
@@ -882,18 +931,44 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
       .slice(0, 200);
   }
 
+  // Bucket de proximidade de duração idêntico ao de
+  // MatchSyncedLyricsOnLrclibUseCase.toCandidate — mesma pontuação pros dois
+  // fluxos que decidem "essa letra bate com essa faixa" (busca interativa de
+  // candidatos vs. auto-sync). Antes desta correção, só o auto-sync (aqui)
+  // não considerava duração — podia casar uma LRC de versão/duração bem
+  // diferente da faixa real (ex.: radio edit vs. ao vivo estendido) sem
+  // nenhuma penalidade, o que quebra a precisão dos anchors acorde↔letra
+  // rio abaixo (os startMs dos acordes vêm do áudio completo, não da LRC
+  // casada).
+  private durationScore(
+    desiredDurationSeconds: number | null,
+    itemDurationSeconds: number | null | undefined,
+  ): number {
+    if (desiredDurationSeconds === null) return 0.5;
+    const diff = Math.abs(desiredDurationSeconds - (itemDurationSeconds ?? 0));
+    if (diff <= 2) return 1;
+    if (diff <= 6) return 0.8;
+    if (diff <= 12) return 0.6;
+    return 0.3;
+  }
+
   private pickBestLyrics(
     items: Array<any>,
     desiredTitle: string,
     acceptableArtists: string[],
-  ): { syncedLyrics: string; meta: Record<string, unknown> } | null {
+    desiredDurationSeconds: number | null,
+  ): {
+    syncedLyrics: string;
+    meta: Record<string, unknown>;
+    durationMismatch: boolean;
+  } | null {
     const list = Array.isArray(items) ? items : [];
     const t = this.normalizeForCompare(desiredTitle);
     const artists = (acceptableArtists ?? []).map((a) =>
       this.normalizeForCompare(a),
     );
 
-    let best: { item: any; score: number } | null = null;
+    let best: { item: any; score: number; durationScore: number } | null = null;
 
     for (const item of list) {
       const hasSynced =
@@ -921,13 +996,22 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
         if (artistScore < minArtistScore) continue;
       }
 
-      const score = 0.72 * titleScore + 0.28 * artistScore + 0.05;
+      const durationScore = this.durationScore(
+        desiredDurationSeconds,
+        typeof item?.duration === "number" ? item.duration : null,
+      );
+      const score =
+        0.55 * titleScore + 0.35 * artistScore + 0.1 * durationScore;
 
-      if (!best || score > best.score) best = { item, score };
+      if (!best || score > best.score) best = { item, score, durationScore };
     }
 
     if (!best) return null;
     const picked = best.item;
+    // <=12s (durationScore >= 0.6) fica sem flag — só a cauda mais distante
+    // (o bucket "else 0.3") é sinalizada como possível descompasso real.
+    const durationMismatch =
+      desiredDurationSeconds !== null && best.durationScore <= 0.3;
 
     const raw =
       typeof picked?.syncedLyrics === "string" && picked.syncedLyrics.trim()
@@ -960,6 +1044,7 @@ export class SyncSyncedLyricsForMusicLibraryUseCase implements IUseCase<
         matched_by:
           raw === picked?.syncedLyrics ? "search" : "search:plain_synthetic",
       },
+      durationMismatch,
     };
   }
 

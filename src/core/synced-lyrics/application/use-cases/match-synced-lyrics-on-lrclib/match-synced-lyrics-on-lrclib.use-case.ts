@@ -105,13 +105,14 @@ export class MatchSyncedLyricsOnLrclibUseCase implements IUseCase<
         .sort((a, b) => b.score - a.score)
         .slice(0, maxResults);
 
+      // TTLs em MILISSEGUNDOS (cache-manager v6+ / Keyv)
       if (!candidates.length) {
-        await this.cache.set(cacheKey, { found: false }, 10 * 60);
+        await this.cache.set(cacheKey, { found: false }, 10 * 60 * 1000);
       } else {
         await this.cache.set(
           cacheKey,
           { found: true, items: candidates },
-          6 * 60 * 60,
+          6 * 60 * 60 * 1000,
         );
       }
 

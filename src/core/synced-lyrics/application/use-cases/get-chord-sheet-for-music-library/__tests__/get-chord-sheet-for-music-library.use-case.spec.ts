@@ -209,6 +209,68 @@ describe("GetChordSheetForMusicLibraryUseCase Unit Tests", () => {
     });
   });
 
+  // Prova, sem mockar nada em get-chord-sheet-for-music-library.use-case.ts,
+  // que o caminho "Modo A" (interval matching por words[] real) já funciona
+  // hoje e produz um anchor DIFERENTE do fallback proporcional por caractere
+  // acima — a única peça que faltava era alguém popular words[] com dado
+  // real (ver SyncedLyrics.applyWordAlignment, novo worker de alinhamento).
+  // Mesma linha/acorde do teste "weighted fraction" acima, mas agora com
+  // words[] real: lá o fallback proporcional escolhia "Hello" (índice 0,
+  // por peso de caractere); aqui, com timestamp real por palavra, o mesmo
+  // acorde em 600ms cai dentro do intervalo real de "world" (500-1000ms).
+  it("should anchor chords to the exact word interval when real word-level timestamps exist", async () => {
+    const input = {
+      musician_id: "550e8400-e29b-41d4-a716-446655440000",
+      music_library_id: "9366b7dc-2d71-4799-b91c-c64adb205106",
+    };
+
+    readModel.items[input.music_library_id] = {
+      id: input.music_library_id,
+      musicianId: input.musician_id,
+      title: "Hello",
+      artist: "World",
+      bpm: 120,
+      key: "C",
+      chords: {
+        timeline: [
+          { start_ms: 600, end_ms: 1000, chord: "G", confidence: 0.9 },
+        ],
+      },
+      structure_segments: null,
+      lrc_provider: "lrclib",
+      lrc_provider_meta: { score: 0.88 },
+      lrc_pipeline_version: 2,
+      lrc_version: 1,
+      lrc_quality_flags: ["word_aligned"],
+      lrc_normalized: {
+        lines: [
+          {
+            start_ms: 0,
+            end_ms: 2000,
+            text: "Hello world",
+            words: [
+              { start_ms: 0, end_ms: 500, text: "Hello" },
+              { start_ms: 500, end_ms: 1000, text: "world" },
+            ],
+          },
+        ],
+      },
+      updated_at: new Date(),
+    } as any;
+
+    const output = await useCase.execute(input);
+    const anchor = output.alignment.anchors["0"];
+    expect(anchor).toMatchObject({ sectionIndex: 0, lineIndex: 0 });
+
+    const line = output.lyrics.normalized.sections[0].lines[0];
+    expect(line.tokens[anchor.tokenIndex]).toMatchObject({
+      kind: "word",
+      text: "world",
+      startMs: 500,
+      endMs: 1000,
+    });
+  });
+
   it("should filter out low-confidence out-of-key chords when key is available", async () => {
     const input = {
       musician_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -317,5 +379,158 @@ describe("GetChordSheetForMusicLibraryUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
     const symbols = output.chords.timeline.map((t) => t.symbol);
     expect(symbols).toEqual(["Bbmaj7", "Cm7", "F/Bb"]);
+  });
+
+  /**
+   * Rede de proteção da unificação com ChordSymbol (Bloco 8E, etapa 2).
+   *
+   * Este use-case mantinha sua própria implementação de acordes — sete métodos
+   * privados que só entendiam 9 qualidades colon e só aplicavam a grafia
+   * enarmônica no ramo colon. O overlay da cifra pessoal usa ChordSymbol, que
+   * entende as duas notações. Duas grafias diferentes para o mesmo acorde em
+   * duas rotas é o defeito que estes testes existem para impedir.
+   *
+   * Duração ≥ 1000ms de propósito: filterChordsByHarmonicCoherence descarta
+   * acorde fora da escala que seja curto E pouco confiante, e o objetivo aqui é
+   * medir formatação, não filtragem.
+   */
+  describe("formatação de símbolo — caracterização", () => {
+    const MUSICIAN = "550e8400-e29b-41d4-a716-446655440000";
+
+    /** Roda o use-case com um timeline sintético e devolve só os símbolos. */
+    const symbolsFor = async (
+      chords: Array<{ chord: string }>,
+      key: string | null,
+    ): Promise<string[]> => {
+      const music_library_id = "9366b7dc-2d71-4799-b91c-c64adb2051ff";
+
+      readModel.items[music_library_id] = {
+        id: music_library_id,
+        musicianId: MUSICIAN,
+        title: "Hello",
+        artist: "World",
+        bpm: 120,
+        key,
+        chords: {
+          timeline: chords.map((c, i) => ({
+            start_ms: i * 2000,
+            end_ms: (i + 1) * 2000,
+            chord: c.chord,
+            confidence: 0.9,
+          })),
+        },
+        structure_segments: null,
+        lrc_provider: "lrclib",
+        lrc_provider_meta: null,
+        lrc_pipeline_version: 2,
+        lrc_version: 1,
+        lrc_quality_flags: [],
+        lrc_normalized: {
+          lines: [
+            {
+              start_ms: 0,
+              end_ms: chords.length * 2000,
+              text: "Hello world",
+            },
+          ],
+        },
+        updated_at: new Date(),
+      };
+
+      const output = await useCase.execute({
+        musician_id: MUSICIAN,
+        music_library_id,
+      });
+      return output.chords.timeline.map((t) => t.symbol);
+    };
+
+    it("converte as qualidades colon conhecidas", async () => {
+      expect(
+        await symbolsFor(
+          [
+            { chord: "C:maj" },
+            { chord: "A:min" },
+            { chord: "G:7" },
+            { chord: "D:min7" },
+            { chord: "F:maj7" },
+            { chord: "E:sus4" },
+          ],
+          "C",
+        ),
+      ).toEqual(["C", "Am", "G7", "Dm7", "Fmaj7", "Esus4"]);
+    });
+
+    /**
+     * As qualidades que a tabela antiga NÃO conhecia. O ChordFormer emite todas
+     * elas; antes da unificação vazavam cruas, com dois-pontos, para o app.
+     */
+    it("converte as qualidades colon que a tabela antiga não cobria", async () => {
+      expect(
+        await symbolsFor(
+          [
+            { chord: "C:dim7" },
+            { chord: "B:hdim7" },
+            { chord: "A:minmaj7" },
+            { chord: "D:min6" },
+            { chord: "F:maj6" },
+            { chord: "G:9" },
+          ],
+          "C",
+        ),
+      ).toEqual(["Cdim7", "Bm7(b5)", "Am(maj7)", "Dm6", "F6", "G9"]);
+    });
+
+    it("mantém a notação de sufixo puro (não-colon) intacta", async () => {
+      expect(
+        await symbolsFor(
+          [{ chord: "Cm7" }, { chord: "F7M" }, { chord: "G7" }],
+          "C",
+        ),
+      ).toEqual(["Cm7", "Fmaj7", "G7"]);
+    });
+
+    it("preserva o baixo invertido nas duas notações", async () => {
+      expect(
+        await symbolsFor([{ chord: "F:maj/A" }, { chord: "C/E" }], "C"),
+      ).toEqual(["F/A", "C/E"]);
+    });
+
+    it("descarta os marcadores de silêncio do worker", async () => {
+      expect(
+        await symbolsFor(
+          [{ chord: "C:maj" }, { chord: "N" }, { chord: "G:maj" }],
+          "C",
+        ),
+      ).toEqual(["C", "G"]);
+
+      expect(
+        await symbolsFor(
+          [{ chord: "C:maj" }, { chord: "N.C." }, { chord: "G:maj" }],
+          "C",
+        ),
+      ).toEqual(["C", "G"]);
+    });
+
+    /**
+     * A divergência que motivou a etapa: em tom bemol, o ramo colon já grafava
+     * Bb, mas o sufixo puro escapava sem preferência nenhuma — o ChordFormer
+     * emite sufixo, então na prática NENHUM acorde dele recebia a grafia certa.
+     */
+    it("aplica a preferência enarmônica do tom nas duas notações", async () => {
+      expect(await symbolsFor([{ chord: "A#:maj" }], "F")).toEqual(["Bb"]);
+      expect(await symbolsFor([{ chord: "A#m7" }], "F")).toEqual(["Bbm7"]);
+      expect(await symbolsFor([{ chord: "D#:min" }], "Bb")).toEqual(["Ebm"]);
+    });
+
+    it("usa sustenido quando o tom é sustenido", async () => {
+      expect(await symbolsFor([{ chord: "Bb:maj" }], "D")).toEqual(["A#"]);
+    });
+
+    /** Símbolo que não entendemos nunca some da cifra — vale para as duas rotas. */
+    it("preserva verbatim o símbolo não parseável", async () => {
+      expect(
+        await symbolsFor([{ chord: "C:zzz" }, { chord: "???" }], "C"),
+      ).toEqual(["C:zzz", "???"]);
+    });
   });
 });

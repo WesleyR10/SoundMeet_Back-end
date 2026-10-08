@@ -2,10 +2,14 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Notification } from "../../../../shared/domain/validators/notification";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import {
+  type ChordAccidentalPreference,
+  ChordSymbol,
+} from "../../../../shared/domain/value-objects/chord-symbol.vo";
 import { SyncedLyrics } from "../../../domain";
 import { IChordSheetReadModel } from "../../gateways/chord-sheet-read-model.interface";
+import { buildChordAlignment } from "../../services/chord-alignment.service";
 import {
-  ChordSheetAlignmentOutput,
   ChordSheetChordTimelineItemOutput,
   ChordSheetLyricsOutput,
   ChordSheetMetaOutput,
@@ -85,7 +89,7 @@ export class GetChordSheetForMusicLibraryUseCase implements IUseCase<
       item.structure_segments,
     );
     const chords = this.buildChords(item.chords, item.key);
-    const alignment = this.buildAlignment(lyrics, chords);
+    const alignment = buildChordAlignment(lyrics, chords);
     const meta = this.buildMeta(item);
 
     return {
@@ -442,129 +446,51 @@ export class GetChordSheetForMusicLibraryUseCase implements IUseCase<
     return this.filterChordsByHarmonicCoherence(filtered, key);
   }
 
+  /**
+   * Símbolo do worker → grafia que o músico lê.
+   *
+   * Delega ao ChordSymbol: as duas notações que circulam no sistema (colon do
+   * MIR e sufixo padrão/brasileiro) passam pelo MESMO parser que o overlay da
+   * cifra pessoal usa. Antes havia uma segunda implementação aqui, que conhecia
+   * 9 qualidades colon e só aplicava a grafia enarmônica no ramo colon — como o
+   * ChordFormer emite sufixo, na prática nenhum acorde dele recebia a grafia do
+   * tom, e a mesma música saía diferente em /chord-sheet e no fork pessoal.
+   */
   private formatChordSymbol(symbol: string, key: string | null): string {
     const raw = String(symbol ?? "").trim();
     if (!raw) return "";
 
-    const upper = raw.replace(/\s+/g, "").toUpperCase();
-    if (
-      upper === "N" ||
-      upper === "NC" ||
-      upper === "NOCHORD" ||
-      upper === "NO_CHORD"
-    ) {
-      return "N";
-    }
+    // Silêncio normalizado para "N": buildChords descarta por esse token, então
+    // devolver o texto cru faria "no_chord" escapar do filtro e virar acorde.
+    if (ChordSymbol.isNoChord(raw)) return "N";
 
-    const colon = this.parseColonChord(raw);
-    if (!colon) return raw;
+    const parsed = ChordSymbol.parse(raw);
+    // Símbolo que não entendemos fica VERBATIM — mesma regra do overlay
+    // applier. Um acorde exótico ainda é informação para o músico.
+    if (!parsed) return raw;
 
-    const root = this.applyEnharmonicPreferenceToRoot(colon.root, key);
-    const quality = colon.quality;
-
-    const qualitySuffix = this.mapColonQualityToSuffix(quality);
-    if (qualitySuffix === null) return raw;
-
-    const base = `${root}${qualitySuffix}`;
-
-    if (colon.bass) {
-      const bass = this.applyEnharmonicPreferenceToRoot(colon.bass, key);
-      return `${base}/${bass}`;
-    }
-    return base;
+    const preferred = this.preferredAccidentalForKey(key);
+    return preferred ? parsed.respell(preferred).toString() : parsed.toString();
   }
 
-  private parseColonChord(
-    value: string,
-  ): { root: string; quality: string; bass?: string } | null {
-    const raw = String(value ?? "").trim();
-    if (!raw) return null;
-    const m = raw.match(
-      /^([A-Ga-g])([#b]?)[ ]*:[ ]*([^\s/]+)(?:\s*\/\s*([A-Ga-g])([#b]?))?\s*$/i,
-    );
-    if (!m) return null;
-    const root = `${m[1].toUpperCase()}${m[2] ?? ""}`;
-    const quality = String(m[3] ?? "").trim();
-    const bass = m[4]
-      ? `${String(m[4] ?? "").toUpperCase()}${String(m[5] ?? "")}`
-      : undefined;
-    return { root, quality, ...(bass ? { bass } : {}) };
-  }
-
-  private mapColonQualityToSuffix(quality: string): string | null {
-    const q = String(quality ?? "")
-      .trim()
-      .toLowerCase();
-    if (!q) return null;
-
-    if (q === "maj" || q === "major") return "";
-    if (q === "min" || q === "minor") return "m";
-
-    if (q === "7") return "7";
-    if (q === "maj7" || q === "major7") return "maj7";
-    if (q === "min7" || q === "minor7" || q === "m7") return "m7";
-
-    if (q === "dim") return "dim";
-    if (q === "aug") return "aug";
-    if (q === "sus2") return "sus2";
-    if (q === "sus4" || q === "sus") return "sus4";
-
-    return null;
-  }
-
-  private applyEnharmonicPreferenceToRoot(
-    root: string,
-    key: string | null,
-  ): string {
-    const pc = this.noteToPitchClass(root);
-    if (pc === null) return root;
-    const preferFlats = this.preferFlatsForKey(key);
-    if (preferFlats === null) return root;
-    return this.pitchClassToNote(pc, preferFlats);
-  }
-
-  private pitchClassToNote(pc: number, preferFlats: boolean): string {
-    const sharp = [
-      "C",
-      "C#",
-      "D",
-      "D#",
-      "E",
-      "F",
-      "F#",
-      "G",
-      "G#",
-      "A",
-      "A#",
-      "B",
-    ];
-    const flat = [
-      "C",
-      "Db",
-      "D",
-      "Eb",
-      "E",
-      "F",
-      "Gb",
-      "G",
-      "Ab",
-      "A",
-      "Bb",
-      "B",
-    ];
-    const idx = ((pc % 12) + 12) % 12;
-    return preferFlats ? flat[idx] : sharp[idx];
-  }
-
-  private preferFlatsForKey(value: string | null): boolean | null {
+  /**
+   * A decisão de grafia mora AQUI, não no VO: ChordSymbol não conhece teoria de
+   * tonalidade de propósito e recebe a preferência já resolvida (mesmo contrato
+   * de resolveAccidentalPreference no ChordSheetOverlayApplier).
+   *
+   * null = tom ausente ou ilegível → preserva a grafia que veio do worker.
+   */
+  private preferredAccidentalForKey(
+    value: string | null,
+  ): ChordAccidentalPreference | null {
     if (!value || typeof value !== "string") return null;
     const raw = value.trim();
     if (!raw) return null;
-    if (/[b♭]/i.test(raw)) return true;
-    if (/[#♯]/.test(raw)) return false;
+    if (/[b♭]/i.test(raw)) return "flat";
+    if (/[#♯]/.test(raw)) return "sharp";
     const m = raw.match(/^([A-Ga-g])/);
     if (!m) return null;
-    return m[1].toUpperCase() === "F";
+    return m[1].toUpperCase() === "F" ? "flat" : "sharp";
   }
 
   private filterChordsByHarmonicCoherence(
@@ -599,7 +525,7 @@ export class GetChordSheetForMusicLibraryUseCase implements IUseCase<
     if (!m) return null;
     const letter = m[1].toUpperCase();
     const accidental = m[2] ?? "";
-    return this.noteToPitchClass(`${letter}${accidental}`);
+    return ChordSymbol.pitchClassOf(`${letter}${accidental}`);
   }
 
   private parseKeyIsMinor(value: string | null): boolean {
@@ -614,6 +540,12 @@ export class GetChordSheetForMusicLibraryUseCase implements IUseCase<
     return new Set(intervals.map((i) => (rootPc + i) % 12));
   }
 
+  /**
+   * Extrai só a fundamental, por PREFIXO — de propósito. O filtro de coerência
+   * harmônica roda sobre símbolos já formatados, inclusive os verbatim que o
+   * ChordSymbol não parseia; parsear o acorde inteiro aqui faria todo símbolo
+   * exótico escapar do filtro.
+   */
   private parseChordRootToPitchClass(symbol: string): number | null {
     const raw = String(symbol ?? "").trim();
     if (!raw) return null;
@@ -621,260 +553,7 @@ export class GetChordSheetForMusicLibraryUseCase implements IUseCase<
     if (!m) return null;
     const letter = m[1].toUpperCase();
     const accidental = m[2] ?? "";
-    return this.noteToPitchClass(`${letter}${accidental}`);
-  }
-
-  private noteToPitchClass(note: string): number | null {
-    const n = String(note ?? "")
-      .trim()
-      .replace(/\s+/g, "")
-      .toUpperCase();
-    if (!n) return null;
-
-    const base: Record<string, number> = {
-      C: 0,
-      D: 2,
-      E: 4,
-      F: 5,
-      G: 7,
-      A: 9,
-      B: 11,
-    };
-
-    const m = n.match(/^([A-G])([#B])?$/);
-    if (!m) return null;
-
-    const letter = m[1];
-    const accidental = m[2] ?? "";
-    const pc = base[letter];
-    if (typeof pc !== "number") return null;
-
-    const delta = accidental === "#" ? 1 : accidental === "B" ? -1 : 0;
-    return (pc + delta + 12) % 12;
-  }
-
-  private buildAlignment(
-    lyrics: ChordSheetLyricsOutput,
-    chords: ChordSheetChordTimelineItemOutput[],
-  ): ChordSheetAlignmentOutput {
-    const anchors: ChordSheetAlignmentOutput["anchors"] = {};
-
-    const sections = lyrics.normalized.sections ?? [];
-    const sectionLineTimings = sections.map((s) =>
-      (s.lines ?? []).map((l) => this.computeLineTiming(l)),
-    );
-
-    const sectionRanges = sections.map((s, idx) => {
-      const lines = s.lines ?? [];
-      const timings = sectionLineTimings[idx] ?? [];
-      const startFromLines = Math.min(
-        ...timings.map((t) => t.startMs).filter((n) => Number.isFinite(n)),
-      );
-      const endFromLines = Math.max(
-        ...timings
-          .map((t) => t.endMs)
-          .filter(
-            (n): n is number => typeof n === "number" && Number.isFinite(n),
-          ),
-      );
-      return {
-        startMs:
-          typeof s.startMs === "number"
-            ? s.startMs
-            : Number.isFinite(startFromLines)
-              ? startFromLines
-              : 0,
-        endMs:
-          typeof s.endMs === "number"
-            ? s.endMs
-            : Number.isFinite(endFromLines)
-              ? endFromLines
-              : undefined,
-        hasLines: lines.length > 0,
-      };
-    });
-
-    for (let chordIndex = 0; chordIndex < chords.length; chordIndex++) {
-      const chord = chords[chordIndex];
-      const sectionIndex = this.pickSectionIndexForChord(
-        chord.startMs,
-        sectionRanges,
-      );
-      const lines = sections[sectionIndex]?.lines ?? [];
-      const lineTimings = sectionLineTimings[sectionIndex] ?? [];
-
-      const { lineIndex, tokenIndex } = this.findAnchorForChord(
-        chord.startMs,
-        lines,
-        lineTimings,
-      );
-
-      anchors[String(chordIndex)] = {
-        sectionIndex,
-        lineIndex,
-        tokenIndex,
-      };
-    }
-
-    return { anchors };
-  }
-
-  private findAnchorForChord(
-    chordStartMs: number,
-    lines: Array<{ tokens: ChordSheetTokenOutput[] }>,
-    timings: Array<{ startMs: number; endMs?: number }>,
-  ): { lineIndex: number; tokenIndex: number } {
-    if (lines.length === 0) {
-      return { lineIndex: 0, tokenIndex: 0 };
-    }
-
-    let lo = 0;
-    let hi = timings.length - 1;
-    let best = 0;
-    while (lo <= hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      if (timings[mid].startMs <= chordStartMs) {
-        best = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-
-    const line = lines[best];
-    const wordIndices = line.tokens
-      .map((t, idx) => ({ t, idx }))
-      .filter(({ t }) => t.kind === "word")
-      .map(({ idx }) => idx);
-    const nonSpaceIndices = line.tokens
-      .map((t, idx) => ({ t, idx }))
-      .filter(({ t }) => t.kind !== "space")
-      .map(({ idx }) => idx);
-
-    if (nonSpaceIndices.length === 0) {
-      return { lineIndex: best, tokenIndex: 0 };
-    }
-
-    const candidateIndices =
-      wordIndices.length > 0 ? wordIndices : nonSpaceIndices;
-    const lineStartMs = timings[best].startMs;
-    const lineEndMs = timings[best].endMs;
-
-    const timedCandidates = candidateIndices
-      .map((idx) => ({ idx, token: line.tokens[idx] }))
-      .filter(({ token }) => typeof token.startMs === "number")
-      .map(({ idx, token }) => ({
-        idx,
-        startMs: token.startMs as number,
-        endMs:
-          typeof token.endMs === "number" ? (token.endMs as number) : undefined,
-      }))
-      .sort((a, b) => a.startMs - b.startMs);
-
-    if (timedCandidates.length === 1) {
-      return { lineIndex: best, tokenIndex: timedCandidates[0].idx };
-    }
-
-    const hasWordLevelTimings =
-      timedCandidates.length > 1 &&
-      new Set(timedCandidates.map((c) => c.startMs)).size > 1;
-
-    if (timedCandidates.length > 0 && hasWordLevelTimings) {
-      let bestToken = timedCandidates[0].idx;
-      for (let i = 0; i < timedCandidates.length; i++) {
-        const curr = timedCandidates[i];
-        const next = timedCandidates[i + 1];
-        const end =
-          typeof curr.endMs === "number"
-            ? curr.endMs
-            : typeof next?.startMs === "number"
-              ? next.startMs
-              : undefined;
-
-        if (curr.startMs <= chordStartMs) {
-          bestToken = curr.idx;
-        }
-
-        if (
-          curr.startMs <= chordStartMs &&
-          typeof end === "number" &&
-          chordStartMs < end
-        ) {
-          bestToken = curr.idx;
-          break;
-        }
-      }
-      return { lineIndex: best, tokenIndex: bestToken };
-    }
-
-    if (
-      typeof lineEndMs === "number" &&
-      Number.isFinite(lineEndMs) &&
-      lineEndMs > lineStartMs &&
-      chordStartMs >= lineStartMs
-    ) {
-      const fraction = Math.max(
-        0,
-        Math.min(
-          0.999,
-          (chordStartMs - lineStartMs) / (lineEndMs - lineStartMs),
-        ),
-      );
-      const weighted = this.pickTokenIndexByWeightedFraction(
-        line.tokens,
-        candidateIndices,
-        fraction,
-      );
-      return { lineIndex: best, tokenIndex: weighted };
-    }
-
-    return {
-      lineIndex: best,
-      tokenIndex: candidateIndices[0] ?? nonSpaceIndices[0],
-    };
-  }
-
-  private pickTokenIndexByWeightedFraction(
-    tokens: ChordSheetTokenOutput[],
-    indices: number[],
-    fraction: number,
-  ): number {
-    const weights = indices.map((idx) => {
-      const t = tokens[idx];
-      if (t.kind === "word") return Math.max(1, String(t.text).length);
-      if (t.kind === "punct") return 0.5;
-      return 0;
-    });
-    const total = weights.reduce((sum, w) => sum + w, 0);
-    if (total <= 0) return indices[0] ?? 0;
-    const target = Math.max(0, Math.min(total - 0.0001, fraction * total));
-    let acc = 0;
-    for (let i = 0; i < weights.length; i++) {
-      acc += weights[i];
-      if (acc >= target) return indices[i];
-    }
-    return indices[indices.length - 1] ?? 0;
-  }
-
-  private computeLineTiming(line: { tokens: ChordSheetTokenOutput[] }): {
-    startMs: number;
-    endMs?: number;
-  } {
-    let start = Number.POSITIVE_INFINITY;
-    let end = Number.NEGATIVE_INFINITY;
-    for (const t of line.tokens) {
-      if (typeof t.startMs === "number" && Number.isFinite(t.startMs)) {
-        start = Math.min(start, t.startMs);
-      }
-      if (typeof t.endMs === "number" && Number.isFinite(t.endMs)) {
-        end = Math.max(end, t.endMs);
-      }
-    }
-
-    if (!Number.isFinite(start)) return { startMs: 0 };
-    if (Number.isFinite(end) && end > start)
-      return { startMs: start, endMs: end };
-    return { startMs: start };
+    return ChordSymbol.pitchClassOf(`${letter}${accidental}`);
   }
 
   private normalizeChordSymbol(value: string): string {
@@ -981,42 +660,6 @@ export class GetChordSheetForMusicLibraryUseCase implements IUseCase<
           ? seg.startMs - startMs
           : startMs > seg.endMs
             ? startMs - seg.endMs
-            : 0;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = i;
-      }
-    }
-
-    return best;
-  }
-
-  private pickSectionIndexForChord(
-    chordStartMs: number,
-    ranges: Array<{ startMs: number; endMs?: number; hasLines: boolean }>,
-  ): number {
-    if (ranges.length === 0) return 0;
-
-    for (let i = 0; i < ranges.length; i++) {
-      const r = ranges[i];
-      if (!r.hasLines) continue;
-      if (typeof r.endMs === "number") {
-        if (chordStartMs >= r.startMs && chordStartMs < r.endMs) return i;
-      } else {
-        if (chordStartMs >= r.startMs) return i;
-      }
-    }
-
-    let best = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < ranges.length; i++) {
-      const r = ranges[i];
-      const end = typeof r.endMs === "number" ? r.endMs : r.startMs;
-      const distance =
-        chordStartMs < r.startMs
-          ? r.startMs - chordStartMs
-          : chordStartMs > end
-            ? chordStartMs - end
             : 0;
       if (distance < bestDistance) {
         bestDistance = distance;

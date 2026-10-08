@@ -43,6 +43,13 @@ export type SyncedLyricsConstructorProps = {
   lrc_coverage_ms?: number | null;
   lrc_has_word_timestamps?: boolean;
   lrc_last_synced_at?: Date | null;
+  // Leitura-somente, projetado de music_library.duration_seconds — este
+  // agregado NÃO escreve esse campo (não está em
+  // SYNCED_LYRICS_SOURCE_OF_TRUTH_POLICY.projection_fields, não sai em
+  // toModel()). Existe só pra permitir pontuar candidatos de LRC por
+  // proximidade de duração (ver pickBestLyrics no use-case de sync) sem
+  // acoplar o agregado a music-library via um lookup separado.
+  duration_seconds?: number | null;
   created_at?: Date;
   updated_at?: Date;
 };
@@ -59,6 +66,13 @@ export type SyncedLyricsUpsertFromRawCommand = {
   provider: string;
   provider_meta?: Record<string, unknown> | null;
   pipeline_version?: number;
+};
+
+export type SyncedLyricsApplyWordAlignmentCommand = {
+  lines: Array<{
+    index: number;
+    words: { text: string; start_ms: number; end_ms: number | null }[];
+  }>;
 };
 
 export class SyncedLyricsId extends Uuid {}
@@ -81,6 +95,7 @@ export class SyncedLyrics extends AggregateRoot {
   lrc_coverage_ms: number | null;
   lrc_has_word_timestamps: boolean;
   lrc_last_synced_at: Date | null;
+  duration_seconds: number | null;
   created_at: Date;
   updated_at: Date;
 
@@ -103,6 +118,7 @@ export class SyncedLyrics extends AggregateRoot {
     this.lrc_coverage_ms = props.lrc_coverage_ms ?? null;
     this.lrc_has_word_timestamps = props.lrc_has_word_timestamps ?? false;
     this.lrc_last_synced_at = props.lrc_last_synced_at ?? null;
+    this.duration_seconds = props.duration_seconds ?? null;
 
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
@@ -140,6 +156,52 @@ export class SyncedLyrics extends AggregateRoot {
     this.lrc_coverage_ms = parsed.ok.quality.coverage_ms;
     this.lrc_has_word_timestamps = parsed.ok.quality.has_word_timestamps;
     this.lrc_last_synced_at = now;
+    this.lrc_version += 1;
+    this.updated_at = now;
+
+    this.validate();
+  }
+
+  // Aplica timestamps reais por palavra (forced-alignment, ver worker de
+  // IA / Docs/ia-musical/folha-de-cifra.md "Modo A") por cima de um
+  // lrc_normalized já existente — não cria letra do zero, só enriquece.
+  // Best-effort por natureza: se o alinhamento não conseguiu nenhuma linha
+  // (command.lines vazio ou todas com words:[]), é um no-op silencioso, não
+  // um erro — quem chama (ProcessLyricsAlignmentJobUseCase) decide separado
+  // se isso é falha de job.
+  applyWordAlignment(
+    command: SyncedLyricsApplyWordAlignmentCommand,
+    now: Date,
+  ): void {
+    if (!this.lrc_normalized) {
+      this.notification.addError(
+        "lrc_normalized is required before applying word alignment",
+        "lrc_normalized",
+      );
+      return;
+    }
+
+    const wordsByIndex = new Map(
+      command.lines
+        .filter((l) => l.words.length > 0)
+        .map((l) => [l.index, l.words]),
+    );
+    if (wordsByIndex.size === 0) return;
+
+    const lines = this.lrc_normalized.lines.map((line, index) => {
+      const words = wordsByIndex.get(index);
+      return words ? { ...line, words } : line;
+    });
+
+    this.lrc_normalized = {
+      ...this.lrc_normalized,
+      meta: { ...this.lrc_normalized.meta, has_word_timestamps: true },
+      lines,
+    };
+    this.lrc_has_word_timestamps = true;
+    if (!this.lrc_quality_flags.includes("word_aligned")) {
+      this.lrc_quality_flags = [...this.lrc_quality_flags, "word_aligned"];
+    }
     this.lrc_version += 1;
     this.updated_at = now;
 
@@ -235,6 +297,7 @@ export class SyncedLyrics extends AggregateRoot {
       lrc_coverage_ms: this.lrc_coverage_ms,
       lrc_has_word_timestamps: this.lrc_has_word_timestamps,
       lrc_last_synced_at: this.lrc_last_synced_at,
+      duration_seconds: this.duration_seconds,
       created_at: this.created_at,
       updated_at: this.updated_at,
     };

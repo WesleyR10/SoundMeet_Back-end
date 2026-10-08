@@ -15,6 +15,14 @@ export type SyncedLyricsNormalized = {
     start_ms: number;
     end_ms: number | null;
     text: string;
+    // Preenchido por SyncedLyrics.applyWordAlignment() (aggregate) depois
+    // de um forced-alignment real (worker de IA, ver
+    // Docs/ia-musical/folha-de-cifra.md "Modo A") — nunca pelo LrcParser, que
+    // só enxerga timestamps de LINHA. Quando presente, é exatamente o
+    // formato que get-chord-sheet-for-music-library.use-case.ts já sabe
+    // consumir (coerceLineWords) pra ancorar acordes por palavra em vez de
+    // por fração proporcional de caractere.
+    words?: { text: string; start_ms: number; end_ms: number | null }[];
   }[];
 };
 

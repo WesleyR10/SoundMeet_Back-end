@@ -65,6 +65,7 @@ export class SyncedLyricsModelMapper {
       lrc_coverage_ms: model.lrc_coverage_ms ?? null,
       lrc_has_word_timestamps: model.lrc_has_word_timestamps ?? false,
       lrc_last_synced_at: model.lrc_last_synced_at ?? null,
+      duration_seconds: model.duration_seconds ?? null,
       created_at: model.created_at,
       updated_at: model.updated_at,
     });

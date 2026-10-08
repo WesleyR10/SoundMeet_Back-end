@@ -30,7 +30,7 @@ import { SyncedLyricsRateLimitGuard } from "./synced-lyrics-rate-limit.guard";
     SYNCED_LYRICS_PROVIDERS.USE_CASES.GET_CHORD_SHEET_FOR_MUSIC_LIBRARY_USE_CASE
       .provide,
     // Consumido por ai-cifra-module (Process/CompleteAiCifraAnalysisJobUseCase)
-    // -- ver Docs/AI-musician/chord-sheet.md "Alinhamento forçado (MMS_FA)".
+    // -- ver Docs/ia-musical/folha-de-cifra.md "Alinhamento forçado (MMS_FA)".
     SYNCED_LYRICS_PROVIDERS.USE_CASES
       .ALIGN_SYNCED_LYRICS_WORD_TIMESTAMPS_USE_CASE.provide,
   ],
