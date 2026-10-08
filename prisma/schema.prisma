@@ -97,21 +97,24 @@ enum MusicRequestStatus {
 
 /// Ciclo do "destaque" de um pedido musical (gorjeta acoplada ao pedido).
 ///
-/// 🔴 A cobrança só nasce no ACEITE do músico — antes disso o que existe é uma
-/// PROMESSA do fã, e nenhum centavo se moveu. É o que dispensa qualquer
-/// estorno: recusa em `promised` vira `cancelled` e acabou.
+/// 🔴 PAGA ANTES, destaca DEPOIS (28/set/2026): o PIX nasce no PEDIDO e só
+/// `paid` sobe na fila. Recusa depois de pago vira `refund_pending` — o
+/// reembolso de fato é tarefa aberta (Docs/funcionalidades/reembolso-do-destaque-pago.md).
 enum RequestBoostStatus {
-  /// Fã prometeu o valor; o músico ainda não respondeu. Já destaca a fila.
+  /// Transitório (só dentro da criação) ou linha do modelo antigo. NÃO destaca.
   promised
-  /// Músico aceitou e a cobrança PIX foi criada. Continua destacando.
+  /// PIX criado junto com o pedido; o fã ainda não pagou. NÃO destaca.
   awaiting_payment
-  /// Webhook confirmou o pagamento. É só aqui que a dedicatória vai a público.
+  /// Webhook confirmou. Destaca a fila e a dedicatória vai a público.
   paid
-  /// A janela de pagamento venceu sem confirmação. NÃO destaca mais.
+  /// A janela venceu sem pagamento. Pedido comum. NÃO destaca.
   expired
-  /// Músico recusou antes do aceite, ou a cobrança não pôde ser criada.
-  /// NÃO destaca mais.
+  /// Pedido recusado antes do pagamento (ou promessa do modelo antigo).
+  /// NÃO destaca.
   cancelled
+  /// Entrou dinheiro e o pedido foi recusado: precisa voltar ao fã.
+  /// Terminal até o reembolso existir.
+  refund_pending
 }
 
 enum SubscriptionStatus {
@@ -404,7 +407,7 @@ model MusicLibrary {
   /// é o que separa estúdio de ao vivo, remaster e remix — mesmo sinal e mesma
   /// fórmula que `synced-lyrics` usa para escolher a LRC certa.
   ///
-  /// Ver `Docs/AI-musician/spotify-track-matching.md`.
+  /// Ver `Docs/funcionalidades/casamento-de-faixa-no-spotify.md`.
   spotifyTrackId    String?
   /// 0..1 — quanto o candidato casou. Guardado porque o custo de errar é
   /// diferente por caminho: abrir no Spotify tolera score médio (o fã vê e
@@ -537,6 +540,7 @@ model Event {
   musicians     EventMusician[]
   requests      MusicRequest[]
   attendees     EventAttendee[]
+  notification_deliveries NotificationDelivery[]
   bookings      Booking[]
   inquiries     Inquiry[]
   tips          Tip[]
@@ -848,10 +852,16 @@ model Audience {
   email_token            String?
   email_token_hash       String?
   email_token_expires_at DateTime?
+  // Push do público (out/2026) — espelho de Musician.push_token: último
+  // aparelho registrado sobrescreve. Nunca sai em presenter.
+  push_token             String?
+  push_token_platform    String?
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
   // Relacionamentos
+  follows                 Follow[]
+  notification_deliveries NotificationDelivery[]
   requests       MusicRequest[]
   votes          RequestVote[]
   tips           Tip[]
@@ -906,6 +916,12 @@ model EventAttendee {
   joinedAt   DateTime  @default(now())
   leftAt     DateTime?
   is_active  Boolean   @default(true)
+  // Presença verificada (out/2026). NUNCA a coordenada do fã — só o veredito:
+  // quando, como ("geo" | "venue_without_coords" | "establishment") e a
+  // distância arredondada. Nulos nas linhas anteriores à verificação.
+  presenceVerifiedAt DateTime?
+  presenceMethod     String?
+  presenceDistanceM  Int?
 
   event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
@@ -1628,9 +1644,10 @@ model Repertoire {
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
-  musician Musician            @relation(fields: [musician_id], references: [id], onDelete: Cascade)
-  songs    RepertoireSong[]
-  invitees RepertoireInvitee[]
+  musician     Musician            @relation(fields: [musician_id], references: [id], onDelete: Cascade)
+  songs        RepertoireSong[]
+  invitees     RepertoireInvitee[]
+  performances Performance[]
 
   @@index([musician_id])
   @@map("repertoires")
@@ -1844,7 +1861,7 @@ model Contract {
 /// Registro de execução ao vivo (F0) — a primitiva que faltava para o sistema
 /// saber o que o músico TOCOU, e não apenas o que ele sabe tocar.
 ///
-/// Ver `Docs/performance/live-performance.md`. Três read models dependem desta
+/// Ver `Docs/funcionalidades/apresentacao-ao-vivo-set-e-relatorio.md`. Três read models dependem desta
 /// tabela: relatório pós-show (F6), currículo verificado (F4) e setlist
 /// inteligente (F5).
 ///
@@ -1865,10 +1882,16 @@ model Performance {
   status          PerformanceStatus @default(live)
   startedAt       DateTime          @default(now())
   endedAt         DateTime?
+  /// A setlist PROGRAMADA para esta noite — um repertório do próprio músico,
+  /// escolhido ao subir ao palco (ou trocado com o set no ar). Opcional: set
+  /// sem setlist é o show de improviso, e continua válido. `SetNull` porque
+  /// apagar o repertório depois não pode apagar a prova de que o show existiu.
+  repertoireId    String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
 
   event         Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  repertoire    Repertoire?     @relation(fields: [repertoireId], references: [id], onDelete: SetNull)
   establishment Establishment   @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   musician      Musician        @relation(fields: [musicianId], references: [id], onDelete: Cascade)
   band          Band?           @relation(fields: [bandId], references: [id], onDelete: SetNull)
@@ -1884,6 +1907,7 @@ model Performance {
   @@index([musicianId, startedAt])
   @@index([establishmentId, startedAt])
   @@index([eventId, status])
+  @@index([repertoireId])
   @@map("performances")
 }
 
@@ -1968,4 +1992,50 @@ model Indication {
   @@index([establishment_id, status, created_at])
   @@index([musician_id, created_at])
   @@map("indications")
+}
+
+/// Fã seguindo um músico ou uma casa, para saber dos próximos shows (Bloco 19.B).
+model Follow {
+  id String @id @default(uuid())
+
+  audience_id String
+  /// "musician" | "establishment". Sem FK para o alvo: é polimórfico, e quem
+  /// valida a existência (e a visibilidade — `open_to_gigs`) é o use-case.
+  target_type String
+  target_id   String
+
+  /// Desliga os avisos deste vínculo sem desfazê-lo.
+  notifications_enabled Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  audience Audience @relation(fields: [audience_id], references: [id], onDelete: Cascade)
+
+  /// Um vínculo por (fã, alvo) NO BANCO — dois toques simultâneos furam a
+  /// checagem só na aplicação.
+  @@unique([audience_id, target_type, target_id])
+  /// Serve a contagem e o envio por alvo (o acesso dominante do disparo).
+  @@index([target_type, target_id, audience_id])
+  @@map("follows")
+}
+
+/// Ledger de avisos a seguidores: quem já foi avisado de quê, por evento.
+/// A unique é a dedupe — seguir o músico E a casa do mesmo show não dobra o
+/// push, e um handler que reentra não reenvia.
+model NotificationDelivery {
+  id String @id @default(uuid())
+
+  audience_id String
+  /// "show_announced" | "artist_confirmed" | "started_now" | "day_reminder" | "show_cancelled"
+  kind        String
+  event_id    String
+  sent_at     DateTime @default(now())
+
+  audience Audience @relation(fields: [audience_id], references: [id], onDelete: Cascade)
+  event    Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([audience_id, kind, event_id])
+  @@index([event_id, kind])
+  @@map("notification_deliveries")
 }
