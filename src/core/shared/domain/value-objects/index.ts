@@ -34,6 +34,9 @@ export * from "./badge.vo";
 // Social Links Value Object
 export * from "./social-links.vo";
 
+// External URL Value Object (INP-2)
+export * from "./external-url.vo";
+
 // Location Value Object
 export * from "./location.vo";
 

@@ -94,6 +94,8 @@ describe("SearchParams Unit Tests", () => {
     ).toBe(props.expected);
   });
 
+  // Escalares continuam sendo coagidos a string (comportamento herdado do FC3,
+  // onde Filter é uma string de busca livre).
   test.each([
     { filter: null, expected: null },
     { filter: undefined, expected: null },
@@ -104,7 +106,6 @@ describe("SearchParams Unit Tests", () => {
     { filter: 5.5, expected: "5.5" },
     { filter: true, expected: "true" },
     { filter: false, expected: "false" },
-    { filter: {}, expected: "[object Object]" },
     { filter: "field", expected: "field" },
   ])("filter props %p", (props) => {
     const params = new SearchParams();
@@ -113,5 +114,24 @@ describe("SearchParams Unit Tests", () => {
     expect(new SearchParams({ filter: props.filter as any }).filter).toBe(
       props.expected,
     );
+  });
+
+  /**
+   * Objetos NÃO podem ser stringificados.
+   *
+   * Este caso afirmava `{}` → "[object Object]", codificando o bug que vazou
+   * dados entre usuários: com o filtro virando string, o repositório lê
+   * `params.filter?.musician_id` como undefined, monta `where: {}` e devolve o
+   * conteúdo de todos. Aconteceu em repertoire (ativo), transaction e
+   * musician-wallet (latentes) — corrigido em 29/jul/2026.
+   */
+  test("preserva filtro-objeto em vez de stringificar", () => {
+    expect(new SearchParams({ filter: {} as any }).filter).toEqual({});
+
+    const filter = { musician_id: "musician-1", name: "Setlist" };
+    const params = new SearchParams({ filter: filter as any });
+
+    expect(params.filter).toEqual(filter);
+    expect((params.filter as any).musician_id).toBe("musician-1");
   });
 });

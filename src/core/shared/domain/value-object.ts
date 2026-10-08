@@ -1,4 +1,4 @@
-import isEqual = require("lodash/isEqual");
+import { isDeepStrictEqual } from "node:util";
 
 export abstract class ValueObject {
   public equals(vo: this): boolean {
@@ -10,6 +10,6 @@ export abstract class ValueObject {
       return false;
     }
 
-    return isEqual(vo, this);
+    return isDeepStrictEqual(vo, this);
   }
 }

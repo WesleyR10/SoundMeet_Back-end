@@ -1,4 +1,5 @@
 export * from "./aggregate-root";
+export * from "./brazil-timezone";
 export * from "./date-time.service";
 export * from "./either";
 export * from "./entity";

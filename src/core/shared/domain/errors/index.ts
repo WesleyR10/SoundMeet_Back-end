@@ -1,5 +1,6 @@
 export * from "./conflict.error";
 export * from "./domain.error";
+export * from "./email-not-verified.error";
 export * from "./invalid-argument.error";
 export * from "./invalid-date-time.error";
 export * from "./invalid-operation.error";

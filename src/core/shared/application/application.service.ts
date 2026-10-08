@@ -28,15 +28,21 @@ export class ApplicationService {
     this.uow.rollback();
   }
 
+  // Todo o fluxo roda dentro de `uow.do()` para que start/callback/finish
+  // compartilhem o mesmo escopo transacional. A UoW do Prisma guarda transação
+  // e aggregate roots em AsyncLocalStorage: fora do `do()` não existe store, e
+  // `finish()` não enxergaria os agregados registrados pelo callback.
   async run<T>(callback: () => Promise<T>): Promise<T> {
-    await this.start();
-    try {
-      const result = await callback();
-      await this.finish();
-      return result;
-    } catch (error) {
-      await this.fail();
-      throw error;
-    }
+    return this.uow.do(async () => {
+      await this.start();
+      try {
+        const result = await callback();
+        await this.finish();
+        return result;
+      } catch (error) {
+        await this.fail();
+        throw error;
+      }
+    });
   }
 }

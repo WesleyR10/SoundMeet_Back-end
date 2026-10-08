@@ -1,6 +1,7 @@
 export * from "./application.service";
 export * from "./clock.interface";
 export * from "./domain-event-handler.interface";
+export * from "./identity-claims.interface";
 export * from "./message-broker.interface";
 export * from "./pagination-output";
 export * from "./search-input";

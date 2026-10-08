@@ -23,8 +23,7 @@ describe("geo.utils", () => {
       const pointLat = lat + (radius / 111.32) * Math.cos(rad);
       const pointLng =
         lng +
-        ((radius / (111.32 * Math.cos((lat * Math.PI) / 180))) *
-          Math.sin(rad));
+        (radius / (111.32 * Math.cos((lat * Math.PI) / 180))) * Math.sin(rad);
       expect(pointLat).toBeGreaterThanOrEqual(box.min_lat - 1e-9);
       expect(pointLat).toBeLessThanOrEqual(box.max_lat + 1e-9);
       expect(pointLng).toBeGreaterThanOrEqual(box.min_lng - 1e-9);

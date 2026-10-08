@@ -84,10 +84,27 @@ export class SearchParams<Filter = string> extends ValueObject {
     return this._filter;
   }
 
+  /**
+   * ⚠️ Filtro-objeto EXIGE override nesta subclasse.
+   *
+   * Herdado do FC3, onde `Filter` é uma string de busca livre — por isso o
+   * `${value}`. Todo `Filter` deste projeto é objeto, e um objeto stringificado
+   * vira "[object Object]": o repositório lê `params.filter?.musician_id` como
+   * undefined, monta `where: {}` e devolve os dados de TODOS os usuários. O
+   * ownership guard autoriza o dono da URL, mas não escopa o resultado — então
+   * o vazamento passa despercebido.
+   *
+   * Aconteceu de fato em `repertoire` (vazamento ativo) e em `transaction` /
+   * `musician-wallet` (latente), corrigidos em 29/jul/2026. Objetos agora
+   * passam intactos; o override na subclasse continua sendo o padrão, porque é
+   * ele que faz o whitelist e a coerção dos campos — ver
+   * `ai-cifra-upload.repository.ts` ou `personal-chord-sheet.repository.ts`.
+   */
   protected set filter(value: Filter | null) {
-    this._filter =
-      value === null || value === undefined || (value as unknown) === ""
-        ? null
-        : (`${value}` as Filter);
+    if (value === null || value === undefined || (value as unknown) === "") {
+      this._filter = null;
+      return;
+    }
+    this._filter = typeof value === "object" ? value : (`${value}` as Filter);
   }
 }

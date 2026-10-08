@@ -1,4 +1,5 @@
 import { ValueObject } from "../value-object";
+import { inspectExternalUrl } from "./external-url.vo";
 
 export type SocialPlatform =
   | "instagram"
@@ -77,13 +78,19 @@ export class SocialLinks extends ValueObject {
     }
   }
 
+  /*
+   * 🔴 INP-2: `new URL(url)` aceitava QUALQUER esquema — o `try/catch` só
+   * detectava sintaxe impossível. Então `http://instagram.com/x` passava (o
+   * downgrade que torna o link interceptável) e a checagem de plataforma logo
+   * abaixo confirmava o hostname, dando ao conjunto uma aparência de validado.
+   *
+   * `inspectExternalUrl` exige `https:`, nega userinfo (`https://instagram.com@
+   * evil.example/`), nega `%`/não-ASCII no host e nega IP cru. A conferência de
+   * plataforma continua sendo feita por `isValidPlatformUrl`, que compara o
+   * hostname por igualdade exata — mais estrito que sufixo, e já estava certo.
+   */
   private isValidUrl(url: string): boolean {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
+    return inspectExternalUrl(url).ok;
   }
 
   private isValidPlatformUrl(platform: SocialPlatform, url: string): boolean {
