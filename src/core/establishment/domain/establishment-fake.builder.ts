@@ -14,8 +14,16 @@ export class EstablishmentFakeBuilder<TBuild = any> {
   private _name: PropOrFactory<string> = (_index) => this.chance.company();
   private _description: PropOrFactory<string | null> = (_index) => null;
   private _avatar: PropOrFactory<string | null> = (_index) => null;
+  private _avatar_key: PropOrFactory<string | null> = (_index) => null;
+  private _cover: PropOrFactory<string | null> = (_index) => null;
+  private _cover_key: PropOrFactory<string | null> = (_index) => null;
   private _cnpj: PropOrFactory<string | null> = (_index) =>
     this.generateValidCNPJ();
+  private _legal_representative_name: PropOrFactory<string | null> = (_index) =>
+    null;
+  private _legal_representative_document: PropOrFactory<string | null> = (
+    _index,
+  ) => null;
   private _email: PropOrFactory<string> = (_index) => this.chance.email();
   private _phone: PropOrFactory<string | null> = (_index) => null;
   private _website: PropOrFactory<string | null> = (_index) =>
@@ -80,8 +88,32 @@ export class EstablishmentFakeBuilder<TBuild = any> {
     return this;
   }
 
+  /** Foto enviada pelo upload: URL e chave juntas, como `withCover`. O
+   * `withAvatar` acima continua existindo para o caso legado — URL sem chave,
+   * gravada pelo PATCH antigo, sem objeto nosso por trás. */
+  withAvatarImage(url: string, key: string): this {
+    this._avatar = () => url;
+    this._avatar_key = () => key;
+    return this;
+  }
+
+  /** Capa e chave juntas — nunca uma sem a outra, que é o estado que o
+   * agregado não sabe representar (URL sem chave é objeto órfão no bucket). */
+  withCover(url: string, key: string): this {
+    this._cover = () => url;
+    this._cover_key = () => key;
+    return this;
+  }
+
   withCnpj(valueOrFactory: PropOrFactory<string | null>): this {
     this._cnpj = valueOrFactory;
+    return this;
+  }
+
+  /** Quem assina pela PJ — nome e CPF, como sairão na qualificação. */
+  withLegalRepresentative(name: string | null, document: string | null): this {
+    this._legal_representative_name = name;
+    this._legal_representative_document = document;
     return this;
   }
 
@@ -215,7 +247,18 @@ export class EstablishmentFakeBuilder<TBuild = any> {
           name: this.callFactory(this._name, index),
           description: this.callFactory(this._description, index),
           avatar: this.callFactory(this._avatar, index),
+          avatar_key: this.callFactory(this._avatar_key, index),
+          cover: this.callFactory(this._cover, index),
+          cover_key: this.callFactory(this._cover_key, index),
           cnpj: this.callFactory(this._cnpj, index),
+          legal_representative_name: this.callFactory(
+            this._legal_representative_name,
+            index,
+          ),
+          legal_representative_document: this.callFactory(
+            this._legal_representative_document,
+            index,
+          ),
           email: new Email(emailValue),
           phone: phoneValue ? new Phone(phoneValue) : null,
           website: this.callFactory(this._website, index),
@@ -253,6 +296,14 @@ export class EstablishmentFakeBuilder<TBuild = any> {
 
   get avatar(): string | null {
     return this.getValue("avatar");
+  }
+
+  get cover(): string | null {
+    return this.getValue("cover");
+  }
+
+  get cover_key(): string | null {
+    return this.getValue("cover_key");
   }
 
   get cnpj(): string | null {

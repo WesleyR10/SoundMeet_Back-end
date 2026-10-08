@@ -1,10 +1,17 @@
+import { PlanLimitExceededError } from "../../../../../plans/domain/errors/plan-limit-exceeded.error";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
+import { EstablishmentPlanTier } from "../../../../../plans/domain/plan-tier.enum";
+import {
+  Subscription,
+  SubscriptionStatus,
+} from "../../../../../plans/domain/subscription.aggregate";
+import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
 import { EstablishmentId } from "../../../../domain/establishment.aggregate";
 import {
   EstablishmentAnalytics,
   EstablishmentAnalyticsId,
 } from "../../../../domain/establishment-analytics.read-model";
 import {
-  EstablishmentAnalyticsFilter,
   EstablishmentAnalyticsSearchParams,
   EstablishmentAnalyticsSearchResult,
   IEstablishmentAnalyticsRepository,
@@ -12,9 +19,12 @@ import {
 import { EstablishmentAnalyticsFakeBuilder } from "../../../../domain/establishment-analytics-fake.builder";
 import { ListEstablishmentAnalyticsUseCase } from "../list-establishment-analytics.use-case";
 
+const ESTABLISHMENT_ID = "11111111-1111-4111-8111-111111111111";
+
 class EstablishmentAnalyticsRepositoryStub implements IEstablishmentAnalyticsRepository {
   sortableFields: string[] = [];
   receivedSearchParams: EstablishmentAnalyticsSearchParams | null = null;
+  searchCallCount = 0;
 
   constructor(
     private readonly searchResult: EstablishmentAnalyticsSearchResult,
@@ -24,6 +34,7 @@ class EstablishmentAnalyticsRepositoryStub implements IEstablishmentAnalyticsRep
     props: EstablishmentAnalyticsSearchParams,
   ): Promise<EstablishmentAnalyticsSearchResult> {
     this.receivedSearchParams = props;
+    this.searchCallCount++;
     return this.searchResult;
   }
 
@@ -79,27 +90,43 @@ class EstablishmentAnalyticsRepositoryStub implements IEstablishmentAnalyticsRep
   }
 }
 
-describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
-  it("should map SearchResult to output", () => {
-    const useCase = new ListEstablishmentAnalyticsUseCase(
-      new EstablishmentAnalyticsRepositoryStub(
-        new EstablishmentAnalyticsSearchResult({
-          items: [],
-          total: 0,
-          current_page: 1,
-          per_page: 15,
-        }),
-      ),
-    );
-
-    const output = useCase["toOutput"](
-      new EstablishmentAnalyticsSearchResult({
-        items: [],
-        total: 0,
-        current_page: 1,
-        per_page: 15,
+async function makePlanCheckService(
+  tier?: EstablishmentPlanTier,
+  cancelled = false,
+) {
+  const subRepo = new SubscriptionInMemoryRepository();
+  if (tier) {
+    await subRepo.insert(
+      new Subscription({
+        establishment_id: ESTABLISHMENT_ID,
+        plan_tier: tier,
+        persona: "establishment",
+        status: cancelled
+          ? SubscriptionStatus.CANCELLED
+          : SubscriptionStatus.ACTIVE,
       }),
     );
+  }
+  return new PlanCheckService(subRepo);
+}
+
+function emptyResult() {
+  return new EstablishmentAnalyticsSearchResult({
+    items: [],
+    total: 0,
+    current_page: 1,
+    per_page: 15,
+  });
+}
+
+describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
+  it("should map SearchResult to output", async () => {
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      new EstablishmentAnalyticsRepositoryStub(emptyResult()),
+      await makePlanCheckService(EstablishmentPlanTier.PRO),
+    );
+
+    const output = useCase["toOutput"](emptyResult());
 
     expect(output).toStrictEqual({
       items: [],
@@ -111,9 +138,7 @@ describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
   });
 
   it("should return analytics items", async () => {
-    const establishmentId = new EstablishmentId(
-      "11111111-1111-4111-8111-111111111111",
-    );
+    const establishmentId = new EstablishmentId(ESTABLISHMENT_ID);
     const analytics = EstablishmentAnalyticsFakeBuilder.theAnalytics(2)
       .withEstablishmentId(establishmentId)
       .withDate((i) => new Date(Date.UTC(2026, 0, i + 1)))
@@ -131,19 +156,21 @@ describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
       per_page: 2,
     });
     const repository = new EstablishmentAnalyticsRepositoryStub(searchResult);
-    const useCase = new ListEstablishmentAnalyticsUseCase(repository);
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(EstablishmentPlanTier.GROWTH),
+    );
 
-    const filter: EstablishmentAnalyticsFilter = {
-      establishment_id: establishmentId.id,
-      date_gte: new Date("2026-01-01T00:00:00.000Z"),
-      date_lte: new Date("2026-01-31T00:00:00.000Z"),
-    };
     const output = await useCase.execute({
+      establishment_id: ESTABLISHMENT_ID,
       page: 1,
       per_page: 2,
       sort: "date",
       sort_dir: "desc",
-      filter,
+      filter: {
+        date_gte: new Date("2026-01-01T00:00:00.000Z"),
+        date_lte: new Date("2026-01-31T00:00:00.000Z"),
+      },
     });
 
     expect(repository.receivedSearchParams).toBeInstanceOf(
@@ -153,7 +180,11 @@ describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
     expect(repository.receivedSearchParams?.per_page).toBe(2);
     expect(repository.receivedSearchParams?.sort).toBe("date");
     expect(repository.receivedSearchParams?.sort_dir).toBe("desc");
-    expect(repository.receivedSearchParams?.filter).toMatchObject(filter);
+    expect(repository.receivedSearchParams?.filter).toMatchObject({
+      establishment_id: ESTABLISHMENT_ID,
+      date_gte: new Date("2026-01-01T00:00:00.000Z"),
+      date_lte: new Date("2026-01-31T00:00:00.000Z"),
+    });
 
     expect(output).toStrictEqual({
       items: analytics.map((a) => ({
@@ -185,9 +216,13 @@ describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
         per_page: 15,
       }),
     );
-    const useCase = new ListEstablishmentAnalyticsUseCase(repository);
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(EstablishmentPlanTier.PRO),
+    );
 
     await useCase.execute({
+      establishment_id: ESTABLISHMENT_ID,
       page: 0,
       per_page: 0,
       sort: "",
@@ -199,6 +234,97 @@ describe("ListEstablishmentAnalyticsUseCase Unit Tests", () => {
     expect(repository.receivedSearchParams?.per_page).toBe(15);
     expect(repository.receivedSearchParams?.sort).toBeNull();
     expect(repository.receivedSearchParams?.sort_dir).toBeNull();
-    expect(repository.receivedSearchParams?.filter).toBeNull();
+    // ⚠️ Mudança de comportamento deliberada (9.7a). Este teste esperava
+    // `filter` NULO quando o chamador mandava lixo — o que significava buscar
+    // SEM escopo, ou seja, devolver as métricas de todos os estabelecimentos.
+    // O escopo agora é injetado pelo use-case e sobrevive a qualquer entrada
+    // inválida: lixo no filtro degrada os campos opcionais, nunca o escopo.
+    expect(repository.receivedSearchParams?.filter).toStrictEqual({
+      establishment_id: ESTABLISHMENT_ID,
+    });
+  });
+
+  it("não deixa o filtro sobrescrever o escopo do estabelecimento", async () => {
+    const repository = new EstablishmentAnalyticsRepositoryStub(emptyResult());
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(EstablishmentPlanTier.PRO),
+    );
+
+    await useCase.execute({
+      establishment_id: ESTABLISHMENT_ID,
+      // Um cliente tentando ler o analytics do concorrente pelo filtro.
+      filter: {
+        establishment_id: "22222222-2222-4222-8222-222222222222",
+      } as any,
+    });
+
+    expect(repository.receivedSearchParams?.filter).toMatchObject({
+      establishment_id: ESTABLISHMENT_ID,
+    });
+  });
+});
+
+describe("ListEstablishmentAnalyticsUseCase — gate 9.7a (advanced_analytics)", () => {
+  it("(a) FREE: lança PlanLimitExceededError", async () => {
+    const repository = new EstablishmentAnalyticsRepositoryStub(emptyResult());
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(),
+    );
+
+    await expect(
+      useCase.execute({ establishment_id: ESTABLISHMENT_ID }),
+    ).rejects.toThrow(PlanLimitExceededError);
+  });
+
+  it("(a) FREE: nem chega a consultar o repositório", async () => {
+    const repository = new EstablishmentAnalyticsRepositoryStub(emptyResult());
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(),
+    );
+
+    await expect(
+      useCase.execute({ establishment_id: ESTABLISHMENT_ID }),
+    ).rejects.toThrow(PlanLimitExceededError);
+
+    expect(repository.searchCallCount).toBe(0);
+  });
+
+  it("(b) GROWTH: acesso liberado", async () => {
+    const repository = new EstablishmentAnalyticsRepositoryStub(emptyResult());
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(EstablishmentPlanTier.GROWTH),
+    );
+
+    await expect(
+      useCase.execute({ establishment_id: ESTABLISHMENT_ID }),
+    ).resolves.toBeDefined();
+  });
+
+  it("(b) PRO: acesso liberado", async () => {
+    const repository = new EstablishmentAnalyticsRepositoryStub(emptyResult());
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(EstablishmentPlanTier.PRO),
+    );
+
+    await expect(
+      useCase.execute({ establishment_id: ESTABLISHMENT_ID }),
+    ).resolves.toBeDefined();
+  });
+
+  it("(c) assinatura cancelada volta ao FREE e bloqueia", async () => {
+    const repository = new EstablishmentAnalyticsRepositoryStub(emptyResult());
+    const useCase = new ListEstablishmentAnalyticsUseCase(
+      repository,
+      await makePlanCheckService(EstablishmentPlanTier.PRO, true),
+    );
+
+    await expect(
+      useCase.execute({ establishment_id: ESTABLISHMENT_ID }),
+    ).rejects.toThrow(PlanLimitExceededError);
   });
 });

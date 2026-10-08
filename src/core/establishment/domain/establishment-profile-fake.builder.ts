@@ -2,6 +2,7 @@ import { Chance } from "chance";
 
 import { Address, SocialLinks, Uuid } from "../../shared/domain";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
+import { StageTechSpec } from "../../shared/domain/value-objects/stage-tech-spec.vo";
 import {
   EstablishmentProfile,
   EstablishmentProfileId,
@@ -20,7 +21,9 @@ export class EstablishmentProfileFakeBuilder<TBuild = any> {
       number: String(this.chance.integer({ min: 1, max: 9999 })),
       neighborhood: this.chance.city(),
       city: this.chance.city(),
-      state: this.chance.state({ full: false }),
+      // UF fixa: o estado decide o fuso da casa (`venueTimezone`), e um estado
+      // sorteado (o Chance sorteia dos EUA) faria horário de teste variar.
+      state: "SP",
       zipCode: "01001000",
     });
   private _amenities: PropOrFactory<string[]> = (_index) => ["sound_system"];
@@ -28,6 +31,8 @@ export class EstablishmentProfileFakeBuilder<TBuild = any> {
   private _operatingHours: PropOrFactory<Record<string, unknown> | null> = (
     _index,
   ) => null;
+  private _stageTechSpec: PropOrFactory<StageTechSpec | null> = (_index) =>
+    null;
   private _priceRange: PropOrFactory<PriceRange | null> = (_index) => null;
   private _socialLinks: PropOrFactory<SocialLinks | null> = (_index) => null;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
@@ -88,6 +93,11 @@ export class EstablishmentProfileFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withStageTechSpec(valueOrFactory: PropOrFactory<StageTechSpec | null>) {
+    this._stageTechSpec = valueOrFactory;
+    return this;
+  }
+
   withPriceRange(valueOrFactory: PropOrFactory<PriceRange | null>) {
     this._priceRange = valueOrFactory;
     return this;
@@ -129,6 +139,7 @@ export class EstablishmentProfileFakeBuilder<TBuild = any> {
           amenities: this.callFactory(this._amenities, index),
           preferredGenres: this.callFactory(this._preferredGenres, index),
           operatingHours: this.callFactory(this._operatingHours, index),
+          stageTechSpec: this.callFactory(this._stageTechSpec, index),
           priceRange: this.callFactory(this._priceRange, index),
           socialLinks: this.callFactory(this._socialLinks, index),
           ...(this._created_at && {

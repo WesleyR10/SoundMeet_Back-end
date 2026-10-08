@@ -3,6 +3,7 @@ import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
 import { Establishment, EstablishmentId } from "../establishment.aggregate";
+import { EstablishmentEmailChangedEvent } from "../events/establishment-email-changed.event";
 
 describe("Establishment Unit Tests without validator", () => {
   beforeEach(() => {
@@ -93,13 +94,33 @@ describe("Establishment Unit Tests without validator", () => {
     expect(establishment.notification.hasErrors()).toBe(false); // Verifica que não há erros de validação
   });
 
-  test("should change email", () => {
+  test("🔴 pedir troca de e-mail NÃO troca o e-mail — só emite o pedido", () => {
+    const establishment = Establishment.fake().anEstablishment().build();
+    const current = establishment.email.value;
+
+    establishment.requestEmailChange("new@test.com");
+
+    expect(establishment.email.value).toBe(current);
+    expect(establishment.notification.hasErrors()).toBe(false);
+    const requested = establishment
+      .getUncommittedEvents()
+      .find((e) => e instanceof EstablishmentEmailChangedEvent) as
+      | EstablishmentEmailChangedEvent
+      | undefined;
+    expect(requested?.new_email).toBe("new@test.com");
+  });
+
+  test("pedido com e-mail inválido vira erro de validação e não emite evento", () => {
     const establishment = Establishment.fake().anEstablishment().build();
 
-    establishment.changeEmail("new@test.com");
-    expect(establishment.email.value).toBe("new@test.com");
-    // O validate() é chamado internamente pelo método changeEmail
-    expect(establishment.notification.hasErrors()).toBe(false); // Verifica que não há erros de validação
+    establishment.requestEmailChange("invalid-email");
+
+    expect(establishment.notification.hasErrors()).toBe(true);
+    expect(
+      establishment
+        .getUncommittedEvents()
+        .some((e) => e instanceof EstablishmentEmailChangedEvent),
+    ).toBe(false);
   });
 
   test("should change phone", () => {
@@ -178,5 +199,69 @@ describe("Establishment Unit Tests without validator", () => {
     establishment.addRating(5, userId, undefined);
     expect(establishment.rating.value).toBe(4.3); // (5 + 3 + 4 + 5) / 4 = 4.25, arredondado para 4.3
     expect(establishment.total_ratings).toBe(4);
+  });
+});
+
+describe("Establishment — foto de perfil (avatar + avatar_key)", () => {
+  test("changeAvatar grava URL e chave e devolve a chave ANTERIOR para faxina", () => {
+    const establishment = Establishment.fake()
+      .anEstablishment()
+      .withAvatarImage(
+        "https://cdn/old.webp",
+        "establishments/x/avatar/old.webp",
+      )
+      .build();
+
+    const previous = establishment.changeAvatar(
+      "https://cdn/new.webp",
+      "establishments/x/avatar/new.webp",
+    );
+
+    expect(previous).toBe("establishments/x/avatar/old.webp");
+    expect(establishment.avatar).toBe("https://cdn/new.webp");
+    expect(establishment.avatar_key).toBe("establishments/x/avatar/new.webp");
+  });
+
+  test("changeAvatar com a MESMA chave não devolve nada — apagá-la deixaria o registro apontando para objeto inexistente", () => {
+    const establishment = Establishment.fake()
+      .anEstablishment()
+      .withAvatarImage("https://cdn/a.webp", "establishments/x/avatar/a.webp")
+      .build();
+
+    expect(
+      establishment.changeAvatar(
+        "https://cdn/a.webp",
+        "establishments/x/avatar/a.webp",
+      ),
+    ).toBeNull();
+  });
+
+  test("avatar legado (URL sem chave) não produz chave para apagar", () => {
+    const establishment = Establishment.fake()
+      .anEstablishment()
+      .withAvatar("https://example.com/logo.png")
+      .build();
+
+    expect(
+      establishment.changeAvatar(
+        "https://cdn/n.webp",
+        "establishments/x/avatar/n.webp",
+      ),
+    ).toBeNull();
+    expect(establishment.removeAvatar()).toBe("establishments/x/avatar/n.webp");
+    expect(establishment.avatar).toBeNull();
+    expect(establishment.avatar_key).toBeNull();
+  });
+
+  test("toJSON carrega a chave — o presenter é quem a deixa de fora", () => {
+    const establishment = Establishment.fake()
+      .anEstablishment()
+      .withAvatarImage("https://cdn/a.webp", "establishments/x/avatar/a.webp")
+      .build();
+
+    expect(establishment.toJSON()).toMatchObject({
+      avatar: "https://cdn/a.webp",
+      avatar_key: "establishments/x/avatar/a.webp",
+    });
   });
 });

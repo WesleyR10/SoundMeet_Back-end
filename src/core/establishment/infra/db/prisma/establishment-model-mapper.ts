@@ -7,6 +7,7 @@ import { Email } from "../../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
 import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Rating } from "../../../../shared/domain/value-objects/rating.vo";
+import { StageTechSpec } from "../../../../shared/domain/value-objects/stage-tech-spec.vo";
 import {
   Establishment,
   EstablishmentId,
@@ -15,12 +16,12 @@ import {
   EstablishmentProfile,
   EstablishmentProfileId,
 } from "../../../domain/establishment-profile.aggregate";
+import { MenuPdfEntry } from "../../../domain/establishment-profile.aggregate";
 import {
   EstablishmentModel,
   EstablishmentProfileModel,
   JsonValue,
 } from "./establishment-model";
-import { MenuPdfEntry } from "../../../domain/establishment-profile.aggregate";
 
 function parseMenuPdfs(raw: unknown): MenuPdfEntry[] {
   if (!Array.isArray(raw)) return [];
@@ -60,8 +61,14 @@ export class EstablishmentModelMapper {
       name: entity.name,
       description: entity.description,
       avatar: entity.avatar,
+      avatar_key: entity.avatar_key,
+      cover: entity.cover,
+      cover_key: entity.cover_key,
       phone: entity.phone?.value ?? null,
       cnpj: entity.cnpj?.value ?? null,
+      legal_representative_name: entity.legal_representative_name,
+      legal_representative_document:
+        entity.legal_representative_document?.value ?? null,
       website: entity.website,
       establishment_type: entity.establishment_type,
       qr_code: entity.qr_code?.code ?? null,
@@ -89,19 +96,22 @@ export class EstablishmentModelMapper {
       preferredGenres: profile.preferredGenres,
       operatingHours: (profile.operatingHours?.toJSON() ??
         null) as unknown as JsonValue | null,
+      stageTechSpec: (profile.stageTechSpec?.toJSON() ??
+        null) as unknown as JsonValue | null,
       priceRange: (profile.priceRange?.toJSON() ??
         null) as unknown as JsonValue | null,
       socialLinks: (profile.socialLinks
         ? ({ links: profile.socialLinks.links } as any)
         : null) as unknown as JsonValue | null,
-      menu_pdfs: profile.menu_pdfs.length > 0
-        ? (profile.menu_pdfs.map((e) => ({
-            id: e.id,
-            url: e.url,
-            key: e.key,
-            uploaded_at: e.uploaded_at.toISOString(),
-          })) as unknown as JsonValue)
-        : null,
+      menu_pdfs:
+        profile.menu_pdfs.length > 0
+          ? (profile.menu_pdfs.map((e) => ({
+              id: e.id,
+              url: e.url,
+              key: e.key,
+              uploaded_at: e.uploaded_at.toISOString(),
+            })) as unknown as JsonValue)
+          : null,
       created_at: profile.created_at,
       updated_at: profile.updated_at,
     };
@@ -142,6 +152,10 @@ export class EstablishmentModelMapper {
           ? OperatingHours.fromJSON(model.profile.operatingHours)
           : null;
 
+        const stageTechSpec = isRecord(model.profile.stageTechSpec)
+          ? StageTechSpec.fromJSON(model.profile.stageTechSpec)
+          : null;
+
         const priceRange = isRecord(model.profile.priceRange)
           ? PriceRange.fromJSON(model.profile.priceRange)
           : null;
@@ -156,6 +170,7 @@ export class EstablishmentModelMapper {
           amenities: model.profile.amenities ?? [],
           preferredGenres: model.profile.preferredGenres ?? [],
           operatingHours,
+          stageTechSpec,
           priceRange,
           socialLinks,
           menu_pdfs: parseMenuPdfs(model.profile.menu_pdfs),
@@ -184,8 +199,13 @@ export class EstablishmentModelMapper {
       name: model.name,
       email: new Email(model.email),
       cnpj: model.cnpj, // Passamos a string direta, o construtor converte para VO
+      legal_representative_name: model.legal_representative_name,
+      legal_representative_document: model.legal_representative_document,
       description: model.description,
       avatar: model.avatar,
+      avatar_key: model.avatar_key,
+      cover: model.cover,
+      cover_key: model.cover_key,
       phone: model.phone ? new Phone(model.phone) : null,
       website: model.website,
       establishment_type: model.establishment_type,

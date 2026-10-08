@@ -2,13 +2,17 @@ import {
   Address,
   AggregateRoot,
   CNPJ,
+  CPF,
   Email,
   InvalidCNPJError,
+  InvalidCPFError,
   Phone,
   QRCode,
   Rating,
   Uuid,
 } from "../../shared/domain";
+import { resolveVenueTimezone } from "../../shared/domain/brazil-timezone";
+import { buildEstablishmentQrLink } from "../../shared/domain/value-objects/qr-code-link";
 import { EstablishmentValidatorFactory } from "./establishment.validator";
 import { EstablishmentFakeBuilder } from "./establishment-fake.builder";
 import { EstablishmentProfile } from "./establishment-profile.aggregate";
@@ -22,7 +26,12 @@ export type EstablishmentConstructorProps = {
   name: string;
   description?: string | null;
   avatar?: string | null;
+  avatar_key?: string | null;
+  cover?: string | null;
+  cover_key?: string | null;
   cnpj?: string | null;
+  legal_representative_name?: string | null;
+  legal_representative_document?: string | null;
   email: Email;
   phone?: Phone | null;
   website?: string | null;
@@ -56,8 +65,46 @@ export class Establishment extends AggregateRoot {
   establishment_id: EstablishmentId;
   name: string;
   description: string | null;
+  /**
+   * Foto de perfil (logo) — URL pública e a chave do objeto que a produziu.
+   *
+   * Mesmo par da capa, e pelo mesmo motivo: sem a chave, trocar a foto deixa o
+   * objeto anterior no bucket sem nada apontando para ele. `avatar_key` é
+   * `null` também quando `avatar` veio de fora (as linhas gravadas pelo PATCH
+   * antigo, que aceitava URL em texto livre) — ali não há objeto nosso a apagar.
+   */
   avatar: string | null;
+  avatar_key: string | null;
+  /**
+   * Capa do espaço — URL pública, e a chave do objeto que a produziu.
+   *
+   * ⚠️ **`cover_key` não é redundância da URL.** Sem a chave, trocar a capa
+   * deixaria o arquivo anterior no bucket sem nada apontando para ele: pago
+   * todo mês, invisível para sempre. O `avatar` tinha exatamente esse defeito
+   * até 18/set/2026; `menu_pdfs`, que guarda `{ url, key }`, não tem. Seguimos o segundo.
+   *
+   * Fora de `EstablishmentCreateCommand` de propósito: a capa nasce no upload,
+   * e até lá o cliente renderiza a capa gerada pela marca. `null` aqui é o
+   * estado normal de quem acabou de se cadastrar, não uma pendência.
+   */
+  cover: string | null;
+  cover_key: string | null;
   cnpj: CNPJ | null;
+  /**
+   * Quem assina pela pessoa jurídica — nome e CPF.
+   *
+   * Existe porque PJ não age sozinha: a qualificação de um contrato diz
+   * "Bar do Zé Ltda., CNPJ nº …, neste ato representada por João da Silva,
+   * CPF nº …". Sem estes dois campos o contrato remetia ao Anexo II, o que é
+   * honesto mas mais fraco.
+   *
+   * Fora de `EstablishmentCreateCommand` de propósito: o cadastro já entregue
+   * não pede esses dados, e travá-lo agora quebraria o fluxo do web. São
+   * preenchidos em configurações do perfil, e a emissão do contrato lista a
+   * ausência como pendência acionável.
+   */
+  legal_representative_name: string | null;
+  legal_representative_document: CPF | null;
   email: Email;
   phone: Phone | null;
   website: string | null;
@@ -77,6 +124,9 @@ export class Establishment extends AggregateRoot {
     this.name = props.name;
     this.description = props.description ?? null;
     this.avatar = props.avatar ?? null;
+    this.avatar_key = props.avatar_key ?? null;
+    this.cover = props.cover ?? null;
+    this.cover_key = props.cover_key ?? null;
     if (props.cnpj) {
       try {
         this.cnpj = new CNPJ(props.cnpj);
@@ -93,17 +143,35 @@ export class Establishment extends AggregateRoot {
     } else {
       this.cnpj = null;
     }
+    this.legal_representative_name =
+      props.legal_representative_name?.trim() || null;
+    if (props.legal_representative_document) {
+      try {
+        this.legal_representative_document = new CPF(
+          props.legal_representative_document,
+        );
+      } catch (error) {
+        const message =
+          error instanceof InvalidCPFError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Invalid legal representative document";
+        this.notification.addError(message, "legal_representative_document");
+        this.legal_representative_document = null;
+      }
+    } else {
+      this.legal_representative_document = null;
+    }
     this.email = props.email;
     this.phone = props.phone ?? null;
     this.website = props.website ?? null;
     this.establishment_type = props.establishment_type;
     this.rating = props.rating ?? new Rating(0);
     this.total_ratings = props.total_ratings ?? 0;
+    // `url` é o próprio `code` — ver a nota equivalente em `Musician`.
     this.qr_code = props.qr_code
-      ? new QRCode({
-          code: props.qr_code,
-          url: `https://soundmeet.app/establishment/${this.establishment_id.id}`,
-        })
+      ? new QRCode({ code: props.qr_code, url: props.qr_code })
       : null;
     this.is_active = props.is_active ?? true;
     this.is_verified = props.is_verified ?? false;
@@ -173,6 +241,19 @@ export class Establishment extends AggregateRoot {
     this.profile = null;
   }
 
+  /**
+   * Fuso IANA da casa — pelo endereço, depois o declarado no horário de
+   * funcionamento, nunca `UTC` (ver `resolveVenueTimezone`). É o fuso de todo
+   * horário de show mostrado ou impresso, e do "hoje" das regras do evento.
+   */
+  venueTimezone(): string {
+    return resolveVenueTimezone({
+      state: this.profile?.location?.state,
+      city: this.profile?.location?.city,
+      declared_timezone: this.profile?.operatingHours?.timezone,
+    });
+  }
+
   changeName(name: string): void {
     this.name = name;
     this.validate(["name"]);
@@ -184,9 +265,64 @@ export class Establishment extends AggregateRoot {
     this.updated_at = new Date();
   }
 
-  changeAvatar(avatar: string | null): void {
+  /**
+   * Troca a foto de perfil e devolve a chave da foto ANTERIOR, para quem chamou
+   * apagar — mesmo contrato de `changeCover`, e pela mesma razão: é aqui que a
+   * chave antiga deixa de ser alcançável.
+   *
+   * 🔴 Substituiu o `changeAvatar(url)` do PATCH, que gravava texto livre sem
+   * chave. Duas portas para o mesmo campo — uma com chave, outra sem — fariam
+   * a segunda apagar o vínculo com o objeto que a primeira subiu, e o arquivo
+   * viraria lixo pago no bucket sem erro nenhum.
+   */
+  changeAvatar(avatar: string, avatarKey: string): string | null {
+    const previousKey = this.avatar_key;
     this.avatar = avatar;
+    this.avatar_key = avatarKey;
     this.updated_at = new Date();
+    return previousKey && previousKey !== avatarKey ? previousKey : null;
+  }
+
+  /**
+   * Volta para o ícone padrão. Devolve a chave a ser apagada — `null` quando a
+   * URL antiga não era objeto nosso (ver `avatar_key`).
+   */
+  removeAvatar(): string | null {
+    const previousKey = this.avatar_key;
+    this.avatar = null;
+    this.avatar_key = null;
+    this.updated_at = new Date();
+    return previousKey;
+  }
+
+  /**
+   * Troca a capa e devolve a chave da capa ANTERIOR, para quem chamou apagar.
+   *
+   * 🔴 **O agregado não apaga objeto de storage — ele não conhece storage.**
+   * Mas é aqui que a chave antiga deixa de ser alcançável, e devolvê-la é o
+   * que impede o caso-padrão de virar lixo no bucket: sem este retorno o
+   * use-case teria de ler a chave antes de chamar o método, e "antes" é
+   * exatamente o passo que alguém esquece numa segunda chamada.
+   *
+   * Devolve `null` quando não havia capa, ou quando a chave nova é a mesma —
+   * apagar a chave recém-gravada deixaria o registro apontando para um objeto
+   * que não existe mais.
+   */
+  changeCover(cover: string, coverKey: string): string | null {
+    const previousKey = this.cover_key;
+    this.cover = cover;
+    this.cover_key = coverKey;
+    this.updated_at = new Date();
+    return previousKey && previousKey !== coverKey ? previousKey : null;
+  }
+
+  /** Volta para a capa gerada pela marca. Devolve a chave a ser apagada. */
+  removeCover(): string | null {
+    const previousKey = this.cover_key;
+    this.cover = null;
+    this.cover_key = null;
+    this.updated_at = new Date();
+    return previousKey;
   }
 
   changeCnpj(cnpj: string): void {
@@ -206,22 +342,76 @@ export class Establishment extends AggregateRoot {
     }
   }
 
-  changeEmail(email: string): void {
-    const emailOrError = Email.create(email);
-    this.email = emailOrError.ok;
-    emailOrError.isFail() &&
-      this.notification.setError(emailOrError.error.message, "email");
-    this.validate(["email"]);
-    this.updated_at = new Date();
-    if (!this.notification.hasErrors()) {
-      this.applyEvent(
-        new EstablishmentEmailChangedEvent({
-          establishment_id: this.establishment_id,
-          new_email: email,
-          name: this.name,
-        }),
+  /**
+   * Define quem assina pela pessoa jurídica.
+   *
+   * Invariante: CPF sem nome é recusado — o documento imprime o nome, e um CPF
+   * solto não qualifica ninguém. O contrário é aceito: nome sem CPF ainda
+   * produz uma qualificação melhor que a remissão ao Anexo II, e a plataforma
+   * não deve exigir o CPF de quem não quer dá-lo.
+   *
+   * Passar os dois como `null` limpa o representante — o contrato volta a
+   * remeter ao Anexo II.
+   */
+  changeLegalRepresentative(
+    name: string | null,
+    document: string | null,
+  ): void {
+    const cleanName = name?.trim() || null;
+
+    if (!cleanName && document) {
+      this.notification.addError(
+        "Legal representative name is required when a document is informed",
+        "legal_representative_name",
       );
+      return;
     }
+
+    if (!document) {
+      this.legal_representative_name = cleanName;
+      this.legal_representative_document = null;
+      this.updated_at = new Date();
+      return;
+    }
+
+    try {
+      this.legal_representative_document = new CPF(document);
+      this.legal_representative_name = cleanName;
+      this.updated_at = new Date();
+    } catch (error) {
+      const message =
+        error instanceof InvalidCPFError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Invalid legal representative document";
+      this.notification.addError(message, "legal_representative_document");
+    }
+  }
+
+  /**
+   * PEDE a troca de e-mail — o e-mail atual continua valendo até o dono do
+   * endereço novo clicar no link (`VerifyEmailService`), que só então troca o
+   * banco E o login no Keycloak.
+   *
+   * 🔴 Até out/2026 este método (então `changeEmail`) gravava o endereço novo
+   * na hora: o perfil passava a exibir um e-mail que ninguém provou ter, o
+   * `email_verified_at` do endereço ANTIGO continuava liberando o saque, e o
+   * login seguia no antigo — banco e Keycloak divergindo para sempre.
+   */
+  requestEmailChange(email: string): void {
+    const emailOrError = Email.create(email);
+    if (emailOrError.isFail()) {
+      this.notification.setError(emailOrError.error.message, "email");
+      return;
+    }
+    this.applyEvent(
+      new EstablishmentEmailChangedEvent({
+        establishment_id: this.establishment_id,
+        new_email: emailOrError.ok.value,
+        name: this.name,
+      }),
+    );
   }
 
   changePhone(phone: string | null): void {
@@ -252,12 +442,14 @@ export class Establishment extends AggregateRoot {
     this.updated_at = new Date();
   }
 
-  generateQRCode(): void {
-    const qrData = `soundmeet://establishment/${this.establishment_id.id}`;
-    this.qr_code = new QRCode({
-      code: qrData,
-      url: `https://soundmeet.app/establishment/${this.establishment_id.id}`,
-    });
+  /**
+   * (Re)gera o QR permanente da casa. Mesma decisão do músico: URL https em vez
+   * do esquema `soundmeet://`, para funcionar na câmera de quem não tem o app.
+   * Ver `qr-code-link.ts`.
+   */
+  generateQRCode(baseUrl?: string): void {
+    const link = buildEstablishmentQrLink(this.establishment_id.id, baseUrl);
+    this.qr_code = new QRCode({ code: link, url: link });
     this.updated_at = new Date();
   }
 
@@ -279,6 +471,23 @@ export class Establishment extends AggregateRoot {
         ratedBy,
       ),
     );
+  }
+
+  /**
+   * Reescreve a projeção a partir do ledger de avaliações (`reviews`,
+   * Bloco 9.3), em vez de incrementar — ver `Musician.syncRatingProjection`
+   * para o motivo completo. `addRating` acima segue existindo para o fluxo
+   * legado por evento de domínio.
+   */
+  syncRatingProjection(average: number, total: number): void {
+    if (total < 0 || average < 0 || average > 5) {
+      this.notification.addError("Invalid rating projection", "rating");
+      return;
+    }
+
+    this.rating = new Rating(Math.round(average * 10) / 10);
+    this.total_ratings = total;
+    this.updated_at = new Date();
   }
 
   activate(): void {
@@ -355,7 +564,13 @@ export class Establishment extends AggregateRoot {
       name: this.name,
       description: this.description,
       avatar: this.avatar,
+      avatar_key: this.avatar_key,
+      cover: this.cover,
+      cover_key: this.cover_key,
       cnpj: this.cnpj?.toJSON() || null,
+      legal_representative_name: this.legal_representative_name,
+      legal_representative_document:
+        this.legal_representative_document?.value || null,
       email: this.email.value,
       phone: this.phone ? this.phone.value : null,
       website: this.website,

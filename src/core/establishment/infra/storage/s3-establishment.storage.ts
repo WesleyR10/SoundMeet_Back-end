@@ -1,4 +1,7 @@
-import AWS from "aws-sdk";
+import { Readable } from "node:stream";
+
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 import { IEstablishmentStorage } from "../../application/ports/establishment-storage.interface";
 
@@ -7,39 +10,36 @@ export class S3EstablishmentStorage implements IEstablishmentStorage {
   private static readonly DEFAULT_QUEUE_SIZE = 2;
 
   constructor(
-    private readonly s3: AWS.S3,
+    private readonly s3: S3Client,
     private readonly bucket: string,
     private readonly publicBaseUrl: string | null,
   ) {}
 
   async putObject(input: {
     object_key: string;
-    data: Buffer | NodeJS.ReadableStream;
+    data: Buffer | Readable;
     content_type: string;
   }): Promise<void> {
-    await this.s3
-      .upload(
-        {
-          Bucket: this.bucket,
-          Key: input.object_key,
-          Body: input.data,
-          ContentType: input.content_type,
-        },
-        {
-          partSize: S3EstablishmentStorage.DEFAULT_PART_SIZE_BYTES,
-          queueSize: S3EstablishmentStorage.DEFAULT_QUEUE_SIZE,
-        },
-      )
-      .promise();
+    await new Upload({
+      client: this.s3,
+      params: {
+        Bucket: this.bucket,
+        Key: input.object_key,
+        Body: input.data,
+        ContentType: input.content_type,
+      },
+      partSize: S3EstablishmentStorage.DEFAULT_PART_SIZE_BYTES,
+      queueSize: S3EstablishmentStorage.DEFAULT_QUEUE_SIZE,
+    }).done();
   }
 
   async deleteObject(input: { object_key: string }): Promise<void> {
-    await this.s3
-      .deleteObject({
+    await this.s3.send(
+      new DeleteObjectCommand({
         Bucket: this.bucket,
         Key: input.object_key,
-      })
-      .promise();
+      }),
+    );
   }
 
   getPublicUrl(object_key: string): string | null {

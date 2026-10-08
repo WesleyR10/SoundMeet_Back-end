@@ -14,6 +14,7 @@ export type EstablishmentProfileModel = {
   amenities: string[];
   preferredGenres: string[];
   operatingHours: JsonValue | null;
+  stageTechSpec: JsonValue | null;
   priceRange: JsonValue | null;
   socialLinks: JsonValue | null;
   menu_pdfs: JsonValue | null;
@@ -27,7 +28,12 @@ export type EstablishmentModel = {
   name: string;
   description: string | null;
   avatar: string | null;
+  avatar_key: string | null;
+  cover: string | null;
+  cover_key: string | null;
   cnpj: string | null;
+  legal_representative_name: string | null;
+  legal_representative_document: string | null;
   phone: string | null;
   website: string | null;
   establishment_type: string;

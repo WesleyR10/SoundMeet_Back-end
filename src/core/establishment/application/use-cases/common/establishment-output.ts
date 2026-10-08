@@ -1,6 +1,7 @@
 import { IDateTimeService } from "../../../../shared/domain/date-time.service";
 import { Currency } from "../../../../shared/domain/value-objects/money.vo";
 import { PriceModel } from "../../../../shared/domain/value-objects/price-range.vo";
+import { StageTechSpecJSON } from "../../../../shared/domain/value-objects/stage-tech-spec.vo";
 import { Establishment } from "../../../domain/establishment.aggregate";
 import { EstablishmentProfile } from "../../../domain/establishment-profile.aggregate";
 
@@ -12,6 +13,7 @@ export type EstablishmentProfileOutput = {
   amenities: string[];
   preferred_genres: string[];
   operating_hours: Record<string, unknown> | null;
+  stage_tech_spec: StageTechSpecJSON | null;
   price_range: {
     model: PriceModel;
     min: number;
@@ -30,9 +32,32 @@ export type EstablishmentOutput = {
   name: string;
   description: string | null;
   avatar: string | null;
+  /**
+   * Capa do espaço — só a URL pública.
+   *
+   * 🔴 `cover_key` fica de FORA do output de propósito. A chave é endereço
+   * interno no bucket e `GET /establishments/:id` é `@Public()`; expô-la
+   * entregaria o layout do storage a quem não precisa dele, e ninguém no
+   * cliente tem o que fazer com ela — quem apaga o objeto é o servidor.
+   */
+  cover: string | null;
   cnpj: {
     formatted: string | null;
     value: string | null;
+  } | null;
+  /**
+   * Quem assina pela PJ.
+   *
+   * 🔴 `GET /establishments` e `GET /establishments/:id` são `@Public()`. O
+   * CNPJ é registro público e sai inteiro; o CPF do representante é PII de
+   * pessoa natural e **nunca** sai completo — só a forma mascarada, que basta
+   * para o dono conferir na tela de configurações que o dado certo está
+   * gravado. O valor íntegro só é lido dentro do servidor, na emissão do
+   * contrato.
+   */
+  legal_representative: {
+    name: string;
+    document_masked: string | null;
   } | null;
   email: string;
   phone: string | null;
@@ -66,6 +91,7 @@ export class EstablishmentOutputMapper {
       amenities: profile.amenities,
       preferred_genres: profile.preferredGenres,
       operating_hours: profile.operatingHours?.toJSON() ?? null,
+      stage_tech_spec: profile.stageTechSpec?.toJSON() ?? null,
       price_range: profile.priceRange
         ? {
             model: profile.priceRange.model,
@@ -96,10 +122,19 @@ export class EstablishmentOutputMapper {
       name: entity.name,
       description: entity.description,
       avatar: entity.avatar,
+      cover: entity.cover,
       cnpj: entity.cnpj
         ? {
             formatted: entity.cnpj.formatted,
             value: entity.cnpj.value,
+          }
+        : null,
+      legal_representative: entity.legal_representative_name
+        ? {
+            name: entity.legal_representative_name,
+            document_masked: EstablishmentOutputMapper.maskCpf(
+              entity.legal_representative_document?.value ?? null,
+            ),
           }
         : null,
       email: entity.email.value,
@@ -122,5 +157,18 @@ export class EstablishmentOutputMapper {
       is_restaurant: entity.isRestaurant,
       is_club: entity.isClub,
     } as EstablishmentOutput;
+  }
+
+  /**
+   * `"12345678901"` → `"123.***.**9-01"`.
+   *
+   * Mostra o bastante para o dono reconhecer o próprio documento na tela de
+   * configurações e não o bastante para alguém colher CPF de terceiro numa
+   * rota pública. Mesmo princípio do `maskName` da verificação de contrato.
+   */
+  private static maskCpf(value: string | null): string | null {
+    if (!value || value.length !== 11) return null;
+
+    return `${value.slice(0, 3)}.***.**${value.slice(8, 9)}-${value.slice(9)}`;
   }
 }

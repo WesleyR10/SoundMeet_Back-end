@@ -1,14 +1,17 @@
-import { IEventRepository } from "@core/events/domain";
+import { IEventRepository, PresenceVerifier } from "@core/events/domain";
 import {
   EventInMemoryRepository,
   EventMusicianInMemoryRepository,
 } from "@core/events/infra/db/in-memory";
+import { VenueLocationInMemoryAdapter } from "@core/events/infra/venue-location";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { EstablishmentOutputMapper } from "../../../core/establishment/application/use-cases/common/establishment-output";
 import { CreateEstablishmentUseCase } from "../../../core/establishment/application/use-cases/create-establishment/create-establishment.use-case";
 import { CreateEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/create-establishment-profile/create-establishment-profile.use-case";
 import { DeleteEstablishmentUseCase } from "../../../core/establishment/application/use-cases/delete-establishment/delete-establishment.use-case";
+import { DeleteEstablishmentAvatarUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-avatar/delete-establishment-avatar.use-case";
+import { DeleteEstablishmentCoverUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-cover/delete-establishment-cover.use-case";
 import { DeleteEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { DeleteEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/delete-establishment-profile/delete-establishment-profile.use-case";
 import { GetEstablishmentUseCase } from "../../../core/establishment/application/use-cases/get-establishment/get-establishment.use-case";
@@ -17,6 +20,8 @@ import { ListEstablishmentAnalyticsUseCase } from "../../../core/establishment/a
 import { ListEstablishmentsUseCase } from "../../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { UploadEstablishmentAvatarUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-avatar/upload-establishment-avatar.use-case";
+import { UploadEstablishmentCoverUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-cover/upload-establishment-cover.use-case";
 import { UploadEstablishmentMenuPdfUseCase } from "../../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
 import { VerifyEstablishmentUseCase } from "../../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
@@ -161,8 +166,14 @@ describe("EstablishmentsController Integration Tests", () => {
         },
         {
           provide: AddEventAttendeeUseCase,
+          // Casa sem coordenada: presença aceita. A verificação em si é
+          // exercitada em add-event-attendee.use-case.spec.ts.
           useFactory: (repo: IEventRepository) =>
-            new AddEventAttendeeUseCase(repo),
+            new AddEventAttendeeUseCase(
+              repo,
+              new VenueLocationInMemoryAdapter(),
+              new PresenceVerifier(),
+            ),
           inject: ["EventRepository"],
         },
         {
@@ -202,6 +213,22 @@ describe("EstablishmentsController Integration Tests", () => {
           useValue: {
             execute: jest.fn(),
           },
+        },
+        {
+          provide: UploadEstablishmentAvatarUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: DeleteEstablishmentAvatarUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: UploadEstablishmentCoverUseCase,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: DeleteEstablishmentCoverUseCase,
+          useValue: { execute: jest.fn() },
         },
         {
           provide: UploadEstablishmentMenuPdfUseCase,

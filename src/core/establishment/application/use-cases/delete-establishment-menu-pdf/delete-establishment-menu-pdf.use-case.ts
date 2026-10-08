@@ -12,9 +12,10 @@ export type DeleteEstablishmentMenuPdfInput = {
   pdf_id: string;
 };
 
-export class DeleteEstablishmentMenuPdfUseCase
-  implements IUseCase<DeleteEstablishmentMenuPdfInput, void>
-{
+export class DeleteEstablishmentMenuPdfUseCase implements IUseCase<
+  DeleteEstablishmentMenuPdfInput,
+  void
+> {
   constructor(
     private readonly establishmentRepo: IEstablishmentRepository,
     private readonly storage: IEstablishmentStorage,

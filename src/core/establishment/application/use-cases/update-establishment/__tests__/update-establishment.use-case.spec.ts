@@ -6,6 +6,7 @@ import {
   EstablishmentId,
 } from "../../../../domain/establishment.aggregate";
 import { EstablishmentFakeBuilder } from "../../../../domain/establishment-fake.builder";
+import { EstablishmentEmailChangedEvent } from "../../../../domain/events/establishment-email-changed.event";
 import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
 import { UpdateEstablishmentUseCase } from "../update-establishment.use-case";
 
@@ -74,16 +75,15 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
           name: "Rock Club Updated",
           email: "updated@rockclub.com",
           description: "Updated description",
-          avatar: "https://example.com/new-avatar.jpg",
           phone: "+5511888888888",
           website: "https://newrockclub.com",
           is_active: false,
         },
         expected: {
           name: "Rock Club Updated",
-          email: "updated@rockclub.com",
+          // Só PEDE a troca: o e-mail muda quando o link for clicado.
+          email: "original@bar.com",
           description: "Updated description",
-          avatar: "https://example.com/new-avatar.jpg",
           phone: "+5511888888888",
           website: "https://newrockclub.com",
           is_active: false,
@@ -103,8 +103,10 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
               value: establishment.cnpj.value,
             }
           : null,
+        legal_representative: null,
         description: expected.description || establishment.description,
-        avatar: expected.avatar || establishment.avatar,
+        avatar: establishment.avatar,
+        cover: null,
         phone: expected.phone || establishment.phone?.value || null,
         website: expected.website || establishment.website,
         establishment_type: establishment.establishment_type,
@@ -146,7 +148,29 @@ describe("UpdateEstablishmentUseCase Unit Tests", () => {
 
     expect(savedEstablishment).toBeDefined();
     expect(savedEstablishment!.name).toBe(input.name);
-    expect(savedEstablishment!.email.value).toBe(input.email);
+    // 🔴 O e-mail só muda quando o dono do endereço novo clica no link.
+    expect(savedEstablishment!.email.value).toBe(establishment.email.value);
+  });
+
+  it("🔴 reenviar o MESMO e-mail não pede troca (o painel manda o campo a cada save)", async () => {
+    const establishment = EstablishmentFakeBuilder.anEstablishment().build();
+    repository.items = [establishment];
+    const published: unknown[] = [];
+    const mediatorUseCase = new UpdateEstablishmentUseCase(repository, {
+      publish: async (aggregate: { getUncommittedEvents(): unknown[] }) => {
+        published.push(...aggregate.getUncommittedEvents());
+      },
+    } as any);
+
+    await mediatorUseCase.execute({
+      id: establishment.establishment_id.id,
+      name: "Outro nome",
+      email: establishment.email.value,
+    });
+
+    expect(
+      published.some((e) => e instanceof EstablishmentEmailChangedEvent),
+    ).toBe(false);
   });
 
   it("should handle validation errors properly", async () => {

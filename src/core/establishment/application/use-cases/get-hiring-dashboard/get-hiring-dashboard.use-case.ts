@@ -13,14 +13,6 @@ import {
   IEventRepository,
 } from "@core/events/domain";
 import {
-  BandFilter,
-  BandSearchParams,
-  IBandRepository,
-  IMusicianRepository,
-  MusicianFilter,
-  MusicianSearchParams,
-} from "@core/musician/domain";
-import {
   BandOutput,
   BandOutputMapper,
 } from "@core/musician/application/use-cases/common/band-output";
@@ -28,6 +20,14 @@ import {
   MusicianOutput,
   MusicianOutputMapper,
 } from "@core/musician/application/use-cases/common/musician-profile-output";
+import {
+  BandFilter,
+  BandSearchParams,
+  IBandRepository,
+  IMusicianRepository,
+  MusicianFilter,
+  MusicianSearchParams,
+} from "@core/musician/domain";
 import {
   PaginationOutput,
   PaginationOutputMapper,

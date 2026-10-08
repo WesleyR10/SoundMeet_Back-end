@@ -2,6 +2,7 @@ import { OperatingHours } from "@core/shared/domain/value-objects/operating-hour
 
 import { Address, AggregateRoot, SocialLinks, Uuid } from "../../shared/domain";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
+import { StageTechSpec } from "../../shared/domain/value-objects/stage-tech-spec.vo";
 import { EstablishmentProfileValidatorFactory } from "./establishment-profile.validator";
 import { EstablishmentProfileFakeBuilder } from "./establishment-profile-fake.builder";
 
@@ -16,6 +17,8 @@ export type MenuPdfEntry = {
 
 export type EstablishmentProfileOperatingHoursInput = Record<string, unknown>;
 
+export type EstablishmentProfileStageTechSpecInput = Record<string, unknown>;
+
 export type EstablishmentProfileConstructorProps = {
   profile_id?: EstablishmentProfileId;
   establishment_id: Uuid;
@@ -27,6 +30,7 @@ export type EstablishmentProfileConstructorProps = {
     | OperatingHours
     | EstablishmentProfileOperatingHoursInput
     | null;
+  stageTechSpec?: StageTechSpec | EstablishmentProfileStageTechSpecInput | null;
   priceRange?: PriceRange | null;
   socialLinks?: SocialLinks | null;
   menu_pdfs?: MenuPdfEntry[];
@@ -45,6 +49,7 @@ export type EstablishmentProfileCreateCommand = {
     | OperatingHours
     | EstablishmentProfileOperatingHoursInput
     | null;
+  stageTechSpec?: StageTechSpec | EstablishmentProfileStageTechSpecInput | null;
   priceRange?: PriceRange | null;
   socialLinks?: SocialLinks | null;
   menu_pdfs?: MenuPdfEntry[];
@@ -60,6 +65,7 @@ export class EstablishmentProfile extends AggregateRoot {
   amenities: string[];
   preferredGenres: string[];
   operatingHours: OperatingHours | null;
+  stageTechSpec: StageTechSpec | null;
   priceRange: PriceRange | null;
   socialLinks: SocialLinks | null;
   menu_pdfs: MenuPdfEntry[];
@@ -77,6 +83,10 @@ export class EstablishmentProfile extends AggregateRoot {
     this.operatingHours = null;
     if (props.operatingHours !== undefined) {
       this.changeOperatingHours(props.operatingHours);
+    }
+    this.stageTechSpec = null;
+    if (props.stageTechSpec !== undefined) {
+      this.changeStageTechSpec(props.stageTechSpec);
     }
     this.priceRange = props.priceRange ?? null;
     this.socialLinks = props.socialLinks ?? null;
@@ -155,6 +165,35 @@ export class EstablishmentProfile extends AggregateRoot {
     }
   }
 
+  changeStageTechSpec(
+    stageTechSpec:
+      | StageTechSpec
+      | EstablishmentProfileStageTechSpecInput
+      | null,
+  ) {
+    if (stageTechSpec === null) {
+      this.stageTechSpec = null;
+      this.updated_at = new Date();
+      return;
+    }
+
+    if (stageTechSpec instanceof StageTechSpec) {
+      this.stageTechSpec = stageTechSpec;
+      this.updated_at = new Date();
+      return;
+    }
+
+    try {
+      this.stageTechSpec = StageTechSpec.fromJSON(stageTechSpec);
+      this.updated_at = new Date();
+    } catch (error: any) {
+      this.notification.addError(
+        error?.message ?? "Invalid stage tech spec",
+        "stageTechSpec",
+      );
+    }
+  }
+
   changePriceRange(priceRange: PriceRange | null) {
     this.priceRange = priceRange;
     this.updated_at = new Date();
@@ -195,6 +234,7 @@ export class EstablishmentProfile extends AggregateRoot {
       amenities: this.amenities,
       preferredGenres: this.preferredGenres,
       operatingHours: this.operatingHours?.toJSON() ?? null,
+      stageTechSpec: this.stageTechSpec?.toJSON() ?? null,
       priceRange: this.priceRange?.toJSON() || null,
       socialLinks: this.socialLinks?.toJSON() ?? null,
       menu_pdfs: this.menu_pdfs.map((e) => ({

@@ -1,10 +1,10 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
+import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import {
   boundingBoxForRadius,
   haversineKm,
 } from "../../../../shared/domain/geo.utils";
-import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
   Establishment,
@@ -54,6 +54,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           operatingHours: this.toPrismaOptionalJson(
             profileModel.operatingHours,
           ),
+          stageTechSpec: this.toPrismaOptionalJson(profileModel.stageTechSpec),
           priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
           menu_pdfs: this.toPrismaOptionalJson(profileModel.menu_pdfs),
@@ -111,6 +112,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           operatingHours: this.toPrismaOptionalJson(
             profileModel.operatingHours,
           ),
+          stageTechSpec: this.toPrismaOptionalJson(profileModel.stageTechSpec),
           priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
           menu_pdfs: this.toPrismaOptionalJson(profileModel.menu_pdfs),
@@ -125,6 +127,7 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
           operatingHours: this.toPrismaOptionalJson(
             profileModel.operatingHours,
           ),
+          stageTechSpec: this.toPrismaOptionalJson(profileModel.stageTechSpec),
           priceRange: this.toPrismaOptionalJson(profileModel.priceRange),
           socialLinks: this.toPrismaOptionalJson(profileModel.socialLinks),
           menu_pdfs: this.toPrismaOptionalJson(profileModel.menu_pdfs),
@@ -201,6 +204,15 @@ export class EstablishmentPrismaRepository implements IEstablishmentRepository {
   async findByEmail(email: string): Promise<Establishment | null> {
     const model = await this.prisma.establishment.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
+      include: { profile: true },
+    });
+
+    return model ? EstablishmentModelMapper.toEntity(model) : null;
+  }
+
+  async findByCnpj(cnpj: string): Promise<Establishment | null> {
+    const model = await this.prisma.establishment.findFirst({
+      where: { cnpj },
       include: { profile: true },
     });
 

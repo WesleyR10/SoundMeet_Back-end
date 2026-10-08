@@ -37,6 +37,90 @@ export class PriceRangeInput {
   notes?: string | null;
 }
 
+export class StageTechSpecDimensionsInput {
+  @IsOptional()
+  @IsNumber()
+  widthM?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  depthM?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  heightM?: number | null;
+}
+
+export class StageTechSpecPowerInput {
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  outlets?: number | null;
+
+  @IsOptional()
+  @IsString()
+  voltage?: string | null;
+}
+
+/**
+ * Ficha técnica do palco (A3). Todo campo é opcional por desenho — meia ficha
+ * vale mais que ficha nenhuma. As regras finas (limites, formato da janela de
+ * passagem de som, dedupe do backline) ficam no `StageTechSpec` VO; aqui só o
+ * contrato de forma, para o 422 sair na fronteira em vez de virar erro de
+ * notificação lá dentro.
+ */
+export class StageTechSpecInput {
+  @IsOptional()
+  @IsBoolean()
+  hasPa?: boolean | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  mixerChannels?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monitors?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  hasMicrophones?: number | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  backline?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StageTechSpecDimensionsInput)
+  dimensions?: StageTechSpecDimensionsInput | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StageTechSpecPowerInput)
+  power?: StageTechSpecPowerInput | null;
+
+  @IsOptional()
+  @IsBoolean()
+  hasParking?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  hasSoundEngineer?: boolean | null;
+
+  @IsOptional()
+  @IsString()
+  soundcheckWindow?: string | null;
+
+  @IsOptional()
+  @IsString()
+  notes?: string | null;
+}
+
 export class AddressInput {
   @IsString()
   street: string;
@@ -144,6 +228,11 @@ export class UpdateEstablishmentProfileInput {
   @IsOptional()
   @IsObject()
   operatingHours?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StageTechSpecInput)
+  stageTechSpec?: StageTechSpecInput | null;
 
   @IsOptional()
   @ValidateNested()

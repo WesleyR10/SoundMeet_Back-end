@@ -1,12 +1,12 @@
-import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { PlanLimitExceededError } from "../../../../../plans/domain/errors/plan-limit-exceeded.error";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { EstablishmentPlanTier } from "../../../../../plans/domain/plan-tier.enum";
 import {
   Subscription,
   SubscriptionStatus,
 } from "../../../../../plans/domain/subscription.aggregate";
-import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
+import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
 import { EstablishmentId } from "../../../../domain/establishment.aggregate";
 import { EstablishmentInMemoryRepository } from "../../../../infra/db/in-memory/establishment-in-memory.repository";
 import { CreateEstablishmentInput } from "../create-establishment.input";
@@ -194,13 +194,16 @@ describe("CreateEstablishmentUseCase — gate 4C.7 (multi_establishment)", () =>
 
   const baseInput: CreateEstablishmentInput = {
     name: "Bar do Wesley",
-    email: "bar2@soundmeet.app",
+    email: "bar2@soundmeet.com.br",
     phone: "+5511999999999",
     establishment_type: "bar",
     existing_establishment_ids: [EXISTING_ID],
   };
 
-  function makeSubscription(tier: EstablishmentPlanTier, status = SubscriptionStatus.ACTIVE) {
+  function makeSubscription(
+    tier: EstablishmentPlanTier,
+    status = SubscriptionStatus.ACTIVE,
+  ) {
     return new Subscription({
       establishment_id: EXISTING_ID,
       plan_tier: tier,
@@ -209,7 +212,10 @@ describe("CreateEstablishmentUseCase — gate 4C.7 (multi_establishment)", () =>
     });
   }
 
-  async function setupWithPlan(tier?: EstablishmentPlanTier, cancelled = false) {
+  async function setupWithPlan(
+    tier?: EstablishmentPlanTier,
+    cancelled = false,
+  ) {
     const establishmentRepo = new EstablishmentInMemoryRepository();
     const subRepo = new SubscriptionInMemoryRepository();
 
@@ -228,7 +234,9 @@ describe("CreateEstablishmentUseCase — gate 4C.7 (multi_establishment)", () =>
 
   it("(a) FREE: lança PlanLimitExceededError ao tentar 2º estabelecimento", async () => {
     const useCase = await setupWithPlan();
-    await expect(useCase.execute(baseInput)).rejects.toThrow(PlanLimitExceededError);
+    await expect(useCase.execute(baseInput)).rejects.toThrow(
+      PlanLimitExceededError,
+    );
   });
 
   it("(b) PRO: cria 2º estabelecimento com sucesso", async () => {
@@ -239,7 +247,9 @@ describe("CreateEstablishmentUseCase — gate 4C.7 (multi_establishment)", () =>
 
   it("(c) subscription cancelada comporta-se como FREE", async () => {
     const useCase = await setupWithPlan(EstablishmentPlanTier.PRO, true);
-    await expect(useCase.execute(baseInput)).rejects.toThrow(PlanLimitExceededError);
+    await expect(useCase.execute(baseInput)).rejects.toThrow(
+      PlanLimitExceededError,
+    );
   });
 
   it("hard-limit: 3 estabelecimentos existentes lança erro independente do plano", async () => {

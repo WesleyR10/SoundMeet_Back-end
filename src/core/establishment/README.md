@@ -143,7 +143,7 @@ O sistema suporta os seguintes filtros:
 - **Rating**: Sistema de avaliação de 0 a 5
 - **QRCode**: Geração e validação de códigos QR únicos
   - Formato: `soundmeet://establishment/{establishment_id}`
-  - URL Web: `https://soundmeet.app/establishment/{establishment_id}`
+  - URL Web: `https://soundmeet.com.br/establishment/{establishment_id}`
   - Funcionalidades: Analytics, indicações, marketing digital
 
 ## Eventos de Domínio

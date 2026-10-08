@@ -7,6 +7,7 @@ import { EntityValidationError } from "../../../../shared/domain/validators/vali
 import { Address } from "../../../../shared/domain/value-objects/address.vo";
 import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { SocialLinks } from "../../../../shared/domain/value-objects/social-links.vo";
+import { StageTechSpec } from "../../../../shared/domain/value-objects/stage-tech-spec.vo";
 import {
   Establishment,
   EstablishmentId,
@@ -66,6 +67,25 @@ export class CreateEstablishmentProfileUseCase implements IUseCase<
           notification.addError(
             error?.message ?? "Invalid operating hours",
             "operatingHours",
+          );
+          throw new EntityValidationError(notification.toJSON());
+        }
+      }
+    }
+
+    if (input.stageTechSpec !== undefined) {
+      if (input.stageTechSpec === null) {
+        profile.changeStageTechSpec(null);
+      } else {
+        try {
+          profile.changeStageTechSpec(
+            StageTechSpec.fromJSON(input.stageTechSpec),
+          );
+        } catch (error: any) {
+          const notification = new Notification();
+          notification.addError(
+            error?.message ?? "Invalid stage tech spec",
+            "stageTechSpec",
           );
           throw new EntityValidationError(notification.toJSON());
         }

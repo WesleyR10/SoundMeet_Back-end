@@ -21,10 +21,12 @@ describe("EstablishmentOutputMapper Unit Tests", () => {
       name: "Test Restaurant",
       description: "A great restaurant",
       avatar: "https://example.com/avatar.jpg",
+      cover: null,
       cnpj: {
         formatted: "12.345.678/0001-95",
         value: "12345678000195",
       },
+      legal_representative: null,
       email: entity.email.value,
       phone: entity.phone?.value || null,
       website: entity.website,
@@ -46,7 +48,11 @@ describe("EstablishmentOutputMapper Unit Tests", () => {
     });
 
     // Verify QR code contains establishment URL
-    expect(output.qr_code).toMatch(/^soundmeet:\/\/establishment\/[a-f0-9-]+$/);
+    // URL https, não `soundmeet://`: o esquema customizado não fazia nada na
+    // câmera de quem não tem o app. Ver `qr-code-link.ts`.
+    expect(output.qr_code).toMatch(
+      /^https:\/\/soundmeet\.com\.br\/local\/[a-f0-9-]+$/,
+    );
   });
 
   it("should convert an establishment with profile social links", () => {
@@ -91,5 +97,59 @@ describe("EstablishmentOutputMapper Unit Tests", () => {
       isEmpty: false,
       size: 1,
     });
+  });
+});
+
+/**
+ * `GET /establishments` e `GET /establishments/:id` são `@Public()`.
+ *
+ * O CNPJ é registro público e sai inteiro. O CPF do representante é PII de
+ * pessoa natural e não pode sair completo numa rota anônima — sai mascarado,
+ * o suficiente para o dono conferir na tela de configurações. O valor íntegro
+ * só circula dentro do servidor, na emissão do contrato.
+ */
+describe("EstablishmentOutputMapper — PII do representante legal", () => {
+  it("mascara o CPF do representante", () => {
+    const entity = EstablishmentFakeBuilder.anEstablishment()
+      .withLegalRepresentative("João da Silva", "52998224725")
+      .build();
+
+    const output = EstablishmentOutputMapper.toOutput(entity);
+
+    expect(output.legal_representative).toEqual({
+      name: "João da Silva",
+      document_masked: "529.***.**7-25",
+    });
+  });
+
+  it("nunca devolve o CPF completo", () => {
+    const entity = EstablishmentFakeBuilder.anEstablishment()
+      .withLegalRepresentative("João da Silva", "52998224725")
+      .build();
+
+    const output = EstablishmentOutputMapper.toOutput(entity);
+
+    expect(JSON.stringify(output)).not.toContain("52998224725");
+  });
+
+  it("devolve o nome mesmo sem CPF informado", () => {
+    const entity = EstablishmentFakeBuilder.anEstablishment()
+      .withLegalRepresentative("João da Silva", null)
+      .build();
+
+    const output = EstablishmentOutputMapper.toOutput(entity);
+
+    expect(output.legal_representative).toEqual({
+      name: "João da Silva",
+      document_masked: null,
+    });
+  });
+
+  it("devolve null quando não há representante", () => {
+    const entity = EstablishmentFakeBuilder.anEstablishment().build();
+
+    const output = EstablishmentOutputMapper.toOutput(entity);
+
+    expect(output.legal_representative).toBeNull();
   });
 });

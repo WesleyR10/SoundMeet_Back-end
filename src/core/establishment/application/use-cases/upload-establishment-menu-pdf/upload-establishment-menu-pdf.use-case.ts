@@ -1,3 +1,7 @@
+import { Readable } from "node:stream";
+
+import { randomUUID } from "crypto";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Notification } from "../../../../shared/domain/validators/notification";
@@ -6,13 +10,9 @@ import {
   Establishment,
   EstablishmentId,
 } from "../../../domain/establishment.aggregate";
-import {
-  MENU_PDF_MAX_COUNT,
-} from "../../../domain/establishment-profile.aggregate";
 import { IEstablishmentRepository } from "../../../domain/establishment.repository";
+import { MENU_PDF_MAX_COUNT } from "../../../domain/establishment-profile.aggregate";
 import { IEstablishmentStorage } from "../../ports/establishment-storage.interface";
-import { randomUUID } from "crypto";
-
 import {
   EstablishmentOutputMapper,
   EstablishmentProfileOutput,
@@ -22,7 +22,7 @@ const DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export type UploadEstablishmentMenuPdfInput = {
   establishment_id: string;
-  data: NodeJS.ReadableStream | Buffer;
+  data: Buffer | Readable;
   content_type: string;
   file_size: number;
 };
@@ -39,10 +39,10 @@ function toSlug(name: string): string {
     .slice(0, 50);
 }
 
-export class UploadEstablishmentMenuPdfUseCase
-  implements
-    IUseCase<UploadEstablishmentMenuPdfInput, UploadEstablishmentMenuPdfOutput>
-{
+export class UploadEstablishmentMenuPdfUseCase implements IUseCase<
+  UploadEstablishmentMenuPdfInput,
+  UploadEstablishmentMenuPdfOutput
+> {
   constructor(
     private readonly establishmentRepo: IEstablishmentRepository,
     private readonly storage: IEstablishmentStorage,

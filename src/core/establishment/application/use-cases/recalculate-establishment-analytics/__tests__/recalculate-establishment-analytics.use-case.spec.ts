@@ -46,6 +46,10 @@ class EstablishmentRepositoryStub implements IEstablishmentRepository {
     throw new Error("Not implemented");
   }
 
+  async findByCnpj(): Promise<Establishment | null> {
+    throw new Error("Not implemented");
+  }
+
   async findByEmail(): Promise<Establishment | null> {
     throw new Error("Not implemented");
   }

@@ -14,6 +14,7 @@ import {
   AddressInput,
   PriceRangeInput,
   SocialLinksInput,
+  StageTechSpecInput,
 } from "../update-establishment-profile/update-establishment-profile.input";
 
 export class CreateEstablishmentProfileInput {
@@ -42,6 +43,11 @@ export class CreateEstablishmentProfileInput {
   @IsOptional()
   @IsObject()
   operatingHours?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StageTechSpecInput)
+  stageTechSpec?: StageTechSpecInput | null;
 
   @IsOptional()
   @ValidateNested()

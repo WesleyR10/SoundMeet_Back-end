@@ -41,6 +41,10 @@ export class EstablishmentProfileRules {
   @IsObject({ groups: ["operatingHours"] })
   operatingHours: object | null;
 
+  @IsOptional({ groups: ["stageTechSpec"] })
+  @IsObject({ groups: ["stageTechSpec"] })
+  stageTechSpec: object | null;
+
   @IsOptional({ groups: ["priceRange"] })
   priceRange?: PriceRange | null;
 
@@ -68,6 +72,9 @@ export class EstablishmentProfileRules {
     this.operatingHours = entity?.operatingHours?.toJSON
       ? entity.operatingHours.toJSON()
       : (entity?.operatingHours ?? null);
+    this.stageTechSpec = entity?.stageTechSpec?.toJSON
+      ? entity.stageTechSpec.toJSON()
+      : (entity?.stageTechSpec ?? null);
     this.priceRange = entity?.priceRange ?? null;
     this.socialLinks = entity?.socialLinks ?? null;
     this.created_at = entity?.created_at;
@@ -86,6 +93,7 @@ export class EstablishmentProfileValidator extends ClassValidatorFields {
           "amenities",
           "preferredGenres",
           "operatingHours",
+          "stageTechSpec",
           "priceRange",
           "socialLinks",
           "created_at",

@@ -36,6 +36,8 @@ import {
 import { CreateEstablishmentUseCase } from "../../core/establishment/application/use-cases/create-establishment/create-establishment.use-case";
 import { CreateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/create-establishment-profile/create-establishment-profile.use-case";
 import { DeleteEstablishmentUseCase } from "../../core/establishment/application/use-cases/delete-establishment/delete-establishment.use-case";
+import { DeleteEstablishmentAvatarUseCase } from "../../core/establishment/application/use-cases/delete-establishment-avatar/delete-establishment-avatar.use-case";
+import { DeleteEstablishmentCoverUseCase } from "../../core/establishment/application/use-cases/delete-establishment-cover/delete-establishment-cover.use-case";
 import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { DeleteEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/delete-establishment-profile/delete-establishment-profile.use-case";
 import { GetEstablishmentUseCase } from "../../core/establishment/application/use-cases/get-establishment/get-establishment.use-case";
@@ -44,6 +46,8 @@ import { ListEstablishmentAnalyticsUseCase } from "../../core/establishment/appl
 import { ListEstablishmentsUseCase } from "../../core/establishment/application/use-cases/list-establishments/list-establishments.use-case";
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { UploadEstablishmentAvatarUseCase } from "../../core/establishment/application/use-cases/upload-establishment-avatar/upload-establishment-avatar.use-case";
+import { UploadEstablishmentCoverUseCase } from "../../core/establishment/application/use-cases/upload-establishment-cover/upload-establishment-cover.use-case";
 import { UploadEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
 import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import {
@@ -109,6 +113,18 @@ export class EstablishmentsController {
 
   @Inject(VerifyEstablishmentUseCase)
   private verifyUseCase: VerifyEstablishmentUseCase;
+
+  @Inject(UploadEstablishmentAvatarUseCase)
+  private uploadAvatarUseCase: UploadEstablishmentAvatarUseCase;
+
+  @Inject(DeleteEstablishmentAvatarUseCase)
+  private deleteAvatarUseCase: DeleteEstablishmentAvatarUseCase;
+
+  @Inject(UploadEstablishmentCoverUseCase)
+  private uploadCoverUseCase: UploadEstablishmentCoverUseCase;
+
+  @Inject(DeleteEstablishmentCoverUseCase)
+  private deleteCoverUseCase: DeleteEstablishmentCoverUseCase;
 
   @Inject(UploadEstablishmentMenuPdfUseCase)
   private uploadMenuPdfUseCase: UploadEstablishmentMenuPdfUseCase;
@@ -327,6 +343,204 @@ export class EstablishmentsController {
     });
 
     return new EstablishmentAnalyticsCollectionPresenter(output);
+  }
+
+  @Post(":id/avatar")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
+  @ApiOperation({
+    summary: "Upload da foto de perfil do espaço",
+    description:
+      "Envia a foto de perfil (logo) do estabelecimento. Limite: 2 MB. Formatos: JPEG, PNG ou WEBP — validados pelos BYTES do arquivo, não pelo Content-Type declarado. Substituir a foto apaga a anterior do storage.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiConsumes("multipart/form-data")
+  @ApiResponse({ status: 201, type: EstablishmentPresenter })
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, tmpdir()),
+        filename: (_req, file, cb) => {
+          // Nome original saneado — mesma defesa de path traversal da capa.
+          const safeName = (file.originalname || "avatar.jpg").replace(
+            /[^a-zA-Z0-9._-]/g,
+            "_",
+          );
+          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
+        },
+      }),
+      limits: {
+        fileSize: Number(
+          process.env.ESTABLISHMENT_AVATAR_MAX_SIZE ?? 2 * 1024 * 1024,
+        ),
+      },
+      fileFilter: (_req, file, cb) => {
+        // Peneira fraca (header do cliente). Quem decide é o
+        // `assertFileSignature` abaixo, lendo os bytes (UPL-1).
+        if (!file.mimetype.startsWith("image/")) {
+          return cb(new Error("Only image files are allowed"), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadAvatar(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new UnprocessableEntityException("file is required");
+    }
+
+    try {
+      /*
+       * 🔴 O tipo gravado é o DETECTADO, não o declarado — mesma razão da capa:
+       * um HTML anunciado como `image/png` servido pelo CDN seria XSS
+       * armazenado no nosso domínio de mídia.
+       */
+      const detectedMime = await assertFileSignature(
+        file.path,
+        ["image/jpeg", "image/png", "image/webp"],
+        "Invalid file: only JPEG, PNG or WEBP images are accepted",
+      );
+
+      const output = await this.uploadAvatarUseCase.execute({
+        establishment_id: id,
+        data: createReadStream(file.path),
+        content_type: detectedMime,
+        file_size: file.size,
+      });
+
+      return EstablishmentsController.serialize(output);
+    } finally {
+      await fs.unlink(file.path).catch(() => undefined);
+    }
+  }
+
+  @Delete(":id/avatar")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
+  @ApiOperation({
+    summary: "Remover a foto de perfil do espaço",
+    description:
+      "Apaga a foto enviada e volta para o ícone padrão. Idempotente: quem não tem foto recebe 200 com `avatar: null`.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: EstablishmentPresenter })
+  async deleteAvatar(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const output = await this.deleteAvatarUseCase.execute({
+      establishment_id: id,
+    });
+
+    return EstablishmentsController.serialize(output);
+  }
+
+  @Post(":id/cover")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
+  @ApiOperation({
+    summary: "Upload da capa do espaço",
+    description:
+      "Envia a imagem de capa (banner) do estabelecimento. Limite: 4 MB. Formatos: JPEG, PNG ou WEBP — validados pelos BYTES do arquivo, não pelo Content-Type declarado. Substituir a capa apaga a anterior do storage.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiConsumes("multipart/form-data")
+  @ApiResponse({ status: 201, type: EstablishmentPresenter })
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, tmpdir()),
+        filename: (_req, file, cb) => {
+          /*
+           * ⚠️ O nome original NUNCA vai cru para o disco. `originalname` é
+           * escrito pelo cliente e um `../../etc/cron.d/x` ali escaparia do
+           * diretório temporário. O `replace` deixa só `[a-zA-Z0-9._-]`, e o
+           * prefixo com timestamp + UUID garante unicidade mesmo quando dois
+           * uploads chegam com o mesmo nome saneado.
+           */
+          const safeName = (file.originalname || "cover.jpg").replace(
+            /[^a-zA-Z0-9._-]/g,
+            "_",
+          );
+          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
+        },
+      }),
+      limits: {
+        fileSize: Number(
+          process.env.ESTABLISHMENT_COVER_MAX_SIZE ?? 4 * 1024 * 1024,
+        ),
+      },
+      fileFilter: (_req, file, cb) => {
+        /*
+         * Primeira peneira, e a mais fraca das duas: `file.mimetype` é o
+         * header que o cliente escreveu. Ela existe para não gastar disco com
+         * um `.zip` óbvio; quem decide de verdade é o `assertFileSignature`
+         * abaixo, que lê os bytes (UPL-1).
+         */
+        if (!file.mimetype.startsWith("image/")) {
+          return cb(new Error("Only image files are allowed"), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadCover(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new UnprocessableEntityException("file is required");
+    }
+
+    try {
+      /*
+       * 🔴 O tipo que vai para o storage é o DETECTADO, não o declarado. Sem
+       * isto, um HTML anunciado como `image/png` seria servido pelo CDN com o
+       * Content-Type que o atacante escolheu — e um `text/html` hospedado no
+       * nosso domínio de mídia é XSS armazenado de graça.
+       */
+      const detectedMime = await assertFileSignature(
+        file.path,
+        ["image/jpeg", "image/png", "image/webp"],
+        "Invalid file: only JPEG, PNG or WEBP images are accepted",
+      );
+
+      const output = await this.uploadCoverUseCase.execute({
+        establishment_id: id,
+        data: createReadStream(file.path),
+        content_type: detectedMime,
+        file_size: file.size,
+      });
+
+      return EstablishmentsController.serialize(output);
+    } finally {
+      // O temporário sai em qualquer desfecho — inclusive quando a assinatura
+      // reprova, que é justamente o caso em que deixar o arquivo no disco
+      // seria pior.
+      await fs.unlink(file.path).catch(() => undefined);
+    }
+  }
+
+  @Delete(":id/cover")
+  @Roles("establishment", "admin")
+  @UseGuards(EstablishmentOwnershipGuard)
+  @ApiOperation({
+    summary: "Remover a capa do espaço",
+    description:
+      "Apaga a capa enviada e volta para a capa gerada pela marca. Idempotente: quem não tem capa recebe 200 com `cover: null`.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: EstablishmentPresenter })
+  async deleteCover(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const output = await this.deleteCoverUseCase.execute({
+      establishment_id: id,
+    });
+
+    return EstablishmentsController.serialize(output);
   }
 
   @Post(":id/menu-pdf")

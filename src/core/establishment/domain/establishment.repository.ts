@@ -106,4 +106,12 @@ export interface IEstablishmentRepository extends ISearchableRepository<
 > {
   deleteProfile(establishment_id: EstablishmentId): Promise<void>;
   findByEmail(email: string): Promise<Establishment | null>;
+  /**
+   * `cnpj` já normalizado (só dígitos — o VO `CNPJ` remove a máscara), que é
+   * como a coluna é gravada. Existe para o registro conseguir devolver 409
+   * ANTES de criar o usuário no provedor de identidade; sem isso a violação da
+   * unique do Postgres só apareceria depois, forçando compensação e devolvendo
+   * erro genérico. Mesmo precedente de `IMusicianRepository.findByCpf`.
+   */
+  findByCnpj(cnpj: string): Promise<Establishment | null>;
 }

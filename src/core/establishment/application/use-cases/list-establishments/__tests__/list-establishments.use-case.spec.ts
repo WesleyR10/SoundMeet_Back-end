@@ -48,8 +48,10 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
                 value: establishment.cnpj.value,
               }
             : null,
+          legal_representative: null,
           description: establishment.description,
           avatar: establishment.avatar,
+          cover: null,
           phone: establishment.phone?.value || null,
           website: establishment.website,
           establishment_type: establishment.establishment_type,
@@ -93,12 +95,14 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           name: establishments[1].name,
           description: establishments[1].description,
           avatar: establishments[1].avatar,
+          cover: null,
           cnpj: establishments[1].cnpj
             ? {
                 formatted: establishments[1].cnpj.formatted,
                 value: establishments[1].cnpj.value,
               }
             : null,
+          legal_representative: null,
           email: establishments[1].email.value,
           phone: establishments[1].phone?.value || null,
           website: establishments[1].website,
@@ -123,12 +127,14 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
           name: establishments[0].name,
           description: establishments[0].description,
           avatar: establishments[0].avatar,
+          cover: null,
           cnpj: establishments[0].cnpj
             ? {
                 formatted: establishments[0].cnpj.formatted,
                 value: establishments[0].cnpj.value,
               }
             : null,
+          legal_representative: null,
           email: establishments[0].email.value,
           phone: establishments[0].phone?.value || null,
           website: establishments[0].website,
@@ -194,8 +200,10 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
                 value: establishments[2].cnpj.value,
               }
             : null,
+          legal_representative: null,
           description: establishments[2].description,
           avatar: establishments[2].avatar,
+          cover: null,
           phone: establishments[2].phone?.value || null,
           website: establishments[2].website,
           establishment_type: establishments[2].establishment_type,
@@ -214,8 +222,10 @@ describe("ListEstablishmentsUseCase Unit Tests", () => {
                 value: establishments[0].cnpj.value,
               }
             : null,
+          legal_representative: null,
           description: establishments[0].description,
           avatar: establishments[0].avatar,
+          cover: null,
           phone: establishments[0].phone?.value || null,
           website: establishments[0].website,
           establishment_type: establishments[0].establishment_type,

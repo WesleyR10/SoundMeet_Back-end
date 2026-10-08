@@ -13,9 +13,10 @@ import {
 export type VerifyEstablishmentInput = { id: string };
 export type VerifyEstablishmentOutput = EstablishmentOutput;
 
-export class VerifyEstablishmentUseCase
-  implements IUseCase<VerifyEstablishmentInput, VerifyEstablishmentOutput>
-{
+export class VerifyEstablishmentUseCase implements IUseCase<
+  VerifyEstablishmentInput,
+  VerifyEstablishmentOutput
+> {
   constructor(private readonly establishmentRepo: IEstablishmentRepository) {}
 
   async execute(

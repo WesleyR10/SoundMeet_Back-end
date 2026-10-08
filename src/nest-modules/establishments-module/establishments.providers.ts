@@ -13,6 +13,8 @@ import { IEstablishmentStorage } from "../../core/establishment/application/port
 import { CreateEstablishmentUseCase } from "../../core/establishment/application/use-cases/create-establishment/create-establishment.use-case";
 import { CreateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/create-establishment-profile/create-establishment-profile.use-case";
 import { DeleteEstablishmentUseCase } from "../../core/establishment/application/use-cases/delete-establishment/delete-establishment.use-case";
+import { DeleteEstablishmentAvatarUseCase } from "../../core/establishment/application/use-cases/delete-establishment-avatar/delete-establishment-avatar.use-case";
+import { DeleteEstablishmentCoverUseCase } from "../../core/establishment/application/use-cases/delete-establishment-cover/delete-establishment-cover.use-case";
 import { DeleteEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/delete-establishment-menu-pdf/delete-establishment-menu-pdf.use-case";
 import { DeleteEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/delete-establishment-profile/delete-establishment-profile.use-case";
 import { GetEstablishmentUseCase } from "../../core/establishment/application/use-cases/get-establishment/get-establishment.use-case";
@@ -22,6 +24,8 @@ import { ListEstablishmentsUseCase } from "../../core/establishment/application/
 import { RecalculateEstablishmentAnalyticsUseCase } from "../../core/establishment/application/use-cases/recalculate-establishment-analytics/recalculate-establishment-analytics.use-case";
 import { UpdateEstablishmentUseCase } from "../../core/establishment/application/use-cases/update-establishment/update-establishment.use-case";
 import { UpdateEstablishmentProfileUseCase } from "../../core/establishment/application/use-cases/update-establishment-profile/update-establishment-profile.use-case";
+import { UploadEstablishmentAvatarUseCase } from "../../core/establishment/application/use-cases/upload-establishment-avatar/upload-establishment-avatar.use-case";
+import { UploadEstablishmentCoverUseCase } from "../../core/establishment/application/use-cases/upload-establishment-cover/upload-establishment-cover.use-case";
 import { UploadEstablishmentMenuPdfUseCase } from "../../core/establishment/application/use-cases/upload-establishment-menu-pdf/upload-establishment-menu-pdf.use-case";
 import { VerifyEstablishmentUseCase } from "../../core/establishment/application/use-cases/verify-establishment/verify-establishment.use-case";
 import { IEstablishmentRepository } from "../../core/establishment/domain/establishment.repository";
@@ -311,6 +315,58 @@ export const USE_CASES = {
       return new VerifyEstablishmentUseCase(repo);
     },
     inject: [REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide],
+  },
+  UPLOAD_ESTABLISHMENT_AVATAR_USE_CASE: {
+    provide: UploadEstablishmentAvatarUseCase,
+    useFactory: (
+      repo: IEstablishmentRepository,
+      storage: IEstablishmentStorage,
+    ) => {
+      return new UploadEstablishmentAvatarUseCase(repo, storage);
+    },
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      ESTABLISHMENT_STORAGE_TOKEN,
+    ],
+  },
+  DELETE_ESTABLISHMENT_AVATAR_USE_CASE: {
+    provide: DeleteEstablishmentAvatarUseCase,
+    useFactory: (
+      repo: IEstablishmentRepository,
+      storage: IEstablishmentStorage,
+    ) => {
+      return new DeleteEstablishmentAvatarUseCase(repo, storage);
+    },
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      ESTABLISHMENT_STORAGE_TOKEN,
+    ],
+  },
+  UPLOAD_ESTABLISHMENT_COVER_USE_CASE: {
+    provide: UploadEstablishmentCoverUseCase,
+    useFactory: (
+      repo: IEstablishmentRepository,
+      storage: IEstablishmentStorage,
+    ) => {
+      return new UploadEstablishmentCoverUseCase(repo, storage);
+    },
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      ESTABLISHMENT_STORAGE_TOKEN,
+    ],
+  },
+  DELETE_ESTABLISHMENT_COVER_USE_CASE: {
+    provide: DeleteEstablishmentCoverUseCase,
+    useFactory: (
+      repo: IEstablishmentRepository,
+      storage: IEstablishmentStorage,
+    ) => {
+      return new DeleteEstablishmentCoverUseCase(repo, storage);
+    },
+    inject: [
+      REPOSITORIES.ESTABLISHMENT_REPOSITORY.provide,
+      ESTABLISHMENT_STORAGE_TOKEN,
+    ],
   },
   UPLOAD_ESTABLISHMENT_MENU_PDF_USE_CASE: {
     provide: UploadEstablishmentMenuPdfUseCase,

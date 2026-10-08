@@ -12,6 +12,7 @@ export class EstablishmentPresenter {
   name: string;
   description: string | null;
   avatar: string | null;
+  cover: string | null;
   cnpj: EstablishmentOutput["cnpj"];
   // CPF vem mascarado do mapper — a rota é `@Public()`.
   legal_representative: EstablishmentOutput["legal_representative"];
@@ -41,6 +42,7 @@ export class EstablishmentPresenter {
     this.name = output.name;
     this.description = output.description;
     this.avatar = output.avatar;
+    this.cover = output.cover;
     this.cnpj = output.cnpj;
     this.legal_representative = output.legal_representative;
     this.email = output.email;

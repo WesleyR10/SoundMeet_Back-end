@@ -30,6 +30,12 @@ export class EstablishmentInMemoryRepository
     );
   }
 
+  async findByCnpj(cnpj: string): Promise<Establishment | null> {
+    // `cnpj` chega normalizado (só dígitos) e o VO também guarda normalizado,
+    // então a comparação é direta — sem máscara dos dois lados.
+    return this.items.find((e) => e.cnpj?.value === cnpj) ?? null;
+  }
+
   async deleteProfile(establishment_id: EstablishmentId): Promise<void> {
     const entity = await this.findById(establishment_id);
     if (!entity) {
@@ -162,8 +168,12 @@ export class EstablishmentInMemoryRepository
           address.latitude !== undefined &&
           address.longitude !== null &&
           address.longitude !== undefined &&
-          haversineKm(filter.lat, filter.lng, address.latitude, address.longitude) <=
-            filter.radius_km;
+          haversineKm(
+            filter.lat,
+            filter.lng,
+            address.latitude,
+            address.longitude,
+          ) <= filter.radius_km;
       }
 
       if (filter.is_active !== undefined) {

@@ -9,6 +9,8 @@ import {
   validateSync,
 } from "class-validator";
 
+import { IsExternalUrl } from "../../../../shared/application/validators/is-external-url.validator";
+
 export type EstablishmentType =
   | "bar"
   | "restaurant"
@@ -41,6 +43,7 @@ export type CreateEstablishmentInputConstructorProps = {
   establishment_type: EstablishmentType;
   is_active?: boolean;
   existing_establishment_ids?: string[];
+  owner_user_id?: string;
 };
 
 export class CreateEstablishmentInput {
@@ -76,6 +79,7 @@ export class CreateEstablishmentInput {
   @IsString()
   @IsOptional()
   @MaxLength(500)
+  @IsExternalUrl()
   website?: string;
 
   @IsString()
@@ -90,6 +94,12 @@ export class CreateEstablishmentInput {
 
   existing_establishment_ids: string[];
 
+  // `sub` do JWT de quem está criando. Recebe o claim `establishment_ids` para
+  // conseguir operar o estabelecimento depois — o id do agregado não é o `sub`.
+  @IsString()
+  @IsOptional()
+  owner_user_id?: string;
+
   constructor(props: CreateEstablishmentInputConstructorProps) {
     if (!props) return;
     this.name = props.name;
@@ -102,6 +112,7 @@ export class CreateEstablishmentInput {
     this.establishment_type = props.establishment_type;
     this.is_active = props.is_active ?? true;
     this.existing_establishment_ids = props.existing_establishment_ids ?? [];
+    this.owner_user_id = props.owner_user_id;
   }
 }
 
