@@ -1,7 +1,7 @@
 import { Band } from "../../../../../musician/domain/band.aggregate";
 import { BandInMemoryRepository } from "../../../../../musician/infra/db/in-memory/band-in-memory.repository";
-import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Booking } from "../../../../../scheduling/domain/booking.aggregate";
+import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { resolveBookingSyncMusicianId } from "../booking-sync-target.resolver";
 
 describe("resolveBookingSyncMusicianId", () => {

@@ -1,15 +1,8 @@
-import {
-  Controller,
-  Get,
-  Header,
-  Inject,
-  Logger,
-  Query,
-  UnprocessableEntityException,
-} from "@nestjs/common";
+import { Controller, Get, Inject, Logger, Query, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiExcludeController } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
+import type { Response } from "express";
 
 import { ConnectGoogleCalendarUseCase } from "../../core/google-calendar/application/use-cases/connect-google-calendar/connect-google-calendar.use-case";
 import { Public } from "../auth-module/auth.decorators";
@@ -25,6 +18,18 @@ import {
  * /musicians/:musician_id). É um redirect de navegador sem Bearer token:
  * a autenticidade vem 100% do `state` assinado (HMAC + expiração), validado
  * ANTES de qualquer troca de code com o Google.
+ *
+ * ## Por que redirect para o app, e não uma página
+ *
+ * Até 24/set/2026 esta rota devolvia uma página HTML dizendo "volte ao
+ * aplicativo" — escrita quando a feature não tinha cliente nenhum. Quem abre o
+ * consentimento é a Chrome Custom Tab do app (`openAuthSessionAsync`), e ela só
+ * fecha sozinha quando o navegador chega no `returnUrl`: com uma página, o
+ * músico terminava o fluxo e ficava olhando para uma aba que ele mesmo tinha
+ * que fechar, e o app não sabia se deu certo — só que a aba sumiu.
+ *
+ * Mesma decisão já tomada em `mercadopago-callback.controller.ts`, e agora é
+ * uma decisão só no projeto em vez de duas.
  */
 @ApiExcludeController()
 @Public()
@@ -42,18 +47,22 @@ export class GoogleCalendarCallbackController {
 
   @Get("callback")
   @SkipThrottle()
-  @Header("Content-Type", "text/html; charset=utf-8")
   async callback(
+    @Res() response: Response,
     @Query("code") code?: string,
     @Query("state") state?: string,
     @Query("error") error?: string,
-  ): Promise<string> {
-    // Usuário cancelou o consentimento na tela do Google.
+  ): Promise<void> {
+    /*
+     * Nada aqui responde JSON de erro: quem está lendo é um NAVEGADOR. Um 422
+     * com corpo JSON deixaria o músico numa aba com texto de API e sem nada
+     * para fazer. Todos os caminhos terminam num redirect para o app.
+     */
+
+    // Usuário negou o consentimento na tela do Google. Não é erro nosso, e o
+    // app diz isso com outras palavras — daí o status próprio.
     if (error) {
-      return this.htmlPage(
-        "Conexão cancelada",
-        "Você não autorizou o acesso ao Google Calendar. Volte ao aplicativo e tente novamente quando quiser.",
-      );
+      return response.redirect(this.appRedirect("cancelado"));
     }
 
     let musician_id: string;
@@ -61,53 +70,67 @@ export class GoogleCalendarCallbackController {
       ({ musician_id } = this.oauthStateService.verify(state ?? ""));
     } catch (stateError) {
       if (stateError instanceof InvalidOAuthStateError) {
-        // Log sem o state bruto — pode ter sido forjado, não poluir o log.
+        /*
+         * O motivo vai para o LOG, nunca para a query do redirect: um `state`
+         * inválido é tentativa de forja ou link velho, e detalhar a causa na
+         * URL ensina o atacante o que ajustar. Log sem o state bruto, pelo
+         * mesmo motivo.
+         */
         this.logger.warn(
           JSON.stringify({ event: "google_calendar.invalid_oauth_state" }),
         );
-        throw new UnprocessableEntityException(
-          "state inválido ou expirado — reinicie a conexão pelo aplicativo",
-        );
+        return response.redirect(this.appRedirect("erro"));
       }
       throw stateError;
     }
 
     if (!code) {
-      throw new UnprocessableEntityException(
-        "code ausente no callback do Google",
+      this.logger.warn(
+        JSON.stringify({
+          event: "google_calendar.callback_rejected",
+          reason: "code ausente",
+        }),
       );
+      return response.redirect(this.appRedirect("erro"));
     }
 
-    const output = await this.connectUseCase.execute({
-      musician_id,
-      code,
-      redirect_uri:
-        this.configService.get<string>("GOOGLE_CALENDAR_REDIRECT_URI") ?? "",
-    });
+    try {
+      await this.connectUseCase.execute({
+        musician_id,
+        code,
+        redirect_uri:
+          this.configService.get<string>("GOOGLE_CALENDAR_REDIRECT_URI") ?? "",
+      });
 
-    return this.htmlPage(
-      "Google Calendar conectado",
-      `Conta <strong>${this.escapeHtml(output.google_account_email ?? "")}</strong> conectada. ` +
-        "Seus shows confirmados no SoundMeet aparecerão automaticamente na sua agenda. " +
-        "Você já pode voltar ao aplicativo.",
-    );
+      // O e-mail da conta NÃO vai para o log — é PII, e o status autenticado
+      // já o entrega a quem tem direito a ele.
+      this.logger.log(
+        JSON.stringify({ event: "google_calendar.connected", musician_id }),
+      );
+
+      return response.redirect(this.appRedirect("sucesso"));
+    } catch (err) {
+      this.logger.error(
+        JSON.stringify({
+          event: "google_calendar.connect_failed",
+          musician_id,
+          message: err instanceof Error ? err.message : "unknown",
+        }),
+      );
+      return response.redirect(this.appRedirect("erro"));
+    }
   }
 
-  private htmlPage(title: string, message: string): string {
-    return (
-      "<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'>" +
-      "<meta name='viewport' content='width=device-width, initial-scale=1'>" +
-      `<title>${title} — SoundMeet</title>` +
-      "<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f0a1e;color:#f5f3ff}main{max-width:420px;padding:32px;text-align:center}h1{color:#7C3AED;font-size:1.4rem}</style>" +
-      `</head><body><main><h1>${title}</h1><p>${message}</p></main></body></html>`
-    );
-  }
-
-  private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  /**
+   * O e-mail da conta conectada NÃO viaja aqui. Ele sai por
+   * `GET /musicians/:id/google-calendar/status`, que é autenticado — colocá-lo
+   * na query de um redirect o deixaria no histórico do navegador e em qualquer
+   * log de proxy pelo caminho.
+   */
+  private appRedirect(status: "sucesso" | "cancelado" | "erro"): string {
+    const base =
+      this.configService.get<string>("GOOGLE_CALENDAR_APP_RETURN_URL") ??
+      "soundmeet://agenda/google";
+    return `${base}?status=${status}`;
   }
 }

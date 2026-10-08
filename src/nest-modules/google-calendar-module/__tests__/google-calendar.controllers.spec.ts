@@ -1,5 +1,5 @@
-import { UnprocessableEntityException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { Response } from "express";
 
 import { Uuid } from "../../../core/shared/domain/value-objects/uuid.vo";
 import { GoogleCalendarController } from "../google-calendar.controller";
@@ -11,6 +11,7 @@ const CONFIG: Record<string, string> = {
   GOOGLE_CALENDAR_CLIENT_SECRET: "client-secret",
   GOOGLE_CALENDAR_REDIRECT_URI:
     "http://localhost:3000/api/v1/google-calendar/oauth/callback",
+  GOOGLE_CALENDAR_APP_RETURN_URL: "soundmeet://agenda/google",
   JWT_SECRET: "test-secret",
 };
 
@@ -90,6 +91,7 @@ describe("GoogleCalendarController", () => {
 
 describe("GoogleCalendarCallbackController", () => {
   const musician_id = new Uuid().id;
+  const RETURN_URL = CONFIG.GOOGLE_CALENDAR_APP_RETURN_URL;
 
   const makeController = () => {
     const controller = new GoogleCalendarCallbackController(configStub);
@@ -99,76 +101,122 @@ describe("GoogleCalendarCallbackController", () => {
     });
     controller["connectUseCase"] = { execute: connect } as any;
     controller["oauthStateService"] = stateService;
-    return { controller, connect };
+
+    const redirect = jest.fn();
+    const response = { redirect } as unknown as Response;
+
+    return { controller, connect, response, redirect };
   };
 
-  it("state válido: troca o code pro musician_id embutido e retorna página de sucesso", async () => {
-    const { controller, connect } = makeController();
+  it("state válido: troca o code pro musician_id embutido e volta pro app", async () => {
+    const { controller, connect, response, redirect } = makeController();
     const state = stateService.sign(musician_id);
 
-    const html = await controller.callback("auth-code", state, undefined);
+    await controller.callback(response, "auth-code", state, undefined);
 
     expect(connect).toHaveBeenCalledWith({
       musician_id,
       code: "auth-code",
       redirect_uri: CONFIG.GOOGLE_CALENDAR_REDIRECT_URI,
     });
-    expect(html).toContain("Google Calendar conectado");
-    expect(html).toContain("musico@gmail.com");
+    expect(redirect).toHaveBeenCalledWith(`${RETURN_URL}?status=sucesso`);
   });
 
-  it("state adulterado → 422 sem tocar o Google", async () => {
-    const { controller, connect } = makeController();
+  it("state adulterado → volta com erro, sem tocar o Google", async () => {
+    const { controller, connect, response, redirect } = makeController();
 
-    await expect(
-      controller.callback("auth-code", "estado.forjado", undefined),
-    ).rejects.toThrow(UnprocessableEntityException);
+    await controller.callback(response, "auth-code", "estado.forjado", undefined);
+
     expect(connect).not.toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith(`${RETURN_URL}?status=erro`);
   });
 
-  it("state ausente → 422 sem tocar o Google", async () => {
-    const { controller, connect } = makeController();
+  it("state ausente → volta com erro, sem tocar o Google", async () => {
+    const { controller, connect, response, redirect } = makeController();
 
-    await expect(
-      controller.callback("auth-code", undefined, undefined),
-    ).rejects.toThrow(UnprocessableEntityException);
+    await controller.callback(response, "auth-code", undefined, undefined);
+
     expect(connect).not.toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith(`${RETURN_URL}?status=erro`);
   });
 
-  it("code ausente com state válido → 422", async () => {
-    const { controller, connect } = makeController();
+  it("code ausente com state válido → volta com erro", async () => {
+    const { controller, connect, response, redirect } = makeController();
     const state = stateService.sign(musician_id);
 
-    await expect(
-      controller.callback(undefined, state, undefined),
-    ).rejects.toThrow(UnprocessableEntityException);
+    await controller.callback(response, undefined, state, undefined);
+
     expect(connect).not.toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith(`${RETURN_URL}?status=erro`);
   });
 
-  it("usuário negou o consentimento → página de cancelamento, sem troca de code", async () => {
-    const { controller, connect } = makeController();
+  it("usuário negou o consentimento → status próprio, sem troca de code", async () => {
+    const { controller, connect, response, redirect } = makeController();
 
-    const html = await controller.callback(
-      undefined,
-      undefined,
-      "access_denied",
-    );
+    await controller.callback(response, undefined, undefined, "access_denied");
 
-    expect(html).toContain("Conexão cancelada");
     expect(connect).not.toHaveBeenCalled();
+    // `cancelado` e não `erro`: quem desistiu foi o usuário, e o app precisa
+    // dizer isso com outras palavras (nada quebrou).
+    expect(redirect).toHaveBeenCalledWith(`${RETURN_URL}?status=cancelado`);
   });
 
-  it("escapa HTML no e-mail da conta (defesa XSS na página de sucesso)", async () => {
-    const { controller, connect } = makeController();
+  it("falha na troca do code → volta com erro, sem vazar o motivo na URL", async () => {
+    const { controller, connect, response, redirect } = makeController();
+    connect.mockRejectedValue(new Error("invalid_grant: code já usado"));
+    const state = stateService.sign(musician_id);
+
+    await controller.callback(response, "auth-code", state, undefined);
+
+    expect(redirect).toHaveBeenCalledWith(`${RETURN_URL}?status=erro`);
+    const redirectUrl = redirect.mock.calls[0][0] as string;
+    expect(redirectUrl).not.toContain("invalid_grant");
+  });
+
+  /*
+   * 🔴 Esta é a razão de o e-mail NÃO viajar no redirect. Ele é PII e ficaria
+   * no histórico do navegador e em qualquer log de proxy pelo caminho — quem
+   * o entrega é o GET /status, autenticado. De quebra, sem HTML na resposta
+   * não existe mais superfície de XSS aqui (o teste de escape que morava
+   * neste arquivo deixou de ter o que testar).
+   */
+  it("nunca põe o e-mail da conta na URL de retorno", async () => {
+    const { controller, connect, response, redirect } = makeController();
     connect.mockResolvedValue({
       connected: true,
-      google_account_email: "<script>alert(1)</script>@gmail.com",
+      google_account_email: "musico@gmail.com",
     });
     const state = stateService.sign(musician_id);
 
-    const html = await controller.callback("auth-code", state, undefined);
+    await controller.callback(response, "auth-code", state, undefined);
 
-    expect(html).not.toContain("<script>alert(1)</script>");
-    expect(html).toContain("&lt;script&gt;");
+    const redirectUrl = redirect.mock.calls[0][0] as string;
+    expect(redirectUrl).not.toContain("musico@gmail.com");
+    expect(redirectUrl).not.toContain("gmail");
+  });
+
+  it("sem GOOGLE_CALENDAR_APP_RETURN_URL configurada, cai no deep link padrão", async () => {
+    const semReturnUrl = {
+      get: (key: string) =>
+        key === "GOOGLE_CALENDAR_APP_RETURN_URL" ? undefined : CONFIG[key],
+    } as unknown as ConfigService;
+    const controller = new GoogleCalendarCallbackController(semReturnUrl);
+    controller["connectUseCase"] = {
+      execute: jest.fn().mockResolvedValue({
+        connected: true,
+        google_account_email: "musico@gmail.com",
+      }),
+    } as any;
+    controller["oauthStateService"] = stateService;
+    const redirect = jest.fn();
+
+    await controller.callback(
+      { redirect } as unknown as Response,
+      "auth-code",
+      stateService.sign(musician_id),
+      undefined,
+    );
+
+    expect(redirect).toHaveBeenCalledWith("soundmeet://agenda/google?status=sucesso");
   });
 });
