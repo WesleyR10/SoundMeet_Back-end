@@ -2,16 +2,20 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Repertoire, RepertoireId } from "../../../domain/repertoire.aggregate";
 import { IRepertoireRepository } from "../../../domain/repertoire.repository";
-import { RepertoireOutput, RepertoireOutputMapper } from "../common/repertoire-output";
+import {
+  RepertoireOutput,
+  RepertoireOutputMapper,
+} from "../common/repertoire-output";
 
 export type RenameRepertoireInput = {
   repertoire_id: string;
   name: string;
 };
 
-export class RenameRepertoireUseCase
-  implements IUseCase<RenameRepertoireInput, RepertoireOutput>
-{
+export class RenameRepertoireUseCase implements IUseCase<
+  RenameRepertoireInput,
+  RepertoireOutput
+> {
   constructor(private readonly repertoireRepo: IRepertoireRepository) {}
 
   async execute(input: RenameRepertoireInput): Promise<RepertoireOutput> {

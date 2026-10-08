@@ -13,7 +13,9 @@ import {
 
 export class RepertoireModelMapper {
   /** Converte aggregate → modelo Prisma (apenas campos do Repertoire, sem relations). */
-  static toModel(entity: Repertoire): Omit<RepertoireModel, "songs" | "invitees"> {
+  static toModel(
+    entity: Repertoire,
+  ): Omit<RepertoireModel, "songs" | "invitees"> {
     return {
       id: entity.repertoire_id.id,
       musician_id: entity.musician_id,

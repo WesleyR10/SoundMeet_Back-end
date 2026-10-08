@@ -1,7 +1,7 @@
+import { MusicLibraryId } from "../../../../music-library/domain/music-library.aggregate";
+import { IMusicLibraryRepository } from "../../../../music-library/domain/music-library.repository";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { IMusicLibraryRepository } from "../../../../music-library/domain/music-library.repository";
-import { MusicLibraryId } from "../../../../music-library/domain/music-library.aggregate";
 import { Repertoire, RepertoireId } from "../../../domain/repertoire.aggregate";
 import { IRepertoireRepository } from "../../../domain/repertoire.repository";
 import {
@@ -15,9 +15,10 @@ export type GetRepertoireInput = {
   requesting_musician_id?: string;
 };
 
-export class GetRepertoireUseCase
-  implements IUseCase<GetRepertoireInput, RepertoireOutput>
-{
+export class GetRepertoireUseCase implements IUseCase<
+  GetRepertoireInput,
+  RepertoireOutput
+> {
   constructor(
     private readonly repertoireRepo: IRepertoireRepository,
     private readonly musicLibraryRepo: IMusicLibraryRepository,
@@ -31,9 +32,15 @@ export class GetRepertoireUseCase
     }
 
     const musicLibraryMap = await this.buildMusicLibraryMap(repertoire);
-    const isOwner = !input.requesting_musician_id || input.requesting_musician_id === repertoire.musician_id;
+    const isOwner =
+      !input.requesting_musician_id ||
+      input.requesting_musician_id === repertoire.musician_id;
 
-    return RepertoireOutputMapper.toOutput(repertoire, musicLibraryMap, isOwner);
+    return RepertoireOutputMapper.toOutput(
+      repertoire,
+      musicLibraryMap,
+      isOwner,
+    );
   }
 
   private async buildMusicLibraryMap(
@@ -42,7 +49,9 @@ export class GetRepertoireUseCase
     const map = new Map<string, MusicLibraryBasicData>();
     if (repertoire.songs.length === 0) return map;
 
-    const ids = repertoire.songs.map((s) => new MusicLibraryId(s.music_library_id));
+    const ids = repertoire.songs.map(
+      (s) => new MusicLibraryId(s.music_library_id),
+    );
     const entries = await this.musicLibraryRepo.findByIds(ids);
 
     for (const entry of entries) {
@@ -51,6 +60,7 @@ export class GetRepertoireUseCase
         title: entry.title,
         artist: entry.artist,
         duration_seconds: entry.duration_seconds,
+        has_chord_sheet: entry.hasChordSheetContent(),
       });
     }
     return map;

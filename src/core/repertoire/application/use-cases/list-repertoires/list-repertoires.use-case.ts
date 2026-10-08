@@ -1,6 +1,12 @@
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { IRepertoireRepository, RepertoireSearchParams } from "../../../domain/repertoire.repository";
-import { RepertoireOutput, RepertoireOutputMapper } from "../common/repertoire-output";
+import {
+  IRepertoireRepository,
+  RepertoireSearchParams,
+} from "../../../domain/repertoire.repository";
+import {
+  RepertoireOutput,
+  RepertoireOutputMapper,
+} from "../common/repertoire-output";
 
 export type ListRepertoiresInput = {
   musician_id: string;
@@ -19,9 +25,10 @@ export type ListRepertoiresOutput = {
   last_page: number;
 };
 
-export class ListRepertoiresUseCase
-  implements IUseCase<ListRepertoiresInput, ListRepertoiresOutput>
-{
+export class ListRepertoiresUseCase implements IUseCase<
+  ListRepertoiresInput,
+  ListRepertoiresOutput
+> {
   constructor(private readonly repertoireRepo: IRepertoireRepository) {}
 
   async execute(input: ListRepertoiresInput): Promise<ListRepertoiresOutput> {

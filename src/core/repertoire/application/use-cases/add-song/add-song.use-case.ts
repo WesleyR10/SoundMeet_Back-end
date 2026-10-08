@@ -1,13 +1,17 @@
-import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
-import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { IMusicLibraryRepository } from "../../../../music-library/domain/music-library.repository";
 import {
   MusicLibrary,
   MusicLibraryId,
 } from "../../../../music-library/domain/music-library.aggregate";
-import { Repertoire, RepertoireId, RepertoireSong } from "../../../domain/repertoire.aggregate";
+import { IMusicLibraryRepository } from "../../../../music-library/domain/music-library.repository";
+import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
+import {
+  Repertoire,
+  RepertoireId,
+  RepertoireSong,
+} from "../../../domain/repertoire.aggregate";
 import { IRepertoireRepository } from "../../../domain/repertoire.repository";
 import {
   MusicLibraryBasicData,
@@ -22,7 +26,10 @@ export type AddSongInput = {
   duration_override_seconds?: number | null;
 };
 
-export class AddSongUseCase implements IUseCase<AddSongInput, RepertoireOutput> {
+export class AddSongUseCase implements IUseCase<
+  AddSongInput,
+  RepertoireOutput
+> {
   constructor(
     private readonly repertoireRepo: IRepertoireRepository,
     private readonly musicLibraryRepo: IMusicLibraryRepository,
@@ -49,7 +56,11 @@ export class AddSongUseCase implements IUseCase<AddSongInput, RepertoireOutput> 
 
     if (musicLibrary.musician_id.id !== repertoire.musician_id) {
       throw new EntityValidationError([
-        { music_library_id: ["Esta música não pertence ao músico dono do repertório."] },
+        {
+          music_library_id: [
+            "Esta música não pertence ao músico dono do repertório.",
+          ],
+        },
       ]);
     }
 
@@ -64,7 +75,9 @@ export class AddSongUseCase implements IUseCase<AddSongInput, RepertoireOutput> 
 
     // Carrega dados de TODAS as músicas do repertório para o output enriquecido
     const musicLibraryMap = new Map<string, MusicLibraryBasicData>();
-    const allIds = repertoire.songs.map((s) => new MusicLibraryId(s.music_library_id));
+    const allIds = repertoire.songs.map(
+      (s) => new MusicLibraryId(s.music_library_id),
+    );
     const allEntries = await this.musicLibraryRepo.findByIds(allIds);
     for (const entry of allEntries) {
       musicLibraryMap.set(entry.music_library_id.id, {
@@ -72,6 +85,7 @@ export class AddSongUseCase implements IUseCase<AddSongInput, RepertoireOutput> 
         title: entry.title,
         artist: entry.artist,
         duration_seconds: entry.duration_seconds,
+        has_chord_sheet: entry.hasChordSheetContent(),
       });
     }
 

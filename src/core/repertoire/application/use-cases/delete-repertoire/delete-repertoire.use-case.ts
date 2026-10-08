@@ -6,9 +6,10 @@ import { IRepertoireRepository } from "../../../domain/repertoire.repository";
 export type DeleteRepertoireInput = { repertoire_id: string };
 export type DeleteRepertoireOutput = void;
 
-export class DeleteRepertoireUseCase
-  implements IUseCase<DeleteRepertoireInput, DeleteRepertoireOutput>
-{
+export class DeleteRepertoireUseCase implements IUseCase<
+  DeleteRepertoireInput,
+  DeleteRepertoireOutput
+> {
   constructor(private readonly repertoireRepo: IRepertoireRepository) {}
 
   async execute(input: DeleteRepertoireInput): Promise<void> {

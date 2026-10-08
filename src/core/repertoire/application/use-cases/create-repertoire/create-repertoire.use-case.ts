@@ -13,16 +13,19 @@ export type CreateRepertoireInput = {
   name: string;
 };
 
-export class CreateRepertoireUseCase
-  implements IUseCase<CreateRepertoireInput, RepertoireOutput>
-{
+export class CreateRepertoireUseCase implements IUseCase<
+  CreateRepertoireInput,
+  RepertoireOutput
+> {
   constructor(
     private readonly repertoireRepo: IRepertoireRepository,
     private readonly planCheckService: PlanCheckService,
   ) {}
 
   async execute(input: CreateRepertoireInput): Promise<RepertoireOutput> {
-    const currentCount = await this.repertoireRepo.countByMusicianId(input.musician_id);
+    const currentCount = await this.repertoireRepo.countByMusicianId(
+      input.musician_id,
+    );
     await this.planCheckService.assertMusicianCanCreateRepertoire(
       input.musician_id,
       currentCount,
@@ -35,6 +38,9 @@ export class CreateRepertoireUseCase
 
     await this.repertoireRepo.insert(repertoire);
 
-    return RepertoireOutputMapper.toOutput(repertoire, new Map<string, MusicLibraryBasicData>());
+    return RepertoireOutputMapper.toOutput(
+      repertoire,
+      new Map<string, MusicLibraryBasicData>(),
+    );
   }
 }

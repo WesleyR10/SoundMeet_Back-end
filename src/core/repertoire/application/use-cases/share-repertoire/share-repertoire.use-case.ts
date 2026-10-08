@@ -3,11 +3,17 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { Repertoire, RepertoireId } from "../../../domain/repertoire.aggregate";
 import { IRepertoireRepository } from "../../../domain/repertoire.repository";
-import { RepertoireOutput, RepertoireOutputMapper } from "../common/repertoire-output";
+import {
+  RepertoireOutput,
+  RepertoireOutputMapper,
+} from "../common/repertoire-output";
 
 export type ShareRepertoireInput = { repertoire_id: string };
 
-export class ShareRepertoireUseCase implements IUseCase<ShareRepertoireInput, RepertoireOutput> {
+export class ShareRepertoireUseCase implements IUseCase<
+  ShareRepertoireInput,
+  RepertoireOutput
+> {
   constructor(
     private readonly repertoireRepo: IRepertoireRepository,
     private readonly planCheckService: PlanCheckService,

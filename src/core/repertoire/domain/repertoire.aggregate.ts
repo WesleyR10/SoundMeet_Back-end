@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+
 import { AggregateRoot, Uuid } from "../../shared/domain";
 import { EntityValidationError } from "../../shared/domain/validators/validation.error";
 import { RepertoireValidatorFactory } from "./repertoire.validator";
@@ -33,8 +34,16 @@ export class RepertoireSong {
   }
 
   /** position é opcional aqui — o aggregate atribui ao chamar addSong. */
-  static create(props: Omit<RepertoireSongProps, "song_id" | "position"> & { position?: number }): RepertoireSong {
-    return new RepertoireSong({ ...props, song_id: randomUUID(), position: props.position ?? 0 });
+  static create(
+    props: Omit<RepertoireSongProps, "song_id" | "position"> & {
+      position?: number;
+    },
+  ): RepertoireSong {
+    return new RepertoireSong({
+      ...props,
+      song_id: randomUUID(),
+      position: props.position ?? 0,
+    });
   }
 
   /** Duração efetiva: override se definido, caso contrário duração da biblioteca. */
@@ -78,7 +87,11 @@ export class RepertoireInvitee {
   }
 
   toJSON() {
-    return { id: this.id, musician_id: this.musician_id, invited_at: this.invited_at };
+    return {
+      id: this.id,
+      musician_id: this.musician_id,
+      invited_at: this.invited_at,
+    };
   }
 }
 
@@ -121,7 +134,9 @@ export class Repertoire extends AggregateRoot {
     this.repertoire_id = props.repertoire_id ?? new RepertoireId();
     this.musician_id = props.musician_id;
     this.name = props.name;
-    this.songs = props.songs ? [...props.songs].sort((a, b) => a.position - b.position) : [];
+    this.songs = props.songs
+      ? [...props.songs].sort((a, b) => a.position - b.position)
+      : [];
     this.invitees = props.invitees ?? [];
     this.share_token = props.share_token ?? null;
     this.share_token_expires_at = props.share_token_expires_at ?? null;
@@ -188,9 +203,16 @@ export class Repertoire extends AggregateRoot {
     const current = new Set(this.songs.map((s) => s.song_id));
     const provided = new Set(ordered_song_ids);
 
-    if (current.size !== provided.size || ![...current].every((id) => provided.has(id))) {
+    if (
+      current.size !== provided.size ||
+      ![...current].every((id) => provided.has(id))
+    ) {
       throw new EntityValidationError([
-        { ordered_song_ids: ["O array deve conter exatamente os IDs de todas as músicas do repertório."] },
+        {
+          ordered_song_ids: [
+            "O array deve conter exatamente os IDs de todas as músicas do repertório.",
+          ],
+        },
       ]);
     }
 
@@ -202,10 +224,18 @@ export class Repertoire extends AggregateRoot {
     this.touch();
   }
 
-  updateSong(song_id: string, props: { custom_notes?: string | null; duration_override_seconds?: number | null }): void {
+  updateSong(
+    song_id: string,
+    props: {
+      custom_notes?: string | null;
+      duration_override_seconds?: number | null;
+    },
+  ): void {
     const song = this.songs.find((s) => s.song_id === song_id);
     if (!song) {
-      throw new EntityValidationError([{ song_id: ["Música não encontrada neste repertório."] }]);
+      throw new EntityValidationError([
+        { song_id: ["Música não encontrada neste repertório."] },
+      ]);
     }
     if (props.custom_notes !== undefined) {
       song.custom_notes = props.custom_notes;
@@ -276,7 +306,9 @@ export class Repertoire extends AggregateRoot {
    * Retorna null se qualquer música não tiver duração disponível.
    * libraryDurations: mapa de music_library_id → duration_seconds (do pipeline futuro).
    */
-  getEstimatedShowDuration(libraryDurations: Map<string, number | null> = new Map()): number | null {
+  getEstimatedShowDuration(
+    libraryDurations: Map<string, number | null> = new Map(),
+  ): number | null {
     if (this.songs.length === 0) return null;
 
     let totalSeconds = 0;

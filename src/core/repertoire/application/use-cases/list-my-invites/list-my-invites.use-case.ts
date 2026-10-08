@@ -1,6 +1,6 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { IMusicLibraryRepository } from "../../../../music-library/domain/music-library.repository";
 import { MusicLibraryId } from "../../../../music-library/domain/music-library.aggregate";
+import { IMusicLibraryRepository } from "../../../../music-library/domain/music-library.repository";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { Repertoire } from "../../../domain/repertoire.aggregate";
 import { IRepertoireRepository } from "../../../domain/repertoire.repository";
 import {
@@ -12,16 +12,19 @@ import {
 export type ListMyInvitesInput = { musician_id: string };
 export type ListMyInvitesOutput = RepertoireOutput[];
 
-export class ListMyInvitesUseCase
-  implements IUseCase<ListMyInvitesInput, ListMyInvitesOutput>
-{
+export class ListMyInvitesUseCase implements IUseCase<
+  ListMyInvitesInput,
+  ListMyInvitesOutput
+> {
   constructor(
     private readonly repertoireRepo: IRepertoireRepository,
     private readonly musicLibraryRepo: IMusicLibraryRepository,
   ) {}
 
   async execute(input: ListMyInvitesInput): Promise<ListMyInvitesOutput> {
-    const repertoires = await this.repertoireRepo.findSharedWithMusician(input.musician_id);
+    const repertoires = await this.repertoireRepo.findSharedWithMusician(
+      input.musician_id,
+    );
     return Promise.all(
       repertoires.map(async (r) => {
         const map = await this.buildMusicLibraryMap(r);
@@ -36,7 +39,9 @@ export class ListMyInvitesUseCase
     const map = new Map<string, MusicLibraryBasicData>();
     if (repertoire.songs.length === 0) return map;
 
-    const ids = repertoire.songs.map((s) => new MusicLibraryId(s.music_library_id));
+    const ids = repertoire.songs.map(
+      (s) => new MusicLibraryId(s.music_library_id),
+    );
     const entries = await this.musicLibraryRepo.findByIds(ids);
 
     for (const entry of entries) {
@@ -45,6 +50,7 @@ export class ListMyInvitesUseCase
         title: entry.title,
         artist: entry.artist,
         duration_seconds: entry.duration_seconds,
+        has_chord_sheet: entry.hasChordSheetContent(),
       });
     }
     return map;

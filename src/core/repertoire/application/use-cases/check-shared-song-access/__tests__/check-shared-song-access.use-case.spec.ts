@@ -1,7 +1,10 @@
 import { InvalidOperationError } from "../../../../../shared/domain/errors/invalid-operation.error";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { Repertoire, RepertoireSong } from "../../../../domain/repertoire.aggregate";
+import {
+  Repertoire,
+  RepertoireSong,
+} from "../../../../domain/repertoire.aggregate";
 import { RepertoireFakeBuilder } from "../../../../domain/repertoire-fake.builder";
 import { RepertoireInMemoryRepository } from "../../../../infra/db/in-memory/repertoire-in-memory.repository";
 import { CheckSharedSongAccessUseCase } from "../check-shared-song-access.use-case";
@@ -18,8 +21,13 @@ describe("CheckSharedSongAccessUseCase", () => {
   it("autoriza acesso via token válido e música pertencente ao repertório", async () => {
     const ownerId = new Uuid().id;
     const musicLibraryId = new Uuid().id;
-    const repertoire = Repertoire.create({ musician_id: ownerId, name: "Setlist" });
-    repertoire.addSong(RepertoireSong.create({ music_library_id: musicLibraryId }));
+    const repertoire = Repertoire.create({
+      musician_id: ownerId,
+      name: "Setlist",
+    });
+    repertoire.addSong(
+      RepertoireSong.create({ music_library_id: musicLibraryId }),
+    );
     repertoire.share();
     await repo.insert(repertoire);
 
@@ -33,7 +41,10 @@ describe("CheckSharedSongAccessUseCase", () => {
 
   it("lança NotFoundError pra token inexistente", async () => {
     await expect(
-      useCase.execute({ share_token: new Uuid().id, music_library_id: new Uuid().id }),
+      useCase.execute({
+        share_token: new Uuid().id,
+        music_library_id: new Uuid().id,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -48,22 +59,33 @@ describe("CheckSharedSongAccessUseCase", () => {
       .withShareToken(expiredToken)
       .withShareTokenExpiresAt(yesterday)
       .build();
-    repertoire.addSong(RepertoireSong.create({ music_library_id: musicLibraryId }));
+    repertoire.addSong(
+      RepertoireSong.create({ music_library_id: musicLibraryId }),
+    );
     await repo.insert(repertoire);
 
     await expect(
-      useCase.execute({ share_token: expiredToken, music_library_id: musicLibraryId }),
+      useCase.execute({
+        share_token: expiredToken,
+        music_library_id: musicLibraryId,
+      }),
     ).rejects.toBeInstanceOf(InvalidOperationError);
   });
 
   it("lança NotFoundError se a música não pertencer ao repertório compartilhado", async () => {
     const ownerId = new Uuid().id;
-    const repertoire = Repertoire.create({ musician_id: ownerId, name: "Setlist" });
+    const repertoire = Repertoire.create({
+      musician_id: ownerId,
+      name: "Setlist",
+    });
     repertoire.share();
     await repo.insert(repertoire);
 
     await expect(
-      useCase.execute({ share_token: repertoire.share_token!, music_library_id: new Uuid().id }),
+      useCase.execute({
+        share_token: repertoire.share_token!,
+        music_library_id: new Uuid().id,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Repertoire, RepertoireId } from "../../../domain/repertoire.aggregate";
@@ -8,8 +9,8 @@ import {
   RepertoireSearchParams,
   RepertoireSearchResult,
 } from "../../../domain/repertoire.repository";
-import { RepertoireModelMapper } from "./repertoire-model-mapper";
 import { RepertoireModel } from "./repertoire-model";
+import { RepertoireModelMapper } from "./repertoire-model-mapper";
 
 const INCLUDE_RELATIONS = {
   songs: { orderBy: { position: "asc" as const } },
@@ -41,7 +42,10 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
             invitees: {
               create: entity.invitees.map((i) => {
                 const { repertoire_id: _repertoireId, ...invitee } =
-                  RepertoireModelMapper.inviteeToModel(i, entity.repertoire_id.id);
+                  RepertoireModelMapper.inviteeToModel(
+                    i,
+                    entity.repertoire_id.id,
+                  );
                 return invitee;
               }),
             },
@@ -72,7 +76,9 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
           data: model,
         });
 
-        await tx.repertoireSong.deleteMany({ where: { repertoire_id: model.id } });
+        await tx.repertoireSong.deleteMany({
+          where: { repertoire_id: model.id },
+        });
         if (entity.songs.length > 0) {
           await tx.repertoireSong.createMany({
             data: entity.songs.map((s) =>
@@ -81,7 +87,9 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
           });
         }
 
-        await tx.repertoireInvitee.deleteMany({ where: { repertoire_id: model.id } });
+        await tx.repertoireInvitee.deleteMany({
+          where: { repertoire_id: model.id },
+        });
         if (entity.invitees.length > 0) {
           await tx.repertoireInvitee.createMany({
             data: entity.invitees.map((i) =>
@@ -116,14 +124,18 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
       where: { id: id.id },
       include: INCLUDE_RELATIONS,
     });
-    return model ? RepertoireModelMapper.toEntity(model as RepertoireModel) : null;
+    return model
+      ? RepertoireModelMapper.toEntity(model as RepertoireModel)
+      : null;
   }
 
   async findAll(): Promise<Repertoire[]> {
     const models = await this.prisma.repertoire.findMany({
       include: INCLUDE_RELATIONS,
     });
-    return models.map((m) => RepertoireModelMapper.toEntity(m as RepertoireModel));
+    return models.map((m) =>
+      RepertoireModelMapper.toEntity(m as RepertoireModel),
+    );
   }
 
   async findByIds(ids: RepertoireId[]): Promise<Repertoire[]> {
@@ -131,7 +143,9 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
       where: { id: { in: ids.map((id) => id.id) } },
       include: INCLUDE_RELATIONS,
     });
-    return models.map((m) => RepertoireModelMapper.toEntity(m as RepertoireModel));
+    return models.map((m) =>
+      RepertoireModelMapper.toEntity(m as RepertoireModel),
+    );
   }
 
   async existsById(
@@ -154,7 +168,9 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
       include: INCLUDE_RELATIONS,
       orderBy: { created_at: "desc" },
     });
-    return models.map((m) => RepertoireModelMapper.toEntity(m as RepertoireModel));
+    return models.map((m) =>
+      RepertoireModelMapper.toEntity(m as RepertoireModel),
+    );
   }
 
   async countByMusicianId(musician_id: string): Promise<number> {
@@ -166,7 +182,9 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
       where: { share_token: token },
       include: INCLUDE_RELATIONS,
     });
-    return model ? RepertoireModelMapper.toEntity(model as RepertoireModel) : null;
+    return model
+      ? RepertoireModelMapper.toEntity(model as RepertoireModel)
+      : null;
   }
 
   async findSharedWithMusician(musician_id: string): Promise<Repertoire[]> {
@@ -175,10 +193,14 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
       include: INCLUDE_RELATIONS,
       orderBy: { created_at: "desc" },
     });
-    return models.map((m) => RepertoireModelMapper.toEntity(m as RepertoireModel));
+    return models.map((m) =>
+      RepertoireModelMapper.toEntity(m as RepertoireModel),
+    );
   }
 
-  async search(params: RepertoireSearchParams): Promise<RepertoireSearchResult> {
+  async search(
+    params: RepertoireSearchParams,
+  ): Promise<RepertoireSearchResult> {
     const offset = (params.page - 1) * params.per_page;
     const where: any = {};
 
@@ -207,7 +229,9 @@ export class RepertoirePrismaRepository implements IRepertoireRepository {
     ]);
 
     return new RepertoireSearchResult({
-      items: models.map((m) => RepertoireModelMapper.toEntity(m as RepertoireModel)),
+      items: models.map((m) =>
+        RepertoireModelMapper.toEntity(m as RepertoireModel),
+      ),
       total,
       current_page: params.page,
       per_page: params.per_page,

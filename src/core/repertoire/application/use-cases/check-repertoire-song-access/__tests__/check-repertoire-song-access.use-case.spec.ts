@@ -1,7 +1,11 @@
 import { ForbiddenException } from "@nestjs/common";
+
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
-import { Repertoire, RepertoireSong } from "../../../../domain/repertoire.aggregate";
+import {
+  Repertoire,
+  RepertoireSong,
+} from "../../../../domain/repertoire.aggregate";
 import { RepertoireInMemoryRepository } from "../../../../infra/db/in-memory/repertoire-in-memory.repository";
 import { CheckRepertoireSongAccessUseCase } from "../check-repertoire-song-access.use-case";
 
@@ -17,8 +21,13 @@ describe("CheckRepertoireSongAccessUseCase", () => {
   it("autoriza o dono do repertório", async () => {
     const ownerId = new Uuid().id;
     const musicLibraryId = new Uuid().id;
-    const repertoire = Repertoire.create({ musician_id: ownerId, name: "Setlist" });
-    repertoire.addSong(RepertoireSong.create({ music_library_id: musicLibraryId }));
+    const repertoire = Repertoire.create({
+      musician_id: ownerId,
+      name: "Setlist",
+    });
+    repertoire.addSong(
+      RepertoireSong.create({ music_library_id: musicLibraryId }),
+    );
     await repo.insert(repertoire);
 
     const output = await useCase.execute({
@@ -34,8 +43,13 @@ describe("CheckRepertoireSongAccessUseCase", () => {
     const ownerId = new Uuid().id;
     const inviteeId = new Uuid().id;
     const musicLibraryId = new Uuid().id;
-    const repertoire = Repertoire.create({ musician_id: ownerId, name: "Setlist" });
-    repertoire.addSong(RepertoireSong.create({ music_library_id: musicLibraryId }));
+    const repertoire = Repertoire.create({
+      musician_id: ownerId,
+      name: "Setlist",
+    });
+    repertoire.addSong(
+      RepertoireSong.create({ music_library_id: musicLibraryId }),
+    );
     repertoire.inviteMusician(inviteeId);
     await repo.insert(repertoire);
 
@@ -52,8 +66,13 @@ describe("CheckRepertoireSongAccessUseCase", () => {
     const ownerId = new Uuid().id;
     const strangerId = new Uuid().id;
     const musicLibraryId = new Uuid().id;
-    const repertoire = Repertoire.create({ musician_id: ownerId, name: "Setlist" });
-    repertoire.addSong(RepertoireSong.create({ music_library_id: musicLibraryId }));
+    const repertoire = Repertoire.create({
+      musician_id: ownerId,
+      name: "Setlist",
+    });
+    repertoire.addSong(
+      RepertoireSong.create({ music_library_id: musicLibraryId }),
+    );
     await repo.insert(repertoire);
 
     await expect(
@@ -69,7 +88,10 @@ describe("CheckRepertoireSongAccessUseCase", () => {
     const ownerId = new Uuid().id;
     const inviteeId = new Uuid().id;
     const otherMusicLibraryId = new Uuid().id;
-    const repertoire = Repertoire.create({ musician_id: ownerId, name: "Setlist" });
+    const repertoire = Repertoire.create({
+      musician_id: ownerId,
+      name: "Setlist",
+    });
     repertoire.inviteMusician(inviteeId);
     await repo.insert(repertoire);
 

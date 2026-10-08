@@ -46,9 +46,7 @@ export class CheckRepertoireSongAccessUseCase implements IUseCase<
       (i) => i.musician_id === input.requesting_musician_id,
     );
     if (!isOwner && !isInvitee) {
-      throw new ForbiddenException(
-        "Você não tem acesso a este repertório.",
-      );
+      throw new ForbiddenException("Você não tem acesso a este repertório.");
     }
 
     const hasSong = repertoire.songs.some(

@@ -5,7 +5,10 @@ import { IRepertoireRepository } from "../../../domain/repertoire.repository";
 
 export type UnshareRepertoireInput = { repertoire_id: string };
 
-export class UnshareRepertoireUseCase implements IUseCase<UnshareRepertoireInput, void> {
+export class UnshareRepertoireUseCase implements IUseCase<
+  UnshareRepertoireInput,
+  void
+> {
   constructor(private readonly repertoireRepo: IRepertoireRepository) {}
 
   async execute(input: UnshareRepertoireInput): Promise<void> {

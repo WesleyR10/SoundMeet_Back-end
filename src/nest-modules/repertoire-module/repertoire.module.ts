@@ -32,5 +32,9 @@ import { REPERTOIRE_PROVIDERS } from "./repertoire.providers";
     ...Object.values(REPERTOIRE_PROVIDERS.REPOSITORIES),
     ...Object.values(REPERTOIRE_PROVIDERS.USE_CASES),
   ],
+  // Consumido pelo PerformanceModule: a setlist da noite é um repertório, e o
+  // set precisa provar que ele é do músico. Sem ciclo — este módulo não
+  // importa nada que chegue ao PerformanceModule.
+  exports: [REPERTOIRE_PROVIDERS.REPOSITORIES.REPERTOIRE_REPOSITORY.provide],
 })
 export class RepertoireModule {}

@@ -9,7 +9,11 @@ import {
 } from "../../../domain/repertoire.repository";
 
 export class RepertoireInMemoryRepository
-  extends InMemorySearchableRepository<Repertoire, RepertoireId, RepertoireFilter>
+  extends InMemorySearchableRepository<
+    Repertoire,
+    RepertoireId,
+    RepertoireFilter
+  >
   implements IRepertoireRepository
 {
   sortableFields: string[] = ["name", "created_at"];
@@ -48,7 +52,9 @@ export class RepertoireInMemoryRepository
   ): Promise<Repertoire[]> {
     if (!filter) return items;
     return items.filter((r) => {
-      const byMusician = filter.musician_id ? r.musician_id === filter.musician_id : true;
+      const byMusician = filter.musician_id
+        ? r.musician_id === filter.musician_id
+        : true;
       const byName = filter.name
         ? r.name.toLowerCase().includes(filter.name.toLowerCase())
         : true;

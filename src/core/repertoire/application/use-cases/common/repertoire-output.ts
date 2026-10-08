@@ -1,4 +1,7 @@
-import { Repertoire, RepertoireSong } from "../../../domain/repertoire.aggregate";
+import {
+  Repertoire,
+  RepertoireSong,
+} from "../../../domain/repertoire.aggregate";
 
 export type RepertoireSongOutput = {
   song_id: string;
@@ -10,6 +13,17 @@ export type RepertoireSongOutput = {
   duration_override_seconds: number | null;
   duration_seconds: number | null;
   effective_duration_seconds: number | null;
+  /**
+   * Se o Play Mode tem o que exibir para esta música. Sem isso o app leva o
+   * músico para uma tela "Sem cifra disponível" sem nenhum aviso prévio.
+   *
+   * O predicado espelha o que `GetChordSheetForMusicLibraryUseCase` realmente
+   * consome — `lrc_normalized` (letra) e `chords` (acordes) — e NÃO a coluna
+   * `chord_sheet` materializada: hoje há mais linhas com lrc/chords do que com
+   * chord_sheet, então usar a materializada marcaria como "sem cifra" músicas
+   * que o endpoint serve normalmente.
+   */
+  has_chord_sheet: boolean;
   added_at: Date;
 };
 
@@ -39,6 +53,7 @@ export type MusicLibraryBasicData = {
   title: string;
   artist: string;
   duration_seconds: number | null;
+  has_chord_sheet: boolean;
 };
 
 export class RepertoireOutputMapper {
@@ -66,6 +81,8 @@ export class RepertoireOutputMapper {
         duration_override_seconds: song.duration_override_seconds,
         duration_seconds,
         effective_duration_seconds: effective,
+        // Ausente do mapa (item removido da biblioteca) conta como sem cifra.
+        has_chord_sheet: lib?.has_chord_sheet ?? false,
         added_at: song.added_at,
       };
     });
@@ -81,9 +98,15 @@ export class RepertoireOutputMapper {
       estimated_show_duration_minutes: estimated,
       is_shared: repertoire.is_shared,
       share_token: isOwner ? repertoire.share_token : null,
-      share_token_expires_at: isOwner ? repertoire.share_token_expires_at : null,
+      share_token_expires_at: isOwner
+        ? repertoire.share_token_expires_at
+        : null,
       invitees: isOwner
-        ? repertoire.invitees.map((i) => ({ id: i.id, musician_id: i.musician_id, invited_at: i.invited_at }))
+        ? repertoire.invitees.map((i) => ({
+            id: i.id,
+            musician_id: i.musician_id,
+            invited_at: i.invited_at,
+          }))
         : [],
       created_at: repertoire.created_at,
       updated_at: repertoire.updated_at,

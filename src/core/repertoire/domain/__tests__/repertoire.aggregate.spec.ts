@@ -1,8 +1,14 @@
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
-import { Repertoire, RepertoireId, RepertoireSong } from "../repertoire.aggregate";
+import {
+  Repertoire,
+  RepertoireId,
+  RepertoireSong,
+} from "../repertoire.aggregate";
 import { RepertoireFakeBuilder } from "../repertoire-fake.builder";
 
-const makeSong = (overrides: Partial<{ music_library_id: string }> = {}): RepertoireSong =>
+const makeSong = (
+  overrides: Partial<{ music_library_id: string }> = {},
+): RepertoireSong =>
   RepertoireSong.create({
     music_library_id: overrides.music_library_id ?? "lib-1",
     custom_notes: null,
@@ -12,7 +18,10 @@ const makeSong = (overrides: Partial<{ music_library_id: string }> = {}): Repert
 describe("Repertoire aggregate", () => {
   describe("create()", () => {
     it("should create a valid Repertoire", () => {
-      const r = Repertoire.create({ musician_id: "m1", name: "Setlist Principal" });
+      const r = Repertoire.create({
+        musician_id: "m1",
+        name: "Setlist Principal",
+      });
       expect(r.musician_id).toBe("m1");
       expect(r.name).toBe("Setlist Principal");
       expect(r.songs).toHaveLength(0);
