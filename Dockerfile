@@ -7,7 +7,7 @@
 # ANTES do `npm ci`: editar o seed ou criar uma migration reinstalava as ~1.350
 # dependências do zero (3–8 min), sem nenhuma dependência ter mudado.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS base
+FROM node:26-alpine AS base
 
 # Toolchain para compilar dependências nativas. Fica só nos estágios de
 # construção — a imagem final parte de um `node:20-alpine` limpo.
@@ -70,7 +70,7 @@ COPY . .
 RUN rm -f src/metadata.ts && npm run build
 
 # Estágio de produção
-FROM node:20-alpine AS production
+FROM node:26-alpine AS production
 
 # yt-dlp vem do release OFICIAL, não do apk.
 #
