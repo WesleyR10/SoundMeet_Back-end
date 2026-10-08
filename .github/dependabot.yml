@@ -9,7 +9,7 @@ updates:
       time: "06:00"
       timezone: America/Sao_Paulo
     # `develop` e não `master`: é onde o fluxo do projeto integra
-    # (Docs/workflow/git-workflow.md). PR de bump direto em master pularia a
+    # (Docs/fluxo-de-trabalho/git-branches-e-commits.md). PR de bump direto em master pularia a
     # integração inteira.
     target-branch: develop
     open-pull-requests-limit: 5

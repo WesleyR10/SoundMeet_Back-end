@@ -31,7 +31,7 @@ jobs:
           # produz falha que não reproduz.
           #
           # ⚠️ O Dockerfile de produção usa node:20-alpine. A diferença é
-          # conhecida e está registrada em Docs/ops/backup-restore.md §6 — o job
+          # conhecida e está registrada em Docs/operacao/backup-e-restauracao.md §6 — o job
           # `docker` abaixo é o que exercita o Node 20 de verdade.
           node-version: "22"
           cache: npm

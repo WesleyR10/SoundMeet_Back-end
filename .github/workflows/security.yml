@@ -69,7 +69,7 @@ jobs:
       # 🔴 O histórico deste repositório TEM um segredo real (RESEND_API_KEY em
       # envs/.env.e2e, alcançável de origin/develop, repositório público). Isso
       # é um INCIDENTE, não um item de CI: rotação de chave, não regex. O
-      # procedimento está em Docs/ops/incident-response.md §"Segredo exposto".
+      # procedimento está em Docs/_privado/operacao/resposta-a-incidente.md §"Segredo exposto".
       - name: Gitleaks
         env:
           EVENT_NAME: ${{ github.event_name }}
