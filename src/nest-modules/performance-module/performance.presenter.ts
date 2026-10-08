@@ -5,7 +5,12 @@ import {
   PerformedSongOutput,
 } from "../../core/performance/application/use-cases/common/performance-output";
 import { GetLivePerformanceOutput } from "../../core/performance/application/use-cases/get-live-performance/get-live-performance.use-case";
+import { GetMusicianNightsOutput } from "../../core/performance/application/use-cases/get-musician-nights/get-musician-nights.use-case";
 import { GetMusicianResumeOutput } from "../../core/performance/application/use-cases/get-musician-resume/get-musician-resume.use-case";
+import {
+  ListStagesOutput,
+  StageOutput,
+} from "../../core/performance/application/use-cases/list-stages/list-stages.use-case";
 import { GetPerformanceReportOutput } from "../../core/performance/application/use-cases/get-performance-report/get-performance-report.use-case";
 import { SuggestSetlistOutput } from "../../core/performance/application/use-cases/suggest-setlist/suggest-setlist.use-case";
 
@@ -65,6 +70,13 @@ export class PerformancePresenter {
   @ApiPropertyOptional({ format: "uuid", nullable: true })
   band_id: string | null;
 
+  @ApiPropertyOptional({
+    format: "uuid",
+    nullable: true,
+    description: "Setlist programada (repertório do músico). `null` = improviso.",
+  })
+  repertoire_id: string | null;
+
   @ApiProperty({ enum: ["live", "ended"] })
   status: string;
 
@@ -86,12 +98,20 @@ export class PerformancePresenter {
   @ApiPropertyOptional({ type: PerformedSongPresenter, nullable: true })
   current_song: PerformedSongPresenter | null;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      "Público com check-in, só na leitura do dono com o set no ar. `null` = não se aplica, nunca zero.",
+  })
+  attendees_count: number | null;
+
   constructor(output: PerformanceOutput) {
     this.id = output.id;
     this.event_id = output.event_id;
     this.establishment_id = output.establishment_id;
     this.musician_id = output.musician_id;
     this.band_id = output.band_id;
+    this.repertoire_id = output.repertoire_id;
     this.status = output.status;
     this.started_at = output.started_at;
     this.ended_at = output.ended_at;
@@ -101,6 +121,7 @@ export class PerformancePresenter {
     this.current_song = output.current_song
       ? new PerformedSongPresenter(output.current_song)
       : null;
+    this.attendees_count = output.attendees_count;
   }
 }
 
@@ -215,6 +236,13 @@ export class PerformanceReportPresenter {
   @ApiProperty()
   attendees_count: number;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      "Plano × execução: músicas DISTINTAS da setlist que foram tocadas. `null` = show sem setlist.",
+  })
+  setlist: GetPerformanceReportOutput["setlist"];
+
   @ApiProperty({
     description:
       "Aviso que viaja com o dado: a gorjeta por música é aproximada por horário.",
@@ -277,6 +305,38 @@ export class MusicianResumePresenter {
   }
 }
 
+/**
+ * As noites do período e o resumo do anterior (Analytics do app).
+ *
+ * Datas saem como ISO; o app agrupa e rotula no fuso do aparelho. Nenhum
+ * cachê aqui — o master fala do que o PÚBLICO fez (pedidos, gorjetas,
+ * presença), não do que a casa pagou.
+ */
+export class MusicianNightsPresenter {
+  @ApiProperty({ format: "uuid" })
+  musician_id: string;
+
+  @ApiProperty({ enum: [7, 30, 90] })
+  period_days: number;
+
+  @ApiProperty({
+    type: Object,
+    description:
+      "Janela atual (`from` inclusivo, `to` exclusivo), noites da mais antiga para a mais recente e o resumo.",
+  })
+  current: GetMusicianNightsOutput["current"];
+
+  @ApiProperty({
+    type: Object,
+    description: "Janela anterior, do mesmo tamanho e encostada na atual — só o resumo.",
+  })
+  previous: GetMusicianNightsOutput["previous"];
+
+  constructor(output: GetMusicianNightsOutput) {
+    Object.assign(this, output);
+  }
+}
+
 export class SetlistSuggestionsPresenter {
   @ApiProperty({ format: "uuid" })
   musician_id: string;
@@ -295,5 +355,89 @@ export class SetlistSuggestionsPresenter {
 
   constructor(output: SuggestSetlistOutput) {
     Object.assign(this, output);
+  }
+}
+
+class StageVenuePresenter {
+  @ApiProperty({ format: "uuid" }) establishment_id: string;
+  @ApiProperty() name: string;
+  @ApiPropertyOptional({ nullable: true }) avatar: string | null;
+  @ApiPropertyOptional({ nullable: true }) cover: string | null;
+  @ApiProperty() establishment_type: string;
+  @ApiPropertyOptional({ nullable: true }) neighborhood: string | null;
+  @ApiPropertyOptional({ nullable: true }) city: string | null;
+  @ApiPropertyOptional({ nullable: true }) state: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: "Km até a casa. `null` sem coordenadas — nunca zero.",
+  })
+  distance_km: number | null;
+
+  constructor(output: StageOutput["venue"]) {
+    Object.assign(this, output);
+  }
+}
+
+class StageNowPlayingPresenter {
+  @ApiProperty() title: string;
+  @ApiProperty() artist: string;
+  @ApiPropertyOptional({ nullable: true }) spotify_url: string | null;
+}
+
+class StagePerformerPresenter {
+  @ApiPropertyOptional({ format: "uuid", nullable: true }) musician_id: string | null;
+  @ApiPropertyOptional({ format: "uuid", nullable: true }) band_id: string | null;
+  @ApiProperty() name: string;
+  @ApiPropertyOptional({ nullable: true }) avatar: string | null;
+  @ApiProperty({ type: [String] }) genres: string[];
+  @ApiProperty({ description: "Há set aberto agora para este ato." }) is_on_stage: boolean;
+  @ApiPropertyOptional({ type: StageNowPlayingPresenter, nullable: true })
+  now_playing: StageNowPlayingPresenter | null;
+  @ApiProperty() songs_count: number;
+
+  constructor(output: StageOutput["lineup"][number]) {
+    Object.assign(this, output);
+  }
+}
+
+export class StagePresenter {
+  @ApiProperty({ format: "uuid" }) event_id: string;
+  @ApiProperty() name: string;
+  @ApiProperty() start_at: string;
+  @ApiProperty() end_at: string;
+  @ApiProperty() status: string;
+  @ApiPropertyOptional({ nullable: true }) cover_charge: number | null;
+  @ApiProperty({ description: "Público com check-in." }) attendees_count: number;
+  @ApiPropertyOptional({ nullable: true }) max_capacity: number | null;
+  @ApiProperty({ type: StageVenuePresenter }) venue: StageVenuePresenter;
+  @ApiProperty({
+    type: [StagePerformerPresenter],
+    description: "Só escalação confirmada. Nenhum valor de cachê.",
+  })
+  lineup: StagePerformerPresenter[];
+
+  constructor(output: StageOutput) {
+    this.event_id = output.event_id;
+    this.name = output.name;
+    this.start_at = output.start_at.toISOString();
+    this.end_at = output.end_at.toISOString();
+    this.status = output.status;
+    this.cover_charge = output.cover_charge;
+    this.attendees_count = output.attendees_count;
+    this.max_capacity = output.max_capacity;
+    this.venue = new StageVenuePresenter(output.venue);
+    this.lineup = output.lineup.map((p) => new StagePerformerPresenter(p));
+  }
+}
+
+export class StagesPresenter {
+  @ApiProperty({ enum: ["live", "upcoming"] }) window: string;
+  @ApiProperty() generated_at: string;
+  @ApiProperty({ type: [StagePresenter] }) stages: StagePresenter[];
+
+  constructor(output: ListStagesOutput) {
+    this.window = output.window;
+    this.generated_at = output.generated_at.toISOString();
+    this.stages = output.stages.map((s) => new StagePresenter(s));
   }
 }

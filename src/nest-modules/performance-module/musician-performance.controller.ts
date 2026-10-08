@@ -15,6 +15,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
+import { GetMusicianNightsUseCase } from "../../core/performance/application/use-cases/get-musician-nights/get-musician-nights.use-case";
 import { GetMusicianResumeUseCase } from "../../core/performance/application/use-cases/get-musician-resume/get-musician-resume.use-case";
 import { SuggestSetlistUseCase } from "../../core/performance/application/use-cases/suggest-setlist/suggest-setlist.use-case";
 import {
@@ -24,8 +25,12 @@ import {
   Roles,
   RolesGuard,
 } from "../auth-module";
-import { SuggestSetlistQueryDto } from "./dto/performance.dto";
 import {
+  MusicianNightsQueryDto,
+  SuggestSetlistQueryDto,
+} from "./dto/performance.dto";
+import {
+  MusicianNightsPresenter,
   MusicianResumePresenter,
   SetlistSuggestionsPresenter,
 } from "./performance.presenter";
@@ -52,6 +57,37 @@ export class MusicianPerformanceController {
 
   @Inject(SuggestSetlistUseCase)
   private suggestSetlistUseCase: SuggestSetlistUseCase;
+
+  @Inject(GetMusicianNightsUseCase)
+  private nightsUseCase: GetMusicianNightsUseCase;
+
+  /*
+   * Mora aqui, e não em `musician-analytics-module`, porque só este nó-folha
+   * enxerga sets, pedidos, gorjetas e presença sem fechar ciclo. O caminho não
+   * disputa com `GET :id/analytics` (segmentos diferentes).
+   */
+  @Get(":id/analytics/nights")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Noites do músico no período (master do Analytics)",
+    description:
+      "Uma linha por EVENTO em que o músico abriu set nos últimos 7/30/90 dias — músicas, pedidos, gorjetas confirmadas e presenças, com as regras do relatório pós-show — e o resumo do período anterior do mesmo tamanho, para comparação. Exige ESSENTIAL ou PRO (mesmo gate do Analytics): o FREE recebe 402.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianNightsPresenter })
+  @ApiResponse({ status: 402, description: "Plano FREE (gate 9.7a)." })
+  async nights(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Query() query: MusicianNightsQueryDto,
+  ) {
+    return new MusicianNightsPresenter(
+      await this.nightsUseCase.execute({
+        musician_id: id,
+        days: query.days ?? 30,
+      }),
+    );
+  }
 
   @Get(":id/resume")
   @Roles("audience", "musician", "establishment", "admin")

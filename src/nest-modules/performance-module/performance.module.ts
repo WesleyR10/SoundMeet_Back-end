@@ -5,6 +5,8 @@ import { EventModule } from "../events-module/events.module";
 import { MusicLibraryModule } from "../music-library-module/music-library.module";
 import { MusiciansModule } from "../musicians-module/musicians.module";
 import { PaymentModule } from "../payment-module/payment.module";
+import { PlansModule } from "../plans-module/plans.module";
+import { RepertoireModule } from "../repertoire-module/repertoire.module";
 import { RequestsModule } from "../requests-module/requests.module";
 import { ReviewsModule } from "../reviews-module/reviews.module";
 import { SchedulingModule } from "../scheduling-module/scheduling.module";
@@ -13,12 +15,13 @@ import { MusicianPerformanceController } from "./musician-performance.controller
 import { PerformanceController } from "./performance.controller";
 import { PERFORMANCE_PROVIDERS } from "./performance.providers";
 import { PerformanceEventsHandlers } from "./performance-events.handlers";
+import { StagesController } from "./stages.controller";
 
 /**
  * Apresentação ao vivo (F0) + currículo verificado (F4) + setlist inteligente
  * (F5) + relatório pós-show (F6).
  *
- * Ver `Docs/performance/live-performance.md`.
+ * Ver `Docs/funcionalidades/apresentacao-ao-vivo-set-e-relatorio.md`.
  *
  * ## Nó-folha
  *
@@ -46,14 +49,19 @@ import { PerformanceEventsHandlers } from "./performance-events.handlers";
     EventModule,
     SchedulingModule,
     RequestsModule,
+    // Só o repositório — a setlist da noite é um repertório do músico.
+    RepertoireModule,
     MusicLibraryModule,
     PaymentModule,
     ReviewsModule,
+    // Só o `PlanCheckService` — o gate do Analytics (noites do período).
+    PlansModule,
   ],
   controllers: [
     LivePerformanceController,
     PerformanceController,
     MusicianPerformanceController,
+    StagesController,
   ],
   providers: [
     ...Object.values(PERFORMANCE_PROVIDERS.REPOSITORIES),

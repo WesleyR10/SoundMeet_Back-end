@@ -20,6 +20,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
+import { ChangePerformanceSetlistUseCase } from "../../core/performance/application/use-cases/change-performance-setlist/change-performance-setlist.use-case";
 import { EndPerformanceUseCase } from "../../core/performance/application/use-cases/end-performance/end-performance.use-case";
 import { GetPerformanceUseCase } from "../../core/performance/application/use-cases/get-performance/get-performance.use-case";
 import { GetPerformanceReportUseCase } from "../../core/performance/application/use-cases/get-performance-report/get-performance-report.use-case";
@@ -37,6 +38,7 @@ import {
 } from "../auth-module";
 import {
   ListPerformancesQueryDto,
+  ChangePerformanceSetlistDto,
   StartPerformanceDto,
   StartSongDto,
 } from "./dto/performance.dto";
@@ -48,7 +50,7 @@ import {
 /**
  * Apresentação ao vivo — o lado do MÚSICO.
  *
- * Ver `Docs/performance/live-performance.md`.
+ * Ver `Docs/funcionalidades/apresentacao-ao-vivo-set-e-relatorio.md`.
  *
  * ## `:performance_id`, nunca `:id`
  *
@@ -76,6 +78,9 @@ import {
 export class PerformanceController {
   @Inject(StartPerformanceUseCase)
   private startPerformanceUseCase: StartPerformanceUseCase;
+
+  @Inject(ChangePerformanceSetlistUseCase)
+  private changeSetlistUseCase: ChangePerformanceSetlistUseCase;
 
   @Inject(StartSongUseCase)
   private startSongUseCase: StartSongUseCase;
@@ -115,6 +120,7 @@ export class PerformanceController {
         // qualquer músico abrir set em nome de outro.
         musician_id: user.userId,
         band_id: dto.band_id ?? null,
+        repertoire_id: dto.repertoire_id ?? null,
       }),
     );
   }
@@ -233,6 +239,31 @@ export class PerformanceController {
         request_id: dto.request_id ?? null,
         title: dto.title ?? null,
         artist: dto.artist ?? null,
+      }),
+    );
+  }
+
+  @Patch(":performance_id/setlist")
+  @Roles("musician", "admin")
+  @ApiOperation({
+    summary: "Trocar a setlist da noite",
+    description:
+      "Aponta o set no ar para outro repertório do próprio músico, ou `null` para seguir no improviso. Repertório de outra pessoa responde 404, igual a inexistente.",
+  })
+  @ApiParam({ name: "performance_id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: PerformancePresenter })
+  @HttpCode(HttpStatus.OK)
+  async changeSetlist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("performance_id", new ParseUUIDPipe({ errorHttpStatusCode: 422 }))
+    performanceId: string,
+    @Body() dto: ChangePerformanceSetlistDto,
+  ) {
+    return new PerformancePresenter(
+      await this.changeSetlistUseCase.execute({
+        performance_id: performanceId,
+        requesting_musician_id: user.userId,
+        repertoire_id: dto.repertoire_id,
       }),
     );
   }

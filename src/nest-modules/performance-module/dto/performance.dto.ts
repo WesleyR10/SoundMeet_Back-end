@@ -1,11 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import {
+  IsIn,
+  IsInt,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
   IsOptional,
+  Max,
+  Min,
   IsString,
   IsUUID,
   MaxLength,
+  ValidateIf,
   MinLength,
 } from "class-validator";
+
+import {
+  NIGHT_PERIOD_DAYS,
+  type NightPeriodDays,
+} from "../../../core/performance/application/use-cases/get-musician-nights/get-musician-nights.use-case";
 
 export class StartPerformanceDto {
   @ApiProperty({
@@ -23,6 +37,28 @@ export class StartPerformanceDto {
   @IsOptional()
   @IsUUID("4")
   band_id?: string;
+
+  @ApiPropertyOptional({
+    format: "uuid",
+    description:
+      "Setlist da noite: um repertório do PRÓPRIO músico. Ausente = improviso.",
+  })
+  @IsOptional()
+  @IsUUID("4")
+  repertoire_id?: string;
+}
+
+/**
+ * Trocar a setlist com o set no ar. `null` remove (segue no improviso).
+ *
+ * `@ValidateIf` em vez de `@IsOptional`: o campo é OBRIGATÓRIO no corpo — um
+ * PATCH vazio não pode ser lido como "remover a setlist" por omissão.
+ */
+export class ChangePerformanceSetlistDto {
+  @ApiProperty({ format: "uuid", nullable: true })
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID("4")
+  repertoire_id: string | null;
 }
 
 /**
@@ -110,4 +146,59 @@ export class SuggestSetlistQueryDto {
   @ApiPropertyOptional({ default: 20 })
   @IsOptional()
   limit?: number;
+}
+
+const toNumber = ({ value }: { value: unknown }) =>
+  value === undefined || value === "" ? undefined : Number(value);
+
+/**
+ * `GET /events/live-now` e `GET /events/up-next`.
+ *
+ * `lat` + `lng` dão distância e ordem por proximidade SEM cortar nada;
+ * `radius_km` junto passa a filtrar. O app manda só o par: um raio que não
+ * pega palco nenhum deixaria a Home vazia numa noite com show a 60 km. Trio
+ * incompleto é ignorado, não recusado — o cartaz sai sem distância.
+ */
+export class ListStagesQueryDto {
+  @ApiPropertyOptional({ description: "Latitude do fã." })
+  @Transform(toNumber)
+  @IsOptional()
+  @IsLatitude()
+  lat?: number;
+
+  @ApiPropertyOptional({ description: "Longitude do fã." })
+  @Transform(toNumber)
+  @IsOptional()
+  @IsLongitude()
+  lng?: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 500 })
+  @Transform(toNumber)
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(500)
+  radius_km?: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 20, default: 10 })
+  @Transform(toNumber)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  limit?: number;
+}
+
+/**
+ * `GET /musicians/:id/analytics/nights` — o período do master do Analytics.
+ *
+ * Só os três períodos da tela: um `days=45` não tem aba que o mostre, e
+ * aceitá-lo faria a API responder uma pergunta que ninguém fez.
+ */
+export class MusicianNightsQueryDto {
+  @ApiPropertyOptional({ enum: NIGHT_PERIOD_DAYS, default: 30 })
+  @IsOptional()
+  @Transform(toNumber)
+  @IsIn(NIGHT_PERIOD_DAYS as unknown as number[])
+  days?: NightPeriodDays;
 }
