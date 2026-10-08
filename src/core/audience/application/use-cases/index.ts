@@ -1,5 +1,4 @@
 // CRUD Use Cases
-export * from "./create-audience";
 export * from "./delete-audience";
 export * from "./get-audience";
 export * from "./list-audiences";

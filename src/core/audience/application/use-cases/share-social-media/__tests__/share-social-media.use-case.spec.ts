@@ -12,6 +12,10 @@ import {
 } from "../share-social-media.input";
 import { ShareSocialMediaUseCase } from "../share-social-media.use-case";
 
+// 28/set/2026: o compartilhamento valia 50 pontos — o mesmo que um pedido
+// ACEITO — sendo a ação mais fraudável do sistema (auto-declarada, sem prova
+// possível e sem dedupe). Caiu para 10, na ordem de `SCAN_QR`. Ver
+// `gamification-points.ts`.
 describe("ShareSocialMediaUseCase Unit Tests", () => {
   let useCase: ShareSocialMediaUseCase;
   let repository: AudienceInMemoryRepository;
@@ -25,7 +29,8 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
     const audienceId = new Uuid();
     const input: ShareSocialMediaInput = {
       audience_id: audienceId.id,
-      request_id: "request_123",
+      content_type: "tip_receipt" as const,
+      content_id: "request_123",
       platform: SocialMediaPlatform.INSTAGRAM,
       message: "Check out this amazing song!",
     };
@@ -38,7 +43,8 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
   it("should throw error when audience_id is not valid", async () => {
     const input: ShareSocialMediaInput = {
       audience_id: "invalid-id",
-      request_id: "request_123",
+      content_type: "tip_receipt" as const,
+      content_id: "request_123",
       platform: SocialMediaPlatform.INSTAGRAM,
       message: "Check out this amazing song!",
     };
@@ -54,7 +60,8 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
 
     const input: ShareSocialMediaInput = {
       audience_id: audience.audience_id.id,
-      request_id: "request_123",
+      content_type: "tip_receipt" as const,
+      content_id: "request_123",
       platform: SocialMediaPlatform.INSTAGRAM,
       message: "Check out this amazing song!",
     };
@@ -73,42 +80,46 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
     const arrange = [
       {
         input: {
-          request_id: "request_123",
+          content_type: "tip_receipt" as const,
+          content_id: "request_123",
           platform: SocialMediaPlatform.INSTAGRAM,
           message: "Check out this amazing song!",
         },
         expected: {
-          points_added: 50,
+          points_added: 10,
         },
       },
       {
         input: {
-          request_id: "request_456",
+          content_type: "tip_receipt" as const,
+          content_id: "request_456",
           platform: SocialMediaPlatform.FACEBOOK,
           message: "Great music here!",
         },
         expected: {
-          points_added: 50,
+          points_added: 10,
         },
       },
       {
         input: {
-          request_id: "request_789",
+          content_type: "tip_receipt" as const,
+          content_id: "request_789",
           platform: SocialMediaPlatform.TWITTER,
           message: "Amazing performance! 🎵",
         },
         expected: {
-          points_added: 50,
+          points_added: 10,
         },
       },
       {
         input: {
-          request_id: "request_101",
+          content_type: "tip_receipt" as const,
+          content_id: "request_101",
           platform: SocialMediaPlatform.WHATSAPP,
           message: "You should listen to this!",
         },
         expected: {
-          points_added: 50,
+          points_added: 10,
         },
       },
     ];
@@ -147,7 +158,8 @@ describe("ShareSocialMediaUseCase Unit Tests", () => {
 
     const input: ShareSocialMediaInput = {
       audience_id: audience.audience_id.id,
-      request_id: "request_123",
+      content_type: "tip_receipt" as const,
+      content_id: "request_123",
       platform: SocialMediaPlatform.INSTAGRAM,
       message: "Check out this amazing song!",
     };

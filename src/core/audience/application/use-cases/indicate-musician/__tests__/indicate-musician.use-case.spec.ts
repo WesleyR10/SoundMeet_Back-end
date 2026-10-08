@@ -9,6 +9,11 @@ import { AudienceInMemoryRepository } from "../../../../infra/db/in-memory/audie
 import { IndicateMusicianInput } from "../indicate-musician.input";
 import { IndicateMusicianUseCase } from "../indicate-musician.use-case";
 
+// 28/set/2026: `AudiencePoints` dava 3 pontos e o mapa canônico
+// (`gamification-points.ts`) nem conhecia a ação — dois sistemas de pontos
+// divergentes. Unificados em 15: a indicação exige mais intenção que um
+// compartilhamento (escolher músico, local e motivo) e agora é única por
+// (fã, músico, estabelecimento).
 describe("IndicateMusicianUseCase Unit Tests", () => {
   let useCase: IndicateMusicianUseCase;
   let repository: AudienceInMemoryRepository;
@@ -75,7 +80,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
           message: "This musician is amazing!",
         },
         expected: {
-          points_added: 3,
+          points_added: 15,
         },
       },
       {
@@ -85,7 +90,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
           message: "Great performance, highly recommended!",
         },
         expected: {
-          points_added: 3,
+          points_added: 15,
         },
       },
       {
@@ -95,7 +100,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
           message: "Excellent musician for this venue!",
         },
         expected: {
-          points_added: 3,
+          points_added: 15,
         },
       },
     ];
@@ -138,7 +143,7 @@ describe("IndicateMusicianUseCase Unit Tests", () => {
     const output = await useCase.execute(input);
 
     expect(output.id).toBe(audience.audience_id.id);
-    expect(output.points.total).toBe(initialPoints + 3);
+    expect(output.points.total).toBe(initialPoints + 15);
     expect(output.is_active).toBe(true);
   });
 

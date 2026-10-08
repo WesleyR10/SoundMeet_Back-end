@@ -1,10 +1,14 @@
+import { Type } from "class-transformer";
 import {
-  IsBoolean,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
+  ValidateNested,
 } from "class-validator";
+
+import { PresenceLocationInput } from "../../../../events/application/use-cases/common/presence-location.input";
+import { CreateRequestBoostInput } from "../../../../request/application/use-cases/create-request/create-request.input";
 
 export type MakeMusicRequestInput = {
   id: string;
@@ -16,7 +20,23 @@ export type MakeMusicRequestInput = {
   event_id?: string;
   establishment_id?: string;
   message?: string;
-  is_priority?: boolean;
+  /**
+   * Destaque pago.
+   *
+   * 🔴 Substitui o antigo `is_priority`, que era campo FANTASMA: o cliente
+   * mandava `true`, a API ecoava `true` em `request_metadata` e nada era
+   * persistido — não chegava ao `CreateRequestUseCase` nem ao agregado. Além
+   * de morto, era prioridade afirmada pelo próprio cliente. A prioridade real
+   * agora custa dinheiro e é verificada pelo domínio.
+   */
+  boost?: { amount: number; dedication?: string } | null;
+  /** Leitura de GPS no ato do pedido — ver `AudienceMustBePresentPolicy`. */
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy_m: number;
+    mocked?: boolean;
+  } | null;
   metadata?: Record<string, any>;
 };
 
@@ -57,9 +77,15 @@ export class MakeMusicRequestInputValidator {
   @IsOptional()
   message?: string;
 
-  @IsBoolean()
+  @ValidateNested()
+  @Type(() => CreateRequestBoostInput)
   @IsOptional()
-  is_priority?: boolean;
+  boost?: CreateRequestBoostInput | null;
+
+  @ValidateNested()
+  @Type(() => PresenceLocationInput)
+  @IsOptional()
+  location?: PresenceLocationInput | null;
 
   @IsObject()
   @IsOptional()

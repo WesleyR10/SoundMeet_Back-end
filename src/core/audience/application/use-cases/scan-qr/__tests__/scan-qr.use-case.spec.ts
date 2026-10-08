@@ -287,7 +287,7 @@ describe("ScanQRUseCase Unit Tests", () => {
     await expect(() =>
       useCase.execute({
         id: audience.audience_id.id,
-        qr_code: `https://soundmeet.app/musician/${new Uuid().id}`,
+        qr_code: `https://soundmeet.com.br/musician/${new Uuid().id}`,
       }),
     ).rejects.toThrow(InvalidArgumentError);
   });
@@ -332,5 +332,106 @@ describe("ScanQRUseCase Unit Tests", () => {
       }),
     ).rejects.toThrow(InvalidArgumentError);
     expect(userInteractionRepo.items).toHaveLength(0);
+  });
+});
+
+describe("ScanQRUseCase — formato do QR", () => {
+  /*
+   * Estes testes exercitam SÓ o parser, através do erro que ele lança. Um
+   * `InvalidArgumentError` de formato prova que o conteúdo foi rejeitado antes
+   * de qualquer leitura de repositório.
+   */
+  let useCase: ScanQRUseCase;
+  let audienceRepo: AudienceInMemoryRepository;
+  let interactionRepo: UserInteractionInMemoryRepository;
+  let musicianRepo: MusicianInMemoryRepository;
+  let audience: Audience;
+  let musician: Musician;
+
+  beforeEach(async () => {
+    audienceRepo = new AudienceInMemoryRepository();
+    interactionRepo = new UserInteractionInMemoryRepository();
+    musicianRepo = new MusicianInMemoryRepository();
+    useCase = new ScanQRUseCase(audienceRepo, interactionRepo, musicianRepo, {
+      do: async (fn: () => Promise<unknown>) => fn(),
+    } as any);
+
+    audience = Audience.create({
+      email: "fan-qr@soundmeet.test",
+      name: "Fã QR",
+    });
+    await audienceRepo.insert(audience);
+
+    musician = Musician.create({
+      email: "musician-qr@soundmeet.test",
+      name: "Músico QR",
+      genres: ["rock"],
+      instruments: ["guitar"],
+    });
+    await musicianRepo.insert(musician);
+  });
+
+  const scan = (qr_code: string) =>
+    useCase.execute({ id: audience.entity_id.id, qr_code });
+
+  it("aceita o link https canônico", async () => {
+    const output = await scan(
+      `https://soundmeet.com.br/musico/${musician.musician_id.id}`,
+    );
+    expect(output.scan_metadata.musician_id).toBe(musician.musician_id.id);
+  });
+
+  /*
+   * QR já impresso não se atualiza: recusar o formato antigo transformaria
+   * cada adesivo de mesa em lixo no dia do deploy.
+   */
+  it("continua aceitando o esquema legado", async () => {
+    const output = await scan(
+      `soundmeet://musician/${musician.musician_id.id}`,
+    );
+    expect(output.scan_metadata.musician_id).toBe(musician.musician_id.id);
+  });
+
+  /*
+   * 🔴 O ataque que a allowlist existe para barrar: um adesivo colado por cima
+   * do original, com o MESMO caminho, apontando para outro domínio.
+   */
+  it("recusa host de terceiro com o mesmo caminho", async () => {
+    await expect(
+      scan(`https://evil.example/musico/${musician.musician_id.id}`),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("recusa host que apenas TERMINA com o nosso", async () => {
+    await expect(
+      scan(`https://notsoundmeet.com.br/musico/${musician.musician_id.id}`),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("recusa host que apenas COMEÇA com o nosso", async () => {
+    await expect(
+      scan(
+        `https://soundmeet.com.br.evil.com/musico/${musician.musician_id.id}`,
+      ),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  // Downgrade para texto claro no mesmo domínio também é recusa.
+  it("recusa http", async () => {
+    await expect(
+      scan(`http://soundmeet.com.br/musico/${musician.musician_id.id}`),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("recusa caminho que não é de músico", async () => {
+    await expect(
+      scan(`https://soundmeet.com.br/local/${musician.musician_id.id}`),
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it("recusa segmento extra depois do id", async () => {
+    await expect(
+      scan(`https://soundmeet.com.br/musico/${musician.musician_id.id}/extra`),
+    ).rejects.toThrow(InvalidArgumentError);
   });
 });

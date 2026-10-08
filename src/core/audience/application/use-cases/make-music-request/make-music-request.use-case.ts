@@ -50,6 +50,8 @@ export class MakeMusicRequestUseCase implements IUseCase<
       artist: input.artist_name,
       message: input.message,
       library_id: input.metadata?.library_id ?? null,
+      boost: input.boost ?? null,
+      location: input.location ?? null,
     });
 
     await this.addPointsUseCase.execute({
@@ -75,9 +77,12 @@ export class MakeMusicRequestUseCase implements IUseCase<
         ? { establishment_id: input.establishment_id }
         : {}),
       ...(input.message ? { message: input.message } : {}),
-      ...(input.is_priority !== undefined
-        ? { is_priority: input.is_priority }
-        : {}),
+      /*
+       * Vem do pedido REAL criado, não do que o cliente pediu. O antigo
+       * `is_priority` era ecoado do input sem nunca ser persistido: a API
+       * respondia "prioridade: sim" para um pedido que nascia comum.
+       */
+      ...(request.boost ? { boost: request.boost } : {}),
       requested_at: new Date(),
       status: "pending",
     };
@@ -107,7 +112,12 @@ export type MakeMusicRequestOutput = {
     event_id?: string;
     establishment_id?: string;
     message?: string;
-    is_priority?: boolean;
+    boost?: {
+      amount: number;
+      dedication: string | null;
+      status: string;
+      is_boosting: boolean;
+    };
     requested_at: Date;
     status: "pending" | "accepted" | "rejected";
   };

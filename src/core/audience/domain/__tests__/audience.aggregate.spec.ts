@@ -1,6 +1,7 @@
 import { AudiencePoints, Email, Phone } from "@core/shared/domain";
 
 import { Audience, AudienceId } from "../audience.aggregate";
+import { AudienceEmailChangedEvent } from "../events/audience-email-changed.event";
 
 describe("Audience Without Validator Unit Tests", () => {
   beforeEach(() => {
@@ -124,15 +125,20 @@ describe("Audience Without Validator Unit Tests", () => {
     expect(audience.notification.hasErrors()).toBe(false);
   });
 
-  test("should change email", () => {
+  test("🔴 pedir troca de e-mail NÃO troca o e-mail — só emite o pedido", () => {
     const audience = new Audience({
       name: "John Doe",
       email: new Email("john@example.com"),
     });
-    audience.changeEmail("jane@example.com");
-    expect(audience.email.value).toBe("jane@example.com");
-    expect(Audience.prototype.validate).toHaveBeenCalledTimes(1);
+    audience.requestEmailChange("jane@example.com");
+    expect(audience.email.value).toBe("john@example.com");
     expect(audience.notification.hasErrors()).toBe(false);
+    const requested = audience
+      .getUncommittedEvents()
+      .find((e) => e instanceof AudienceEmailChangedEvent) as
+      | AudienceEmailChangedEvent
+      | undefined;
+    expect(requested?.new_email).toBe("jane@example.com");
   });
 
   test("should activate an audience", () => {
@@ -343,15 +349,21 @@ describe("Audience Validator", () => {
     });
   });
 
-  describe("changeEmail method", () => {
-    it("should a invalid audience using email property", () => {
+  describe("requestEmailChange method", () => {
+    it("e-mail inválido vira erro de validação, sem evento", () => {
       const audience = Audience.create({
         name: "John Doe",
         email: "john@example.com",
       });
-      expect(() => {
-        audience.changeEmail("invalid-email");
-      }).toThrow("Invalid email format");
+      audience.requestEmailChange("invalid-email");
+      expect(audience.notification.toJSON()).toEqual([
+        { email: ["Invalid email format"] },
+      ]);
+      expect(
+        audience
+          .getUncommittedEvents()
+          .some((e) => e instanceof AudienceEmailChangedEvent),
+      ).toBe(false);
     });
   });
 });

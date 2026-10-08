@@ -10,16 +10,18 @@ describe("SocialMediaSharedEvent Unit Tests", () => {
 
     const event = new SocialMediaSharedEvent(
       audienceId,
+      "tip_receipt",
       requestId,
       platform,
       message,
     );
 
     expect(event.aggregate_id).toBe(audienceId);
-    expect(event.request_id).toBe(requestId);
+    expect(event.content_id).toBe(requestId);
     expect(event.platform).toBe(platform);
     expect(event.message).toBe(message);
-    expect(event.event_version).toBe(1);
+    // v2: o payload trocou `request_id` por content_type + content_id (28/set/2026).
+    expect(event.event_version).toBe(2);
     expect(event.occurred_on).toBeInstanceOf(Date);
   });
 
@@ -31,6 +33,7 @@ describe("SocialMediaSharedEvent Unit Tests", () => {
 
     const event = new SocialMediaSharedEvent(
       audienceId,
+      "tip_receipt",
       requestId,
       platform,
       message,
@@ -39,10 +42,11 @@ describe("SocialMediaSharedEvent Unit Tests", () => {
 
     expect(json).toEqual({
       aggregate_id: "123e4567-e89b-12d3-a456-426614174000",
-      request_id: requestId,
+      content_type: "tip_receipt",
+      content_id: requestId,
       platform: platform,
       message: message,
-      event_version: 1,
+      event_version: 2,
       occurred_on: event.occurred_on.toISOString(),
     });
   });
@@ -56,20 +60,21 @@ describe("SocialMediaSharedEvent Unit Tests", () => {
 
     const json = {
       aggregate_id: audienceId,
-      request_id: requestId,
+      content_id: requestId,
       platform: platform,
       message: message,
-      event_version: 1,
+      event_version: 2,
       occurred_on: occurredOn.toISOString(),
     };
 
     const event = SocialMediaSharedEvent.fromJSON(json);
 
     expect(event.aggregate_id.id).toBe(audienceId);
-    expect(event.request_id).toBe(requestId);
+    expect(event.content_id).toBe(requestId);
     expect(event.platform).toBe(platform);
     expect(event.message).toBe(message);
-    expect(event.event_version).toBe(1);
+    // v2: o payload trocou `request_id` por content_type + content_id (28/set/2026).
+    expect(event.event_version).toBe(2);
     expect(event.occurred_on).toEqual(occurredOn);
   });
 
@@ -81,6 +86,7 @@ describe("SocialMediaSharedEvent Unit Tests", () => {
     platforms.forEach((platform) => {
       const event = new SocialMediaSharedEvent(
         audienceId,
+        "tip_receipt",
         requestId,
         platform,
         "Test message",
@@ -88,7 +94,7 @@ describe("SocialMediaSharedEvent Unit Tests", () => {
 
       expect(event.platform).toBe(platform);
       expect(event.aggregate_id).toBe(audienceId);
-      expect(event.request_id).toBe(requestId);
+      expect(event.content_id).toBe(requestId);
     });
   });
 });

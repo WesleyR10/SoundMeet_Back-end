@@ -29,6 +29,7 @@ import { IndicateMusicianUseCase } from "../../core/audience/application/use-cas
 import { ListAudiencesUseCase } from "../../core/audience/application/use-cases/list-audiences/list-audiences.use-case";
 import { MakeMusicRequestUseCase } from "../../core/audience/application/use-cases/make-music-request/make-music-request.use-case";
 import { RecommendMusiciansUseCase } from "../../core/audience/application/use-cases/recommend-musicians/recommend-musicians.use-case";
+import { RegisterAudiencePushTokenUseCase } from "../../core/audience/application/use-cases/register-push-token/register-audience-push-token.use-case";
 import { ScanQRUseCase } from "../../core/audience/application/use-cases/scan-qr/scan-qr.use-case";
 import { SendTipUseCase } from "../../core/audience/application/use-cases/send-tip/send-tip.use-case";
 import { ShareSocialMediaUseCase } from "../../core/audience/application/use-cases/share-social-media/share-social-media.use-case";
@@ -55,6 +56,7 @@ import { CompleteProfileDto } from "./dto/complete-profile.dto";
 import { IndicateMusicianDto } from "./dto/indicate-musician.dto";
 import { MakeMusicRequestDto } from "./dto/make-music-request.dto";
 import { RecommendMusiciansDto } from "./dto/recommend-musicians.dto";
+import { RegisterAudiencePushTokenDto } from "./dto/register-audience-push-token.dto";
 import { ScanQRDto } from "./dto/scan-qr.dto";
 import { SearchAudiencesDto } from "./dto/search-audiences.dto";
 import { SendTipDto } from "./dto/send-tip.dto";
@@ -84,6 +86,9 @@ export class AudiencesController {
 
   @Inject(AttendEventUseCase)
   private attendEventUseCase: AttendEventUseCase;
+
+  @Inject(RegisterAudiencePushTokenUseCase)
+  private registerPushTokenUseCase: RegisterAudiencePushTokenUseCase;
 
   @Inject(ScanQRUseCase)
   private scanQRUseCase: ScanQRUseCase;
@@ -252,7 +257,8 @@ export class AudiencesController {
   @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Fazer pedido musical",
-    description: "Cria um pedido musical e aplica pontuação/gamificação.",
+    description:
+      "Cria um pedido musical e aplica pontuação/gamificação. Exige `location` (GPS no raio da casa, a cada pedido) — sem ela o pedido é recusado com 422 em `location`.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: MakeMusicRequestPresenter })
@@ -271,6 +277,7 @@ export class AudiencesController {
       establishment_id: body.establishment_id,
       message: body.message,
       boost: body.boost,
+      location: body.location,
       metadata: body.metadata,
     });
     return new MakeMusicRequestPresenter(output);
@@ -369,12 +376,31 @@ export class AudiencesController {
     return AudiencesController.serialize(output);
   }
 
+  @Patch(":id/push-token")
+  @Roles("audience", "admin")
+  @UseGuards(AudienceOwnershipGuard)
+  @HttpCode(204)
+  @ApiOperation({
+    summary: "Registrar token de push do fã",
+    description:
+      "Registra/atualiza o Expo push token do aparelho do fã (último registrado sobrescreve). É por ele que chegam os avisos de quem o fã segue. O token nunca sai em resposta.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
+  async registerPushToken(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @Body() dto: RegisterAudiencePushTokenDto,
+  ) {
+    await this.registerPushTokenUseCase.execute({ ...dto, id });
+  }
+
   @Post(":id/attend-event")
   @Roles("audience", "admin")
   @UseGuards(AudienceOwnershipGuard)
   @ApiOperation({
     summary: "Participar de evento",
-    description: "Registra participação em evento e aplica pontuação.",
+    description:
+      "Registra participação em evento ao vivo. Exige `location` (leitura de GPS no raio da casa) — é a presença que libera o pedido de música.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 201, type: AudiencePresenter })
@@ -386,6 +412,7 @@ export class AudiencesController {
       audience_id: id,
       event_id: body.event_id,
       establishment_id: body.establishment_id,
+      location: body.location,
     });
     return AudiencesController.serialize(output);
   }

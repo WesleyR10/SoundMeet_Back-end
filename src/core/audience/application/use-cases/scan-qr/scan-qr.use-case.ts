@@ -13,6 +13,10 @@ import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-a
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { IUnitOfWork } from "../../../../shared/domain/repository/unit-of-work.interface";
 import { Points } from "../../../../shared/domain/value-objects/points.vo";
+import {
+  QR_DEFAULT_BASE_URL,
+  QR_MUSICIAN_PATH,
+} from "../../../../shared/domain/value-objects/qr-code-link";
 import { Audience, AudienceId } from "../../../domain/audience.aggregate";
 import { IAudienceRepository } from "../../../domain/audience.repository";
 import {
@@ -27,7 +31,45 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
     private userInteractionRepo: IUserInteractionRepository,
     private musicianRepository: IMusicianRepository,
     private readonly uow: IUnitOfWork,
+    /**
+     * Base pública do sistema (`APP_URL`). É daqui que sai o host aceito no
+     * QR — ver `parseMusicianQRCode`.
+     */
+    private readonly appBaseUrl: string = QR_DEFAULT_BASE_URL,
   ) {}
+
+  /**
+   * Origens aceitas no QR: a configurada (`APP_URL`) e a canônica.
+   *
+   * As duas, e não só a configurada, porque a GERAÇÃO usa a constante
+   * (`QR_DEFAULT_BASE_URL`) enquanto a validação usa a config. Num ambiente em
+   * que `APP_URL` é `http://localhost:3000`, aceitar só a configurada faria o
+   * scanner recusar exatamente os QRs que o próprio ambiente acabou de gerar.
+   *
+   * 🔴 Não é afrouxamento: `QR_DEFAULT_BASE_URL` (`soundmeet.com.br`) é
+   * domínio NOSSO em qualquer ambiente. O que a lista barra é host de
+   * terceiro — o adesivo colado por cima do original.
+   *
+   * ⚠️ Este comentário afirmava o mesmo de `soundmeet.app` até 07/set/2026, e
+   * era FALSO: aquele domínio nunca foi nosso. Enquanto esteve na constante,
+   * o scanner aceitava como legítimo um QR apontando para domínio de outra
+   * pessoa. Ao mexer aqui, confira de quem é o host antes de confiar nele.
+   *
+   * `origin` compara protocolo + host + porta de uma vez, então um
+   * `http://` para um host que só existe em https já não casa.
+   */
+  private get allowedOrigins(): string[] {
+    const origins = new Set<string>();
+    for (const candidate of [this.appBaseUrl, QR_DEFAULT_BASE_URL]) {
+      try {
+        origins.add(new URL(candidate).origin);
+      } catch {
+        // Base inválida em config não pode derrubar o scan — apenas não
+        // contribui com uma origem.
+      }
+    }
+    return [...origins];
+  }
 
   async execute(input: ScanQRInput): Promise<ScanQROutput> {
     const audienceId = new AudienceId(input.id);
@@ -132,20 +174,41 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
     };
   }
 
+  /**
+   * Extrai o músico do conteúdo lido no QR.
+   *
+   * ## Dois formatos, de propósito
+   *
+   * - `https://<app>/musico/<uuid>` — o formato ATUAL. URL https é o que faz o
+   *   adesivo de mesa funcionar na câmera nativa de quem ainda não tem o app.
+   * - `soundmeet://musician/<uuid>` — legado. Continua aceito porque QR já
+   *   impresso não se atualiza: recusá-lo transformaria cada adesivo antigo em
+   *   lixo no dia do deploy.
+   *
+   * ## 🔴 A allowlist de host não é opcional
+   *
+   * Sem ela, `https://evil.example/musico/<uuid>` casa no padrão de caminho e
+   * é aceito como QR legítimo — um adesivo colado por cima do original levaria
+   * o fã a um domínio de terceiro que o app trataria como nosso. Mesmo
+   * raciocínio de `shared/utils/external-url.ts` (SM-025): comparar o HOST
+   * inteiro, nunca `startsWith`/`includes`.
+   */
   private parseMusicianQRCode(qrCode: string): MusicianId {
     if (!qrCode || qrCode.trim().length === 0) {
       throw new InvalidArgumentError("QR code inválido");
     }
 
-    const match = qrCode.trim().match(/^soundmeet:\/\/musician\/([^/]+)$/);
-    if (!match) {
+    const raw = qrCode.trim();
+    const rawId = this.extractLegacyId(raw) ?? this.extractLinkId(raw);
+
+    if (!rawId) {
       throw new InvalidArgumentError(
-        "QR code must follow soundmeet://musician/<uuid>",
+        `QR code must follow ${this.appBaseUrl}/${QR_MUSICIAN_PATH}/<uuid> (or the legacy soundmeet://musician/<uuid>)`,
       );
     }
 
     try {
-      return new MusicianId(match[1]);
+      return new MusicianId(rawId);
     } catch (error) {
       throw new InvalidArgumentError(
         "QR code musician id must be a valid UUID",
@@ -154,6 +217,36 @@ export class ScanQRUseCase implements IUseCase<ScanQRInput, ScanQROutput> {
         },
       );
     }
+  }
+
+  private extractLegacyId(raw: string): string | null {
+    const match = raw.match(/^soundmeet:\/\/musician\/([^/?#]+)$/);
+    return match ? match[1] : null;
+  }
+
+  private extractLinkId(raw: string): string | null {
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      return null;
+    }
+
+    /*
+     * Igualdade de ORIGEM, nunca `startsWith`/`includes`: é o que faz
+     * `notsoundmeet.com.br`, `soundmeet.com.br.evil.com` e `evil.example` serem
+     * recusados pelos três motivos diferentes que cada um representa.
+     */
+    if (!this.allowedOrigins.includes(parsed.origin)) {
+      return null;
+    }
+
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length !== 2 || segments[0] !== QR_MUSICIAN_PATH) {
+      return null;
+    }
+
+    return segments[1];
   }
 }
 

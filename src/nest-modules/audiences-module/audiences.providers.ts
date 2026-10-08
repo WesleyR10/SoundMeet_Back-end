@@ -20,6 +20,7 @@ import { ListAudiencesUseCase } from "../../core/audience/application/use-cases/
 import { MakeMusicRequestUseCase } from "../../core/audience/application/use-cases/make-music-request/make-music-request.use-case";
 import { RecommendMusiciansUseCase } from "../../core/audience/application/use-cases/recommend-musicians/recommend-musicians.use-case";
 import { RefreshSpotifyTokensUseCase } from "../../core/audience/application/use-cases/refresh-spotify-tokens/refresh-spotify-tokens.use-case";
+import { RegisterAudiencePushTokenUseCase } from "../../core/audience/application/use-cases/register-push-token/register-audience-push-token.use-case";
 import { FindSpotifyTrackUseCase } from "../../core/audience/application/use-cases/save-track-to-spotify/find-spotify-track.use-case";
 import { SaveTrackToSpotifyUseCase } from "../../core/audience/application/use-cases/save-track-to-spotify/save-track-to-spotify.use-case";
 import { ScanQRUseCase } from "../../core/audience/application/use-cases/scan-qr/scan-qr.use-case";
@@ -32,6 +33,7 @@ import { IAudienceSpotifyLinkRepository } from "../../core/audience/domain/audie
 import { AudiencePrismaRepository } from "../../core/audience/infra/db/prisma/audience-prisma.repository";
 import { AudienceSpotifyLinkPrismaRepository } from "../../core/audience/infra/db/prisma/audience-spotify-link-prisma.repository";
 import { SpotifyAdapter } from "../../core/audience/infra/gateways/spotify.adapter";
+import { AudiencePushTokenStorePrisma } from "../../core/audience/infra/push-token/audience-push-token.store.prisma";
 import { AddEventAttendeeUseCase } from "../../core/events/application/use-cases/add-event-attendee/add-event-attendee.use-case";
 import { AddPointsUseCase } from "../../core/gamification/application/use-cases/add-points/add-points.use-case";
 import { IUserInteractionRepository } from "../../core/gamification/domain/user-interaction.repository";
@@ -321,6 +323,14 @@ export const USE_CASES = {
       return new RecommendMusiciansUseCase(audienceRepo, musicianRepo);
     },
     inject: [REPOSITORIES.AUDIENCE_REPOSITORY.provide, "MusicianRepository"],
+  },
+  REGISTER_AUDIENCE_PUSH_TOKEN_USE_CASE: {
+    provide: RegisterAudiencePushTokenUseCase,
+    useFactory: (prismaService: PrismaService) =>
+      new RegisterAudiencePushTokenUseCase(
+        new AudiencePushTokenStorePrisma(prismaService),
+      ),
+    inject: [PrismaService],
   },
 };
 

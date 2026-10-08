@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from "class-validator";
+
+import { PresenceLocationInput } from "../../../../events/application/use-cases/common/presence-location.input";
 
 export class AttendEventInput {
   @IsString()
@@ -15,4 +24,14 @@ export class AttendEventInput {
   @IsOptional()
   @IsUUID()
   establishment_id?: string;
+
+  /**
+   * Leitura de GPS no ato do check-in. Opcional no contrato para que a
+   * ausência vire a mensagem certa ("ative a localização") no use-case de
+   * presença, e não um 422 genérico de campo obrigatório.
+   */
+  @ValidateNested()
+  @Type(() => PresenceLocationInput)
+  @IsOptional()
+  location?: PresenceLocationInput;
 }

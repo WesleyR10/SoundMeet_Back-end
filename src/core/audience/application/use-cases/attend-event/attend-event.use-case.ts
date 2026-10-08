@@ -41,6 +41,9 @@ export class AttendEventUseCase implements IUseCase<
       establishment_id: input.establishment_id,
       event_id: input.event_id,
       audience_id: input.audience_id,
+      // Este caminho é sempre o próprio fã — verificação de presença obrigatória.
+      registered_by: "audience",
+      location: input.location ?? null,
     });
 
     return AudienceOutputMapper.toOutput(audience);

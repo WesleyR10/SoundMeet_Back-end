@@ -34,7 +34,8 @@ export class UpdateAudienceUseCase implements IUseCase<
           { email: ["Email already in use by another audience member"] },
         ]);
       }
-      audience.changeEmail(input.email);
+      // Só PEDE a troca: o e-mail muda quando o link for clicado.
+      audience.requestEmailChange(input.email);
     }
 
     if (input.name !== undefined) {

@@ -21,6 +21,7 @@ import { MusicianQRCodeScannedEvent } from "./events/musician-qr-code-scanned.ev
 import { SocialMediaSharedEvent } from "./events/social-media-shared.event";
 import { SongVotedEvent } from "./events/song-voted.event";
 import { TipSentEvent } from "./events/tip-sent.event";
+import { SocialShareContentType } from "./value-objects/social-share-content";
 
 export type AudienceConstructorProps = {
   audience_id?: AudienceId;
@@ -347,18 +348,26 @@ export class Audience extends AggregateRoot {
     this.dispatchUpdateEvent();
   }
 
-  changeEmail(email: string): void {
-    this.email = new Email(email);
-    this.updated_at = new Date();
-    this.validate(["email"]);
-    if (this.notification.hasErrors()) {
+  /**
+   * PEDE a troca de e-mail — o e-mail atual continua valendo até o dono do
+   * endereço novo clicar no link (`VerifyEmailService`), que só então troca o
+   * banco E o login no Keycloak.
+   *
+   * 🔴 Até out/2026 este método (então `changeEmail`) gravava o endereço novo
+   * na hora: o perfil passava a exibir um e-mail que ninguém provou ter, o
+   * `email_verified_at` do endereço ANTIGO continuava liberando o saque, e o
+   * login seguia no antigo — banco e Keycloak divergindo para sempre.
+   */
+  requestEmailChange(email: string): void {
+    const emailOrError = Email.create(email);
+    if (emailOrError.isFail()) {
+      this.notification.setError(emailOrError.error.message, "email");
       return;
     }
-    this.dispatchUpdateEvent();
     this.applyEvent(
       new AudienceEmailChangedEvent({
         audience_id: this.audience_id,
-        new_email: email,
+        new_email: emailOrError.ok.value,
         name: this.name,
       }),
     );
@@ -701,26 +710,43 @@ export class Audience extends AggregateRoot {
     this.applyEvent(new SongVotedEvent(this.audience_id, requestId, vote));
   }
 
+  /**
+   * ⚠️ O ponto creditado AQUI é o do agregado (`Audience.points`), que alimenta
+   * o nível do fã. O ledger canônico (`UserScore`/`UserPoints`, lido pelo
+   * leaderboard) é creditado pelo handler de `SocialMediaSharedEvent`, e é lá
+   * que mora o dedupe por conteúdo — este agregado não conhece gamificação.
+   */
   shareOnSocialMedia(
-    requestId: string,
-    platform: string,
+    contentType: SocialShareContentType,
+    contentId: string,
+    platform?: string | null,
     message?: string,
   ): void {
     this.addPointsForAction("share_social");
     this.applyEvent(
       new SocialMediaSharedEvent(
         this.audience_id,
-        requestId,
-        platform,
+        contentType,
+        contentId,
+        platform ?? null,
         message,
       ),
     );
   }
 
-  indicateMusician(establishmentId: string, musicianId: string): void {
+  indicateMusician(
+    establishmentId: string,
+    musicianId: string,
+    message?: string | null,
+  ): void {
     this.addPointsForAction("indicate_musician");
     this.applyEvent(
-      new MusicianIndicatedEvent(this.audience_id, establishmentId, musicianId),
+      new MusicianIndicatedEvent(
+        this.audience_id,
+        establishmentId,
+        musicianId,
+        message ?? null,
+      ),
     );
   }
 

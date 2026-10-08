@@ -9,6 +9,7 @@ import { IndicateMusicianUseCase } from "../../../core/audience/application/use-
 import { ListAudiencesUseCase } from "../../../core/audience/application/use-cases/list-audiences/list-audiences.use-case";
 import { MakeMusicRequestUseCase } from "../../../core/audience/application/use-cases/make-music-request/make-music-request.use-case";
 import { RecommendMusiciansUseCase } from "../../../core/audience/application/use-cases/recommend-musicians/recommend-musicians.use-case";
+import { RegisterAudiencePushTokenUseCase } from "../../../core/audience/application/use-cases/register-push-token/register-audience-push-token.use-case";
 import { ScanQRUseCase } from "../../../core/audience/application/use-cases/scan-qr/scan-qr.use-case";
 import { SendTipUseCase } from "../../../core/audience/application/use-cases/send-tip/send-tip.use-case";
 import { ShareSocialMediaUseCase } from "../../../core/audience/application/use-cases/share-social-media/share-social-media.use-case";
@@ -126,6 +127,10 @@ describe("AudiencesController Integration Tests", () => {
           useFactory: (repo: IAudienceRepository, addEventAttendee: any) =>
             new AttendEventUseCase(repo, addEventAttendee),
           inject: ["AudienceRepository", "AddEventAttendeeUseCase"],
+        },
+        {
+          provide: RegisterAudiencePushTokenUseCase,
+          useValue: { execute: jest.fn() },
         },
         {
           provide: MakeMusicRequestUseCase,
