@@ -2,15 +2,15 @@ import { NotFoundError } from "../../../../../shared/domain/errors/not-found.err
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Campaign } from "../../../../domain/campaign.aggregate";
 import { CampaignInMemoryRepository } from "../../../../infra/db/in-memory/campaign-in-memory.repository";
-import { GetCampaignUseCase } from "../get-campaign.use-case";
+import { DeleteCampaignUseCase } from "../delete-campaign.use-case";
 
-describe("GetCampaignUseCase Unit Tests", () => {
-  let useCase: GetCampaignUseCase;
+describe("DeleteCampaignUseCase Unit Tests", () => {
+  let useCase: DeleteCampaignUseCase;
   let repo: CampaignInMemoryRepository;
 
   beforeEach(() => {
     repo = new CampaignInMemoryRepository();
-    useCase = new GetCampaignUseCase(repo);
+    useCase = new DeleteCampaignUseCase(repo);
   });
 
   const buildCampaign = (establishment_id: string) =>
@@ -21,58 +21,66 @@ describe("GetCampaignUseCase Unit Tests", () => {
       end_date: new Date("2026-08-31"),
     });
 
-  it("should allow the owning establishment to fetch its campaign", async () => {
+  it("should allow the owning establishment to delete its campaign", async () => {
     const establishment_id = new Uuid().id;
     const campaign = buildCampaign(establishment_id);
     await repo.insert(campaign);
 
-    const output = await useCase.execute({
+    await useCase.execute({
       campaign_id: campaign.campaign_id.id,
-      requesting_establishment_ids: [establishment_id],
+      establishment_ids: [establishment_id],
     });
 
-    expect(output.campaign_id).toBe(campaign.campaign_id.id);
+    expect(await repo.findById(campaign.campaign_id)).toBeNull();
   });
 
-  it("should allow a multi-unit owner to fetch a campaign from their 2nd/3rd establishment", async () => {
+  it("should allow a multi-unit owner to delete a campaign from their 2nd/3rd establishment", async () => {
     const secondUnitId = new Uuid().id;
     const campaign = buildCampaign(secondUnitId);
     await repo.insert(campaign);
 
-    const output = await useCase.execute({
+    await useCase.execute({
       campaign_id: campaign.campaign_id.id,
-      requesting_establishment_ids: [
-        new Uuid().id,
-        secondUnitId,
-        new Uuid().id,
-      ],
+      establishment_ids: [new Uuid().id, secondUnitId],
     });
 
-    expect(output.campaign_id).toBe(campaign.campaign_id.id);
+    expect(await repo.findById(campaign.campaign_id)).toBeNull();
   });
 
-  it("should throw NotFoundError when a different establishment requests it", async () => {
+  it("should throw NotFoundError when a different establishment tries to delete it", async () => {
     const campaign = buildCampaign(new Uuid().id);
     await repo.insert(campaign);
 
     await expect(() =>
       useCase.execute({
         campaign_id: campaign.campaign_id.id,
-        requesting_establishment_ids: [new Uuid().id],
+        establishment_ids: [new Uuid().id],
       }),
     ).rejects.toThrow(NotFoundError);
+
+    expect(await repo.findById(campaign.campaign_id)).not.toBeNull();
   });
 
-  it("should allow admin regardless of establishment", async () => {
+  // Admin não tem establishmentIds no JWT — o controller manda [] e is_admin.
+  it("should allow admin to delete any campaign", async () => {
     const campaign = buildCampaign(new Uuid().id);
     await repo.insert(campaign);
 
-    const output = await useCase.execute({
+    await useCase.execute({
       campaign_id: campaign.campaign_id.id,
-      requesting_establishment_ids: [new Uuid().id],
+      establishment_ids: [],
       is_admin: true,
     });
 
-    expect(output.campaign_id).toBe(campaign.campaign_id.id);
+    expect(await repo.findById(campaign.campaign_id)).toBeNull();
+  });
+
+  it("should throw NotFoundError when campaign does not exist", async () => {
+    await expect(() =>
+      useCase.execute({
+        campaign_id: new Uuid().id,
+        establishment_ids: [new Uuid().id],
+      }),
+    ).rejects.toThrow(NotFoundError);
   });
 });

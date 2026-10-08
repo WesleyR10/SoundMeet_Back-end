@@ -1,10 +1,10 @@
 import { PlanLimitExceededError } from "../../../../../plans/domain/errors/plan-limit-exceeded.error";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { EstablishmentPlanTier } from "../../../../../plans/domain/plan-tier.enum";
 import {
   Subscription,
   SubscriptionStatus,
 } from "../../../../../plans/domain/subscription.aggregate";
-import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
 import { CampaignInMemoryRepository } from "../../../../infra/db/in-memory/campaign-in-memory.repository";
 import { CreateCampaignUseCase } from "../create-campaign.use-case";
@@ -30,10 +30,7 @@ const baseInput = {
   end_date: new Date("2026-07-31"),
 };
 
-async function setup(
-  tier?: EstablishmentPlanTier,
-  cancelled = false,
-) {
+async function setup(tier?: EstablishmentPlanTier, cancelled = false) {
   const subRepo = new SubscriptionInMemoryRepository();
   const campaignRepo = new CampaignInMemoryRepository();
 
@@ -54,7 +51,9 @@ async function setup(
 describe("CreateCampaignUseCase — gate 4C.10", () => {
   it("(a) FREE: lança PlanLimitExceededError ao tentar criar campanha", async () => {
     const { useCase } = await setup();
-    await expect(useCase.execute(baseInput)).rejects.toThrow(PlanLimitExceededError);
+    await expect(useCase.execute(baseInput)).rejects.toThrow(
+      PlanLimitExceededError,
+    );
   });
 
   it("(b) GROWTH: cria campanha com sucesso", async () => {
@@ -73,6 +72,8 @@ describe("CreateCampaignUseCase — gate 4C.10", () => {
 
   it("(c) subscription cancelada comporta-se como FREE", async () => {
     const { useCase } = await setup(EstablishmentPlanTier.GROWTH, true);
-    await expect(useCase.execute(baseInput)).rejects.toThrow(PlanLimitExceededError);
+    await expect(useCase.execute(baseInput)).rejects.toThrow(
+      PlanLimitExceededError,
+    );
   });
 });

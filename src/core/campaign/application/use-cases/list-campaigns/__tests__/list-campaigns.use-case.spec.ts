@@ -28,13 +28,33 @@ describe("ListCampaignsUseCase Unit Tests", () => {
     await repo.insert(buildCampaign(otherEstablishmentId, "Campanha alheia"));
 
     const output = await useCase.execute({
-      requesting_establishment_id: ownEstablishmentId,
+      requesting_establishment_ids: [ownEstablishmentId],
       // Tenta ler campanhas de outro estabelecimento — deve ser ignorado.
       establishment_id: otherEstablishmentId,
     });
 
     expect(output.items).toHaveLength(1);
     expect(output.items[0].title).toBe("Minha campanha");
+  });
+
+  it("should list campaigns from every unit of a multi-establishment owner", async () => {
+    const firstUnitId = new Uuid().id;
+    const secondUnitId = new Uuid().id;
+    const otherOwnerId = new Uuid().id;
+
+    await repo.insert(buildCampaign(firstUnitId, "Campanha unidade 1"));
+    await repo.insert(buildCampaign(secondUnitId, "Campanha unidade 2"));
+    await repo.insert(buildCampaign(otherOwnerId, "Campanha de outro dono"));
+
+    const output = await useCase.execute({
+      requesting_establishment_ids: [firstUnitId, secondUnitId],
+    });
+
+    expect(output.items).toHaveLength(2);
+    expect(output.items.map((c) => c.title).sort()).toEqual([
+      "Campanha unidade 1",
+      "Campanha unidade 2",
+    ]);
   });
 
   it("should respect the explicit filter for admin callers", async () => {

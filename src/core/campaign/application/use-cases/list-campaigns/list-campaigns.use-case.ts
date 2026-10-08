@@ -1,13 +1,14 @@
-import { IUseCase } from "../../../../shared/application/use-case.interface";
 import {
   PaginationOutput,
   PaginationOutputMapper,
 } from "../../../../shared/application/pagination-output";
-import {
-  CampaignSearchParams,
-} from "../../../domain/campaign.repository";
+import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { CampaignSearchParams } from "../../../domain/campaign.repository";
 import { ICampaignRepository } from "../../../domain/campaign.repository";
-import { CampaignOutput, CampaignOutputMapper } from "../common/campaign-output";
+import {
+  CampaignOutput,
+  CampaignOutputMapper,
+} from "../common/campaign-output";
 
 export type ListCampaignsInput = {
   page?: number;
@@ -17,25 +18,28 @@ export type ListCampaignsInput = {
   establishment_id?: string | null;
   status?: string | null;
   title?: string | null;
-  // Estabelecimento autenticado — quando presente e não-admin, força o
-  // filtro pro próprio estabelecimento, ignorando qualquer establishment_id
-  // que o cliente tenha pedido (evita listar campanhas de outro
-  // estabelecimento). Ausente = chamada interna/admin, sem restrição.
-  requesting_establishment_id?: string;
+  // Todas as unidades do estabelecimento autenticado (registerEstablishment
+  // permite até 3) — quando presente e não-admin, força o filtro pro
+  // conjunto de unidades do dono, ignorando qualquer establishment_id que o
+  // cliente tenha pedido (evita listar campanhas de outro estabelecimento).
+  // Usar só a 1ª unidade (bug corrigido aqui) deixava a 2ª/3ª sem campanhas
+  // visíveis. Ausente/vazio = chamada interna/admin, sem restrição.
+  requesting_establishment_ids?: string[];
   is_admin?: boolean;
 };
 
 export type ListCampaignsOutput = PaginationOutput<CampaignOutput>;
 
-export class ListCampaignsUseCase
-  implements IUseCase<ListCampaignsInput, ListCampaignsOutput>
-{
+export class ListCampaignsUseCase implements IUseCase<
+  ListCampaignsInput,
+  ListCampaignsOutput
+> {
   constructor(private readonly campaignRepo: ICampaignRepository) {}
 
   async execute(input: ListCampaignsInput): Promise<ListCampaignsOutput> {
     const establishment_id =
-      !input.is_admin && input.requesting_establishment_id
-        ? input.requesting_establishment_id
+      !input.is_admin && input.requesting_establishment_ids?.length
+        ? input.requesting_establishment_ids
         : (input.establishment_id ?? null);
 
     const params = CampaignSearchParams.create({

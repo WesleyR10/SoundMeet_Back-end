@@ -7,7 +7,10 @@ import { SearchResult as DefaultSearchResult } from "../../shared/domain/reposit
 import { Campaign, CampaignId } from "./campaign.aggregate";
 
 export type CampaignFilter = {
-  establishment_id?: string | null;
+  // Array: dono com mais de um estabelecimento (registerEstablishment permite
+  // até 3 unidades) — filtra "establishment_id IN (...)" em vez de um único
+  // valor, senão a 2ª/3ª unidade do dono nunca aparece na listagem.
+  establishment_id?: string | string[] | null;
   status?: string | null;
   title?: string | null;
 };
@@ -41,10 +44,17 @@ export class CampaignSearchParams extends DefaultSearchParams<CampaignFilter> {
         ? null
         : value;
 
+    const establishment_id = Array.isArray(_value?.establishment_id)
+      ? _value.establishment_id.filter(Boolean).map((id) => `${id}`)
+      : _value?.establishment_id
+        ? `${_value.establishment_id}`
+        : undefined;
+
     const filter = {
-      ...(_value?.establishment_id && {
-        establishment_id: `${_value.establishment_id}`,
-      }),
+      ...(establishment_id &&
+        (!Array.isArray(establishment_id) || establishment_id.length) && {
+          establishment_id,
+        }),
       ...(_value?.status && { status: `${_value.status}` }),
       ...(_value?.title && { title: `${_value.title}` }),
     };
@@ -55,13 +65,12 @@ export class CampaignSearchParams extends DefaultSearchParams<CampaignFilter> {
 
 export class CampaignSearchResult extends DefaultSearchResult<Campaign> {}
 
-export interface ICampaignRepository
-  extends ISearchableRepository<
-    Campaign,
-    CampaignId,
-    CampaignFilter,
-    CampaignSearchParams,
-    CampaignSearchResult
-  > {
+export interface ICampaignRepository extends ISearchableRepository<
+  Campaign,
+  CampaignId,
+  CampaignFilter,
+  CampaignSearchParams,
+  CampaignSearchResult
+> {
   findByEstablishmentId(establishment_id: string): Promise<Campaign[]>;
 }

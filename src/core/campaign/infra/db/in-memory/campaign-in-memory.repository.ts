@@ -9,11 +9,7 @@ import {
 } from "../../../domain/campaign.repository";
 
 export class CampaignInMemoryRepository
-  extends InMemorySearchableRepository<
-    Campaign,
-    CampaignId,
-    CampaignFilter
-  >
+  extends InMemorySearchableRepository<Campaign, CampaignId, CampaignFilter>
   implements ICampaignRepository
 {
   sortableFields: string[] = ["title", "start_date", "created_at"];
@@ -39,7 +35,9 @@ export class CampaignInMemoryRepository
     if (!filter) return items;
     return items.filter((c) => {
       const byEstablishment = filter.establishment_id
-        ? c.establishment_id === filter.establishment_id
+        ? Array.isArray(filter.establishment_id)
+          ? filter.establishment_id.includes(c.establishment_id)
+          : c.establishment_id === filter.establishment_id
         : true;
       const byStatus = filter.status ? c.status === filter.status : true;
       return byEstablishment && byStatus;

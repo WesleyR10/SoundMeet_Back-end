@@ -1,8 +1,11 @@
 import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
-import { ICampaignRepository } from "../../../domain/campaign.repository";
 import { Campaign } from "../../../domain/campaign.aggregate";
-import { CampaignOutput, CampaignOutputMapper } from "../common/campaign-output";
+import { ICampaignRepository } from "../../../domain/campaign.repository";
+import {
+  CampaignOutput,
+  CampaignOutputMapper,
+} from "../common/campaign-output";
 
 export type CreateCampaignInput = {
   establishment_id: string;
@@ -15,9 +18,10 @@ export type CreateCampaignInput = {
 
 export type CreateCampaignOutput = CampaignOutput;
 
-export class CreateCampaignUseCase
-  implements IUseCase<CreateCampaignInput, CreateCampaignOutput>
-{
+export class CreateCampaignUseCase implements IUseCase<
+  CreateCampaignInput,
+  CreateCampaignOutput
+> {
   constructor(
     private readonly campaignRepo: ICampaignRepository,
     private readonly planCheckService: PlanCheckService,

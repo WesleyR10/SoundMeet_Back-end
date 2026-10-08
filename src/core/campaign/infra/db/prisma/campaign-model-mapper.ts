@@ -1,5 +1,9 @@
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
-import { Campaign, CampaignId, CampaignStatus } from "../../../domain/campaign.aggregate";
+import {
+  Campaign,
+  CampaignId,
+  CampaignStatus,
+} from "../../../domain/campaign.aggregate";
 
 export type CampaignModel = {
   id: string;

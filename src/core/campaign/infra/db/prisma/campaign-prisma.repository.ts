@@ -116,7 +116,9 @@ export class CampaignPrismaRepository implements ICampaignRepository {
     const where: any = {};
 
     if (params.filter?.establishment_id) {
-      where.establishment_id = params.filter.establishment_id;
+      where.establishment_id = Array.isArray(params.filter.establishment_id)
+        ? { in: params.filter.establishment_id }
+        : params.filter.establishment_id;
     }
     if (params.filter?.status) {
       where.status = params.filter.status;
@@ -142,7 +144,9 @@ export class CampaignPrismaRepository implements ICampaignRepository {
     ]);
 
     return new CampaignSearchResult({
-      items: models.map((m) => CampaignModelMapper.toEntity(m as CampaignModel)),
+      items: models.map((m) =>
+        CampaignModelMapper.toEntity(m as CampaignModel),
+      ),
       total,
       current_page: params.page,
       per_page: params.per_page,

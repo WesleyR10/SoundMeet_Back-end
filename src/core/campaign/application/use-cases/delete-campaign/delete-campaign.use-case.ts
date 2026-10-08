@@ -5,12 +5,17 @@ import { ICampaignRepository } from "../../../domain/campaign.repository";
 
 export type DeleteCampaignInput = {
   campaign_id: string;
-  establishment_id: string;
+  // Todas as unidades do estabelecimento autenticado — um dono com 2ª/3ª
+  // unidade (registerEstablishment permite até 3) não conseguia apagar a
+  // própria campanha comparando só a 1ª unidade.
+  establishment_ids: string[];
+  is_admin?: boolean;
 };
 
-export class DeleteCampaignUseCase
-  implements IUseCase<DeleteCampaignInput, void>
-{
+export class DeleteCampaignUseCase implements IUseCase<
+  DeleteCampaignInput,
+  void
+> {
   constructor(private readonly campaignRepo: ICampaignRepository) {}
 
   async execute(input: DeleteCampaignInput): Promise<void> {
@@ -21,7 +26,10 @@ export class DeleteCampaignUseCase
       throw new NotFoundError(input.campaign_id, Campaign);
     }
 
-    if (campaign.establishment_id !== input.establishment_id) {
+    if (
+      !input.is_admin &&
+      !input.establishment_ids.includes(campaign.establishment_id)
+    ) {
       throw new NotFoundError(input.campaign_id, Campaign);
     }
 
