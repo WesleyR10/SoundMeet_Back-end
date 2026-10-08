@@ -69,6 +69,9 @@ export type MusicLibraryConstructorProps = {
   lrc_last_synced_at?: Date | null;
   /** Duração real da música em segundos; populado pelo pipeline ai-cifra/ai-audio (Bloco 6). */
   duration_seconds?: number | null;
+  spotify_track_id?: string | null;
+  spotify_match_score?: number | null;
+  spotify_checked_at?: Date | null;
   created_at?: Date;
   updated_at?: Date;
 };
@@ -127,6 +130,9 @@ export class MusicLibrary extends AggregateRoot {
   lrc_has_word_timestamps: boolean;
   lrc_last_synced_at: Date | null;
   duration_seconds: number | null;
+  spotify_track_id: string | null;
+  spotify_match_score: number | null;
+  spotify_checked_at: Date | null;
   created_at: Date;
   updated_at: Date;
 
@@ -164,6 +170,9 @@ export class MusicLibrary extends AggregateRoot {
     this.lrc_has_word_timestamps = props.lrc_has_word_timestamps ?? false;
     this.lrc_last_synced_at = props.lrc_last_synced_at ?? null;
     this.duration_seconds = props.duration_seconds ?? null;
+    this.spotify_track_id = props.spotify_track_id ?? null;
+    this.spotify_match_score = props.spotify_match_score ?? null;
+    this.spotify_checked_at = props.spotify_checked_at ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
@@ -224,6 +233,52 @@ export class MusicLibrary extends AggregateRoot {
       return;
     }
     this.bpm = bpm;
+    this.touch();
+  }
+
+  // Populado pelo pipeline de análise de cifra (worker devolve
+  // artifacts.duration_seconds em /v1 e /v2/analyze) -- antes desta mudança
+  // nenhum use-case escrevia isso, então SyncSyncedLyricsForMusicLibraryUseCase.
+  // pickBestLyrics (duration_mismatch, ver Docs/ia-musical/folha-de-cifra.md)
+  // nunca tinha dado real pra pontuar.
+  changeDurationSeconds(duration_seconds: number | null): void {
+    if (duration_seconds !== null && duration_seconds < 0) {
+      this.notification.addError(
+        "duration_seconds cannot be negative",
+        "duration_seconds",
+      );
+      return;
+    }
+    this.duration_seconds = duration_seconds;
+    this.touch();
+  }
+
+  /**
+   * Registra o resultado da busca no catálogo do Spotify.
+   *
+   * 🔴 **`checked_at` é gravado mesmo quando NÃO se acha nada.** É o negative
+   * cache: sem ele, música fora do catálogo (autoral, regional, cover que não
+   * existe em streaming) seria reconsultada em toda passada do job, para
+   * sempre. Mesma política que o LRCLIB já usa para letra inexistente.
+   *
+   * Ver `Docs/funcionalidades/casamento-de-faixa-no-spotify.md`.
+   */
+  registerSpotifyMatch(params: {
+    track_id: string | null;
+    score: number | null;
+    checked_at?: Date;
+  }): void {
+    if (params.score !== null && (params.score < 0 || params.score > 1)) {
+      this.notification.addError(
+        "spotify_match_score deve estar entre 0 e 1",
+        "spotify_match_score",
+      );
+      return;
+    }
+
+    this.spotify_track_id = params.track_id;
+    this.spotify_match_score = params.track_id ? params.score : null;
+    this.spotify_checked_at = params.checked_at ?? new Date();
     this.touch();
   }
 
@@ -338,6 +393,21 @@ export class MusicLibrary extends AggregateRoot {
     this.touch();
   }
 
+  /**
+   * Há algo para o Play Mode desenhar? Espelha o que
+   * `GetChordSheetForMusicLibraryUseCase` de fato consome ao montar a folha de
+   * cifra: `lrc_normalized` vira a letra e `chords` vira a linha do tempo de
+   * acordes. Qualquer um dos dois já rende uma tela útil (cifra sem letra ou
+   * letra sem cifra), então a checagem é OU, não E.
+   *
+   * Deliberadamente NÃO olha `chord_sheet`/`renderable_chord_sheet`: essas são
+   * projeções materializadas que nem toda música analisada tem, e usá-las aqui
+   * marcaria como "sem cifra" músicas que o endpoint serve normalmente.
+   */
+  hasChordSheetContent(): boolean {
+    return this.lrc_normalized !== null || this.chords !== null;
+  }
+
   private touch(): void {
     this.updated_at = new Date();
   }
@@ -404,6 +474,9 @@ export class MusicLibrary extends AggregateRoot {
       lrc_has_word_timestamps: this.lrc_has_word_timestamps,
       lrc_last_synced_at: this.lrc_last_synced_at,
       duration_seconds: this.duration_seconds,
+      spotify_track_id: this.spotify_track_id,
+      spotify_match_score: this.spotify_match_score,
+      spotify_checked_at: this.spotify_checked_at,
       created_at: this.created_at,
       updated_at: this.updated_at,
       display_name: this.displayName,

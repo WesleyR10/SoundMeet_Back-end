@@ -1,4 +1,9 @@
-import { IsNotEmpty, IsOptional, IsString, validateSync } from "class-validator";
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  validateSync,
+} from "class-validator";
 
 export type DeleteMusicLibraryInputConstructorProps = {
   id: string;

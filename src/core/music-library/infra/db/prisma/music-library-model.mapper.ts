@@ -52,6 +52,9 @@ export class MusicLibraryModelMapper {
       lrc_has_word_timestamps: entity.lrc_has_word_timestamps,
       lrc_last_synced_at: entity.lrc_last_synced_at ?? null,
       duration_seconds: entity.duration_seconds ?? null,
+      spotifyTrackId: entity.spotify_track_id ?? null,
+      spotifyMatchScore: entity.spotify_match_score ?? null,
+      spotifyCheckedAt: entity.spotify_checked_at ?? null,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
@@ -95,6 +98,9 @@ export class MusicLibraryModelMapper {
       lrc_has_word_timestamps: model.lrc_has_word_timestamps,
       lrc_last_synced_at: model.lrc_last_synced_at ?? null,
       duration_seconds: model.duration_seconds ?? null,
+      spotify_track_id: model.spotifyTrackId ?? null,
+      spotify_match_score: model.spotifyMatchScore ?? null,
+      spotify_checked_at: model.spotifyCheckedAt ?? null,
       created_at: model.created_at,
       updated_at: model.updated_at,
     });

@@ -46,6 +46,8 @@ export class UpdateMusicLibraryUseCase implements IUseCase<
     input.genre !== undefined && entity.changeGenre(input.genre);
     input.key !== undefined && entity.changeKey(input.key);
     input.bpm !== undefined && entity.changeBpm(input.bpm);
+    input.duration_seconds !== undefined &&
+      entity.changeDurationSeconds(input.duration_seconds);
     input.lyrics !== undefined && entity.changeLyrics(input.lyrics);
     input.notes !== undefined && entity.changeNotes(input.notes);
     input.difficulty !== undefined && entity.changeDifficulty(input.difficulty);

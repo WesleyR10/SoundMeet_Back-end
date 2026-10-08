@@ -179,6 +179,30 @@ describe("MusicLibrary Unit Tests without validator", () => {
     expect(entity.bpm).toBeNull();
   });
 
+  test("should change duration_seconds", () => {
+    const entity = new MusicLibrary({
+      musician_id: new Uuid(),
+      title: "Song",
+      artist: "Artist",
+    });
+    expect(entity.duration_seconds).toBeNull();
+    entity.changeDurationSeconds(214);
+    expect(entity.duration_seconds).toBe(214);
+    entity.changeDurationSeconds(null);
+    expect(entity.duration_seconds).toBeNull();
+  });
+
+  test("should add error when duration_seconds is negative", () => {
+    const entity = new MusicLibrary({
+      musician_id: new Uuid(),
+      title: "Song",
+      artist: "Artist",
+    });
+    entity.changeDurationSeconds(-1);
+    expect(entity.notification.hasErrors()).toBe(true);
+    expect(entity.duration_seconds).toBeNull();
+  });
+
   test("should mark and unmark as favorite", () => {
     const entity = new MusicLibrary({
       musician_id: new Uuid(),
@@ -330,6 +354,9 @@ describe("MusicLibrary Unit Tests without validator", () => {
       notes: null,
       difficulty: 2,
       duration_seconds: null,
+      spotify_track_id: null,
+      spotify_match_score: null,
+      spotify_checked_at: null,
       is_favorite: false,
       source: null,
       source_id: null,

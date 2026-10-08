@@ -11,6 +11,8 @@ import {
   MusicLibraryFilter,
   MusicLibrarySearchParams,
   MusicLibrarySearchResult,
+  SearchSongCatalogInput,
+  SongCatalogEntry,
 } from "../../../domain/music-library.repository";
 import { MusicLibraryModel } from "./music-library-model";
 import { MusicLibraryModelMapper } from "./music-library-model.mapper";
@@ -69,6 +71,16 @@ export class MusicLibraryPrismaRepository implements IMusicLibraryRepository {
       lrc_coverage_ms: model.lrc_coverage_ms,
       lrc_has_word_timestamps: model.lrc_has_word_timestamps,
       lrc_last_synced_at: model.lrc_last_synced_at,
+      // O mapper sempre produziu duration_seconds, mas esta lista o omitia —
+      // então insert e update descartavam o campo em silêncio e a coluna ficava
+      // NULL mesmo com o worker devolvendo a duração em artifacts.
+      duration_seconds: model.duration_seconds,
+      // ⚠️ Esta lista é explícita: campo do mapper que não aparecer AQUI é
+      // descartado em silêncio no insert e no update — foi exatamente o que
+      // aconteceu com `duration_seconds` (comentário acima).
+      spotifyTrackId: model.spotifyTrackId,
+      spotifyMatchScore: model.spotifyMatchScore,
+      spotifyCheckedAt: model.spotifyCheckedAt,
       created_at: model.created_at,
       updated_at: model.updated_at,
     };
@@ -299,6 +311,86 @@ export class MusicLibraryPrismaRepository implements IMusicLibraryRepository {
     return {
       [sort]: sort_dir === "asc" ? ("asc" as const) : ("desc" as const),
     };
+  }
+
+  async findPendingSpotifyResolution(limit: number): Promise<MusicLibrary[]> {
+    const models = await this.prisma.musicLibrary.findMany({
+      where: { spotifyCheckedAt: null },
+      // Mais nova primeiro: a música recém-analisada é a que alguém vai tocar,
+      // e é para ela que o link precisa existir antes do próximo show.
+      orderBy: { created_at: "desc" },
+      take: Math.max(0, limit),
+    });
+    return models.map((m) =>
+      MusicLibraryModelMapper.toEntity(m as unknown as MusicLibraryModel),
+    );
+  }
+
+  async searchSongCatalog(
+    input: SearchSongCatalogInput,
+  ): Promise<SongCatalogEntry[]> {
+    const term = input.term?.trim() ?? "";
+    /*
+     * No escopo `repertoire` o recorte é a biblioteca do próprio músico, sem
+     * o filtro de cifra: o repertório dele é o que ele toca, tenha a
+     * plataforma analisado a música ou não.
+     *
+     * `$queryRaw` porque o que esta consulta faz não existe no Prisma Client:
+     * `groupBy` não aceita expressão (`lower(trim(title))`) como chave, e sem
+     * normalizar o par "Garota de Ipanema" e "garota de ipanema " viram duas
+     * entradas do catálogo. O `%` vai como PARÂMETRO (`${like}`), nunca
+     * concatenado no template — `$queryRaw` só parametriza o que é
+     * interpolado, e montar o LIKE por string reabriria injeção.
+     */
+    const like = `%${term}%`;
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        title: string;
+        artist: string;
+        genre: string | null;
+        musicians_count: bigint | number;
+        library_id: string | null;
+      }>
+    >`
+      SELECT
+        MIN(ml."title")  AS title,
+        MIN(ml."artist") AS artist,
+        MIN(ml."genre")  AS genre,
+        COUNT(DISTINCT ml."musicianId") AS musicians_count,
+        MAX(CASE WHEN ml."musicianId" = ${input.musician_id} THEN ml."id" END)
+          AS library_id
+      FROM "music_library" ml
+      WHERE (
+          CASE
+            WHEN ${input.scope}::text = 'repertoire'
+              THEN ml."musicianId" = ${input.musician_id}
+            ELSE (ml."lrc_normalized" IS NOT NULL OR ml."chords" IS NOT NULL)
+          END
+        )
+        AND (
+          ${term} = ''
+          OR ml."title"  ILIKE ${like}
+          OR ml."artist" ILIKE ${like}
+        )
+      GROUP BY lower(btrim(ml."title")), lower(btrim(ml."artist"))
+      ORDER BY
+        (MAX(CASE WHEN ml."musicianId" = ${input.musician_id} THEN 1 ELSE 0 END)) DESC,
+        COUNT(DISTINCT ml."musicianId") DESC,
+        MIN(ml."title") ASC
+      LIMIT ${Math.max(0, input.limit)}
+    `;
+
+    return rows.map((row) => ({
+      title: row.title,
+      artist: row.artist,
+      genre: row.genre,
+      // COUNT() do Postgres volta como BigInt no driver — `Number` aqui, senão
+      // o JSON.stringify da resposta HTTP lança "Do not know how to serialize
+      // a BigInt".
+      musicians_count: Number(row.musicians_count),
+      library_id: row.library_id,
+    }));
   }
 
   getEntity(): new (...args: any[]) => MusicLibrary {

@@ -64,10 +64,81 @@ export class MusicLibrarySearchParams extends DefaultSearchParams<MusicLibraryFi
 
 export class MusicLibrarySearchResult extends DefaultSearchResult<MusicLibrary> {}
 
+/**
+ * Uma música do catálogo da plataforma — agregada, sem dono.
+ *
+ * `MusicLibrary` é biblioteca **pessoal**: cada músico tem a própria linha da
+ * mesma música, com a própria análise. "O catálogo do SoundMeet" existe como a
+ * UNIÃO dessas linhas, e é isso que esta entrada representa: um par
+ * (título, artista) que a plataforma já cifrou, sem dizer de quem é.
+ *
+ * 🔴 **Não existe `musician_id` aqui, e é a feature.** Devolver o dono de cada
+ * linha transformaria a busca do fã num relatório de quem toca o quê. O único
+ * id que sai é `library_id`, e ele é sempre do músico **alvo** da busca — o
+ * mesmo que o fã já escolheu para pedir.
+ */
+export type SongCatalogEntry = {
+  title: string;
+  artist: string;
+  genre: string | null;
+  /** Quantos músicos da plataforma têm a música. Ordena por popularidade. */
+  musicians_count: number;
+  /**
+   * A linha do músico ALVO para esta música, quando ele já a tem. É o que o
+   * pedido carrega em `library_id` — nunca a linha de um terceiro.
+   */
+  library_id: string | null;
+};
+
+/**
+ * Onde a busca do fã acontece.
+ *
+ * `platform` — todas as músicas já cifradas na plataforma, deduplicadas.
+ * `repertoire` — só a biblioteca deste músico, para quem desligou o pedido
+ * fora do repertório.
+ *
+ * 🔴 Quem escolhe é o SERVIDOR, a partir do próprio músico, nunca o cliente.
+ * Um `scope` vindo da query faria o limite depender de quem faz a chamada —
+ * exatamente o que desligar o switch existe para impedir.
+ */
+export type SongCatalogScope = "platform" | "repertoire";
+
+export type SearchSongCatalogInput = {
+  /** Texto livre do fã. `null` devolve as mais presentes na plataforma. */
+  term: string | null;
+  limit: number;
+  /** Músico a quem o pedido será feito — resolve `library_id`. */
+  musician_id: string;
+  scope: SongCatalogScope;
+};
+
 export interface IMusicLibraryRepository extends ISearchableRepository<
   MusicLibrary,
   MusicLibraryId,
   MusicLibraryFilter,
   MusicLibrarySearchParams,
   MusicLibrarySearchResult
-> {}
+> {
+  /**
+   * Músicas que ainda não foram procuradas no catálogo do Spotify — a fila do
+   * job de backfill.
+   *
+   * Existe como método próprio, e não como filtro de `search()`, porque
+   * "nunca procurado" é `spotifyCheckedAt IS NULL`: o `SearchParams` do projeto
+   * descarta valores falsy no setter de filtro, então `null` como critério não
+   * atravessa. Tentar expressar isso ali daria um filtro que se apaga sozinho e
+   * devolve a biblioteca inteira.
+   */
+  findPendingSpotifyResolution(limit: number): Promise<MusicLibrary[]>;
+
+  /**
+   * Catálogo agregado da plataforma: pares (título, artista) já cifrados,
+   * deduplicados entre todos os músicos.
+   *
+   * Método próprio, e não `search()` sem `musician_id`, por duas razões que
+   * não dá para expressar em `SearchParams`: a **deduplicação** (sem ela a
+   * mesma música volta uma vez por músico) e a **omissão do dono** (o
+   * `MusicLibrary` sai sempre com `musicianId`, e aqui ele não pode sair).
+   */
+  searchSongCatalog(input: SearchSongCatalogInput): Promise<SongCatalogEntry[]>;
+}

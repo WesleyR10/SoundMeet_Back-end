@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../database-module/database.module";
+import { MusiciansModule } from "../musicians-module/musicians.module";
 import { BackfillSpotifyTracksJob } from "./backfill-spotify-tracks.job";
 import { MusicLibraryController } from "./music-library.controller";
 import { MUSIC_LIBRARY_PROVIDERS } from "./music-library.providers";
@@ -8,7 +9,10 @@ import { MusicLibraryCatalogService } from "./music-library.service";
 import { PublicRepertoireController } from "./public-repertoire.controller";
 
 @Module({
-  imports: [DatabaseModule],
+  // MusiciansModule: o catálogo do fã lê o próprio músico para decidir o
+  // escopo da busca (SearchSongCatalogUseCase). Direção segura —
+  // MusiciansModule importa só DatabaseModule e PlansModule.
+  imports: [DatabaseModule, MusiciansModule],
   controllers: [MusicLibraryController, PublicRepertoireController],
   providers: [
     ...Object.values(MUSIC_LIBRARY_PROVIDERS.REPOSITORIES),

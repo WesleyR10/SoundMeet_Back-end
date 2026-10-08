@@ -35,6 +35,9 @@ export type MusicLibraryModel = {
   lrc_has_word_timestamps: boolean;
   lrc_last_synced_at: Date | null;
   duration_seconds: number | null;
+  spotifyTrackId: string | null;
+  spotifyMatchScore: number | null;
+  spotifyCheckedAt: Date | null;
   created_at: Date;
   updated_at: Date;
 };

@@ -26,6 +26,7 @@ export type UpdateMusicLibraryInputConstructorProps = {
   genre?: string | null;
   key?: string | null;
   bpm?: number | null;
+  duration_seconds?: number | null;
   lyrics?: string | null;
   chords?: ChordsData | null;
   structure_segments?: StructureSegments | null;
@@ -69,6 +70,11 @@ export class UpdateMusicLibraryInput {
   @Min(0)
   @IsOptional()
   bpm?: number | null;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  duration_seconds?: number | null;
 
   @IsString()
   @IsOptional()
@@ -118,6 +124,7 @@ export class UpdateMusicLibraryInput {
     this.genre = props.genre;
     this.key = props.key;
     this.bpm = props.bpm;
+    this.duration_seconds = props.duration_seconds;
     this.lyrics = props.lyrics;
     this.chords = props.chords;
     this.structure_segments = props.structure_segments;

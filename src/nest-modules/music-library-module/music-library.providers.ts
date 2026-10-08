@@ -9,8 +9,10 @@ import { DeleteMusicLibraryUseCase } from "../../core/music-library/application/
 import { GetMusicLibraryUseCase } from "../../core/music-library/application/use-cases/get-music-library/get-music-library.use-case";
 import { ListMusicLibraryUseCase } from "../../core/music-library/application/use-cases/list-music-library/list-music-library.use-case";
 import { ResolveSpotifyTrackUseCase } from "../../core/music-library/application/use-cases/resolve-spotify-track/resolve-spotify-track.use-case";
+import { SearchSongCatalogUseCase } from "../../core/music-library/application/use-cases/search-song-catalog/search-song-catalog.use-case";
 import { UpdateMusicLibraryUseCase } from "../../core/music-library/application/use-cases/update-music-library/update-music-library.use-case";
 import { IMusicLibraryRepository } from "../../core/music-library/domain/music-library.repository";
+import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { MusicLibraryPrismaRepository } from "../../core/music-library/infra/db/prisma/music-library-prisma.repository";
 import { SpotifyCatalogAdapter } from "../../core/music-library/infra/gateways/spotify-catalog.adapter";
 import { EnvConfig } from "../config-module/config.schema";
@@ -52,6 +54,19 @@ export const USE_CASES = {
       return new ListMusicLibraryUseCase(repo);
     },
     inject: [REPOSITORIES.MUSIC_LIBRARY_REPOSITORY.provide],
+  },
+  SEARCH_SONG_CATALOG_USE_CASE: {
+    provide: SearchSongCatalogUseCase,
+    useFactory: (
+      repo: IMusicLibraryRepository,
+      musicianRepo: IMusicianRepository,
+    ) => {
+      return new SearchSongCatalogUseCase(repo, musicianRepo);
+    },
+    // "MusicianRepository" vem do MusiciansModule, importado por
+    // MusicLibraryModule. Sem ciclo: MusiciansModule importa só Database e
+    // Plans.
+    inject: [REPOSITORIES.MUSIC_LIBRARY_REPOSITORY.provide, "MusicianRepository"],
   },
   UPDATE_MUSIC_LIBRARY_USE_CASE: {
     provide: UpdateMusicLibraryUseCase,
