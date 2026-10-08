@@ -25,6 +25,8 @@ export type SubscriptionProps = {
   expires_at?: Date | null;
   trial_ends_at?: Date | null;
   cancelled_at?: Date | null;
+  gateway_customer_id?: string | null;
+  gateway_subscription_id?: string | null;
   created_at?: Date;
 };
 
@@ -35,6 +37,8 @@ export type CreateSubscriptionCommand = {
   persona: SubscriptionPersona;
   billing_cycle?: BillingCycle;
   trial_ends_at?: Date;
+  gateway_customer_id?: string;
+  gateway_subscription_id?: string;
 };
 
 export class Subscription extends AggregateRoot {
@@ -49,6 +53,8 @@ export class Subscription extends AggregateRoot {
   expires_at: Date | null;
   trial_ends_at: Date | null;
   cancelled_at: Date | null;
+  gateway_customer_id: string | null;
+  gateway_subscription_id: string | null;
   created_at: Date;
 
   constructor(props: SubscriptionProps) {
@@ -64,6 +70,8 @@ export class Subscription extends AggregateRoot {
     this.expires_at = props.expires_at ?? null;
     this.trial_ends_at = props.trial_ends_at ?? null;
     this.cancelled_at = props.cancelled_at ?? null;
+    this.gateway_customer_id = props.gateway_customer_id ?? null;
+    this.gateway_subscription_id = props.gateway_subscription_id ?? null;
     this.created_at = props.created_at ?? new Date();
   }
 
@@ -83,6 +91,8 @@ export class Subscription extends AggregateRoot {
       started_at,
       expires_at,
       trial_ends_at: command.trial_ends_at,
+      gateway_customer_id: command.gateway_customer_id,
+      gateway_subscription_id: command.gateway_subscription_id,
       status: command.trial_ends_at
         ? SubscriptionStatus.TRIAL
         : SubscriptionStatus.ACTIVE,
@@ -115,6 +125,21 @@ export class Subscription extends AggregateRoot {
   cancel(): void {
     this.status = SubscriptionStatus.CANCELLED;
     this.cancelled_at = new Date();
+  }
+
+  /**
+   * Renovação por pagamento de ciclo confirmado no gateway: reativa (se
+   * trial/expirada) e empurra a expiração um ciclo à frente a partir de `now`.
+   * Assinatura cancelada não renova — cancelamento é decisão do usuário e o
+   * webhook pode chegar atrasado; nesse caso o pagamento residual é ignorado.
+   */
+  renew(now: Date = new Date()): void {
+    if (this.status === SubscriptionStatus.CANCELLED) {
+      return;
+    }
+    this.status = SubscriptionStatus.ACTIVE;
+    this.trial_ends_at = null;
+    this.expires_at = Subscription.computeExpiryDate(this.billing_cycle, now);
   }
 
   expire(): void {
@@ -154,6 +179,8 @@ export class Subscription extends AggregateRoot {
       expires_at: this.expires_at,
       trial_ends_at: this.trial_ends_at,
       cancelled_at: this.cancelled_at,
+      gateway_customer_id: this.gateway_customer_id,
+      gateway_subscription_id: this.gateway_subscription_id,
       created_at: this.created_at,
     };
   }

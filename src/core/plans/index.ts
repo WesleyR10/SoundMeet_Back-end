@@ -1,3 +1,11 @@
+export * from "./application/ports/subscription-billing.gateway";
+export * from "./application/use-cases/activate-subscription-from-payment/activate-subscription-from-payment.use-case";
+export * from "./application/use-cases/cancel-subscription/cancel-subscription.use-case";
+export * from "./application/use-cases/common/subscription-external-reference";
+export * from "./application/use-cases/common/subscription-output";
+export * from "./application/use-cases/create-subscription-checkout/create-subscription-checkout.use-case";
+export * from "./application/use-cases/get-active-subscription/get-active-subscription.use-case";
+export * from "./application/use-cases/list-plans/list-plans.use-case";
 export * from "./domain/errors/plan-limit-exceeded.error";
 export * from "./domain/plan-check.service";
 export * from "./domain/plan-features.config";
@@ -7,3 +15,5 @@ export * from "./domain/subscription.repository";
 export * from "./infra/db/in-memory/subscription-in-memory.repository";
 export * from "./infra/db/prisma/subscription-model.mapper";
 export * from "./infra/db/prisma/subscription-prisma.repository";
+export * from "./infra/gateways/asaas-subscription.gateway";
+export * from "./infra/gateways/fake-subscription-billing.gateway";

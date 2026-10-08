@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+
+import { MusicianPlanTier } from "../../../domain/plan-tier.enum";
 import {
   Subscription,
   SubscriptionId,
@@ -131,5 +133,39 @@ export class SubscriptionPrismaRepository implements ISubscriptionRepository {
     return models.map((m) =>
       SubscriptionModelMapper.toEntity(m as SubscriptionModel),
     );
+  }
+
+  async findByGatewaySubscriptionId(
+    gateway_subscription_id: string,
+  ): Promise<Subscription | null> {
+    const model = await this.prisma.subscription.findUnique({
+      where: { gateway_subscription_id },
+    });
+    return model
+      ? SubscriptionModelMapper.toEntity(model as SubscriptionModel)
+      : null;
+  }
+
+  async findActivePaidMusicianIds(): Promise<string[]> {
+    // `distinct` no banco: um músico com upgrade no mesmo ciclo tem duas
+    // linhas vigentes, e o destaque é por PESSOA, não por assinatura.
+    const rows = await this.prisma.subscription.findMany({
+      where: {
+        persona: "musician",
+        musician_id: { not: null },
+        status: { in: ["active", "trial"] },
+        // FREE excluído EXPLICITAMENTE. O seed afirma que tier gratuito não
+        // gera linha, mas `plan_tier` é String sem constraint — a invariante
+        // vive numa convenção, não no schema, e uma linha órfã de FREE
+        // compraria destaque de graça.
+        plan_tier: { not: MusicianPlanTier.FREE },
+      },
+      select: { musician_id: true },
+      distinct: ["musician_id"],
+    });
+
+    return rows
+      .map((row) => row.musician_id)
+      .filter((id): id is string => id !== null);
   }
 }

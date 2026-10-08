@@ -1,15 +1,12 @@
+import { SubscriptionInMemoryRepository } from "../../infra/db/in-memory/subscription-in-memory.repository";
 import { PlanLimitExceededError } from "../errors/plan-limit-exceeded.error";
+import { PlanCheckService } from "../plan-check.service";
 import {
   BillingCycle,
   EstablishmentPlanTier,
   MusicianPlanTier,
 } from "../plan-tier.enum";
-import { PlanCheckService } from "../plan-check.service";
-import {
-  Subscription,
-  SubscriptionStatus,
-} from "../subscription.aggregate";
-import { SubscriptionInMemoryRepository } from "../../infra/db/in-memory/subscription-in-memory.repository";
+import { Subscription, SubscriptionStatus } from "../subscription.aggregate";
 
 const MUSICIAN_ID = "musician-uuid-001";
 const ESTABLISHMENT_ID = "establishment-uuid-001";
@@ -53,7 +50,9 @@ describe("PlanCheckService", () => {
 
     it("retorna ESSENTIAL quando há subscription ESSENTIAL ativa", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       expect(await service.getMusicianPlanTier(MUSICIAN_ID)).toBe(
         MusicianPlanTier.ESSENTIAL,
@@ -87,9 +86,9 @@ describe("PlanCheckService", () => {
   describe("getEstablishmentPlanTier", () => {
     it("retorna FREE quando não há subscription ativa", async () => {
       const service = new PlanCheckService(makeRepo());
-      expect(
-        await service.getEstablishmentPlanTier(ESTABLISHMENT_ID),
-      ).toBe(EstablishmentPlanTier.FREE);
+      expect(await service.getEstablishmentPlanTier(ESTABLISHMENT_ID)).toBe(
+        EstablishmentPlanTier.FREE,
+      );
     });
 
     it("retorna GROWTH quando há subscription GROWTH ativa", async () => {
@@ -98,9 +97,9 @@ describe("PlanCheckService", () => {
         makeEstablishmentSub(ESTABLISHMENT_ID, EstablishmentPlanTier.GROWTH),
       );
       const service = new PlanCheckService(repo);
-      expect(
-        await service.getEstablishmentPlanTier(ESTABLISHMENT_ID),
-      ).toBe(EstablishmentPlanTier.GROWTH);
+      expect(await service.getEstablishmentPlanTier(ESTABLISHMENT_ID)).toBe(
+        EstablishmentPlanTier.GROWTH,
+      );
     });
   });
 
@@ -115,7 +114,9 @@ describe("PlanCheckService", () => {
 
     it("retorna 7% para músico ESSENTIAL", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       expect(await service.getMusicianTipFeePercentage(MUSICIAN_ID)).toBe(7);
     });
@@ -150,7 +151,9 @@ describe("PlanCheckService", () => {
 
     it("ESSENTIAL → R$70 mínimo, 3 dias úteis", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       const config = await service.getMusicianWithdrawalConfig(MUSICIAN_ID);
       expect(config.min_amount_brl).toBe(70);
@@ -180,7 +183,9 @@ describe("PlanCheckService", () => {
 
     it("ESSENTIAL → analytics liberado", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       await expect(
         service.assertMusicianFeature(MUSICIAN_ID, "realtime_analytics"),
@@ -221,7 +226,9 @@ describe("PlanCheckService", () => {
 
     it("ESSENTIAL → filtro de ruído do afinador liberado", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       await expect(
         service.assertMusicianFeature(MUSICIAN_ID, "tuner_noise_filter"),
@@ -304,7 +311,9 @@ describe("PlanCheckService", () => {
 
     it("ESSENTIAL → permite dentro do limite (2 de 3)", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       await expect(
         service.assertMusicianCanGenerateBanner(MUSICIAN_ID, 2),
@@ -313,7 +322,9 @@ describe("PlanCheckService", () => {
 
     it("ESSENTIAL → bloqueia ao atingir limite (3 de 3)", async () => {
       const repo = makeRepo();
-      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL));
+      await repo.insert(
+        makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.ESSENTIAL),
+      );
       const service = new PlanCheckService(repo);
       await expect(
         service.assertMusicianCanGenerateBanner(MUSICIAN_ID, 3),
@@ -396,9 +407,9 @@ describe("PlanCheckService", () => {
   describe("getEstablishmentBillingCycle", () => {
     it("sem subscription → MONTHLY", async () => {
       const service = new PlanCheckService(makeRepo());
-      expect(
-        await service.getEstablishmentBillingCycle(ESTABLISHMENT_ID),
-      ).toBe(BillingCycle.MONTHLY);
+      expect(await service.getEstablishmentBillingCycle(ESTABLISHMENT_ID)).toBe(
+        BillingCycle.MONTHLY,
+      );
     });
 
     it("subscription ANNUAL ativa → ANNUAL", async () => {
@@ -413,9 +424,9 @@ describe("PlanCheckService", () => {
         }),
       );
       const service = new PlanCheckService(repo);
-      expect(
-        await service.getEstablishmentBillingCycle(ESTABLISHMENT_ID),
-      ).toBe(BillingCycle.ANNUAL);
+      expect(await service.getEstablishmentBillingCycle(ESTABLISHMENT_ID)).toBe(
+        BillingCycle.ANNUAL,
+      );
     });
   });
 
@@ -500,6 +511,47 @@ describe("PlanCheckService", () => {
       expect(pricing.monthly_price_brl).toBe(74.9);
       expect(pricing.annual_price_brl).toBe(670);
       expect(pricing.annual_discount_percent).toBe(25);
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // Banda — convite é do PRO e tem teto de integrantes
+  // ----------------------------------------------------------------
+  describe("assertBandCanAddMember", () => {
+    it.each([
+      ["FREE", null],
+      ["ESSENTIAL", MusicianPlanTier.ESSENTIAL],
+    ])(
+      "%s não convida: banda com integrantes é do PRO",
+      async (_tier, tier) => {
+        const repo = makeRepo();
+        if (tier) await repo.insert(makeMusicianSub(MUSICIAN_ID, tier));
+        const service = new PlanCheckService(repo);
+
+        await expect(
+          service.assertBandCanAddMember(MUSICIAN_ID, 1),
+        ).rejects.toThrow(PlanLimitExceededError);
+      },
+    );
+
+    it("PRO convida enquanto houver vaga", async () => {
+      const repo = makeRepo();
+      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.PRO));
+      const service = new PlanCheckService(repo);
+
+      await expect(
+        service.assertBandCanAddMember(MUSICIAN_ID, 7),
+      ).resolves.toBeUndefined();
+    });
+
+    it('🔴 PRO é barrado no teto — o "até 8" deixou de ser só texto do app', async () => {
+      const repo = makeRepo();
+      await repo.insert(makeMusicianSub(MUSICIAN_ID, MusicianPlanTier.PRO));
+      const service = new PlanCheckService(repo);
+
+      await expect(
+        service.assertBandCanAddMember(MUSICIAN_ID, 8),
+      ).rejects.toThrow(/Limite de 8 integrantes/);
     });
   });
 });

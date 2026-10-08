@@ -1,9 +1,6 @@
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
 import { BillingCycle } from "../plan-tier.enum";
-import {
-  Subscription,
-  SubscriptionStatus,
-} from "../subscription.aggregate";
+import { Subscription, SubscriptionStatus } from "../subscription.aggregate";
 
 describe("Subscription aggregate — billing_cycle (4D.8)", () => {
   // ----------------------------------------------------------------

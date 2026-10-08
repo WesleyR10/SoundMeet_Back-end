@@ -2,11 +2,14 @@ import { SubscriptionStatus as PrismaSubscriptionStatus } from "@prisma/client";
 
 import { LoadEntityError } from "../../../../shared/domain/validators/validation.error";
 import {
+  BillingCycle,
+  SubscriptionPersona,
+} from "../../../domain/plan-tier.enum";
+import {
   Subscription,
   SubscriptionId,
   SubscriptionStatus,
 } from "../../../domain/subscription.aggregate";
-import { BillingCycle, SubscriptionPersona } from "../../../domain/plan-tier.enum";
 
 export type SubscriptionModel = {
   id: string;
@@ -20,6 +23,8 @@ export type SubscriptionModel = {
   expires_at: Date | null;
   trial_ends_at: Date | null;
   cancelled_at: Date | null;
+  gateway_customer_id: string | null;
+  gateway_subscription_id: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -51,12 +56,15 @@ export class SubscriptionModelMapper {
       establishment_id: model.establishment_id,
       plan_tier: model.plan_tier,
       persona: model.persona as SubscriptionPersona,
-      billing_cycle: billingCycleMap[model.billing_cycle] ?? BillingCycle.MONTHLY,
+      billing_cycle:
+        billingCycleMap[model.billing_cycle] ?? BillingCycle.MONTHLY,
       status,
       started_at: model.started_at,
       expires_at: model.expires_at,
       trial_ends_at: model.trial_ends_at,
       cancelled_at: model.cancelled_at,
+      gateway_customer_id: model.gateway_customer_id,
+      gateway_subscription_id: model.gateway_subscription_id,
       created_at: model.created_at,
     });
   }
@@ -74,6 +82,8 @@ export class SubscriptionModelMapper {
       expires_at: entity.expires_at,
       trial_ends_at: entity.trial_ends_at,
       cancelled_at: entity.cancelled_at,
+      gateway_customer_id: entity.gateway_customer_id,
+      gateway_subscription_id: entity.gateway_subscription_id,
       created_at: entity.created_at,
     };
   }
