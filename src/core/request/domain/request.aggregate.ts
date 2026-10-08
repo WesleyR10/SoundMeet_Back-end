@@ -1,11 +1,15 @@
 import { AggregateRoot, Points, Uuid } from "../../shared/domain";
 import { RequestAcceptedEvent } from "./events/request-accepted.event";
+import { RequestBoostChargeCreatedEvent } from "./events/request-boost-charge-created.event";
+import { RequestBoostPaidEvent } from "./events/request-boost-paid.event";
+import { RequestBoostRefundPendingEvent } from "./events/request-boost-refund-pending.event";
 import { RequestCreatedEvent } from "./events/request-created.event";
 import { RequestPlayedEvent } from "./events/request-played.event";
 import { RequestRejectedEvent } from "./events/request-rejected.event";
 import { RequestUpdatedEvent } from "./events/request-updated.event";
 import { RequestValidatorFactory } from "./request.validator";
 import { RequestFakeBuilder } from "./request-fake.builder";
+import { RequestBoost } from "./value-objects/request-boost.vo";
 import { RequestMessage } from "./value-objects/request-message.vo";
 import {
   RequestStatus,
@@ -29,6 +33,7 @@ export type RequestConstructorProps = {
   created_at?: Date;
   updated_at?: Date;
   responded_at?: Date | null;
+  boost?: RequestBoost | null;
 };
 
 export type RequestCreateCommand = {
@@ -39,6 +44,7 @@ export type RequestCreateCommand = {
   song_title: string;
   artist?: string | null;
   message?: string | null;
+  boost?: RequestBoost | null;
 };
 
 export class RequestId extends Uuid {}
@@ -59,6 +65,11 @@ export class Request extends AggregateRoot {
   created_at: Date;
   updated_at: Date;
   responded_at: Date | null;
+  /**
+   * Destaque pago. `null` no pedido comum, que segue sendo o caso normal.
+   * Ver `value-objects/request-boost.vo.ts`.
+   */
+  boost: RequestBoost | null;
 
   constructor(props: RequestConstructorProps) {
     super();
@@ -80,6 +91,7 @@ export class Request extends AggregateRoot {
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? this.created_at;
     this.responded_at = props.responded_at ?? null;
+    this.boost = props.boost ?? null;
   }
 
   get entity_id(): RequestId {
@@ -95,6 +107,7 @@ export class Request extends AggregateRoot {
       song_title: props.song_title,
       artist: props.artist,
       message: props.message,
+      boost: props.boost,
     });
 
     request.validate();
@@ -153,6 +166,21 @@ export class Request extends AggregateRoot {
     this.rejection_reason = reason || null;
     this.updated_at = new Date();
 
+    /*
+     * Destaque de pedido recusado:
+     * - sem pagamento ainda (`awaiting_payment`, ou promessa antiga) → cancela;
+     *   se o PIX for pago mesmo assim, `markBoostPaid` o manda a reembolso;
+     * - JÁ PAGO → `refund_pending`: o fã pagou por um pedido que não vai
+     *   acontecer. O reembolso de fato é tarefa aberta (ver o evento).
+     * - `expired` fica como está (nada entrou; pagamento tardio vira reembolso).
+     */
+    if (this.boost?.isPromised || this.boost?.isAwaitingPayment) {
+      this.boost = this.boost.cancel("request_rejected");
+    } else if (this.boost?.isPaid) {
+      this.boost = this.boost.markRefundPending("request_rejected");
+      this.applyRefundPendingEvent("request_rejected");
+    }
+
     // Emitir evento para notificação
     this.applyEvent(
       new RequestRejectedEvent({
@@ -164,6 +192,125 @@ export class Request extends AggregateRoot {
         rejection_reason: this.rejection_reason,
       }),
     );
+  }
+
+  /**
+   * Registra o PIX do destaque, criado no instante do pedido.
+   *
+   * Chamado DEPOIS de o provedor confirmar a criação e ANTES de gravar o
+   * pedido — ver `CreateRequestUseCase`: cobrança primeiro, pedido depois. A
+   * FK `music_requests.boostTipId -> tips.id` faz o banco exigir essa ordem.
+   * O evento é o gatilho do "pague agora" no app do fã.
+   */
+  markBoostAwaitingPayment(tipId: string): void {
+    if (!this.boost) {
+      this.notification.addError("Request has no boost to charge", "boost");
+      return;
+    }
+    this.boost = this.boost.withCharge(tipId);
+    this.updated_at = new Date();
+
+    this.applyEvent(
+      new RequestBoostChargeCreatedEvent({
+        request_id: this.request_id,
+        audience_id: this.audience_id.id,
+        musician_id: this.musician_id.id,
+        song_title: this.song_title.value,
+        amount: this.boost.amount.amount,
+        tip_id: tipId,
+        charged_at: this.boost.charged_at!,
+      }),
+    );
+  }
+
+  /**
+   * Webhook confirmou o PIX.
+   *
+   * - pedido aberto (pendente, aceito ou tocado) → `paid`: passa a destacar a
+   *   fila e a dedicatória vira pública — inclusive PIX pago fora da janela;
+   * - pedido RECUSADO → `refund_pending`: o dinheiro chegou para um pedido que
+   *   não vai acontecer. Nem destaque, nem dedicatória, nem celebração.
+   */
+  markBoostPaid(paidAt?: Date): void {
+    if (!this.boost) {
+      this.notification.addError("Request has no boost to settle", "boost");
+      return;
+    }
+    if (this.status.isRejected() || this.boost.isCancelled) {
+      this.boost = this.boost.markRefundPending("paid_after_rejection", paidAt);
+      this.updated_at = new Date();
+      this.applyRefundPendingEvent("paid_after_rejection");
+      return;
+    }
+    this.boost = this.boost.markPaid(paidAt);
+    this.updated_at = new Date();
+
+    this.applyEvent(
+      new RequestBoostPaidEvent({
+        request_id: this.request_id,
+        audience_id: this.audience_id.id,
+        musician_id: this.musician_id.id,
+        song_title: this.song_title.value,
+        // Só agora a dedicatória sai do círculo de participantes.
+        dedication: this.boost.dedication,
+        amount: this.boost.amount.amount,
+        tip_id: this.boost.tip_id!,
+      }),
+    );
+  }
+
+  /**
+   * A janela de pagamento venceu sem PIX. O pedido segue — pendente ou aceito —
+   * como pedido COMUM: como nunca destacou, nada muda na fila.
+   */
+  markBoostExpired(): void {
+    if (!this.boost) {
+      this.notification.addError("Request has no boost to expire", "boost");
+      return;
+    }
+    this.boost = this.boost.markExpired();
+    this.updated_at = new Date();
+  }
+
+  /** Promessa do modelo antigo (sem PIX) sendo aceita: nunca será cobrada. */
+  cancelBoost(reason: string): void {
+    if (!this.boost) {
+      return;
+    }
+    this.boost = this.boost.cancel(reason);
+    this.updated_at = new Date();
+  }
+
+  private applyRefundPendingEvent(reason: string): void {
+    this.applyEvent(
+      new RequestBoostRefundPendingEvent({
+        request_id: this.request_id,
+        audience_id: this.audience_id.id,
+        musician_id: this.musician_id.id,
+        tip_id: this.boost!.tip_id!,
+        amount: this.boost!.amount.amount,
+        reason,
+      }),
+    );
+  }
+
+  /** O pedido sobe na fila do músico? Só com destaque PAGO. */
+  get isBoosted(): boolean {
+    return this.boost?.isBoosting ?? false;
+  }
+
+  /**
+   * A dedicatória como o PÚBLICO pode vê-la.
+   *
+   * 🔴 Este getter — e não o campo cru — é o que superfícies públicas devem
+   * ler (hoje, o "tocando agora" de `GetLivePerformanceUseCase`). O
+   * `RequestOutput` normal pode carregar a dedicatória crua porque toda rota
+   * que o serve passa por `assertRequestParticipant`: quem lê ali é o próprio
+   * fã, o músico-alvo ou a casa. O músico PRECISA ler antes de aceitar — é
+   * metade do motivo para aceitar.
+   */
+  get publicDedication(): string | null {
+    return this.boost?.isPublic ? this.boost.dedication : null;
   }
 
   private dispatchUpdateEvent(): void {
@@ -427,6 +574,8 @@ export class Request extends AggregateRoot {
       is_old: this.isOld,
       is_urgent: this.isUrgent,
       priority: this.priority,
+      boost: this.boost?.toJSON() ?? null,
+      is_boosted: this.isBoosted,
       points_value: this.pointsValue,
       can_be_accepted: this.canBeAccepted(),
       can_be_rejected: this.canBeRejected(),

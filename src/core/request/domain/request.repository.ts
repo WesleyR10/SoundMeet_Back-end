@@ -56,6 +56,15 @@ export interface IRequestRepository extends ISearchableRepository<
 > {
   findByAudienceId(audience_id: string): Promise<Request[]>;
   findByMusicianId(musician_id: string): Promise<Request[]>;
+  /**
+   * Pedidos ao músico em vários eventos, numa consulta — o recorte do
+   * relatório pós-show (evento + músico) aplicado a um período inteiro.
+   * Lista vazia devolve vazio, nunca "todos".
+   */
+  findByMusicianAndEvents(
+    musician_id: string,
+    event_ids: string[],
+  ): Promise<Request[]>;
   findPendingRequests(musician_id?: string): Promise<Request[]>;
   findPendingRequestsByMusician(musician_id: string): Promise<Request[]>;
   findAcceptedRequestsByMusician(musician_id: string): Promise<Request[]>;
@@ -100,4 +109,18 @@ export interface IRequestRepository extends ISearchableRepository<
   findByStatus(status: string): Promise<Request[]>;
   countByStatus(status: string): Promise<number>;
   countByMusicianId(musician_id: Uuid): Promise<number>;
+  /**
+   * Pedido cuja cobrança de destaque é esta.
+   *
+   * O webhook do provedor só conhece o `tip_id`; é por aqui que ele chega ao
+   * pedido para marcar o destaque como pago. `music_requests.boostTipId` é
+   * `@unique`, então no máximo um pedido volta.
+   */
+  findByBoostTipId(tip_id: string): Promise<Request | null>;
+  /**
+   * Destaques em `awaiting_payment` COBRADOS antes de `charged_before` — a
+   * varredura do job de expiração. O corte é pela data da cobrança, não da
+   * promessa: ver `RequestBoost.charged_at`.
+   */
+  findBoostsAwaitingPaymentBefore(charged_before: Date): Promise<Request[]>;
 }

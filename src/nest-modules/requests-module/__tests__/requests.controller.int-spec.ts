@@ -2,8 +2,9 @@ import { Test, TestingModule } from "@nestjs/testing";
 
 import { Audience, AudienceId } from "../../../core/audience/domain";
 import { AudienceInMemoryRepository } from "../../../core/audience/infra/db/in-memory/audience-in-memory.repository";
-import { Event, EventId } from "../../../core/events/domain";
+import { Event, EventId, PresenceVerifier } from "../../../core/events/domain";
 import { EventInMemoryRepository } from "../../../core/events/infra/db/in-memory/event-in-memory.repository";
+import { VenueLocationInMemoryAdapter } from "../../../core/events/infra/venue-location";
 import {
   Musician,
   MusicianId,
@@ -137,6 +138,14 @@ describe("RequestsController Integration Tests", () => {
               eventRepo,
               musicianRepo,
               audRepo,
+              // Nenhum caso deste spec manda `library_id`; a porta só precisa
+              // existir para o construtor. A regra em si é exercitada em
+              // create-request.use-case.spec.ts.
+              { belongsToMusician: async () => false },
+              // Casa sem coordenada: presença aceita. A regra de presença é
+              // exercitada em create-request.use-case.spec.ts.
+              new VenueLocationInMemoryAdapter(),
+              new PresenceVerifier(),
               10,
               120,
             ),

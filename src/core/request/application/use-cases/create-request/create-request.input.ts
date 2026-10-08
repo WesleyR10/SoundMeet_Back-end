@@ -1,12 +1,42 @@
+import { Type } from "class-transformer";
 import {
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
   validateSync,
 } from "class-validator";
+
+import { PresenceLocationInput } from "../../../../events/application/use-cases/common/presence-location.input";
+import { REQUEST_BOOST_DEDICATION_MAX_LENGTH } from "../../../domain/value-objects/request-boost.vo";
+
+/**
+ * Destaque pago do pedido.
+ *
+ * 🔴 O valor entra como PROMESSA — a cobrança só é criada quando o músico
+ * aceita. Ver `RequestBoost` e `RespondToRequestUseCase`.
+ *
+ * O piso não é validado aqui: mora em config (`REQUEST_BOOST_MIN_AMOUNT`) e é
+ * cobrado por `BoostMinimumAmountPolicy`, junto com as demais regras de
+ * elegibilidade — assim a mensagem de erro sai no mesmo formato das outras.
+ */
+export class CreateRequestBoostInput {
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount: number;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(REQUEST_BOOST_DEDICATION_MAX_LENGTH, {
+    message: `Dedication cannot exceed ${REQUEST_BOOST_DEDICATION_MAX_LENGTH} characters`,
+  })
+  dedication?: string;
+}
 
 export type CreateRequestInputConstructorProps = {
   event_id: string;
@@ -16,6 +46,13 @@ export type CreateRequestInputConstructorProps = {
   song_title: string;
   artist?: string;
   message?: string;
+  boost?: { amount: number; dedication?: string } | null;
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy_m: number;
+    mocked?: boolean;
+  } | null;
 };
 
 export class CreateRequestInput {
@@ -52,6 +89,22 @@ export class CreateRequestInput {
   @MaxLength(500, { message: "Message cannot exceed 500 characters" })
   message?: string;
 
+  @ValidateNested()
+  @Type(() => CreateRequestBoostInput)
+  @IsOptional()
+  boost?: CreateRequestBoostInput | null;
+
+  /**
+   * Leitura de GPS feita no ato do pedido. Opcional no CONTRATO só para que a
+   * ausência chegue à policy e vire a mensagem certa ("ative a localização"),
+   * e não um 422 genérico de campo obrigatório. Sem ela o pedido é recusado —
+   * ver `AudienceMustBePresentPolicy`.
+   */
+  @ValidateNested()
+  @Type(() => PresenceLocationInput)
+  @IsOptional()
+  location?: PresenceLocationInput | null;
+
   constructor(props: CreateRequestInputConstructorProps) {
     if (!props) return;
 
@@ -62,6 +115,18 @@ export class CreateRequestInput {
     this.song_title = props.song_title;
     this.artist = props.artist;
     this.message = props.message;
+    if (props.boost) {
+      this.boost = Object.assign(new CreateRequestBoostInput(), {
+        amount: props.boost.amount,
+        dedication: props.boost.dedication,
+      });
+    }
+    if (props.location) {
+      this.location = Object.assign(
+        new PresenceLocationInput(),
+        props.location,
+      );
+    }
   }
 }
 

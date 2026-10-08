@@ -91,20 +91,54 @@ export class RequestInMemoryRepository
     return Request;
   }
 
+  /**
+   * Espelha o ORDER BY do `RequestPrismaRepository` no ramo
+   * `sort === "priority"`: destaque primeiro, maior valor primeiro, e só então
+   * a prioridade por idade.
+   *
+   * Não é conveniência de teste: o repositório in-memory é o que os testes de
+   * domínio exercitam, e se ele ordenasse diferente do banco a fila do músico
+   * passaria verde no unitário e sairia errada em produção. `super.applySort`
+   * não serve aqui porque compara `item.priority` como STRING — "low" > "high"
+   * em ordem alfabética.
+   */
+  private applyPrioritySort(
+    items: Request[],
+    sort_dir: SortDirection | null,
+  ): Request[] {
+    const boostTier = (item: Request) => (item.isBoosted ? 1 : 0);
+    const boostAmount = (item: Request) =>
+      item.isBoosted ? (item.boost?.amount.amount ?? 0) : 0;
+    const priorityRank = (item: Request) =>
+      item.priority === "high" ? 2 : item.priority === "medium" ? 1 : 0;
+
+    // `sort_dir` vale só para a prioridade por idade — ver a nota no repositório Prisma.
+    const ageDir = sort_dir === "asc" ? 1 : -1;
+
+    return [...items].sort(
+      (a, b) =>
+        boostTier(b) - boostTier(a) ||
+        boostAmount(b) - boostAmount(a) ||
+        (priorityRank(a) - priorityRank(b)) * ageDir ||
+        b.created_at.getTime() - a.created_at.getTime(),
+    );
+  }
+
   protected applySort(
     items: Request[],
     sort: string | null,
     sort_dir: SortDirection | null,
   ) {
+    if (sort === "priority") {
+      return this.applyPrioritySort(items, sort_dir);
+    }
+
     return sort
       ? super.applySort(
           items,
           sort,
           sort_dir,
           (sort: string, item: Request) => {
-            if (sort === "priority") {
-              return item.priority;
-            }
             if (sort === "points_value") {
               return item.pointsValue;
             }
@@ -126,6 +160,19 @@ export class RequestInMemoryRepository
 
   async findByMusicianId(musician_id: string): Promise<Request[]> {
     return this.items.filter((item) => item.musician_id.id === musician_id);
+  }
+
+  async findByMusicianAndEvents(
+    musician_id: string,
+    event_ids: string[],
+  ): Promise<Request[]> {
+    const wanted = new Set(event_ids);
+    return this.items.filter(
+      (item) =>
+        item.musician_id.id === musician_id &&
+        !!item.event_id &&
+        wanted.has(item.event_id.id),
+    );
   }
 
   async findPendingRequests(musician_id?: string): Promise<Request[]> {
@@ -263,6 +310,21 @@ export class RequestInMemoryRepository
     if (item) {
       item.updateVotesCount(item.votes_count + 1);
     }
+  }
+
+  async findByBoostTipId(tip_id: string): Promise<Request | null> {
+    return this.items.find((item) => item.boost?.tip_id === tip_id) ?? null;
+  }
+
+  async findBoostsAwaitingPaymentBefore(
+    charged_before: Date,
+  ): Promise<Request[]> {
+    return this.items.filter(
+      (item) =>
+        item.boost?.isAwaitingPayment === true &&
+        !!item.boost.charged_at &&
+        item.boost.charged_at.getTime() < charged_before.getTime(),
+    );
   }
 
   async findByStatus(status: string): Promise<Request[]> {

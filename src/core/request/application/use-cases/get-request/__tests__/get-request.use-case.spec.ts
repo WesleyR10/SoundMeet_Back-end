@@ -183,7 +183,7 @@ describe("GetRequestUseCase Unit Tests", () => {
 
       const output = await useCase.execute({
         id: request.request_id.id,
-        requesting_user_id: request.audience_id.id,
+        requesting_participant_ids: [request.audience_id.id],
       });
 
       expect(output.id).toBe(request.request_id.id);
@@ -195,7 +195,7 @@ describe("GetRequestUseCase Unit Tests", () => {
 
       const output = await useCase.execute({
         id: request.request_id.id,
-        requesting_user_id: request.musician_id.id,
+        requesting_participant_ids: [request.musician_id.id],
       });
 
       expect(output.id).toBe(request.request_id.id);
@@ -203,6 +203,7 @@ describe("GetRequestUseCase Unit Tests", () => {
 
     it("should allow the establishment that owns the event to view the request", async () => {
       const establishment_id = new Uuid().id;
+      const owner_sub = new Uuid().id;
       const request = buildRequest();
       await repository.insert(request);
       await eventRepo.insert(
@@ -218,10 +219,37 @@ describe("GetRequestUseCase Unit Tests", () => {
 
       const output = await useCase.execute({
         id: request.request_id.id,
-        requesting_user_id: establishment_id,
+        // Como o JWT real chega: `sub` do dono + claim establishment_ids.
+        requesting_participant_ids: [owner_sub, establishment_id],
       });
 
       expect(output.id).toBe(request.request_id.id);
+    });
+
+    // O `sub` do dono nunca é igual ao UUID do estabelecimento — era assim que
+    // a conta de estabelecimento levava 403 no pedido do próprio evento.
+    it("should reject the establishment owner's sub without the establishment_ids claim", async () => {
+      const establishment_id = new Uuid().id;
+      const owner_sub = new Uuid().id;
+      const request = buildRequest();
+      await repository.insert(request);
+      await eventRepo.insert(
+        new Event({
+          event_id: new EventId(request.event_id.id),
+          establishment_id: new Uuid(establishment_id),
+          name: "Event",
+          start_at: new Date(),
+          end_at: new Date(Date.now() + 60 * 60 * 1000),
+          status: "active",
+        }),
+      );
+
+      await expect(() =>
+        useCase.execute({
+          id: request.request_id.id,
+          requesting_participant_ids: [owner_sub],
+        }),
+      ).rejects.toMatchObject({ status: 403 });
     });
 
     it("should throw ForbiddenException for an unrelated user", async () => {
@@ -231,7 +259,7 @@ describe("GetRequestUseCase Unit Tests", () => {
       await expect(() =>
         useCase.execute({
           id: request.request_id.id,
-          requesting_user_id: new Uuid().id,
+          requesting_participant_ids: [new Uuid().id],
         }),
       ).rejects.toMatchObject({ status: 403 });
     });
@@ -242,7 +270,7 @@ describe("GetRequestUseCase Unit Tests", () => {
 
       const output = await useCase.execute({
         id: request.request_id.id,
-        requesting_user_id: new Uuid().id,
+        requesting_participant_ids: [new Uuid().id],
         is_admin: true,
       });
 

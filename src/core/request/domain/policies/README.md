@@ -52,7 +52,7 @@ A policy principal deste diretório é [`CanMakeRequestPolicy`](./can-make-reque
 
 - `EventMustBeActivePolicy`
 - `MusicianMustBePerformerPolicy`
-- `AudienceMustBeAttendeePolicy`
+- `AudienceMustBePresentPolicy` (check-in **e** GPS no raio da casa neste pedido — ver `events/domain/presence`)
 - `DailyRequestLimitPolicy`
 - `NoPendingRequestForMusicianPolicy`
 - `AntiSpamSimilarRecentRequestPolicy`

@@ -1,4 +1,29 @@
 import { Request } from "../../../domain/request.aggregate";
+import { RequestBoostStatusEnum } from "../../../domain/value-objects/request-boost.vo";
+
+/**
+ * Destaque pago, como sai para PARTICIPANTES do pedido (o fã que pediu, o
+ * músico-alvo, a casa do evento) — toda rota que serve `RequestOutput` passa
+ * por `assertRequestParticipant`.
+ *
+ * 🔴 `dedication` sai cru aqui de propósito: o músico precisa lê-la para
+ * decidir se aceita. Quem aplica o portão do público é
+ * `Request.publicDedication`, lido pelo "tocando agora".
+ */
+export type RequestBoostOutput = {
+  amount: number;
+  dedication: string | null;
+  status: RequestBoostStatusEnum;
+  tip_id: string | null;
+  promised_at: Date;
+  charged_at: Date | null;
+  paid_at: Date | null;
+  cancellation_reason: string | null;
+  /** O pedido está subindo na fila por causa deste destaque? */
+  is_boosting: boolean;
+  /** A dedicatória já pode aparecer em superfície pública? */
+  is_public: boolean;
+};
 
 export type RequestOutput = {
   id: string;
@@ -28,6 +53,8 @@ export type RequestOutput = {
   is_old: boolean;
   is_urgent: boolean;
   priority: "low" | "medium" | "high";
+  boost: RequestBoostOutput | null;
+  is_boosted: boolean;
   points_value: {
     value: number;
     source: string;

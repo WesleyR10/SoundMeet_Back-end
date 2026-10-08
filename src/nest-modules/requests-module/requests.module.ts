@@ -4,6 +4,7 @@ import { AudiencesModule } from "../audiences-module/audiences.module";
 import { DatabaseModule } from "../database-module/database.module";
 import { EventModule } from "../events-module/events.module";
 import { GamificationModule } from "../gamification-module/gamification.module";
+import { MusicLibraryModule } from "../music-library-module/music-library.module";
 import { MusiciansModule } from "../musicians-module/musicians.module";
 import { PaymentModule } from "../payment-module/payment.module";
 import { BoostChargeAdapter } from "./boost-charge.adapter";
@@ -11,6 +12,7 @@ import { ExpireRequestBoostsJob } from "./expire-request-boosts.job";
 import { RequestBoostEventsHandler } from "./request-boost-events.handler";
 import { RequestEventProcessingService } from "./request-event-processing.service";
 import { RequestEventsHandlers } from "./request-events.handlers";
+import { RepertoireMembershipAdapter } from "./repertoire-membership.adapter";
 import { RequestsController } from "./requests.controller";
 import { REQUESTS_PROVIDERS } from "./requests.providers";
 import { TipEligibilityAdapter } from "./tip-eligibility.adapter";
@@ -21,6 +23,12 @@ import { TipEligibilityAdapter } from "./tip-eligibility.adapter";
     MusiciansModule,
     EventModule,
     GamificationModule,
+    /*
+     * `IRepertoireMembershipPort`: confere se o `library_id` do pedido é mesmo
+     * do músico. Direção segura — `MusicLibraryModule` importa Database e
+     * Musicians, e não conhece `RequestsModule`.
+     */
+    MusicLibraryModule,
     /*
      * Destaque pago do pedido: as portas `IBoostChargePort` e
      * `ITipEligibilityPort` são satisfeitas por adapters que falam com
@@ -43,6 +51,7 @@ import { TipEligibilityAdapter } from "./tip-eligibility.adapter";
     RequestEventsHandlers,
     BoostChargeAdapter,
     TipEligibilityAdapter,
+    RepertoireMembershipAdapter,
     RequestBoostEventsHandler,
     ExpireRequestBoostsJob,
   ],

@@ -1,8 +1,14 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsUUID, validateSync } from "class-validator";
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  validateSync,
+} from "class-validator";
 
 export type GetRequestFeedbackInputConstructorProps = {
   request_id: string;
-  requesting_user_id?: string;
+  requesting_participant_ids?: string[] | null;
   is_admin?: boolean;
 };
 
@@ -11,11 +17,11 @@ export class GetRequestFeedbackInput {
   @IsNotEmpty()
   request_id: string;
 
-  // Mesmo esquema de ownership de GetRequestInput — RequestFeedback não tem
+  // Mesmo esquema de identidade de GetRequestInput — RequestFeedback não tem
   // audience_id/musician_id próprios, então o use-case resolve via Request.
-  @IsUUID()
+  @IsUUID("4", { each: true })
   @IsOptional()
-  requesting_user_id?: string;
+  requesting_participant_ids?: string[] | null;
 
   @IsBoolean()
   @IsOptional()
@@ -25,7 +31,7 @@ export class GetRequestFeedbackInput {
     if (!props) return;
 
     this.request_id = props.request_id;
-    this.requesting_user_id = props.requesting_user_id;
+    this.requesting_participant_ids = props.requesting_participant_ids;
     this.is_admin = props.is_admin;
   }
 }

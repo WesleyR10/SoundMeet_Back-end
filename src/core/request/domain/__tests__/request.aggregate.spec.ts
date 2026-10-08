@@ -1,5 +1,10 @@
+import { Money } from "../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../shared/domain/value-objects/uuid.vo";
 import { Request, RequestCreateCommand } from "../request.aggregate";
+import {
+  RequestBoost,
+  RequestBoostStatusEnum,
+} from "../value-objects/request-boost.vo";
 import { RequestMessage } from "../value-objects/request-message.vo";
 import {
   RequestStatus,
@@ -333,6 +338,147 @@ describe("Request Unit Tests", () => {
         created_at: request.created_at,
         responded_at: null,
       });
+    });
+  });
+
+  describe("destaque pago (boost)", () => {
+    const TIP_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+    function makeBoosted(dedication = "essa é pra minha esposa, Ana") {
+      return Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
+        audience_id: "123e4567-e89b-12d3-a456-426614174000",
+        musician_id: "123e4567-e89b-12d3-a456-426614174001",
+        song_title: "Evidências",
+        artist: "Chitãozinho & Xororó",
+        boost: new RequestBoost({ amount: new Money(10), dedication }),
+      });
+    }
+
+    test("pedido comum não tem destaque", () => {
+      const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
+        audience_id: "123e4567-e89b-12d3-a456-426614174000",
+        musician_id: "123e4567-e89b-12d3-a456-426614174001",
+        song_title: "Song",
+      });
+
+      expect(request.boost).toBeNull();
+      expect(request.isBoosted).toBe(false);
+      expect(request.publicDedication).toBeNull();
+    });
+
+    // 🔴 Paga antes, destaca depois: nem a escolha do valor nem o PIX gerado
+    // furam a fila — só o pagamento confirmado.
+    test("não destaca antes de PAGO", () => {
+      const request = makeBoosted();
+      expect(request.boost!.status).toBe(RequestBoostStatusEnum.PROMISED);
+      expect(request.isBoosted).toBe(false);
+
+      request.markBoostAwaitingPayment("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+      expect(request.isBoosted).toBe(false);
+
+      request.markBoostPaid();
+      expect(request.isBoosted).toBe(true);
+    });
+
+    // Dinheiro que chega para pedido já recusado não vira destaque nem festa.
+    test("PIX pago depois da recusa vai a reembolso, sem dedicatória pública", () => {
+      const request = makeBoosted();
+      request.markBoostAwaitingPayment("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+      request.reject("não conheço");
+      request.markBoostPaid();
+
+      expect(request.boost!.status).toBe(RequestBoostStatusEnum.REFUND_PENDING);
+      expect(request.isBoosted).toBe(false);
+      expect(request.publicDedication).toBeNull();
+    });
+
+    // Recusa ANTES de qualquer pagamento: nada entrou, só cancela.
+    test("recusa cancela o destaque que ainda não foi pago", () => {
+      const request = makeBoosted();
+      request.reject("não conheço a música");
+
+      expect(request.isRejected).toBe(true);
+      expect(request.boost!.status).toBe(RequestBoostStatusEnum.CANCELLED);
+      expect(request.boost!.cancellation_reason).toBe("request_rejected");
+      expect(request.boost!.tip_id).toBeNull();
+      expect(request.isBoosted).toBe(false);
+    });
+
+    test("aceite não move o destaque — o PIX nasce no pedido, não no aceite", () => {
+      const request = makeBoosted();
+      request.accept();
+
+      expect(request.isAccepted).toBe(true);
+      expect(request.boost!.status).toBe(RequestBoostStatusEnum.PROMISED);
+    });
+
+    test("ciclo completo: cobrança criada e paga", () => {
+      const request = makeBoosted();
+      request.accept();
+      request.markBoostAwaitingPayment(TIP_ID);
+
+      expect(request.boost!.status).toBe(
+        RequestBoostStatusEnum.AWAITING_PAYMENT,
+      );
+      expect(request.boost!.tip_id).toBe(TIP_ID);
+
+      request.markBoostPaid();
+      expect(request.boost!.status).toBe(RequestBoostStatusEnum.PAID);
+    });
+
+    /*
+     * O pedido continua ACEITO quando o pagamento vence: o músico já disse sim,
+     * e desfazer isso seria pior que perder o destaque. Perde-se a posição na
+     * fila e a dedicatória pública.
+     */
+    test("expiração tira o destaque mas mantém o pedido aceito", () => {
+      const request = makeBoosted();
+      request.accept();
+      request.markBoostAwaitingPayment(TIP_ID);
+      request.markBoostExpired();
+
+      expect(request.isAccepted).toBe(true);
+      expect(request.isBoosted).toBe(false);
+      expect(request.publicDedication).toBeNull();
+    });
+
+    describe("publicDedication", () => {
+      test("só sai depois de paga", () => {
+        const request = makeBoosted("pra Ana");
+        expect(request.publicDedication).toBeNull();
+
+        request.accept();
+        request.markBoostAwaitingPayment(TIP_ID);
+        expect(request.publicDedication).toBeNull();
+
+        request.markBoostPaid();
+        expect(request.publicDedication).toBe("pra Ana");
+      });
+
+      /*
+       * O campo cru continua disponível para PARTICIPANTES — toda rota que
+       * serve RequestOutput passa por assertRequestParticipant, e o músico
+       * precisa ler a dedicatória para decidir se aceita.
+       */
+      test("o campo cru segue visível para quem participa do pedido", () => {
+        const request = makeBoosted("pra Ana");
+        expect(request.toJSON().boost!.dedication).toBe("pra Ana");
+        expect(request.toJSON().boost!.is_public).toBe(false);
+      });
+    });
+
+    test("marcar pago sem destaque vira erro de notificação, não exceção", () => {
+      const request = Request.create({
+        event_id: "123e4567-e89b-12d3-a456-426614174999",
+        audience_id: "123e4567-e89b-12d3-a456-426614174000",
+        musician_id: "123e4567-e89b-12d3-a456-426614174001",
+        song_title: "Song",
+      });
+
+      request.markBoostPaid();
+      expect(request.notification.hasErrors()).toBe(true);
     });
   });
 

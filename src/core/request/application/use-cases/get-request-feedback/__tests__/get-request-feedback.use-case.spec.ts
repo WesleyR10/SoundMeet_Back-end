@@ -19,7 +19,11 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
     feedbackRepo = new RequestFeedbackInMemoryRepository();
     requestRepo = new RequestInMemoryRepository();
     eventRepo = new EventInMemoryRepository();
-    useCase = new GetRequestFeedbackUseCase(feedbackRepo, requestRepo, eventRepo);
+    useCase = new GetRequestFeedbackUseCase(
+      feedbackRepo,
+      requestRepo,
+      eventRepo,
+    );
   });
 
   const buildRequestWithFeedback = async () => {
@@ -52,7 +56,7 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
 
     const output = await useCase.execute({
       request_id: request.request_id.id,
-      requesting_user_id: request.audience_id.id,
+      requesting_participant_ids: [request.audience_id.id],
     });
 
     expect(output.request_id).toBe(request.request_id.id);
@@ -63,7 +67,7 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
 
     const output = await useCase.execute({
       request_id: request.request_id.id,
-      requesting_user_id: request.musician_id.id,
+      requesting_participant_ids: [request.musician_id.id],
     });
 
     expect(output.request_id).toBe(request.request_id.id);
@@ -72,6 +76,7 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
   it("should allow the establishment that owns the event to view the feedback", async () => {
     const request = await buildRequestWithFeedback();
     const establishment_id = new Uuid().id;
+    const owner_sub = new Uuid().id;
     await eventRepo.insert(
       new Event({
         event_id: new EventId(request.event_id.id),
@@ -85,10 +90,36 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
 
     const output = await useCase.execute({
       request_id: request.request_id.id,
-      requesting_user_id: establishment_id,
+      // Como o JWT real chega: `sub` do dono + claim establishment_ids.
+      requesting_participant_ids: [owner_sub, establishment_id],
     });
 
     expect(output.request_id).toBe(request.request_id.id);
+  });
+
+  // O `sub` do dono nunca é igual ao UUID do estabelecimento — era assim que
+  // a conta de estabelecimento levava 403 na avaliação do próprio evento.
+  it("should reject the establishment owner's sub without the establishment_ids claim", async () => {
+    const request = await buildRequestWithFeedback();
+    const establishment_id = new Uuid().id;
+    const owner_sub = new Uuid().id;
+    await eventRepo.insert(
+      new Event({
+        event_id: new EventId(request.event_id.id),
+        establishment_id: new Uuid(establishment_id),
+        name: "Event",
+        start_at: new Date(),
+        end_at: new Date(Date.now() + 60 * 60 * 1000),
+        status: "active",
+      }),
+    );
+
+    await expect(() =>
+      useCase.execute({
+        request_id: request.request_id.id,
+        requesting_participant_ids: [owner_sub],
+      }),
+    ).rejects.toMatchObject({ status: 403 });
   });
 
   it("should throw ForbiddenException for an unrelated user", async () => {
@@ -97,7 +128,7 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
     await expect(() =>
       useCase.execute({
         request_id: request.request_id.id,
-        requesting_user_id: new Uuid().id,
+        requesting_participant_ids: [new Uuid().id],
       }),
     ).rejects.toMatchObject({ status: 403 });
   });
@@ -107,7 +138,7 @@ describe("GetRequestFeedbackUseCase Unit Tests", () => {
 
     const output = await useCase.execute({
       request_id: request.request_id.id,
-      requesting_user_id: new Uuid().id,
+      requesting_participant_ids: [new Uuid().id],
       is_admin: true,
     });
 

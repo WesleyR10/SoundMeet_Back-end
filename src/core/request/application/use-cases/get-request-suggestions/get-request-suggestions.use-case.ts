@@ -8,6 +8,7 @@ import { IRequestRepository } from "@core/request/domain";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
+import { ITipEligibilityPort } from "../../../domain/ports/tip-eligibility.port";
 import { GetRequestSuggestionsInput } from "./get-request-suggestions.input";
 
 export type RequestSuggestion = {
@@ -20,6 +21,23 @@ export type GetRequestSuggestionsOutput = {
   musician_id: string;
   genres: string[];
   suggestions: RequestSuggestion[];
+  /**
+   * O músico consegue receber gorjeta — ou seja, a tela do fã pode oferecer o
+   * destaque pago.
+   *
+   * ## Por que viaja AQUI, e não no perfil do músico
+   *
+   * O lugar natural seria `PublicMusicianPresenter`, mas `musicians-module`
+   * teria de ler `MusicianWallet`, e `PaymentModule` já importa
+   * `MusiciansModule` — seria ciclo. Esta rota já é chamada pela mesma tela
+   * (`SongRequestScreen` carrega as sugestões ao abrir) e vive no
+   * `requests-module`, que importa `PaymentModule` na direção segura. Zero
+   * requisição nova, zero `forwardRef`.
+   *
+   * Sem isso a UI ofereceria um destaque que a escrita vai recusar — a policy
+   * `MusicianAcceptsTipsPolicy` barra na criação.
+   */
+  accepts_tips: boolean;
 };
 
 export class GetRequestSuggestionsUseCase implements IUseCase<
@@ -29,6 +47,10 @@ export class GetRequestSuggestionsUseCase implements IUseCase<
   constructor(
     private requestRepo: IRequestRepository,
     private musicianRepo: IMusicianRepository,
+    /** Ausente em teste/chamada interna: assume-se que não aceita, e a UI
+     * apenas deixa de oferecer o destaque — nunca o contrário, que ofereceria
+     * algo destinado a falhar. */
+    private readonly tipEligibility?: ITipEligibilityPort,
   ) {}
 
   async execute(
@@ -99,6 +121,9 @@ export class GetRequestSuggestionsUseCase implements IUseCase<
       musician_id: musician.musician_id.id,
       genres: musician.genres,
       suggestions,
+      accepts_tips: this.tipEligibility
+        ? await this.tipEligibility.acceptsTips(musician.musician_id.id)
+        : false,
     };
   }
 }

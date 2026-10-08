@@ -1,5 +1,3 @@
-import { ForbiddenException } from "@nestjs/common";
-
 import { EventId, IEventRepository } from "../../../../events/domain";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -11,6 +9,10 @@ import {
   RequestFeedbackOutput,
   RequestFeedbackOutputMapper,
 } from "../common/request-feedback-output";
+import {
+  assertRequestParticipant,
+  isRequestViewerScoped,
+} from "../common/request-viewer";
 import { GetRequestFeedbackInput } from "./get-request-feedback.input";
 
 export type GetRequestFeedbackOutput = RequestFeedbackOutput;
@@ -44,9 +46,9 @@ export class GetRequestFeedbackUseCase implements IUseCase<
   // Mesmo escopo de participantes de GetRequestUseCase — a avaliação em si
   // não tem audience_id/musician_id, então resolve via o Request pai.
   private async ensureCanView(input: GetRequestFeedbackInput): Promise<void> {
-    // Mesmo convênio de GetRequestUseCase.ensureCanView — requesting_user_id
-    // ausente = chamada interna/admin, sem restrição.
-    if (input.is_admin || !input.requesting_user_id) return;
+    // Mesmo convênio de GetRequestUseCase.ensureCanView — sem identidade a
+    // chamada é interna/admin, sem restrição.
+    if (!isRequestViewerScoped(input)) return;
 
     const request = await this.requestRepo.findById(
       new RequestId(input.request_id),
@@ -55,22 +57,23 @@ export class GetRequestFeedbackUseCase implements IUseCase<
       throw new NotFoundError(input.request_id, Request);
     }
 
-    if (
-      request.audience_id.id === input.requesting_user_id ||
-      request.musician_id.id === input.requesting_user_id
-    ) {
-      return;
-    }
+    const viewerIds = input.requesting_participant_ids ?? [];
+    const isDirectParticipant =
+      viewerIds.includes(request.audience_id.id) ||
+      viewerIds.includes(request.musician_id.id);
 
-    const event = await this.eventRepo.findById(
-      new EventId(request.event_id.id),
-    );
-    if (event && event.establishment_id.id === input.requesting_user_id) {
-      return;
-    }
+    const event = isDirectParticipant
+      ? null
+      : await this.eventRepo.findById(new EventId(request.event_id.id));
 
-    throw new ForbiddenException(
-      "Você não tem permissão para ver esta avaliação.",
+    assertRequestParticipant(
+      input,
+      {
+        audience_id: request.audience_id.id,
+        musician_id: request.musician_id.id,
+        establishment_id: event?.establishment_id.id ?? null,
+      },
+      "esta avaliação",
     );
   }
 }

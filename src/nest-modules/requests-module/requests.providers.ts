@@ -1,7 +1,12 @@
 import { ConfigService } from "@nestjs/config";
 
 import { IAudienceRepository } from "../../core/audience/domain";
-import { IEventRepository } from "../../core/events/domain";
+import {
+  IEventRepository,
+  IVenueLocationPort,
+  PresenceVerifier,
+} from "../../core/events/domain";
+import { VenueLocationPrismaAdapter } from "../../core/events/infra/venue-location";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { BatchRespondToRequestsUseCase } from "../../core/request/application/use-cases/batch-respond-to-requests/batch-respond-to-requests.use-case";
 import { CreateRequestUseCase } from "../../core/request/application/use-cases/create-request/create-request.use-case";
@@ -20,6 +25,7 @@ import { RespondToRequestUseCase } from "../../core/request/application/use-case
 import { UpdateRequestUseCase } from "../../core/request/application/use-cases/update-request/update-request.use-case";
 import { VoteRequestUseCase } from "../../core/request/application/use-cases/vote-request/vote-request.use-case";
 import { IBoostChargePort } from "../../core/request/domain/ports/boost-charge.port";
+import { IRepertoireMembershipPort } from "../../core/request/domain/ports/repertoire-membership.port";
 import { ITipEligibilityPort } from "../../core/request/domain/ports/tip-eligibility.port";
 import { IRequestRepository } from "../../core/request/domain/request.repository";
 import { IRequestFeedbackRepository } from "../../core/request/domain/request-feedback.repository";
@@ -32,6 +38,7 @@ import { DomainEventMediator } from "../../core/shared/domain/events/domain-even
 import { ConfigSchemaType } from "../config-module/config.schema";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { BoostChargeAdapter } from "./boost-charge.adapter";
+import { RepertoireMembershipAdapter } from "./repertoire-membership.adapter";
 import { TipEligibilityAdapter } from "./tip-eligibility.adapter";
 
 export const REPOSITORIES = {
@@ -85,22 +92,32 @@ export const USE_CASES = {
       eventRepo: IEventRepository,
       musicianRepo: IMusicianRepository,
       audienceRepo: IAudienceRepository,
+      repertoireMembership: IRepertoireMembershipPort,
+      venueLocation: IVenueLocationPort,
+      presenceVerifier: PresenceVerifier,
       configService: ConfigSchemaType,
       clock: IClock,
       domainEventMediator: DomainEventMediator,
       tipEligibility: ITipEligibilityPort,
+      boostCharge: IBoostChargePort,
     ) => {
       return new CreateRequestUseCase(
         requestRepo,
         eventRepo,
         musicianRepo,
         audienceRepo,
+        repertoireMembership,
+        venueLocation,
+        presenceVerifier,
         configService.get<number>("MAX_REQUESTS_PER_USER_PER_EVENT")!,
         configService.get<number>("REQUEST_COOLDOWN_MINUTES")!,
         clock,
         domainEventMediator,
         configService.get<number>("REQUEST_BOOST_MIN_AMOUNT")!,
         tipEligibility,
+        // Paga antes: o PIX do destaque nasce junto com o pedido.
+        boostCharge,
+        configService.get<number>("REQUEST_LIMIT_DAY_START_HOUR")!,
       );
     },
     inject: [
@@ -108,10 +125,15 @@ export const USE_CASES = {
       "EventRepository",
       "MusicianRepository",
       "AudienceRepository",
+      RepertoireMembershipAdapter,
+      // Do `EventModule` (@Global): mesma regra e config do check-in.
+      VenueLocationPrismaAdapter,
+      PresenceVerifier,
       ConfigService,
       SERVICES.CLOCK.provide,
       DomainEventMediator,
       TipEligibilityAdapter,
+      BoostChargeAdapter,
     ],
   },
   LIST_REQUESTS_USE_CASE: {
@@ -168,15 +190,14 @@ export const USE_CASES = {
       musicianRepo: IMusicianRepository,
       configService: ConfigSchemaType,
       domainEventMediator: DomainEventMediator,
-      boostCharge: IBoostChargePort,
     ) => {
+      // O aceite não cobra mais: o PIX do destaque nasce no pedido.
       return new RespondToRequestUseCase(
         requestRepo,
         eventRepo,
         musicianRepo,
         configService.get<number>("REQUEST_RESPONSE_TIME_MINUTES")!,
         domainEventMediator,
-        boostCharge,
       );
     },
     inject: [
@@ -185,7 +206,6 @@ export const USE_CASES = {
       "MusicianRepository",
       ConfigService,
       DomainEventMediator,
-      BoostChargeAdapter,
     ],
   },
   GET_REQUEST_BOOST_PAYMENT_USE_CASE: {

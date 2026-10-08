@@ -13,7 +13,11 @@ export * from "./request.validator";
 export * from "./request-feedback.validator";
 export * from "./request-vote.validator";
 
+// Ports (inversão de dependência para `payment`)
+export * from "./ports";
+
 // Value Objects
+export * from "./value-objects/request-boost.vo";
 export * from "./value-objects/request-message.vo";
 export * from "./value-objects/request-status.vo";
 export * from "./value-objects/request-vote-type.vo";
@@ -21,6 +25,9 @@ export * from "./value-objects/song-title.vo";
 
 // Events
 export * from "./events/request-accepted.event";
+export * from "./events/request-boost-charge-created.event";
+export * from "./events/request-boost-paid.event";
+export * from "./events/request-boost-refund-pending.event";
 export * from "./events/request-rejected.event";
 
 // Fake Builder

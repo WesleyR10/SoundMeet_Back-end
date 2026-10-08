@@ -1,8 +1,14 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsUUID, validateSync } from "class-validator";
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  validateSync,
+} from "class-validator";
 
 export type GetRequestInputConstructorProps = {
   id: string;
-  requesting_user_id?: string;
+  requesting_participant_ids?: string[] | null;
   is_admin?: boolean;
 };
 
@@ -11,13 +17,15 @@ export class GetRequestInput {
   @IsNotEmpty()
   id: string;
 
-  // Id do usuário autenticado (audience_id, musician_id OU establishment_id
-  // — checado contra os três no use-case, já que um mesmo Keycloak `sub`
-  // pode ter múltiplos papéis). undefined só ocorre em chamada não
-  // autenticada, o que a rota já impede via guards.
-  @IsUUID()
+  // Identidades do autenticado: `sub` (fã/músico) + claims `establishment_ids`.
+  // Um id só não serve — o estabelecimento tem UUID próprio, distinto do `sub`,
+  // então comparar o `sub` contra `event.establishment_id` nunca casava e a
+  // conta de estabelecimento levava 403 no pedido do próprio evento.
+  // Preenchido pelo controller a partir do JWT; ausente só em chamada interna,
+  // o que a rota já impede via guards.
+  @IsUUID("4", { each: true })
   @IsOptional()
-  requesting_user_id?: string;
+  requesting_participant_ids?: string[] | null;
 
   @IsBoolean()
   @IsOptional()
@@ -27,7 +35,7 @@ export class GetRequestInput {
     if (!props) return;
 
     this.id = props.id;
-    this.requesting_user_id = props.requesting_user_id;
+    this.requesting_participant_ids = props.requesting_participant_ids;
     this.is_admin = props.is_admin;
   }
 }

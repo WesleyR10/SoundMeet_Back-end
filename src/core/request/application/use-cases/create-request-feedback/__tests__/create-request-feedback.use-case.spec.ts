@@ -2,8 +2,8 @@ import { ForbiddenException } from "@nestjs/common";
 
 import { Uuid } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Request } from "../../../../domain/request.aggregate";
-import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
 import { RequestFeedbackInMemoryRepository } from "../../../../infra/db/in-memory/request-feedback-in-memory.repository";
+import { RequestInMemoryRepository } from "../../../../infra/db/in-memory/request-in-memory.repository";
 import { CreateRequestFeedbackInput } from "../create-request-feedback.input";
 import { CreateRequestFeedbackUseCase } from "../create-request-feedback.use-case";
 

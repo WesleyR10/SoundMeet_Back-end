@@ -108,6 +108,15 @@ export class RespondToRequestUseCase implements IUseCase<
       throw new EntityValidationError(entity.notification.toJSON());
     }
 
+    /*
+     * O destaque NÃO é cobrado no aceite (modelo antigo): o PIX nasce no
+     * pedido (`CreateRequestUseCase`). Promessa do modelo antigo, sem PIX,
+     * nunca será cobrada — cai aqui, no aceite, para não ficar pendurada.
+     */
+    if (input.action === RespondToRequestAction.ACCEPT && entity.boost?.isPromised) {
+      entity.cancelBoost("legacy_promise_not_charged");
+    }
+
     await this.requestRepo.update(entity);
 
     if (this.domainEventMediator) {

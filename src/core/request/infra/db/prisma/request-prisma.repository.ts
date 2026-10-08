@@ -185,6 +185,31 @@ export class RequestPrismaRepository implements IRequestRepository {
         ELSE 0
       END`;
 
+      /*
+       * 🔴 Só destaque PAGO vem antes de tudo (paga antes, destaca depois —
+       * 28/set/2026). PIX gerado e não pago (`awaiting_payment`), promessa
+       * antiga, vencido, cancelado ou a reembolsar são pedido comum: no topo,
+       * entregariam a posição que ninguém pagou. Espelha `BOOSTING_STATUSES`
+       * do `RequestBoost` — mexeu num, mexa no outro.
+       */
+      const boostTierExpr = Prisma.sql`CASE
+        WHEN "boostStatus" = 'paid' THEN 1
+        ELSE 0
+      END`;
+      // O VALOR também só ordena quando pago: sem isto, um R$50 não pago
+      // passaria na frente dos outros pedidos comuns.
+      const boostAmountExpr = Prisma.sql`CASE
+        WHEN "boostStatus" = 'paid' THEN COALESCE("boostAmount", 0)
+        ELSE 0
+      END`;
+
+      /*
+       * 🔴 Vale só para a prioridade por IDADE, que é o que `sort_dir` sempre
+       * significou neste ramo. Os dois níveis de destaque abaixo são sempre
+       * DESC: deixá-los seguir `sort_dir` faria `?sort_dir=asc` enterrar no fim
+       * da fila exatamente os pedidos pagos — uma promessa de produto desfeita
+       * por query param, sem erro nenhum para denunciar.
+       */
       const orderDirSql =
         props.sort_dir === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
 
@@ -209,11 +234,22 @@ export class RequestPrismaRepository implements IRequestRepository {
               "votesCount",
               "playedAt",
               "respondedAt",
+              "boostAmount",
+              "boostDedication",
+              "boostStatus",
+              "boostTipId",
+              "boostPromisedAt",
+              "boostChargedAt",
+              "boostPaidAt",
               "created_at",
               "updated_at"
             FROM "music_requests"
             ${whereSql}
-            ORDER BY ${priorityExpr} ${orderDirSql}, "created_at" DESC
+            ORDER BY
+              ${boostTierExpr} DESC,
+              ${boostAmountExpr} DESC,
+              ${priorityExpr} ${orderDirSql},
+              "created_at" DESC
             OFFSET ${offset}
             LIMIT ${limit}
           `,
@@ -279,6 +315,39 @@ export class RequestPrismaRepository implements IRequestRepository {
     const models = await this.prisma.musicRequest.findMany({
       where: { musicianId: musician_id },
       orderBy: { created_at: "desc" },
+    });
+    return models.map((model) => RequestModelMapper.toEntity(model));
+  }
+
+  async findByMusicianAndEvents(
+    musician_id: string,
+    event_ids: string[],
+  ): Promise<Request[]> {
+    // Array vazio nunca vira `where` sem evento: seriam todos os pedidos do
+    // músico, de todos os tempos.
+    if (event_ids.length === 0) return [];
+    const models = await this.prisma.musicRequest.findMany({
+      where: { musicianId: musician_id, eventId: { in: event_ids } },
+    });
+    return models.map((model) => RequestModelMapper.toEntity(model));
+  }
+
+  async findByBoostTipId(tip_id: string): Promise<Request | null> {
+    const model = await this.prisma.musicRequest.findUnique({
+      where: { boostTipId: tip_id },
+    });
+    return model ? RequestModelMapper.toEntity(model) : null;
+  }
+
+  async findBoostsAwaitingPaymentBefore(
+    charged_before: Date,
+  ): Promise<Request[]> {
+    const models = await this.prisma.musicRequest.findMany({
+      where: {
+        boostStatus: "awaiting_payment",
+        boostChargedAt: { lt: charged_before },
+      },
+      orderBy: { boostChargedAt: "asc" },
     });
     return models.map((model) => RequestModelMapper.toEntity(model));
   }
