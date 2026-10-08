@@ -7,6 +7,7 @@ import {
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
 import { Tip, TipId } from "../../../domain/tip.aggregate";
+import { TipStatus } from "../../../domain/tip-enums";
 
 export class TipInMemoryRepository
   extends InMemorySearchableRepository<Tip, TipId, TipFilter>
@@ -65,5 +66,22 @@ export class TipInMemoryRepository
 
   async findByMusicianId(musicianId: string): Promise<Tip[]> {
     return this.items.filter((item) => item.musician_id?.id === musicianId);
+  }
+
+  async sumCompletedByMusician(musician_id: string): Promise<number> {
+    const cents = this.items
+      .filter((item) => item.status === TipStatus.COMPLETED && item.musician_id?.id === musician_id)
+      .reduce((acc, item) => acc + Math.round(item.amount.amount * 100), 0);
+    return cents / 100;
+  }
+
+  async findCompletedByEvents(event_ids: string[]): Promise<Tip[]> {
+    const wanted = new Set(event_ids);
+    return this.items.filter(
+      (item) =>
+        item.status === TipStatus.COMPLETED &&
+        !!item.event_id &&
+        wanted.has(item.event_id.id),
+    );
   }
 }

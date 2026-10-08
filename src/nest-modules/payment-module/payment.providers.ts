@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { randomBytes } from "crypto";
 
 import { IBandRepository } from "../../core/musician/domain/band.repository";
@@ -83,7 +84,7 @@ export const INFRA_PROVIDERS = {
    * conta do próprio músico via OAuth), com fallback para o mock em
    * desenvolvimento. O Asaas **não** entra aqui: R$1,99 fixos dão prejuízo em
    * toda gorjeta abaixo de R$22 no plano FREE. Ver
-   * `Docs/payment-gateway-research-2026-08.md`.
+   * `Docs/_privado/pagamentos/pesquisa-de-gateways-2026-08.md`.
    *
    * O fallback é para o mock, e não para o Asaas, de propósito: cair
    * silenciosamente num gateway que perde dinheiro por transação é pior que
@@ -617,8 +618,24 @@ export const USE_CASES = {
   },
 };
 
+/**
+ * 🔴 Factory, nunca a classe pura na lista de `providers`: o
+ * `DomainEventMediator` não tem `@Injectable()`, e sem `inject` o Nest o
+ * constrói com `eventEmitter` undefined — o primeiro `publish` vira 500 DEPOIS
+ * de gravar (ver `domain-event-mediator.di.spec.ts`). Mesmo formato dos outros
+ * módulos (`musicians.providers.ts`, `scheduling.providers.ts`).
+ */
+export const EVENTS = {
+  DOMAIN_EVENT_MEDIATOR: {
+    provide: DomainEventMediator,
+    useFactory: (eventEmitter: EventEmitter2) => new DomainEventMediator(eventEmitter),
+    inject: [EventEmitter2],
+  },
+};
+
 export const PAYMENT_PROVIDERS = {
   REPOSITORIES,
   INFRA_PROVIDERS,
   USE_CASES,
+  EVENTS,
 };

@@ -4,6 +4,7 @@ import {
   TipStatus as PrismaTipStatus,
 } from "@prisma/client";
 
+import { IEncryptionService } from "../../../../shared/domain/encryption.service";
 import { Money } from "../../../../shared/domain/value-objects/money.vo";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { Tip } from "../../../domain/tip.aggregate";
@@ -22,17 +23,39 @@ export type TipModelProps = {
   paymentMethod: string;
   status: PrismaTipStatus;
   transactionId: string | null;
+  // SM-016: pixKey (texto puro) é legado — o mapper nunca mais escreve nele,
+  // só lê como fallback de leitura em linhas antigas ainda não migradas pelo
+  // backfill. Escrita sempre vai para as 3 colunas cifradas abaixo.
   pixKey: string | null;
+  pixKeyCiphertext: string | null;
+  pixKeyIv: string | null;
+  pixKeyAuthTag: string | null;
   pixKeyType: string | null;
+  pixQrCode: string | null;
+  pixCopyPaste: string | null;
   isAnonymous: boolean;
   showInWall: boolean;
   created_at: Date;
   updated_at: Date;
 };
 
+/**
+ * Instância (não mais `static`) porque precisa do IEncryptionService injetado
+ * — cifra em toModel, decifra em toEntity (com fallback pro texto puro
+ * legado enquanto o backfill não roda). Ver mesmo padrão em
+ * GoogleCalendarIntegrationModelMapper, só que lá o agregado já guarda o
+ * EncryptedPayload; aqui o domínio (Tip.pix_key) continua com o PixKey VO em
+ * claro — a cifra é só uma preocupação de infra, na borda do mapper.
+ */
 export class TipModelMapper {
-  static toModel(entity: Tip): TipModelProps {
-    const model = {
+  constructor(private readonly encryption: IEncryptionService) {}
+
+  toModel(entity: Tip): TipModelProps {
+    const encryptedPixKey = entity.pix_key?.key
+      ? this.encryption.encrypt(entity.pix_key.key)
+      : null;
+
+    return {
       id: entity.tip_id.id,
       audienceId: entity.audience_id.id,
       musicianId: entity.musician_id?.id ?? null,
@@ -44,28 +67,26 @@ export class TipModelMapper {
       paymentMethod: entity.payment_method,
       status: entity.status as PrismaTipStatus,
       transactionId: entity.transaction_id,
-      pixKey: entity.pix_key?.key || null,
+      pixKey: null,
+      pixKeyCiphertext: encryptedPixKey?.ciphertext ?? null,
+      pixKeyIv: encryptedPixKey?.iv ?? null,
+      pixKeyAuthTag: encryptedPixKey?.authTag ?? null,
       pixKeyType: entity.pix_key?.type || null,
       isAnonymous: entity.is_anonymous,
       showInWall: entity.show_in_wall,
+      pixQrCode: entity.pix_qr_code,
+      pixCopyPaste: entity.pix_copy_paste,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
-
-    // Remove propriedades nulas para evitar conflitos de tipagem
-    // No caso do musicianId e outros relacionamentos opcionais, o Prisma espera que sejam undefined se não existirem na criação
-    // ou que a tipagem do mapper corresponda exatamente aos tipos gerados
-    // No caso específico do erro relatado, o Prisma pode estar esperando um tipo específico
-
-    // Uma abordagem mais segura é retornar exatamente o que o Prisma espera
-    // Se musicianId for null, passamos null explicitamente, mas garantimos que a tipagem esteja correta
-    return model;
   }
 
-  static toEntity(model: PrismaTip): Tip {
-    const pixKey = model.pixKey
-      ? new PixKey(model.pixKey, (model.pixKeyType as any) || "unknown")
-      : null;
+  toEntity(model: PrismaTip): Tip {
+    const rawKey = this.decryptPixKey(model);
+    const pixKey =
+      rawKey && PixKey.isValidType(model.pixKeyType)
+        ? new PixKey(rawKey, model.pixKeyType)
+        : null;
 
     return new Tip({
       tip_id: new Uuid(model.id),
@@ -81,8 +102,21 @@ export class TipModelMapper {
       pix_key: pixKey,
       is_anonymous: model.isAnonymous,
       show_in_wall: model.showInWall,
+      pix_qr_code: model.pixQrCode,
+      pix_copy_paste: model.pixCopyPaste,
       created_at: model.created_at,
       updated_at: model.updated_at,
     });
+  }
+
+  private decryptPixKey(model: PrismaTip): string | null {
+    if (model.pixKeyCiphertext && model.pixKeyIv && model.pixKeyAuthTag) {
+      return this.encryption.decrypt({
+        ciphertext: model.pixKeyCiphertext,
+        iv: model.pixKeyIv,
+        authTag: model.pixKeyAuthTag,
+      });
+    }
+    return model.pixKey ?? null;
   }
 }

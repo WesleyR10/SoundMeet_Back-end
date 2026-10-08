@@ -6,6 +6,8 @@ export * from "./fail-tip-payment/fail-tip-payment.use-case";
 export * from "./get-musician-tips/get-musician-tips.use-case";
 export * from "./get-musician-transactions/get-musician-transactions.use-case";
 export * from "./get-musician-wallet/get-musician-wallet.use-case";
+export * from "./get-tip/get-tip.use-case";
+export * from "./refund-failed-withdraw/refund-failed-withdraw.use-case";
 export * from "./send-tip/send-tip.use-case";
 export * from "./update-musician-pix-key/update-musician-pix-key.use-case";
 export * from "./withdraw-to-pix/withdraw-to-pix.use-case";

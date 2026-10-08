@@ -1,6 +1,5 @@
 import { Module } from "@nestjs/common";
 
-import { DomainEventMediator } from "../../core/shared/domain/events/domain-event-mediator";
 import { PrismaEmailVerificationChecker } from "../auth-module/prisma-email-verification.checker";
 import { DatabaseModule } from "../database-module/database.module";
 import { GamificationModule } from "../gamification-module/gamification.module";
@@ -53,7 +52,7 @@ import { RefreshMercadoPagoTokensJob } from "./refresh-mercadopago-tokens.job";
     ...Object.values(PAYMENT_PROVIDERS.REPOSITORIES),
     ...Object.values(PAYMENT_PROVIDERS.INFRA_PROVIDERS),
     ...Object.values(PAYMENT_PROVIDERS.USE_CASES),
-    DomainEventMediator,
+    PAYMENT_PROVIDERS.EVENTS.DOMAIN_EVENT_MEDIATOR,
     PaymentEventProcessingService,
     PaymentEventsHandlers,
     BookingEscrowCreationHandler,

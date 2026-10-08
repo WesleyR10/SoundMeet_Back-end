@@ -34,4 +34,17 @@ export interface ITipRepository extends ISearchableRepository<
 > {
   findById(id: TipId): Promise<Tip | null>;
   findByMusicianId(musicianId: string): Promise<Tip[]>;
+  /**
+   * Gorjetas CONFIRMADAS de vários eventos, numa consulta. Não filtra
+   * destinatário — um evento tem mais de um artista, e quem chama estreita por
+   * músico/banda (mesma regra do relatório pós-show). Lista vazia devolve vazio.
+   */
+  findCompletedByEvents(event_ids: string[]): Promise<Tip[]>;
+  /**
+   * Total em REAIS das gorjetas CONFIRMADAS dadas diretamente ao músico, de
+   * todos os tempos — somado no banco. É o "total em gorjetas" do Analytics.
+   * Não é `wallet.total_earned`: aquele também cresce com o cachê liberado da
+   * custódia, e gorjeta é gorjeta, cachê é cachê.
+   */
+  sumCompletedByMusician(musician_id: string): Promise<number>;
 }

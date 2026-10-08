@@ -8,6 +8,10 @@ import {
   TransactionSearchResult,
 } from "../../../domain/repositories/transaction.repository";
 import { Transaction } from "../../../domain/transaction.aggregate";
+import {
+  TransactionStatus,
+  TransactionType,
+} from "../../../domain/transaction-enums";
 
 export class TransactionInMemoryRepository
   extends InMemorySearchableRepository<Transaction, Uuid, TransactionFilter>
@@ -82,5 +86,36 @@ export class TransactionInMemoryRepository
 
   async findByExternalId(externalId: string): Promise<Transaction | null> {
     return this.items.find((item) => item.external_id === externalId) ?? null;
+  }
+
+  async findByIdempotencyKey(
+    key: string,
+    musicianId: string,
+  ): Promise<Transaction | null> {
+    // O escopo de dono é parte do contrato, não detalhe do Prisma — sem ele
+    // aqui, o teste unitário passaria e o defeito só apareceria em produção.
+    return (
+      this.items.find(
+        (item) =>
+          item.idempotency_key === key &&
+          item.musician_id?.id === musicianId,
+      ) ?? null
+    );
+  }
+
+  async sumWithdrawalsSince(
+    musicianId: string,
+    since: Date,
+  ): Promise<{ total: number; count: number }> {
+    const counted = this.items.filter(
+      (item) =>
+        item.musician_id?.id === musicianId &&
+        item.type === TransactionType.WITHDRAWAL &&
+        (item.status === TransactionStatus.PENDING ||
+          item.status === TransactionStatus.COMPLETED) &&
+        item.created_at >= since,
+    );
+    const total = counted.reduce((sum, item) => sum + item.amount.amount, 0);
+    return { total, count: counted.length };
   }
 }

@@ -19,6 +19,7 @@ export type TransactionConstructorProps = {
   status?: TransactionStatus;
   payment_method: PaymentMethod;
   external_id?: string | null;
+  idempotency_key?: string | null;
   metadata?: Record<string, any> | null;
   created_at?: Date;
   updated_at?: Date;
@@ -32,6 +33,13 @@ export type TransactionCreateCommand = {
   amount: number;
   fee?: number;
   payment_method: PaymentMethod;
+  external_id?: string | null;
+  /**
+   * Chave do CLIENTE (header `Idempotency-Key`). Distinta de `external_id`,
+   * que é do provedor e só existe depois da chamada — por isso as duas
+   * coexistem: a primeira identifica a INTENÇÃO, a segunda o EFEITO.
+   */
+  idempotency_key?: string | null;
   metadata?: Record<string, any> | null;
 };
 
@@ -49,6 +57,7 @@ export class Transaction extends AggregateRoot {
   status: TransactionStatus;
   payment_method: PaymentMethod;
   external_id: string | null;
+  idempotency_key: string | null;
   metadata: Record<string, any> | null;
   created_at: Date;
   updated_at: Date;
@@ -66,6 +75,7 @@ export class Transaction extends AggregateRoot {
     this.status = props.status ?? TransactionStatus.PENDING;
     this.payment_method = props.payment_method;
     this.external_id = props.external_id ?? null;
+    this.idempotency_key = props.idempotency_key ?? null;
     this.metadata = props.metadata ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
@@ -75,10 +85,22 @@ export class Transaction extends AggregateRoot {
     return this.transaction_id;
   }
 
+  /** Ainda aguarda desfecho no provedor — nem concluída, nem falha, nem estornada. */
+  get isPending(): boolean {
+    return this.status === TransactionStatus.PENDING;
+  }
+
   static create(command: TransactionCreateCommand): Transaction {
     const amount = new Money(command.amount);
     const fee = new Money(command.fee ?? 0);
-    const net_amount = new Money(command.amount - (command.fee ?? 0));
+    /*
+     * 🔴 `command.amount - command.fee` em ponto flutuante, como era aqui,
+     * quebra com valores comuns: um cachê de R$1.111,10 com 10% de comissão
+     * dava `999.9899999999999`, e o `Money` recusa mais de duas casas — a
+     * transação nascia inválida e a confirmação do pagamento falhava com o
+     * dinheiro já aprovado no gateway. `subtract` opera em centavos inteiros.
+     */
+    const net_amount = amount.subtract(fee);
 
     const transaction = new Transaction({
       user_id: command.user_id ? new Uuid(command.user_id) : null,
@@ -89,6 +111,8 @@ export class Transaction extends AggregateRoot {
       fee,
       net_amount,
       payment_method: command.payment_method,
+      external_id: command.external_id,
+      idempotency_key: command.idempotency_key ?? null,
       metadata: command.metadata,
     });
 
@@ -121,8 +145,53 @@ export class Transaction extends AggregateRoot {
     this.updated_at = new Date();
   }
 
-  fail(): void {
+  /**
+   * `reason` é registrado em `metadata.failure_reason`.
+   *
+   * Um saque que falhou e devolveu saldo é exatamente o lançamento que alguém
+   * vai pedir para explicar — do músico que viu o dinheiro voltar ao suporte
+   * reconstruindo o extrato. Sem o motivo gravado no próprio lançamento, a
+   * resposta depende de correlacionar log com timestamp.
+   */
+  fail(reason?: string): void {
     this.status = TransactionStatus.FAILED;
+    if (reason?.trim()) {
+      this.metadata = { ...(this.metadata ?? {}), failure_reason: reason };
+    }
+    this.updated_at = new Date();
+  }
+
+  /**
+   * Registra o identificador que o provedor devolveu para esta transação.
+   *
+   * Existe para que o `external_id` deixe de ser atribuído por fora
+   * (`tx.external_id = result.transfer_id` no use-case do saque): é o campo
+   * pelo qual o webhook reencontra a transação, e a coluna é UNIQUE. Vincular
+   * duas vezes a mesma transação a transferências diferentes deixaria a
+   * primeira órfã — nenhum webhook a completaria, e o saldo ficaria debitado
+   * sem contrapartida. Por isso o método é no-op quando o vínculo já existe e
+   * bate, e recusa quando difere.
+   */
+  linkExternalId(externalId: string): void {
+    const value = externalId?.trim();
+    if (!value) {
+      this.notification.addError(
+        "external_id não pode ser vazio",
+        "external_id",
+      );
+      return;
+    }
+    if (this.external_id !== null) {
+      if (this.external_id !== value) {
+        this.notification.addError(
+          "Transação já vinculada a outro identificador externo",
+          "external_id",
+        );
+      }
+      return;
+    }
+
+    this.external_id = value;
     this.updated_at = new Date();
   }
 
@@ -139,6 +208,7 @@ export class Transaction extends AggregateRoot {
       status: this.status,
       payment_method: this.payment_method,
       external_id: this.external_id,
+      idempotency_key: this.idempotency_key,
       metadata: this.metadata,
       created_at: this.created_at,
       updated_at: this.updated_at,

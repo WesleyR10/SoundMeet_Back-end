@@ -2,6 +2,7 @@ import { IMusicianWalletRepository, MusicianWallet } from "@core/payment";
 import { PlanCheckService } from "@core/plans/domain/plan-check.service";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
+import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import {
   MusicianWalletOutput,
@@ -26,6 +27,7 @@ export class UpdateMusicianPixKeyUseCase implements IUseCase<
   constructor(
     private readonly walletRepository: IMusicianWalletRepository,
     private readonly planCheckService?: PlanCheckService,
+    private readonly domainEventMediator?: DomainEventMediator,
   ) {}
 
   async execute(
@@ -48,8 +50,15 @@ export class UpdateMusicianPixKeyUseCase implements IUseCase<
     }
     await this.walletRepository.update(wallet);
 
+    // Depois de persistir: dispara PixKeyChangedEvent (se a chave mudou) para a
+    // notificação antifraude. Publicar antes do update arriscaria avisar de uma
+    // troca que o banco ainda pode recusar.
+    await this.domainEventMediator?.publish(wallet);
+
     const withdrawalConfig = this.planCheckService
-      ? await this.planCheckService.getMusicianWithdrawalConfig(input.musician_id)
+      ? await this.planCheckService.getMusicianWithdrawalConfig(
+          input.musician_id,
+        )
       : { min_amount_brl: 110, days: 5 };
 
     return {

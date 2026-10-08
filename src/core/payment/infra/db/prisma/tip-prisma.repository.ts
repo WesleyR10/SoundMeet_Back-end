@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
+import { IEncryptionService } from "../../../../shared/domain/encryption.service";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { IUnitOfWork } from "../../../../shared/domain/repository/unit-of-work.interface";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
@@ -10,22 +11,27 @@ import {
   TipSearchResult,
 } from "../../../domain/repositories/tip.repository";
 import { Tip, TipId } from "../../../domain/tip.aggregate";
+import { TipStatus } from "../../../domain/tip-enums";
 import { TipModelMapper } from "./tip-model.mapper";
 
 export class TipPrismaRepository implements ITipRepository {
   sortableFields: string[] = ["created_at", "amount", "status"];
+  private readonly mapper: TipModelMapper;
 
   constructor(
     private prisma: PrismaClient,
-    private readonly uow?: IUnitOfWork<Prisma.TransactionClient>,
-  ) {}
+    private readonly uow: IUnitOfWork<Prisma.TransactionClient> | undefined,
+    encryption: IEncryptionService,
+  ) {
+    this.mapper = new TipModelMapper(encryption);
+  }
 
   private get client(): PrismaClient | Prisma.TransactionClient {
     return this.uow?.getTransaction() ?? this.prisma;
   }
 
   async insert(entity: Tip): Promise<void> {
-    const modelProps = TipModelMapper.toModel(entity);
+    const modelProps = this.mapper.toModel(entity);
     try {
       await this.client.tip.create({
         data: {
@@ -46,7 +52,7 @@ export class TipPrismaRepository implements ITipRepository {
 
   async bulkInsert(entities: Tip[]): Promise<void> {
     const modelsProps = entities.map((entity) => {
-      const model = TipModelMapper.toModel(entity);
+      const model = this.mapper.toModel(entity);
       return {
         ...model,
         musicianId: model.musicianId ?? null,
@@ -67,7 +73,7 @@ export class TipPrismaRepository implements ITipRepository {
   }
 
   async update(entity: Tip): Promise<void> {
-    const modelProps = TipModelMapper.toModel(entity);
+    const modelProps = this.mapper.toModel(entity);
     try {
       await this.client.tip.update({
         where: { id: entity.tip_id.id },
@@ -102,12 +108,12 @@ export class TipPrismaRepository implements ITipRepository {
       where: { id },
     });
 
-    return model ? TipModelMapper.toEntity(model) : null;
+    return model ? this.mapper.toEntity(model) : null;
   }
 
   async findAll(): Promise<Tip[]> {
     const models = await this.client.tip.findMany();
-    return models.map((model) => TipModelMapper.toEntity(model));
+    return models.map((model) => this.mapper.toEntity(model));
   }
 
   async findByIds(ids: TipId[]): Promise<Tip[]> {
@@ -118,7 +124,7 @@ export class TipPrismaRepository implements ITipRepository {
         },
       },
     });
-    return models.map((m) => TipModelMapper.toEntity(m));
+    return models.map((m) => this.mapper.toEntity(m));
   }
 
   async existsById(
@@ -165,7 +171,7 @@ export class TipPrismaRepository implements ITipRepository {
       this.client.tip.count({ where }),
     ]);
 
-    const entities = models.map((model) => TipModelMapper.toEntity(model));
+    const entities = models.map((model) => this.mapper.toEntity(model));
 
     return new TipSearchResult({
       items: entities,
@@ -181,7 +187,24 @@ export class TipPrismaRepository implements ITipRepository {
       where: { musicianId },
       orderBy: { created_at: "desc" },
     });
-    return models.map((model) => TipModelMapper.toEntity(model));
+    return models.map((model) => this.mapper.toEntity(model));
+  }
+
+  async findCompletedByEvents(event_ids: string[]): Promise<Tip[]> {
+    if (event_ids.length === 0) return [];
+    const models = await this.client.tip.findMany({
+      where: { eventId: { in: event_ids }, status: TipStatus.COMPLETED },
+    });
+    return models.map((model) => this.mapper.toEntity(model));
+  }
+
+  async sumCompletedByMusician(musician_id: string): Promise<number> {
+    const result = await this.client.tip.aggregate({
+      where: { musicianId: musician_id, status: TipStatus.COMPLETED },
+      _sum: { amount: true },
+    });
+    // `Decimal(12,2)` chega exato; o arredondamento só apara a conversão.
+    return Math.round(Number(result._sum.amount ?? 0) * 100) / 100;
   }
 
   getEntity(): new (...args: any[]) => Tip {

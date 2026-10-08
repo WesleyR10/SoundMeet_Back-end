@@ -67,4 +67,35 @@ export class MusicianWalletInMemoryRepository
       this.items.find((item) => item.musician_id.id === musicianId) || null
     );
   }
+
+  /**
+   * Não há linha para travar em memória, e o runtime do Node é single-threaded
+   * dentro de um tick — a corrida que o lock existe para impedir não se
+   * reproduz aqui. Delega, para que o use-case possa ser exercitado sem banco.
+   */
+  async findByMusicianIdForUpdate(
+    musicianId: string,
+  ): Promise<MusicianWallet | null> {
+    return this.findByMusicianId(musicianId);
+  }
+
+  async findByMercadoPagoUserId(
+    mpUserId: string,
+  ): Promise<MusicianWallet | null> {
+    return this.items.find((w) => w.mp_user_id === mpUserId) ?? null;
+  }
+
+  async findMercadoPagoExpiring(
+    before: Date,
+    limit: number,
+  ): Promise<MusicianWallet[]> {
+    return this.items
+      .filter(
+        (w) =>
+          w.hasMercadoPagoLink &&
+          w.mp_token_expires_at !== null &&
+          w.mp_token_expires_at <= before,
+      )
+      .slice(0, limit);
+  }
 }

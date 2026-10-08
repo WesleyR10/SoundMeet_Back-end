@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
+import { IEncryptionService } from "../../../../shared/domain/encryption.service";
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { IUnitOfWork } from "../../../../shared/domain/repository/unit-of-work.interface";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
@@ -15,18 +16,22 @@ import { MusicianWalletModelMapper } from "./musician-wallet-model.mapper";
 
 export class MusicianWalletPrismaRepository implements IMusicianWalletRepository {
   sortableFields: string[] = ["created_at", "balance", "totalEarned"];
+  private readonly mapper: MusicianWalletModelMapper;
 
   constructor(
     private prisma: PrismaClient,
-    private readonly uow?: IUnitOfWork<Prisma.TransactionClient>,
-  ) {}
+    private readonly uow: IUnitOfWork<Prisma.TransactionClient> | undefined,
+    encryption: IEncryptionService,
+  ) {
+    this.mapper = new MusicianWalletModelMapper(encryption);
+  }
 
   private get client(): PrismaClient | Prisma.TransactionClient {
     return this.uow?.getTransaction() ?? this.prisma;
   }
 
   async insert(entity: MusicianWallet): Promise<void> {
-    const modelProps = MusicianWalletModelMapper.toModel(entity);
+    const modelProps = this.mapper.toModel(entity);
     try {
       await this.client.musicianWallet.create({
         data: modelProps,
@@ -41,9 +46,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async bulkInsert(entities: MusicianWallet[]): Promise<void> {
-    const modelsProps = entities.map((entity) =>
-      MusicianWalletModelMapper.toModel(entity),
-    );
+    const modelsProps = entities.map((entity) => this.mapper.toModel(entity));
     try {
       await this.client.musicianWallet.createMany({
         data: modelsProps,
@@ -57,7 +60,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
   }
 
   async update(entity: MusicianWallet): Promise<void> {
-    const modelProps = MusicianWalletModelMapper.toModel(entity);
+    const modelProps = this.mapper.toModel(entity);
     try {
       await this.client.musicianWallet.update({
         where: { id: entity.wallet_id.id },
@@ -91,12 +94,12 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
       where: { id: entity_id.id },
     });
 
-    return model ? MusicianWalletModelMapper.toEntity(model) : null;
+    return model ? this.mapper.toEntity(model) : null;
   }
 
   async findAll(): Promise<MusicianWallet[]> {
     const models = await this.client.musicianWallet.findMany();
-    return models.map((model) => MusicianWalletModelMapper.toEntity(model));
+    return models.map((model) => this.mapper.toEntity(model));
   }
 
   async findByIds(ids: Uuid[]): Promise<MusicianWallet[]> {
@@ -107,7 +110,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
         },
       },
     });
-    return models.map((m) => MusicianWalletModelMapper.toEntity(m));
+    return models.map((m) => this.mapper.toEntity(m));
   }
 
   async existsById(
@@ -156,9 +159,7 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
       this.client.musicianWallet.count({ where }),
     ]);
 
-    const entities = models.map((model) =>
-      MusicianWalletModelMapper.toEntity(model),
-    );
+    const entities = models.map((model) => this.mapper.toEntity(model));
 
     return new MusicianWalletSearchResult({
       items: entities,
@@ -172,7 +173,64 @@ export class MusicianWalletPrismaRepository implements IMusicianWalletRepository
     const model = await this.client.musicianWallet.findUnique({
       where: { musicianId },
     });
-    return model ? MusicianWalletModelMapper.toEntity(model) : null;
+    return model ? this.mapper.toEntity(model) : null;
+  }
+
+  /**
+   * `SELECT ... FOR UPDATE` na linha da carteira, seguido da leitura normal.
+   *
+   * O `FOR UPDATE` seleciona só a chave: o objetivo é adquirir o lock de linha,
+   * e o `findUnique` seguinte — já dentro da mesma transação e do mesmo lock —
+   * devolve a entidade pelo mapper de sempre, sem precisar remontar o agregado
+   * a partir de colunas cruas.
+   */
+  async findByMusicianIdForUpdate(
+    musicianId: string,
+  ): Promise<MusicianWallet | null> {
+    const tx = this.uow?.getTransaction();
+    if (!tx) {
+      throw new InvalidArgumentError(
+        "findByMusicianIdForUpdate exige uma transação ativa — fora dela o lock é liberado ao fim do SELECT e não protege nada",
+      );
+    }
+
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "musician_wallets" WHERE "musicianId" = ${musicianId} FOR UPDATE
+    `;
+    if (locked.length === 0) {
+      return null;
+    }
+
+    return this.findByMusicianId(musicianId);
+  }
+
+  async findByMercadoPagoUserId(
+    mpUserId: string,
+  ): Promise<MusicianWallet | null> {
+    const model = await this.client.musicianWallet.findUnique({
+      where: { mpUserId },
+    });
+    return model ? this.mapper.toEntity(model) : null;
+  }
+
+  /**
+   * Ordenado pelo vencimento mais próximo: se a fila crescer além do lote,
+   * quem está mais perto de expirar é renovado primeiro. O inverso deixaria o
+   * token mais urgente para o fim da fila.
+   */
+  async findMercadoPagoExpiring(
+    before: Date,
+    limit: number,
+  ): Promise<MusicianWallet[]> {
+    const models = await this.client.musicianWallet.findMany({
+      where: {
+        mpUserId: { not: null },
+        mpTokenExpiresAt: { lte: before },
+      },
+      orderBy: { mpTokenExpiresAt: "asc" },
+      take: limit,
+    });
+    return models.map((m) => this.mapper.toEntity(m));
   }
 
   getEntity(): new (...args: any[]) => MusicianWallet {

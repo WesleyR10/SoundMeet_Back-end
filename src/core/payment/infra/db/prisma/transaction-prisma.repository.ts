@@ -11,6 +11,10 @@ import {
   TransactionSearchResult,
 } from "../../../domain/repositories/transaction.repository";
 import { Transaction } from "../../../domain/transaction.aggregate";
+import {
+  TransactionStatus,
+  TransactionType,
+} from "../../../domain/transaction-enums";
 import { TransactionModelMapper } from "./transaction-model.mapper";
 
 export class TransactionPrismaRepository implements ITransactionRepository {
@@ -190,6 +194,48 @@ export class TransactionPrismaRepository implements ITransactionRepository {
       where: { externalId },
     });
     return model ? TransactionModelMapper.toEntity(model) : null;
+  }
+
+  /**
+   * `findFirst`, não `findUnique`: o UNIQUE da coluna é global (a chave vem do
+   * cliente), então a busca precisa do `musicianId` no `where` para não
+   * devolver a transação de outro músico que tenha usado a mesma chave. Ver a
+   * nota longa na interface do repositório.
+   */
+  async findByIdempotencyKey(
+    key: string,
+    musicianId: string,
+  ): Promise<Transaction | null> {
+    const model = await this.client.transaction.findFirst({
+      where: { idempotencyKey: key, musicianId },
+    });
+    return model ? TransactionModelMapper.toEntity(model) : null;
+  }
+
+  async sumWithdrawalsSince(
+    musicianId: string,
+    since: Date,
+  ): Promise<{ total: number; count: number }> {
+    // `aggregate` sob a mesma conexão (`this.client`): quando o chamador está
+    // numa transação com o lock da carteira, esta leitura enxerga o `PENDING`
+    // que a própria reserva acabou de inserir. `_sum`/`_count` numa query só.
+    const result = await this.client.transaction.aggregate({
+      where: {
+        musicianId,
+        type: TransactionType.WITHDRAWAL,
+        status: {
+          in: [TransactionStatus.PENDING, TransactionStatus.COMPLETED],
+        },
+        created_at: { gte: since },
+      } as Prisma.TransactionWhereInput,
+      _sum: { amount: true },
+      _count: true,
+    });
+
+    return {
+      total: Number(result._sum.amount ?? 0),
+      count: result._count,
+    };
   }
 
   getEntity(): new (...args: any[]) => Transaction {

@@ -10,12 +10,35 @@ export enum PixKeyType {
 }
 
 export class PixKey extends ValueObject {
-  constructor(
-    readonly key: string,
-    readonly type: PixKeyType,
-  ) {
+  readonly key: string;
+  readonly type: PixKeyType;
+
+  /**
+   * O `type` entra como `string` de propósito: ele nasce de input do usuário
+   * (DTO) e de coluna do banco, nunca de um `PixKeyType` já garantido. O
+   * construtor é a fronteira que valida — quem chamava com `type as any`
+   * furava exatamente esta checagem.
+   */
+  constructor(key: string, type: string) {
     super();
+    this.key = key;
+    this.type = PixKey.normalizeType(type);
     this.validate();
+  }
+
+  /** `true` se `type` é um `PixKeyType` conhecido — guard para a carga (mapper). */
+  static isValidType(type: string | null | undefined): type is PixKeyType {
+    return (
+      typeof type === "string" &&
+      (Object.values(PixKeyType) as string[]).includes(type)
+    );
+  }
+
+  private static normalizeType(type: string): PixKeyType {
+    if (!PixKey.isValidType(type)) {
+      throw new InvalidArgumentError(`Invalid Pix key type: ${type}`);
+    }
+    return type;
   }
 
   private validate(): void {
@@ -39,6 +62,11 @@ export class PixKey extends ValueObject {
       case PixKeyType.RANDOM:
         this.validateRandom();
         break;
+      default:
+        // Inalcançável: `normalizeType` já barrou tipo desconhecido. Fica como
+        // defesa-em-profundidade — um `type` novo no enum sem `case` aqui não
+        // deve passar sem validação de formato, que era a origem do bypass.
+        throw new InvalidArgumentError(`Invalid Pix key type: ${this.type}`);
     }
   }
 
@@ -84,7 +112,7 @@ export class PixKey extends ValueObject {
     }
   }
 
-  static create(key: string, type: PixKeyType): PixKey {
+  static create(key: string, type: string): PixKey {
     return new PixKey(key, type);
   }
 }

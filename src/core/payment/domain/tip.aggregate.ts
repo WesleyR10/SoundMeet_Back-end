@@ -27,6 +27,8 @@ export type TipConstructorProps = {
   pix_key?: PixKey | null;
   is_anonymous?: boolean;
   show_in_wall?: boolean;
+  pix_qr_code?: string | null;
+  pix_copy_paste?: string | null;
   created_at?: Date;
   updated_at?: Date;
 };
@@ -58,6 +60,21 @@ export class Tip extends AggregateRoot {
   pix_key: PixKey | null;
   is_anonymous: boolean;
   show_in_wall: boolean;
+  /**
+   * Payload da cobrança PIX devolvido pelo provedor.
+   *
+   * 🔴 Guardado de propósito. Antes disso ele só existia na resposta HTTP da
+   * criação: quem fechasse a tela perdia o QR para sempre e a gorjeta ficava
+   * `pending` sem caminho de volta. No fluxo de destaque isso deixa de ser
+   * inconveniente e vira impossibilidade — a cobrança nasce no aceite do
+   * músico, com o fã fora da tela.
+   *
+   * Não confundir com `pix_key`, que é cifrada (SM-016): aquela é a chave de
+   * RECEBIMENTO do músico, dado permanente dele; isto é um código de cobrança
+   * de uso único que o pagador precisa enxergar para pagar.
+   */
+  pix_qr_code: string | null;
+  pix_copy_paste: string | null;
   created_at: Date;
   updated_at: Date;
 
@@ -76,6 +93,8 @@ export class Tip extends AggregateRoot {
     this.pix_key = props.pix_key ?? null;
     this.is_anonymous = props.is_anonymous ?? false;
     this.show_in_wall = props.show_in_wall ?? true;
+    this.pix_qr_code = props.pix_qr_code ?? null;
+    this.pix_copy_paste = props.pix_copy_paste ?? null;
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
@@ -94,7 +113,7 @@ export class Tip extends AggregateRoot {
       message: command.message,
       payment_method: command.payment_method,
       pix_key: command.pix_key
-        ? PixKey.create(command.pix_key.key, command.pix_key.type as any)
+        ? PixKey.create(command.pix_key.key, command.pix_key.type)
         : null,
       is_anonymous: command.is_anonymous,
       show_in_wall: command.show_in_wall,
@@ -118,6 +137,26 @@ export class Tip extends AggregateRoot {
 
   static fake() {
     return TipFakeBuilder;
+  }
+
+  /**
+   * Registra o payload da cobrança criada no provedor.
+   *
+   * Só faz sentido enquanto a gorjeta está pendente — depois de concluída o
+   * código já foi usado, e reescrevê-lo confundiria um recibo com uma cobrança
+   * em aberto.
+   */
+  attachPixCharge(qrCode: string | null, copyPasteCode: string | null): void {
+    if (this.status !== TipStatus.PENDING) {
+      this.notification.addError(
+        "Only pending tips can receive a PIX charge payload",
+        "status",
+      );
+      return;
+    }
+    this.pix_qr_code = qrCode || null;
+    this.pix_copy_paste = copyPasteCode || null;
+    this.updated_at = new Date();
   }
 
   complete(transactionId: string): void {
@@ -172,6 +211,8 @@ export class Tip extends AggregateRoot {
       pix_key: this.pix_key?.key || null,
       is_anonymous: this.is_anonymous,
       show_in_wall: this.show_in_wall,
+      pix_qr_code: this.pix_qr_code,
+      pix_copy_paste: this.pix_copy_paste,
       created_at: this.created_at,
       updated_at: this.updated_at,
     };

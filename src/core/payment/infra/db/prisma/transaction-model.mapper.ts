@@ -29,6 +29,7 @@ export type TransactionModelProps = {
   status: PrismaTransactionStatus;
   paymentMethod: string;
   externalId: string | null;
+  idempotencyKey: string | null;
   metadata: any | null;
   created_at: Date;
   updated_at: Date;
@@ -49,6 +50,7 @@ export class TransactionModelMapper {
       status: entity.status as PrismaTransactionStatus,
       paymentMethod: entity.payment_method,
       externalId: entity.external_id ?? null,
+      idempotencyKey: entity.idempotency_key ?? null,
       metadata: entity.metadata,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
@@ -68,6 +70,7 @@ export class TransactionModelMapper {
       status: model.status as TransactionStatus,
       payment_method: model.paymentMethod as PaymentMethod,
       external_id: model.externalId ?? null,
+      idempotency_key: model.idempotencyKey ?? null,
       metadata: model.metadata as Record<string, any> | null,
       created_at: model.created_at,
       updated_at: model.updated_at,
