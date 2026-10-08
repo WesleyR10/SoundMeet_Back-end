@@ -18,6 +18,7 @@ import {
   musicianAuthUser,
 } from "../../src/nest-modules/shared-module/testing/auth-guard-mock";
 import { startApp } from "../../src/nest-modules/shared-module/testing/helpers";
+import { IdentityClaimsTestingModule } from "../../src/nest-modules/shared-module/testing/identity-claims-testing.module";
 
 /**
  * Áudio de apresentação — o caminho inteiro contra Postgres e MinIO REAIS.
@@ -153,6 +154,7 @@ describe("Áudio de apresentação do músico (e2e)", () => {
       imports: [
         ConfigModuleRoot.forRoot(),
         EventEmitterModule.forRoot(),
+        IdentityClaimsTestingModule,
         MusiciansModule,
       ],
     },
