@@ -34,3 +34,13 @@ create-rsa.js
 generate-token.js
 Dockerfile
 Dockerfile.prod
+# ── 29/set/2026 ───────────────────────────────────────────────────────────────
+# Fora do contexto: nada disto entra no build, e o que muda sozinho invalidaria o
+# `COPY . .` do estágio de build — o `graphify update` reescreve `graphify-out/`
+# e recompilaria o Nest inteiro sem nenhuma linha de código ter mudado.
+graphify-out/
+sample/
+test/
+Docs/
+.claude/
+**/__pycache__/

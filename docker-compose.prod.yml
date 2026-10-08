@@ -1,0 +1,287 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SoundMeet — composição de PRODUÇÃO (SM-020)
+#
+# Este arquivo existe separado de `docker-compose.yml` de propósito. O de
+# desenvolvimento precisa de portas abertas, senhas conhecidas, Adminer, Dozzle
+# e um filesystem gravável para o fluxo diário funcionar; endurecer aquele
+# arquivo tornaria o ambiente de trabalho hostil sem tornar a produção segura,
+# já que produção não roda a partir dele.
+#
+# O que muda aqui, e por quê:
+#
+#   • **Imagens fixadas por digest.** Uma tag é um ponteiro móvel: `postgres:15-alpine`
+#     hoje e amanhã podem ser imagens diferentes, e um build reproduzível não
+#     pode depender de quem publicou por último. O digest é o conteúdo.
+#     🔴 Fixar por digest CONGELA correções de segurança da base: atualizar é
+#     tarefa deliberada e recorrente, não automática. O procedimento está no
+#     rodapé deste arquivo.
+#   • **`no-new-privileges` e `cap_drop: ALL`.** Um processo comprometido não
+#     consegue escalar por binário setuid nem usar capabilities que ninguém
+#     pediu. Cada `cap_add` abaixo é justificado individualmente — capability
+#     sem justificativa é capability que não deveria estar lá.
+#   • **Filesystem somente leitura.** O atacante que consegue execução não
+#     consegue persistir: nada de webshell, nada de binário baixado, nada de
+#     cron alterado. Onde o processo legitimamente escreve, há `tmpfs` (efêmero,
+#     em RAM) ou volume nomeado — nunca a raiz.
+#   • **Nenhuma porta de banco publicada.** Postgres, Redis e RabbitMQ só
+#     existem na rede interna. Só a API fala com o mundo, e através do proxy.
+#   • **Sem `container_name` fixo.** O nome vem do projeto (`-p`), o que permite
+#     staging e produção no mesmo host e evita colidir com o compose de
+#     desenvolvimento. Para alcançar um container, use
+#     `docker compose -f docker-compose.prod.yml -p <projeto> exec app ...`.
+#   • **Nenhuma senha com default.** Toda credencial é `${VAR:?...}`: o compose
+#     RECUSA subir se faltar, em vez de silenciosamente usar `soundmeet123` em
+#     produção — que é exatamente como uma senha de desenvolvimento vaza para
+#     um ambiente real.
+#
+# 🔴 ANTES DO PRIMEIRO DEPLOY: rode o smoke test descrito no rodapé. O
+# filesystem somente leitura é a mudança com maior chance de quebrar um caminho
+# de escrita que ninguém mapeou, e o momento de descobrir isso é agora.
+#
+# Uso:  docker compose -f docker-compose.prod.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# Base comum de endurecimento. Todo serviço parte daqui; o que precisa de mais
+# adiciona explicitamente, e o `cap_add` correspondente carrega o motivo.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  restart: unless-stopped
+  logging: *default-logging
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: soundmeet-api:${SOUNDMEET_VERSION:?defina a versão da imagem}
+    <<: *hardening
+    init: true
+    # A imagem já declara `USER nestjs` (1001). Repetido aqui para que o
+    # container continue non-root mesmo se alguém trocar a imagem base.
+    user: "1001:1001"
+    read_only: true
+    volumes:
+      # 🔴 `/tmp` é VOLUME, não tmpfs, e a diferença é operacional: os uploads
+      # de áudio (`os.tmpdir()` em ai-cifra, ai-audio e nos avatares) passam
+      # inteiros por aqui antes de ir para o storage. Um tmpfs colocaria
+      # arquivos de centenas de MB na RAM do host e derrubaria o processo por
+      # OOM no primeiro upload grande.
+      - app_tmp:/tmp
+    ports:
+      # Só no loopback: quem fala com o mundo é o reverse proxy. A porta é
+      # parametrizável para que staging e produção coexistam no mesmo host.
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    env_file:
+      - ./envs/.env.production
+    environment:
+      NODE_ENV: production
+      # SM-020: sem isto o Joi recusa subir — é a allowlist de CORS, e não há
+      # default seguro que possamos adivinhar pelo deploy.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?defina as origens permitidas}
+      # Documentação desligada. Ligue apenas de forma temporária e consciente.
+      SWAGGER_ENABLED: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      # 🔴 A senha vai na URL. O `requirepass` do serviço `redis` abaixo não é
+      # opcional (o Redis guarda sessão e cache de autorização), e sem
+      # propagá-la aqui o app sobe, conecta e morre no primeiro comando com
+      # `NOAUTH Authentication required` — um erro que não menciona nem Redis
+      # nem senha. Os dois-pontos antes da senha são a sintaxe de "sem usuário".
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?}:${RABBITMQ_PASSWORD:?}@rabbitmq:5672
+      AUTH_JWT_VALIDATION_MODE: keycloak
+      KEYCLOAK_VERIFY_AUDIENCE: "true"
+    # Keycloak NÃO está aqui — ver a nota no rodapé. A dependência é externa e
+    # o app tolera a indisponibilidade dele no boot (o JWKS é buscado sob
+    # demanda, com cache).
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    networks:
+      - soundmeet-network
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/v1/health', (r) => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1));",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
+    <<: *hardening
+    user: "70:70" # usuário `postgres` da imagem alpine
+    read_only: true
+    # O entrypoint do Postgres ajusta dono e permissões do datadir no primeiro
+    # boot e troca de usuário — não dá para fazer isso sem estas capabilities.
+    # Nenhuma delas permite escapar do container com `no-new-privileges` ativo.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    tmpfs:
+      # O socket unix e os arquivos de lock; pequenos e descartáveis.
+      - /var/run/postgresql:uid=70,gid=70
+      - /tmp:uid=70,gid=70
+    # Sem `ports`: o banco existe só na rede interna. Para acessar de fora,
+    # use um túnel SSH — publicar 5432 é o caminho mais curto entre uma senha
+    # vazada e um dump completo.
+    networks:
+      - soundmeet-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    <<: *hardening
+    user: "999:1000" # `redis` na imagem alpine
+    read_only: true
+    # 🔴 `requirepass` mesmo estando só na rede interna: o Redis guarda sessão e
+    # cache de autorização, e "só a rede interna" é uma premissa que envelhece
+    # mal — basta um container novo comprometido para ela deixar de valer.
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD:?defina REDIS_PASSWORD}",
+      ]
+    volumes:
+      - redis_data:/data
+    tmpfs:
+      - /tmp:uid=999,gid=1000
+    networks:
+      - soundmeet-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  rabbitmq:
+    build:
+      context: ./docker/rabbitmq-delayed
+    image: soundmeet-rabbitmq-delayed:3.12-management-alpine
+    <<: *hardening
+    user: "100:101" # `rabbitmq` na imagem alpine
+    read_only: true
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?defina RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?defina RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    tmpfs:
+      # O Erlang escreve arquivos de runtime aqui; o estado durável fica no
+      # volume acima.
+      - /tmp:uid=100,gid=101
+      - /var/log/rabbitmq:uid=100,gid=101
+    # A UI de management NÃO é publicada. Acesse por túnel quando precisar.
+    networks:
+      - soundmeet-network
+    healthcheck:
+      # 🔴 `ping` NÃO serve aqui, e a diferença derruba o deploy.
+      #
+      # Ele confirma que o nó Erlang responde, o que acontece MUITO antes de o
+      # listener AMQP existir: medido neste container, o broker leva ~22s para
+      # completar o boot, e o `ping` já retorna OK aos poucos segundos. Com
+      # `depends_on: service_healthy`, o app era liberado nessa janela, batia em
+      # `ECONNREFUSED` na porta 5672 e morria no timeout de 5s do
+      # `@golevelup/nestjs-rabbitmq` — crash loop a cada deploy, sem nada de
+      # errado no broker.
+      #
+      # `check_port_connectivity` verifica os listeners de verdade, que é a
+      # pergunta que o `depends_on` está fazendo.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 45s
+
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  app_tmp:
+
+networks:
+  soundmeet-network:
+    driver: bridge
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NÃO ESTÁ AQUI: o Keycloak (e o banco dele)
+#
+# 🔴 Ele tem compose próprio — `infra/keycloak/docker-compose.prod.yml`, do
+# SM-014 — e as decisões de lá são deliberadas e diferentes das que este arquivo
+# tomaria por conta própria: a imagem vem por digest EM VARIÁVEL (porque a
+# versão migra 22→26 na Fase 4c do roadmap, e fixar 22 aqui congelaria a
+# migração), o proxy usa `KC_PROXY_HEADERS` (o `KC_PROXY` é obsoleto), a porta
+# não é publicada, e o banco é externo.
+#
+# Declarar `keycloak` nos dois lugares não daria erro nenhum — daria dois
+# arquivos discordando sobre como subir o provedor de identidade, e o deploy
+# seguiria o que alguém abrisse primeiro. Suba os dois composes; eles se
+# encontram pelo `KEYCLOAK_INTERNAL_URL` do `.env.production`.
+#
+# NÃO ESTÃO AQUI TAMBÉM: os workers de IA (`ai-cifra-worker-gpu`, `ai-audio-separation`)
+#
+# Eles precisam de GPU e, em produção, vivem em host próprio — inclusive porque
+# um só cabe por vez numa placa de 8GB (ver CLAUDE.md). O endurecimento deles
+# está nos respectivos Dockerfiles, que passaram a rodar como usuário `worker`
+# (uid 1001) em vez de root. Ao compor o host de GPU, reaproveite a âncora
+# `x-hardening` deste arquivo.
+#
+# ── Smoke test antes do primeiro deploy ──────────────────────────────────────
+#
+#   Use o script `scripts/smoke-test-prod.sh`, que executa e reporta os seis
+#   itens abaixo. Ele sobe a stack num projeto isolado, verifica e derruba.
+#
+#     ./scripts/smoke-test-prod.sh
+#
+#   O que ele confere:
+#     1. Todo container roda como não-root (`id -u` != 0)
+#     2. A raiz do filesystem é somente leitura (escrita falha)
+#     3. `/tmp` do app é gravável — é por onde passam os uploads de áudio
+#     4. `/api/docs` responde 404 (Swagger desligado)
+#     5. Os cabeçalhos do Helmet estão presentes na resposta
+#     6. Postgres, Redis e RabbitMQ não publicam porta no host
+#
+# ── Como atualizar uma imagem fixada por digest ──────────────────────────────
+#
+#   Fixar por digest congela também as correções de segurança da base, então
+#   isto é tarefa periódica, não eventual:
+#
+#     docker pull postgres:15-alpine
+#     docker inspect --format='{{index .RepoDigests 0}}' postgres:15-alpine
+#
+#   Troque o digest, suba em staging, rode o smoke test, então promova.
+# ─────────────────────────────────────────────────────────────────────────────

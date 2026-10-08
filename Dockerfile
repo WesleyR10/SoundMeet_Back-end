@@ -1,23 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Estágios: base (deps + Prisma Client) → prod-deps (só o que roda) → build
+# (compila) → production (imagem final). `development` fica disponível.
+#
+# 🔴 A ORDEM DOS COPY É O CACHE. Cada camada só é refeita quando o que foi
+# copiado para ela muda. Até 29/set/2026 a pasta `prisma/` inteira era copiada
+# ANTES do `npm ci`: editar o seed ou criar uma migration reinstalava as ~1.350
+# dependências do zero (3–8 min), sem nenhuma dependência ter mudado.
+# ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS base
 
-# Instalar dependências do sistema
+# Toolchain para compilar dependências nativas. Fica só nos estágios de
+# construção — a imagem final parte de um `node:20-alpine` limpo.
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
-# Copiar arquivos de dependências
-COPY package.json ./
-COPY package-lock.json ./
-COPY prisma ./prisma/
-COPY prisma.config.ts ./
+# 1) Dependências: esta camada só muda quando o lockfile muda.
+#    O cache mount guarda os tarballs do npm ENTRE builds (fora da imagem): quando
+#    o lockfile muda, só o que é novo é baixado.
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --no-audit --no-fund
 
-# Instalar dependências (inclui dev para permitir geração do Prisma)
-RUN npm ci --no-audit --no-fund
+# 2) Prisma Client: só o SCHEMA entra aqui. Seed e migrations não mudam o client
+#    gerado — copiá-los invalidaria esta camada à toa. (A pasta inteira chega no
+#    estágio de build pelo `COPY . .` e vai para a imagem final de lá.)
+COPY prisma/schema.prisma ./prisma/schema.prisma
+COPY prisma.config.ts ./
 
 # Variáveis necessárias para leitura do schema durante a geração
 ENV DATABASE_URL=postgresql://soundmeet:soundmeet123@postgres:5432/soundmeet
 
-# Gerar Prisma Client
-RUN npx prisma generate
+# `prisma:prepare` = `prisma generate` + o link `@prisma/client/.prisma`, o mesmo
+# que o `npm run build` faz. Aqui para que `prod-deps` herde o client pronto.
+RUN npm run prisma:prepare
 
 # Estágio de desenvolvimento
 FROM base AS development
@@ -25,10 +40,34 @@ COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "start:dev"]
 
+# Só as dependências que RODAM — sem nenhum arquivo de código-fonte, então esta
+# camada é reaproveitada em todo build que não mexe em dependência ou schema.
+#
+# 🔴 `--omit=optional` é o que tira o ferramental do Prisma da produção. O
+# `@prisma/client` 7 declara `prisma` (CLI) e `typescript` como peers OPCIONAIS,
+# e o npm os marca `devOptional` no lockfile — `--omit=dev` sozinho os MANTÉM.
+# Eram ~200 MB: CLI, Studio, `@prisma/dev` (um Postgres em WASM), engines,
+# `effect`, `typescript`. Nada disso é carregado pelo app: migrations e seed
+# rodam do host (`npx prisma migrate deploy`), nunca de dentro desta imagem.
+# Verificado pelo lockfile em 29/set/2026: os 128 pacotes `devOptional` só são
+# alcançáveis por dev ou peer opcional, e o único `optional` de produção é o
+# `pg-cloudflare` (só existe para Cloudflare Workers).
+# ⚠️ Se um dia a migration precisar rodar de DENTRO do container, use o estágio
+# `migrate` abaixo — não traga o CLI de volta para `production`.
+FROM base AS prod-deps
+RUN npm prune --omit=dev --omit=optional --no-audit --no-fund
+
+# Imagem de migração, sob demanda: `docker build --target migrate -t soundmeet-migrate .`
+# e `docker run --rm -e DATABASE_URL=... soundmeet-migrate`. Não é construída
+# pelo compose; existe para o deploy não depender de Node instalado no host.
+FROM base AS migrate
+COPY prisma ./prisma/
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 # Estágio de build
 FROM base AS build
 COPY . .
-RUN rm -f src/metadata.ts && npm run build && npm prune --omit=dev
+RUN rm -f src/metadata.ts && npm run build
 
 # Estágio de produção
 FROM node:20-alpine AS production
@@ -60,17 +99,23 @@ RUN apk add --no-cache libc6-compat python3 ca-certificates \
     && wget -qO /usr/local/bin/yt-dlp "$YT_DLP_URL" \
     && chmod +rx /usr/local/bin/yt-dlp \
     && /usr/local/bin/yt-dlp --version
+
+# Default seguro; o compose de desenvolvimento sobrescreve com `development`.
+# DEPOIS do yt-dlp: qualquer linha acima dele invalida aquela camada e força um
+# download novo do GitHub a cada build.
+ENV NODE_ENV=production
 WORKDIR /app
 
 # Criar usuário não-root
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nestjs
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nestjs
 
-# Copiar arquivos necessários
-COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
+# Dependências ANTES do código: a camada de `node_modules` (a maior) só muda
+# quando `prod-deps` muda. Deploy de código novo baixa só a camada do `dist`.
+COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/package.json ./package.json
 COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
 
 # 🔴 NÃO REMOVA. Esta linha é o que faz a imagem SUBIR — e não parece.
 #
@@ -96,4 +141,8 @@ EXPOSE 3000
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 CMD node -e "require('http').get('http://localhost:3000/api/v1/health', (r) => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1));"
 
-CMD ["npm", "run", "start:prod"]
+# `node` direto, não `npm run start:prod` (que é exatamente `node dist/main`).
+# Com o npm no meio, o SIGTERM do `docker stop` chega ao npm e não ao app: o
+# Nest não fecha conexões de Postgres/RabbitMQ com calma, e o container só morre
+# no SIGKILL, 10 s depois. Um processo a menos, também, na memória.
+CMD ["node", "dist/main"]
