@@ -1,5 +1,5 @@
-import { Message } from "../message.aggregate";
 import { EntityValidationError } from "../../../shared/domain/validators/validation.error";
+import { Message } from "../message.aggregate";
 
 const validCmd = {
   conversation_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",

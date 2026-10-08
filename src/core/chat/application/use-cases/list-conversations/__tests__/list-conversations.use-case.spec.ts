@@ -1,8 +1,9 @@
 import { v4 as uuidv4 } from "uuid";
-import { ConversationInMemoryRepository } from "../../../../infra/db/in-memory/conversation-in-memory.repository";
-import { MessageInMemoryRepository } from "../../../../infra/db/in-memory/message-in-memory.repository";
+
 import { Conversation } from "../../../../domain/conversation.aggregate";
 import { Message } from "../../../../domain/message.aggregate";
+import { ConversationInMemoryRepository } from "../../../../infra/db/in-memory/conversation-in-memory.repository";
+import { MessageInMemoryRepository } from "../../../../infra/db/in-memory/message-in-memory.repository";
 import { ListConversationsUseCase } from "../list-conversations.use-case";
 
 describe("ListConversationsUseCase", () => {
@@ -20,7 +21,7 @@ describe("ListConversationsUseCase", () => {
   });
 
   it("should return empty list when participant has no conversations", async () => {
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations).toHaveLength(0);
   });
@@ -32,7 +33,7 @@ describe("ListConversationsUseCase", () => {
       .build();
     await convRepo.insert(conv);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations).toHaveLength(1);
     expect(out.conversations[0].musician_id).toBe(musicianId);
@@ -47,7 +48,7 @@ describe("ListConversationsUseCase", () => {
       .build();
     await convRepo.insert(conv);
 
-    const out = await useCase.execute({ participant_id: bandId });
+    const out = await useCase.execute({ participant_ids: [bandId] });
 
     expect(out.conversations).toHaveLength(1);
     expect(out.conversations[0].band_id).toBe(bandId);
@@ -60,9 +61,37 @@ describe("ListConversationsUseCase", () => {
       .build();
     await convRepo.insert(conv);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations).toHaveLength(0);
+  });
+
+  it("should return conversations across all of the caller's identities (multi-unit establishment owner)", async () => {
+    // Regressão: dono com 2 estabelecimentos, cada um com sua própria
+    // conversa. Antes do fix, listConversations só passava a 1ª identidade
+    // do JWT pro repositório, então a conversa da 2ª unidade nunca aparecia.
+    const firstUnitId = uuidv4();
+    const secondUnitId = uuidv4();
+
+    const convUnit1 = Conversation.fake()
+      .aConversation()
+      .withEstablishmentId(firstUnitId)
+      .build();
+    const convUnit2 = Conversation.fake()
+      .aConversation()
+      .withEstablishmentId(secondUnitId)
+      .build();
+    await convRepo.insert(convUnit1);
+    await convRepo.insert(convUnit2);
+
+    const out = await useCase.execute({
+      participant_ids: [firstUnitId, secondUnitId],
+    });
+
+    expect(out.conversations).toHaveLength(2);
+    expect(out.conversations.map((c) => c.establishment_id).sort()).toEqual(
+      [firstUnitId, secondUnitId].sort(),
+    );
   });
 
   it("should return multiple conversations for the same participant", async () => {
@@ -77,7 +106,7 @@ describe("ListConversationsUseCase", () => {
     await convRepo.insert(conv1);
     await convRepo.insert(conv2);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations).toHaveLength(2);
   });
@@ -89,7 +118,7 @@ describe("ListConversationsUseCase", () => {
       .build();
     await convRepo.insert(conv);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations[0]).toMatchObject({
       conversation_id: conv.conversation_id.id,
@@ -104,7 +133,7 @@ describe("ListConversationsUseCase", () => {
       .build();
     await convRepo.insert(conv);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations[0].last_message).toBeNull();
     expect(out.conversations[0].unread_count).toBe(0);
@@ -134,7 +163,7 @@ describe("ListConversationsUseCase", () => {
     await msgRepo.insert(older);
     await msgRepo.insert(newer);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     expect(out.conversations[0].last_message?.content).toBe("Segunda");
   });
@@ -159,7 +188,7 @@ describe("ListConversationsUseCase", () => {
     await msgRepo.insert(fromEstablishment);
     await msgRepo.insert(ownMessage);
 
-    const out = await useCase.execute({ participant_id: musicianId });
+    const out = await useCase.execute({ participant_ids: [musicianId] });
 
     // Só a mensagem do estabelecimento conta como não lida — a própria
     // mensagem do músico nunca entra na contagem dele mesmo.

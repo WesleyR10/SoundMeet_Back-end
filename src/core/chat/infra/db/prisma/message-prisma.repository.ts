@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Message, MessageId } from "../../../domain/message.aggregate";
@@ -112,9 +113,7 @@ export class MessagePrismaRepository implements IMessageRepository {
       where: { conversation_id },
       orderBy: { created_at: "asc" },
       take: options.limit + 1,
-      ...(options.cursor
-        ? { cursor: { id: options.cursor }, skip: 1 }
-        : {}),
+      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
     });
 
     const hasNext = rows.length > options.limit;
@@ -167,7 +166,7 @@ export class MessagePrismaRepository implements IMessageRepository {
 
   async countUnreadByConversationIds(
     conversation_ids: string[],
-    reader_id: string,
+    reader_ids: string[],
   ): Promise<Map<string, number>> {
     if (!conversation_ids.length) return new Map();
 
@@ -175,7 +174,7 @@ export class MessagePrismaRepository implements IMessageRepository {
       by: ["conversation_id"],
       where: {
         conversation_id: { in: conversation_ids },
-        NOT: { sender_id: reader_id },
+        NOT: { sender_id: { in: reader_ids } },
         status: { not: "read" },
       },
       _count: { _all: true },

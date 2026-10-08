@@ -24,6 +24,6 @@ export interface IMessageRepository extends IRepository<Message, MessageId> {
   ): Promise<Map<string, Message>>;
   countUnreadByConversationIds(
     conversation_ids: string[],
-    reader_id: string,
+    reader_ids: string[],
   ): Promise<Map<string, number>>;
 }

@@ -6,7 +6,9 @@ import {
 
 export type ConversationModel = {
   id: string;
-  inquiry_id: string;
+  /** Exatamente um dos dois — ver `ConversationCreateCommand`. */
+  inquiry_id: string | null;
+  booking_id: string | null;
   establishment_id: string;
   musician_id: string | null;
   band_id: string | null;
@@ -19,6 +21,7 @@ export class ConversationModelMapper {
     return {
       id: entity.conversation_id.id,
       inquiry_id: entity.inquiry_id,
+      booking_id: entity.booking_id,
       establishment_id: entity.establishment_id,
       musician_id: entity.musician_id,
       band_id: entity.band_id,
@@ -32,6 +35,7 @@ export class ConversationModelMapper {
       const conversation = new Conversation({
         conversation_id: new ConversationId(model.id),
         inquiry_id: model.inquiry_id,
+        booking_id: model.booking_id,
         establishment_id: model.establishment_id,
         musician_id: model.musician_id,
         band_id: model.band_id,

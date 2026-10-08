@@ -1,7 +1,7 @@
-import { ConversationInMemoryRepository } from "../../../../infra/db/in-memory/conversation-in-memory.repository";
-import { MessageInMemoryRepository } from "../../../../infra/db/in-memory/message-in-memory.repository";
 import { Conversation } from "../../../../domain/conversation.aggregate";
 import { Message } from "../../../../domain/message.aggregate";
+import { ConversationInMemoryRepository } from "../../../../infra/db/in-memory/conversation-in-memory.repository";
+import { MessageInMemoryRepository } from "../../../../infra/db/in-memory/message-in-memory.repository";
 import { GetConversationUseCase } from "../get-conversation.use-case";
 
 describe("GetConversationUseCase", () => {
@@ -22,7 +22,7 @@ describe("GetConversationUseCase", () => {
   it("should return conversation and empty messages list", async () => {
     const out = await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      requester_id: testConv.establishment_id,
+      requester_ids: [testConv.establishment_id],
     });
 
     expect(out.conversation.conversation_id).toBe(testConv.conversation_id.id);
@@ -49,7 +49,7 @@ describe("GetConversationUseCase", () => {
 
     const out = await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      requester_id: testConv.musician_id!,
+      requester_ids: [testConv.musician_id!],
     });
 
     expect(out.messages).toHaveLength(2);
@@ -61,7 +61,7 @@ describe("GetConversationUseCase", () => {
     await expect(
       useCase.execute({
         conversation_id: "00000000-0000-0000-0000-000000000000",
-        requester_id: testConv.establishment_id,
+        requester_ids: [testConv.establishment_id],
       }),
     ).rejects.toThrow();
   });
@@ -70,7 +70,7 @@ describe("GetConversationUseCase", () => {
     await expect(
       useCase.execute({
         conversation_id: testConv.conversation_id.id,
-        requester_id: "00000000-0000-0000-0000-000000000099",
+        requester_ids: ["00000000-0000-0000-0000-000000000099"],
       }),
     ).rejects.toThrow();
   });
@@ -88,7 +88,7 @@ describe("GetConversationUseCase", () => {
 
     const out = await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      requester_id: testConv.musician_id!,
+      requester_ids: [testConv.musician_id!],
       limit: 3,
     });
 

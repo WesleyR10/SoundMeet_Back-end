@@ -1,4 +1,11 @@
-import { IsIn, IsNotEmpty, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
+import {
+  IsIn,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
 import { Notification } from "../../shared/domain/validators/notification";
@@ -29,11 +36,7 @@ export class MessageRules {
 }
 
 export class MessageValidator extends ClassValidatorFields {
-  validate(
-    notification: Notification,
-    data: any,
-    fields?: string[],
-  ): boolean {
+  validate(notification: Notification, data: any, fields?: string[]): boolean {
     const newFields = fields?.length
       ? fields
       : ["conversation_id", "sender_id", "sender_type", "content"];

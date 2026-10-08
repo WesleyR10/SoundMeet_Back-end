@@ -71,14 +71,14 @@ export class MessageInMemoryRepository
 
   async countUnreadByConversationIds(
     conversation_ids: string[],
-    reader_id: string,
+    reader_ids: string[],
   ): Promise<Map<string, number>> {
     const result = new Map<string, number>();
     for (const id of conversation_ids) {
       const count = this.items.filter(
         (m) =>
           m.conversation_id === id &&
-          m.sender_id !== reader_id &&
+          !reader_ids.includes(m.sender_id) &&
           m.status !== "read",
       ).length;
       result.set(id, count);

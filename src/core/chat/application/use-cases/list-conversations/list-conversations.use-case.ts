@@ -5,7 +5,10 @@ import { MessageStatus } from "../../../domain/message.aggregate";
 import { IMessageRepository } from "../../../domain/message.repository";
 
 export type ListConversationsInput = {
-  participant_id: string;
+  // Todas as identidades do ator (ex.: um dono com mais de um
+  // estabelecimento) — uma conversa pertence a UMA unidade específica, então
+  // listar só pela 1ª identidade do JWT escondia as conversas das demais.
+  participant_ids: string[];
 };
 
 export type ConversationListItem = ReturnType<Conversation["toJSON"]> & {
@@ -22,9 +25,10 @@ export type ListConversationsOutput = {
   conversations: ConversationListItem[];
 };
 
-export class ListConversationsUseCase
-  implements IUseCase<ListConversationsInput, ListConversationsOutput>
-{
+export class ListConversationsUseCase implements IUseCase<
+  ListConversationsInput,
+  ListConversationsOutput
+> {
   constructor(
     private readonly convRepo: IConversationRepository,
     private readonly msgRepo: IMessageRepository,
@@ -34,7 +38,7 @@ export class ListConversationsUseCase
     input: ListConversationsInput,
   ): Promise<ListConversationsOutput> {
     const conversations = await this.convRepo.findByParticipant(
-      input.participant_id,
+      input.participant_ids,
     );
 
     if (!conversations.length) {
@@ -44,7 +48,7 @@ export class ListConversationsUseCase
     const ids = conversations.map((c) => c.conversation_id.id);
     const [lastMessages, unreadCounts] = await Promise.all([
       this.msgRepo.findLastMessagesByConversationIds(ids),
-      this.msgRepo.countUnreadByConversationIds(ids, input.participant_id),
+      this.msgRepo.countUnreadByConversationIds(ids, input.participant_ids),
     ]);
 
     return {

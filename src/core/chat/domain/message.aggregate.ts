@@ -1,8 +1,8 @@
 import { AggregateRoot } from "../../shared/domain/aggregate-root";
-import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { EntityValidationError } from "../../shared/domain/validators/validation.error";
-import { MessageSentEvent } from "./events/message-sent.event";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
 import { MessageReadEvent } from "./events/message-read.event";
+import { MessageSentEvent } from "./events/message-sent.event";
 import { MessageValidatorFactory } from "./message.validator";
 import { MessageFakeBuilder } from "./message-fake.builder";
 

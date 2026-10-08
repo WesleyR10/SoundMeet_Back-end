@@ -2,14 +2,18 @@ import { ForbiddenException } from "@nestjs/common";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
-import { Conversation, ConversationId } from "../../../domain/conversation.aggregate";
+import {
+  Conversation,
+  ConversationId,
+} from "../../../domain/conversation.aggregate";
 import { IConversationRepository } from "../../../domain/conversation.repository";
 import { Message } from "../../../domain/message.aggregate";
 import { IMessageRepository } from "../../../domain/message.repository";
 
 export type GetConversationInput = {
   conversation_id: string;
-  requester_id: string;
+  // Identidades candidatas do ator — ver SendMessageInput.sender_ids.
+  requester_ids: string[];
   cursor?: string;
   limit?: number;
 };
@@ -20,9 +24,10 @@ export type GetConversationOutput = {
   next_cursor: string | null;
 };
 
-export class GetConversationUseCase
-  implements IUseCase<GetConversationInput, GetConversationOutput>
-{
+export class GetConversationUseCase implements IUseCase<
+  GetConversationInput,
+  GetConversationOutput
+> {
   constructor(
     private readonly convRepo: IConversationRepository,
     private readonly msgRepo: IMessageRepository,
@@ -37,14 +42,9 @@ export class GetConversationUseCase
       throw new NotFoundError(input.conversation_id, Conversation);
     }
 
-    const isParticipant =
-      conv.establishment_id === input.requester_id ||
-      conv.musician_id === input.requester_id ||
-      conv.band_id === input.requester_id;
-
-    if (!isParticipant) {
+    if (!conv.hasParticipant(...input.requester_ids)) {
       throw new ForbiddenException(
-        `Requester ${input.requester_id} is not a participant of conversation ${input.conversation_id}`,
+        `Requester is not a participant of conversation ${input.conversation_id}`,
       );
     }
 

@@ -39,6 +39,7 @@ describe("ChatGateway — autorização de join_conversation", () => {
     convRepo = new ConversationInMemoryRepository();
     conversation = Conversation.create({
       inquiry_id: "55555555-5555-4555-8555-555555555555",
+      booking_id: null,
       establishment_id: ESTABLISHMENT_ID,
       musician_id: MUSICIAN_ID,
       band_id: null,
@@ -99,6 +100,7 @@ describe("ChatGateway — autorização de join_conversation", () => {
   it("ignora conversation_id do payload que não bate com os claims da banda", async () => {
     const bandConversation = Conversation.create({
       inquiry_id: "66666666-6666-4666-8666-666666666666",
+      booking_id: null,
       establishment_id: ESTABLISHMENT_ID,
       musician_id: null,
       band_id: BAND_ID,
@@ -183,6 +185,7 @@ describe("AssertConversationParticipantUseCase", () => {
     const convRepo = new ConversationInMemoryRepository();
     const conversation = Conversation.create({
       inquiry_id: "55555555-5555-4555-8555-555555555555",
+      booking_id: null,
       establishment_id: ESTABLISHMENT_ID,
       musician_id: MUSICIAN_ID,
       band_id: null,

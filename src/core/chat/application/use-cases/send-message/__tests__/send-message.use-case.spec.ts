@@ -1,6 +1,6 @@
+import { Conversation } from "../../../../domain/conversation.aggregate";
 import { ConversationInMemoryRepository } from "../../../../infra/db/in-memory/conversation-in-memory.repository";
 import { MessageInMemoryRepository } from "../../../../infra/db/in-memory/message-in-memory.repository";
-import { Conversation } from "../../../../domain/conversation.aggregate";
 import { SendMessageUseCase } from "../send-message.use-case";
 
 describe("SendMessageUseCase", () => {
@@ -21,7 +21,7 @@ describe("SendMessageUseCase", () => {
   it("should send a message and return it", async () => {
     const out = await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      sender_id: testConv.musician_id!,
+      sender_ids: [testConv.musician_id!],
       sender_type: "musician",
       content: "Topamos!",
     });
@@ -37,7 +37,7 @@ describe("SendMessageUseCase", () => {
   it("should allow establishment to send a message", async () => {
     const out = await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      sender_id: testConv.establishment_id,
+      sender_ids: [testConv.establishment_id],
       sender_type: "establishment",
       content: "Olá, músico!",
     });
@@ -51,7 +51,7 @@ describe("SendMessageUseCase", () => {
     await expect(
       useCase.execute({
         conversation_id: testConv.conversation_id.id,
-        sender_id: "00000000-0000-0000-0000-000000000099",
+        sender_ids: ["00000000-0000-0000-0000-000000000099"],
         sender_type: "musician",
         content: "intruso",
       }),
@@ -62,24 +62,41 @@ describe("SendMessageUseCase", () => {
     await expect(
       useCase.execute({
         conversation_id: "00000000-0000-0000-0000-000000000000",
-        sender_id: "any-id",
+        sender_ids: ["any-id"],
         sender_type: "musician",
         content: "hello",
       }),
     ).rejects.toThrow();
   });
 
+  it("should resolve the concrete sender_id from multiple candidate establishments (multi-unit owner)", async () => {
+    // Regressão: dono com mais de um estabelecimento — a 1ª unidade do JWT
+    // não é participante desta conversa, só a 2ª é. Antes do fix o
+    // controller assumia sempre establishmentIds[0] e isso lançava
+    // ForbiddenException mesmo para o dono legítimo da 2ª unidade.
+    const otherUnitId = "00000000-0000-0000-0000-000000000077";
+
+    const out = await useCase.execute({
+      conversation_id: testConv.conversation_id.id,
+      sender_ids: [otherUnitId, testConv.establishment_id],
+      sender_type: "establishment",
+      content: "Mensagem da 2ª unidade",
+    });
+
+    expect(out.sender_id).toBe(testConv.establishment_id);
+  });
+
   it("should persist multiple messages in the same conversation", async () => {
     await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      sender_id: testConv.musician_id!,
+      sender_ids: [testConv.musician_id!],
       sender_type: "musician",
       content: "Primeira mensagem",
     });
 
     await useCase.execute({
       conversation_id: testConv.conversation_id.id,
-      sender_id: testConv.establishment_id,
+      sender_ids: [testConv.establishment_id],
       sender_type: "establishment",
       content: "Segunda mensagem",
     });

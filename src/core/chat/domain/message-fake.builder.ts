@@ -9,8 +9,7 @@ export class MessageFakeBuilder<TBuild = any> {
   private _conversation_id: PropOrFactory<string> = (_index) => uuidv4();
   private _sender_id: PropOrFactory<string> = (_index) => uuidv4();
   private _sender_type: PropOrFactory<SenderType> = (_index) => "musician";
-  private _content: PropOrFactory<string> = (_index) =>
-    "Mensagem de teste";
+  private _content: PropOrFactory<string> = (_index) => "Mensagem de teste";
 
   private countObjs: number;
 

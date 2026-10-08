@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 
-import { Conversation, ConversationId } from "../../../../domain/conversation.aggregate";
+import {
+  Conversation,
+  ConversationId,
+} from "../../../../domain/conversation.aggregate";
 import { ConversationModelMapper } from "../conversation-model-mapper";
 import { ConversationPrismaRepository } from "../conversation-prisma.repository";
 
@@ -44,9 +47,9 @@ describe("ConversationPrismaRepository", () => {
         modelProps,
       );
 
-      const result = await repository.findByInquiryId(
-        conversation.inquiry_id,
-      );
+      // `!`: o fake nasce com inquiry (a origem padrão do builder), e o tipo
+      // virou nullable quando o booking passou a poder abrir conversa também.
+      const result = await repository.findByInquiryId(conversation.inquiry_id!);
 
       expect(prisma.conversation.findUnique).toHaveBeenCalledWith({
         where: { inquiry_id: conversation.inquiry_id },
@@ -72,14 +75,14 @@ describe("ConversationPrismaRepository", () => {
     it("should query by musician_id, band_id, and establishment_id (all three OR branches)", async () => {
       (prisma.conversation.findMany as jest.Mock).mockResolvedValue([]);
 
-      await repository.findByParticipant("participant-id");
+      await repository.findByParticipant(["participant-id"]);
 
       expect(prisma.conversation.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
-            { musician_id: "participant-id" },
-            { band_id: "participant-id" },
-            { establishment_id: "participant-id" },
+            { musician_id: { in: ["participant-id"] } },
+            { band_id: { in: ["participant-id"] } },
+            { establishment_id: { in: ["participant-id"] } },
           ],
         },
       });
@@ -92,9 +95,9 @@ describe("ConversationPrismaRepository", () => {
         modelProps,
       ]);
 
-      const result = await repository.findByParticipant(
+      const result = await repository.findByParticipant([
         conversation.musician_id!,
-      );
+      ]);
 
       expect(result).toHaveLength(1);
       expect(result[0].conversation_id.id).toBe(
@@ -109,12 +112,28 @@ describe("ConversationPrismaRepository", () => {
         modelProps,
       ]);
 
-      const result = await repository.findByParticipant(
+      const result = await repository.findByParticipant([
         conversation.establishment_id,
-      );
+      ]);
 
       expect(result).toHaveLength(1);
       expect(result[0].establishment_id).toBe(conversation.establishment_id);
+    });
+
+    it("should query multiple candidate ids for a multi-unit establishment owner", async () => {
+      (prisma.conversation.findMany as jest.Mock).mockResolvedValue([]);
+
+      await repository.findByParticipant(["unit-1", "unit-2"]);
+
+      expect(prisma.conversation.findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { musician_id: { in: ["unit-1", "unit-2"] } },
+            { band_id: { in: ["unit-1", "unit-2"] } },
+            { establishment_id: { in: ["unit-1", "unit-2"] } },
+          ],
+        },
+      });
     });
   });
 

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import {
@@ -112,13 +113,20 @@ export class ConversationPrismaRepository implements IConversationRepository {
     return model ? ConversationModelMapper.toEntity(model) : null;
   }
 
-  async findByParticipant(participant_id: string): Promise<Conversation[]> {
+  async findByBookingId(booking_id: string): Promise<Conversation | null> {
+    const model = await this.prisma.conversation.findUnique({
+      where: { booking_id },
+    });
+    return model ? ConversationModelMapper.toEntity(model) : null;
+  }
+
+  async findByParticipant(participant_ids: string[]): Promise<Conversation[]> {
     const models = await this.prisma.conversation.findMany({
       where: {
         OR: [
-          { musician_id: participant_id },
-          { band_id: participant_id },
-          { establishment_id: participant_id },
+          { musician_id: { in: participant_ids } },
+          { band_id: { in: participant_ids } },
+          { establishment_id: { in: participant_ids } },
         ],
       },
     });
