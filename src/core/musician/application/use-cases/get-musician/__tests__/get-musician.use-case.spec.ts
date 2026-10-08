@@ -12,8 +12,7 @@ import {
 } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
-import { GetMusicianInput } from "../get-musician.input";
-import { GetMusicianUseCase } from "../get-musician.use-case";
+import { GetMusicianInput, GetMusicianUseCase } from "../get-musician.use-case";
 
 describe("GetMusicianUseCase Unit Tests", () => {
   let useCase: GetMusicianUseCase;
@@ -211,6 +210,43 @@ describe("GetMusicianUseCase Unit Tests", () => {
       const output = await useCase.execute({ id: musician.musician_id.id });
 
       expect(output.plan_tier).toBe(MusicianPlanTier.ESSENTIAL);
+    });
+  });
+
+  /*
+   * `GET /musicians/:id` é a rota mais chamada do módulo e só o dono lê o
+   * tier: para terceiros a consulta de assinatura era custo sem leitor.
+   */
+  describe("include_plan_tier", () => {
+    it("false: não consulta assinatura e não devolve plan_tier", async () => {
+      const spy = jest.spyOn(planCheckService, "getMusicianPlanTier");
+      const musician = Musician.fake().aMusician().build();
+      repository.items = [musician];
+
+      const output = await useCase.execute({
+        id: musician.musician_id.id,
+        include_plan_tier: false,
+      });
+
+      expect(spy).not.toHaveBeenCalled();
+      expect(output).not.toHaveProperty("plan_tier");
+      expect(output.id).toBe(musician.musician_id.id);
+    });
+
+    it("omitido ou true: consulta e devolve", async () => {
+      const spy = jest.spyOn(planCheckService, "getMusicianPlanTier");
+      const musician = Musician.fake().aMusician().build();
+      repository.items = [musician];
+
+      const byDefault = await useCase.execute({ id: musician.musician_id.id });
+      const explicit = await useCase.execute({
+        id: musician.musician_id.id,
+        include_plan_tier: true,
+      });
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(byDefault.plan_tier).toBe(MusicianPlanTier.FREE);
+      expect(explicit.plan_tier).toBe(MusicianPlanTier.FREE);
     });
   });
 });

@@ -46,11 +46,16 @@ Os casos de uso orquestram as operações de negócio e interagem com o domínio
 
 #### Gestão Básica de Músicos
 
-- **Criar Músico**: `CreateMusicianUseCase`
-- **Atualizar Músico**: `UpdateMusicianUseCase`
-- **Listar Músicos**: `ListMusiciansUseCase`
+- **Atualizar Músico** (identidade): `UpdateMusicianUseCase`
+- **Atualizar Perfil** (preço, base, redes): `UpdateMusicianProfileUseCase`
+- **Listar Músicos** (busca pública): `ListMusiciansUseCase`
+- **Identidade de vários músicos**: `ListMusicianIdentitiesUseCase`
 - **Obter Músico por ID**: `GetMusicianUseCase`
-- **Deletar Músico**: `DeleteMusicianUseCase`
+
+> **Não há `CreateMusicianUseCase` nem `DeleteMusicianUseCase`** (removidos em out/2026). O músico
+> nasce no registro (`core/auth`, com o `sub` do Keycloak como id), e excluir conta é um fluxo de
+> produto ainda não implementado — ver `Docs/regras-de-negocio/musico-e-banda.md` → "Rotas do
+> músico".
 
 ### Métodos da Entidade `Musician`
 
@@ -73,7 +78,7 @@ A entidade `Musician` encapsula a lógica de negócio e as regras de validação
 
 #### Métodos de Avaliação e Status
 
-- `addRating(rating)`: Adiciona uma nova avaliação
+- `syncRatingProjection(average, total)`: aplica a nota recalculada a partir do ledger de avaliações (`reviews`). Não há `addRating`: somar fica errado em reavaliação e moderação
 - `activate()`: Ativa o perfil do músico
 - `deactivate()`: Desativa o perfil do músico
 - `verify()`: Marca o perfil como verificado
@@ -222,11 +227,11 @@ musician/
 │   ├── use-cases/                 # Casos de uso
 │   │   ├── common/                # DTOs e mappers comuns
 │   │   │   └── musician-output.ts # Output padrão
-│   │   ├── create-musician/       # Criar músico
-│   │   ├── delete-musician/       # Deletar músico
 │   │   ├── get-musician/          # Obter músico por ID
-│   │   ├── list-musicians/        # Listar músicos
-│   │   └── update-musician/       # Atualizar músico
+│   │   ├── list-musicians/        # Busca pública
+│   │   ├── list-musician-identities/ # Nome e foto de vários ids
+│   │   ├── update-musician/       # Atualizar identidade
+│   │   └── update-musician-profile/ # Preço, base e redes
 │   └── validations/               # Validações de aplicação
 ├── domain/                        # Camada de Domínio
 │   ├── __tests__/                 # Testes da entidade
@@ -272,11 +277,11 @@ const result = await useCase.execute({
 });
 ```
 
-### Adicionando avaliação
+### Atualizando a nota
 
 ```typescript
-musician.addRating(4.5);
-// Atualiza automaticamente o rating médio e total de avaliações
+// A nota vem do ledger de avaliações (SubmitReviewUseCase), nunca somada à mão.
+musician.syncRatingProjection(4.5, 12);
 ```
 
 ## 🎯 Casos de Uso Específicos da Plataforma

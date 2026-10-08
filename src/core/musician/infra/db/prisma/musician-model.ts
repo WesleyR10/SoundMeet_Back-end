@@ -12,6 +12,7 @@ export type MusicianModel = {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  avatar_key?: string | null;
   // Áudio de apresentação: os quatro andam juntos (ver presentation-audio.vo.ts).
   presentation_audio_url?: string | null;
   presentation_audio_key?: string | null;
@@ -27,6 +28,7 @@ export type MusicianModel = {
   qr_foreground_color?: string | null;
   qr_background_color?: string | null;
   qr_logo_url?: string | null;
+  qr_logo_key?: string | null;
   qr_label?: string | null;
   push_token?: string | null;
   push_token_platform?: string | null;

@@ -24,9 +24,6 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     expect(profile.priceRanges).toEqual([]);
     expect(profile.location).toBeInstanceOf(Location);
     expect(profile.socialLinks).toBeNull();
-    expect(profile.experience).toBe(0);
-    expect(profile.instruments).toEqual([]);
-    expect(profile.genres).toEqual([]);
     expect(profile.created_at).toBeInstanceOf(Date);
     expect(profile.updated_at).toBeInstanceOf(Date);
 
@@ -45,9 +42,6 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
       musician_id,
       location,
       socialLinks: { instagram: "@test" },
-      experience: 10,
-      instruments: ["Guitar"],
-      genres: ["Rock"],
       created_at,
       updated_at,
       priceRanges: [priceRange],
@@ -58,9 +52,6 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     expect(profile.priceRanges).toEqual([priceRange]);
     expect(profile.location).toBe(location);
     expect(profile.socialLinks).toEqual({ instagram: "@test" });
-    expect(profile.experience).toBe(10);
-    expect(profile.instruments).toEqual(["Guitar"]);
-    expect(profile.genres).toEqual(["Rock"]);
     expect(profile.created_at).toBe(created_at);
     expect(profile.updated_at).toBe(updated_at);
   });
@@ -128,25 +119,32 @@ describe("MusicianProfile Without Validator Unit Tests", () => {
     expect(profile.priceRanges).toEqual([]);
   });
 
-  test("should update experience", () => {
-    const profile = MusicianProfile.fake().aProfile().withExperience(0).build();
-    profile.updateExperience(5);
-    expect(profile.experience).toBe(5);
-    expect(profile.notification.hasErrors()).toBe(false);
-  });
+  /*
+   * 🔴 Gêneros, instrumentos e experiência são do `Musician`, e SÓ dele.
+   *
+   * Este agregado os duplicava sem ter coluna para eles: `PATCH .../profile`
+   * com `experience` alterava a cópia daqui, respondia 200 e não gravava nada.
+   * O teste trava a volta da cópia — por campo, por método e pelo `toJSON`.
+   */
+  test("não carrega gêneros, instrumentos nem experiência", () => {
+    const profile = MusicianProfile.fake()
+      .aProfile()
+      .build() as unknown as Record<string, unknown>;
 
-  test("should not allow negative experience", () => {
-    const profile = MusicianProfile.fake().aProfile().withExperience(1).build();
-    profile.updateExperience(-1);
-    expect(profile.experience).toBe(1);
-    expect(profile.notification.hasErrors()).toBe(true);
-  });
-
-  test("should update instruments and genres", () => {
-    const profile = MusicianProfile.fake().aProfile().build();
-    profile.updateInstruments(["Guitar", "Vocals"]);
-    profile.updateGenres(["Rock", "Pop"]);
-    expect(profile.instruments).toEqual(["Guitar", "Vocals"]);
-    expect(profile.genres).toEqual(["Rock", "Pop"]);
+    for (const field of ["genres", "instruments", "experience"]) {
+      expect(profile).not.toHaveProperty(field);
+    }
+    for (const method of [
+      "updateGenres",
+      "updateInstruments",
+      "updateExperience",
+    ]) {
+      expect(profile[method]).toBeUndefined();
+    }
+    expect(
+      Object.keys((profile as any).toJSON()).filter((key) =>
+        ["genres", "instruments", "experience"].includes(key),
+      ),
+    ).toEqual([]);
   });
 });

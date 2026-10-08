@@ -2,12 +2,9 @@ import {
   IsArray,
   IsDate,
   IsNotEmpty,
-  IsNumber,
   IsObject,
   IsOptional,
-  IsString,
   IsUUID,
-  Min,
 } from "class-validator";
 
 import { ClassValidatorFields } from "../../shared/domain/validators/class-validator-fields";
@@ -19,18 +16,6 @@ export class MusicianProfileRules {
   @IsUUID(undefined, { groups: ["musician_id"] })
   @IsNotEmpty({ groups: ["musician_id"] })
   musician_id: string;
-
-  @IsNumber({}, { groups: ["experience"] })
-  @Min(0, { groups: ["experience"] })
-  experience: number;
-
-  @IsArray({ groups: ["instruments"] })
-  @IsString({ each: true, groups: ["instruments"] })
-  instruments: string[];
-
-  @IsArray({ groups: ["genres"] })
-  @IsString({ each: true, groups: ["genres"] })
-  genres: string[];
 
   @IsOptional({ groups: ["socialLinks"] })
   @IsObject({ groups: ["socialLinks"] })
@@ -61,9 +46,6 @@ export class MusicianProfileRules {
 
   constructor(entity: MusicianProfile | any) {
     this.musician_id = entity?.musician_id?.id ?? entity?.musician_id;
-    this.experience = entity?.experience;
-    this.instruments = entity?.instruments;
-    this.genres = entity?.genres;
     this.socialLinks = entity?.socialLinks;
     this.priceRanges = entity?.priceRanges;
     this.location = entity?.location?.toJSON
@@ -84,9 +66,6 @@ export class MusicianProfileValidator extends ClassValidatorFields {
       ? fields
       : [
           "musician_id",
-          "experience",
-          "instruments",
-          "genres",
           "socialLinks",
           "priceRanges",
           "location",

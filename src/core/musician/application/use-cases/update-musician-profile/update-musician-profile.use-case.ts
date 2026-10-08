@@ -3,15 +3,12 @@ import { NotFoundError } from "../../../../shared/domain/errors/not-found.error"
 import { IGeocodingService } from "../../../../shared/domain/geocoding.service";
 import { Notification } from "../../../../shared/domain/validators/notification";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { Location } from "../../../../shared/domain/value-objects/location.vo";
 import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import { IMusicianRepository } from "../../../domain/musician.repository";
 import { MusicianOutputMapper } from "../common/musician-profile-output";
-import {
-  LocationInput,
-  UpdateMusicianProfileInput,
-} from "./update-musician-profile.input";
+import { resolveLocation } from "../common/resolve-location";
+import { UpdateMusicianProfileInput } from "./update-musician-profile.input";
 import { UpdateMusicianProfileOutput } from "./update-musician-profile.output";
 
 export class UpdateMusicianProfileUseCase implements IUseCase<
@@ -61,21 +58,16 @@ export class UpdateMusicianProfileUseCase implements IUseCase<
     }
 
     if (input.location) {
-      profile.changeLocation(await this.resolveLocation(input.location));
-    }
-
-    if (input.experience !== undefined) {
-      profile.updateExperience(input.experience);
-    }
-
-    if (input.instruments) {
-      profile.updateInstruments(input.instruments);
-      musician.updateInstruments(input.instruments);
-    }
-
-    if (input.genres) {
-      profile.updateGenres(input.genres);
-      musician.updateGenres(input.genres);
+      // Geocodificação best-effort (7.13c) — e a coordenada reenviada pelo app
+      // é descartada quando o endereço mudou. Ver `resolveLocation`.
+      profile.changeLocation(
+        await resolveLocation(
+          input.location,
+          profile.location,
+          this.geocodingService,
+          "location",
+        ),
+      );
     }
 
     if (input.socialLinks !== undefined) {
@@ -97,39 +89,5 @@ export class UpdateMusicianProfileUseCase implements IUseCase<
     await this.musicianRepo.update(musician);
 
     return MusicianOutputMapper.toOutput(musician);
-  }
-
-  // Geocodificação best-effort (7.13c): endereço salvo sem coordenadas
-  // explícitas tenta CEP/endereço → coords para o músico entrar na busca por
-  // raio. Falha do provedor nunca bloqueia o save — só fica sem coordenadas.
-  private async resolveLocation(input: LocationInput): Promise<Location> {
-    const hasCoords =
-      input.latitude !== null &&
-      input.latitude !== undefined &&
-      input.longitude !== null &&
-      input.longitude !== undefined;
-
-    if (hasCoords || !this.geocodingService) {
-      return new Location(input);
-    }
-
-    const coords = await this.geocodingService.geocode({
-      street: input.street,
-      number: input.number,
-      neighborhood: input.neighborhood,
-      city: input.city,
-      state: input.state,
-      zip_code: input.zip_code,
-    });
-
-    if (!coords) {
-      return new Location(input);
-    }
-
-    return new Location({
-      ...input,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-    });
   }
 }

@@ -42,9 +42,6 @@ describe("UpdateMusicianProfileUseCase Unit Tests", () => {
         city: "São Paulo",
         state: "SP",
       },
-      experience: 5,
-      instruments: ["Guitar", "Voice"],
-      genres: ["Rock", "Pop"],
       socialLinks: { instagram: "@musician" },
     };
 
@@ -71,9 +68,6 @@ describe("UpdateMusicianProfileUseCase Unit Tests", () => {
       city: "São Paulo",
       state: "SP",
     });
-    expect(output.profile?.experience).toBe(5);
-    expect(output.profile?.instruments).toStrictEqual(["Guitar", "Voice"]);
-    expect(output.profile?.genres).toStrictEqual(["Rock", "Pop"]);
     expect(output.profile?.social_links).toStrictEqual({
       instagram: "@musician",
     });
@@ -87,7 +81,7 @@ describe("UpdateMusicianProfileUseCase Unit Tests", () => {
   it("should throw error if musician not found", async () => {
     const input = {
       id: "9366b7dc-2d71-4799-b91c-c64adb205104",
-      experience: 5,
+      socialLinks: null,
     };
 
     await expect(useCase.execute(input)).rejects.toThrow(NotFoundError);
@@ -190,5 +184,146 @@ describe("UpdateMusicianProfileUseCase — geocodificação (7.13c)", () => {
     expect(updated?.profile?.location.city).toBe("Curitiba");
     expect(updated?.profile?.location.latitude).toBeNull();
     expect(geocoding.queries).toHaveLength(1);
+  });
+
+  /*
+   * 🔴 A tela de endereço do app não coleta latitude/longitude: ela devolve o
+   * par que recebeu ao abrir (`latitude: initialLocation?.latitude ?? null`).
+   * Enquanto a regra era "veio coordenada, não geocodifica", mudar de cidade
+   * gravava o endereço novo com a coordenada ANTIGA — o músico continuava
+   * aparecendo nas buscas por raio da cidade de onde saiu.
+   */
+  describe("coordenada reenviada pelo app", () => {
+    const saoPaulo = {
+      city: "São Paulo",
+      state: "SP",
+      street: "Avenida Paulista",
+      zip_code: "01310-100",
+    };
+
+    const seedInSaoPaulo = async () => {
+      geocoding.setCoordinates({ latitude: -23.5614, longitude: -46.6559 });
+      const musician = Musician.fake().aMusician().build();
+      await repository.insert(musician);
+      await useCase.execute({
+        id: musician.musician_id.id,
+        location: saoPaulo,
+      });
+      geocoding.queries.length = 0;
+      return musician;
+    };
+
+    it("endereço novo com o par antigo é regeocodificado", async () => {
+      const musician = await seedInSaoPaulo();
+      geocoding.setCoordinates({ latitude: -22.9068, longitude: -43.1729 });
+
+      await useCase.execute({
+        id: musician.musician_id.id,
+        location: {
+          city: "Rio de Janeiro",
+          state: "RJ",
+          zip_code: "20040-020",
+          latitude: -23.5614,
+          longitude: -46.6559,
+        },
+      });
+
+      const updated = await repository.findById(musician.musician_id);
+      expect(updated?.profile?.location).toMatchObject({
+        city: "Rio de Janeiro",
+        latitude: -22.9068,
+        longitude: -43.1729,
+      });
+      expect(geocoding.queries).toHaveLength(1);
+    });
+
+    it("mudou de cidade e o geocoder não respondeu: fica sem coordenada, não com a da cidade antiga", async () => {
+      const musician = await seedInSaoPaulo();
+      geocoding.setCoordinates(null);
+
+      await useCase.execute({
+        id: musician.musician_id.id,
+        location: {
+          city: "Rio de Janeiro",
+          state: "RJ",
+          zip_code: "20040-020",
+          latitude: -23.5614,
+          longitude: -46.6559,
+        },
+      });
+
+      const updated = await repository.findById(musician.musician_id);
+      expect(updated?.profile?.location.latitude).toBeNull();
+      expect(updated?.profile?.location.longitude).toBeNull();
+    });
+
+    it("mesmo endereço com o mesmo par não custa chamada ao geocoder", async () => {
+      const musician = await seedInSaoPaulo();
+
+      await useCase.execute({
+        id: musician.musician_id.id,
+        location: {
+          ...saoPaulo,
+          complement: "apto 12",
+          latitude: -23.5614,
+          longitude: -46.6559,
+        },
+      });
+
+      const updated = await repository.findById(musician.musician_id);
+      expect(updated?.profile?.location.latitude).toBe(-23.5614);
+      expect(geocoding.queries).toHaveLength(0);
+    });
+
+    it("par DIFERENTE do gravado é novidade de verdade e é respeitado", async () => {
+      const musician = await seedInSaoPaulo();
+
+      await useCase.execute({
+        id: musician.musician_id.id,
+        location: {
+          city: "Rio de Janeiro",
+          state: "RJ",
+          latitude: -22.9,
+          longitude: -43.17,
+        },
+      });
+
+      const updated = await repository.findById(musician.musician_id);
+      expect(updated?.profile?.location.latitude).toBe(-22.9);
+      expect(geocoding.queries).toHaveLength(0);
+    });
+  });
+
+  /*
+   * 🔴 Esta rota não escreve gêneros, instrumentos nem experiência.
+   *
+   * Aceitava os três. `experience` alterava só uma cópia em memória e a
+   * resposta trazia o valor novo — o repositório em memória devolve a mesma
+   * instância, então este próprio spec afirmava `profile.experience === 5`
+   * sobre um valor que o Postgres nunca recebeu. Os campos saíram do input; se
+   * chegarem por um chamador sem tipo, são ignorados.
+   */
+  it("ignora gêneros, instrumentos e experiência: não são desta rota", async () => {
+    const musician = Musician.fake()
+      .aMusician()
+      .withGenres(["MPB"])
+      .withInstruments(["Violão"])
+      .withExperienceYears(3)
+      .build();
+    await repository.insert(musician);
+
+    const output = await useCase.execute({
+      id: musician.musician_id.id,
+      experience: 12,
+      instruments: ["Bateria"],
+      genres: ["Rock"],
+    } as any);
+
+    expect(output.experience_years).toBe(3);
+    expect(output.instruments).toStrictEqual(["Violão"]);
+    expect(output.genres).toStrictEqual(["MPB"]);
+    for (const field of ["experience", "instruments", "genres"]) {
+      expect(output.profile).not.toHaveProperty(field);
+    }
   });
 });

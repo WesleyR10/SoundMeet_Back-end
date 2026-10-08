@@ -32,31 +32,10 @@ describe("MusicianProfileValidator Tests", () => {
     expect(notification.hasErrors()).toBeTruthy();
   });
 
-  test("invalidation cases for experience field", () => {
-    notification = new Notification();
-    const isValid = validator.validate(notification, {
-      musician_id: new Uuid().id,
-      experience: -1,
-      instruments: ["Guitar"],
-      genres: ["Rock"],
-      location: {},
-      socialLinks: null,
-      rating: 0,
-      total_ratings: 0,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
-    expect(isValid).toBeFalsy();
-    expect(notification.hasErrors()).toBeTruthy();
-  });
-
   test("valid cases", () => {
     notification = new Notification();
     const isValid = validator.validate(notification, {
       musician_id: new Uuid().id,
-      experience: 0,
-      instruments: [],
-      genres: [],
       location: {},
       socialLinks: null,
       rating: 0,
@@ -75,9 +54,6 @@ describe("MusicianProfileRules Unit Tests", () => {
     const rules = new MusicianProfileRules(profile);
     expect(rules).toBeDefined();
     expect(rules.musician_id).toBe(profile.musician_id.id);
-    expect(rules.experience).toBe(profile.experience);
-    expect(rules.instruments).toEqual(profile.instruments);
-    expect(rules.genres).toEqual(profile.genres);
     expect(rules.socialLinks).toBe(profile.socialLinks);
     expect(rules.created_at).toBe(profile.created_at);
     expect(rules.updated_at).toBe(profile.updated_at);

@@ -1,8 +1,9 @@
+import { UnauthorizedException } from "@nestjs/common";
+
 import { MusicianOutput } from "../../../core/musician/application/use-cases/common/musician-profile-output";
 import { ListMusiciansOutput } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { SortDirection } from "../../../core/shared/domain/repository/search-params";
 import { Currency } from "../../../core/shared/domain/value-objects/money.vo";
-import { CreateMusicianDto } from "../dto/create-musician.dto";
 import { SearchMusiciansDto } from "../dto/search-musicians.dto";
 import { UpdateMusicianDto } from "../dto/update-musician.dto";
 import { UpdateMusicianProfileDto } from "../dto/update-musician-profile.dto";
@@ -54,52 +55,6 @@ describe("MusiciansController Unit Tests", () => {
   beforeEach(async () => {
     jest.restoreAllMocks();
     controller = new MusiciansController();
-  });
-
-  describe("create", () => {
-    it("should create a musician", async () => {
-      const output = makeMusicianOutput();
-      const mockCreateUseCase = {
-        execute: jest.fn().mockResolvedValue(output),
-      };
-      (controller as any).createUseCase = mockCreateUseCase;
-
-      const serializeSpy = jest.spyOn(MusiciansController, "serialize");
-      const input: CreateMusicianDto = {
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+5511999999999",
-        genres: ["Rock"],
-        instruments: ["Guitar"],
-        experience_years: 0,
-        is_active: true,
-      } as any;
-
-      const presenter = await controller.create(input);
-
-      expect(mockCreateUseCase.execute).toHaveBeenCalledWith(input);
-      expect(serializeSpy).toHaveBeenCalledWith(output);
-      expect(presenter).toBeInstanceOf(MusicianPresenter);
-      expect(presenter).toStrictEqual(new MusicianPresenter(output));
-    });
-
-    it("should throw when create use case throws", async () => {
-      const error = new Error("create error");
-      const mockCreateUseCase = {
-        execute: jest.fn().mockRejectedValue(error),
-      };
-      (controller as any).createUseCase = mockCreateUseCase;
-
-      const input: CreateMusicianDto = {
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+5511999999999",
-        genres: ["Rock"],
-        instruments: ["Guitar"],
-      } as any;
-
-      await expect(controller.create(input)).rejects.toThrow(error);
-    });
   });
 
   describe("findAll", () => {
@@ -177,10 +132,15 @@ describe("MusiciansController Unit Tests", () => {
 
       const presenter = await controller.findOne(id);
 
-      expect(mockGetUseCase.execute).toHaveBeenCalledWith({ id });
+      // Terceiro não lê `plan_tier`, então a consulta de assinatura é pulada.
+      expect(mockGetUseCase.execute).toHaveBeenCalledWith({
+        id,
+        include_plan_tier: false,
+      });
       expect(presenter).toBeInstanceOf(PublicMusicianPresenter);
       expect(presenter).not.toHaveProperty("email");
       expect(presenter).not.toHaveProperty("phone");
+      expect(presenter).not.toHaveProperty("plan_tier");
     });
 
     it("estranho autenticado (outro musician_id) recebe PublicMusicianPresenter", async () => {
@@ -203,6 +163,10 @@ describe("MusiciansController Unit Tests", () => {
 
       const presenter = await controller.findOne(id, ownerUser as any);
 
+      expect(mockGetUseCase.execute).toHaveBeenCalledWith({
+        id,
+        include_plan_tier: true,
+      });
       expect(serializeSpy).toHaveBeenCalledWith(output);
       expect(presenter).toBeInstanceOf(MusicianPresenter);
       expect(presenter).toStrictEqual(new MusicianPresenter(output));
@@ -228,6 +192,52 @@ describe("MusiciansController Unit Tests", () => {
 
       await expect(controller.findOne(id)).rejects.toThrow(error);
     });
+
+    /*
+     * 🔴 O dono com token expirado.
+     *
+     * A rota é pública com autenticação opcional: token recusado vira anônimo
+     * e a resposta era 200 com a versão PÚBLICA. O app só renova a sessão ao
+     * receber 401, então o músico via o próprio perfil sem e-mail, telefone e
+     * CNPJ — e salvar o formulário de identidade gravava `cnpj: null`.
+     */
+    describe("token recusado", () => {
+      it("do PRÓPRIO dono responde 401, sem consultar o músico", async () => {
+        const mockGetUseCase = { execute: jest.fn() };
+        (controller as any).getUseCase = mockGetUseCase;
+
+        await expect(controller.findOne(id, undefined, id)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        expect(mockGetUseCase.execute).not.toHaveBeenCalled();
+      });
+
+      it("de OUTRA pessoa segue recebendo a versão pública", async () => {
+        const output = makeMusicianOutput({ id });
+        const mockGetUseCase = { execute: jest.fn().mockResolvedValue(output) };
+        (controller as any).getUseCase = mockGetUseCase;
+
+        const presenter = await controller.findOne(
+          id,
+          undefined,
+          "11111111-2222-4333-8444-555555555555",
+        );
+
+        expect(presenter).toBeInstanceOf(PublicMusicianPresenter);
+      });
+
+      it("não vira atalho: um token VÁLIDO de terceiro com o mesmo sub recusado não importa", async () => {
+        // `currentUser` presente significa que o token passou na verificação;
+        // o `sub` recusado nem deveria existir, mas se existir não manda.
+        const output = makeMusicianOutput({ id });
+        const mockGetUseCase = { execute: jest.fn().mockResolvedValue(output) };
+        (controller as any).getUseCase = mockGetUseCase;
+
+        const presenter = await controller.findOne(id, strangerUser as any, id);
+
+        expect(presenter).toBeInstanceOf(PublicMusicianPresenter);
+      });
+    });
   });
 
   describe("update", () => {
@@ -248,7 +258,6 @@ describe("MusiciansController Unit Tests", () => {
       const input: UpdateMusicianDto = {
         name: "Jane Smith",
         email: "jane@example.com",
-        is_active: true,
       } as any;
 
       const presenter = await controller.update(id, input);
@@ -307,9 +316,6 @@ describe("MusiciansController Unit Tests", () => {
           touring_expires_at: null,
           is_touring: false,
           social_links: { instagram: "@john" },
-          experience: 5,
-          instruments: ["Guitar"],
-          genres: ["Rock"],
           created_at: new Date("2025-01-01T00:00:00.000Z"),
           updated_at: new Date("2025-01-01T00:00:00.000Z"),
         },
@@ -379,9 +385,6 @@ describe("MusiciansController Unit Tests", () => {
           touring_expires_at: new Date("2025-01-06T00:00:00.000Z"),
           is_touring: true,
           social_links: null,
-          experience: 0,
-          instruments: [],
-          genres: [],
           created_at: new Date("2025-01-01T00:00:00.000Z"),
           updated_at: new Date("2025-01-01T00:00:00.000Z"),
         },
@@ -431,30 +434,6 @@ describe("MusiciansController Unit Tests", () => {
     });
   });
 
-  describe("remove", () => {
-    it("should delete a musician", async () => {
-      const mockDeleteUseCase = {
-        execute: jest.fn().mockResolvedValue(undefined),
-      };
-      (controller as any).deleteUseCase = mockDeleteUseCase;
-
-      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
-      await expect(controller.remove(id)).resolves.toBeUndefined();
-      expect(mockDeleteUseCase.execute).toHaveBeenCalledWith({ id });
-    });
-
-    it("should throw when delete use case throws", async () => {
-      const error = new Error("delete error");
-      const mockDeleteUseCase = {
-        execute: jest.fn().mockRejectedValue(error),
-      };
-      (controller as any).deleteUseCase = mockDeleteUseCase;
-
-      const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
-      await expect(controller.remove(id)).rejects.toThrow(error);
-    });
-  });
-
   describe("serialize", () => {
     it("should serialize output into presenter", () => {
       const output = makeMusicianOutput();
@@ -495,6 +474,16 @@ describe("MusiciansController — ordem de rota", () => {
       "path",
       (MusiciansController.prototype as unknown as Record<string, any>)[method],
     ) as string | undefined;
+
+  it("declara findIdentities ANTES de findOne", () => {
+    const order = methodOrder();
+
+    expect(order.indexOf("findIdentities")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("findIdentities")).toBeLessThan(
+      order.indexOf("findOne"),
+    );
+    expect(pathOf("findIdentities")).toBe("identities");
+  });
 
   it("declara findFeatured ANTES de findOne", () => {
     const order = methodOrder();
@@ -544,5 +533,218 @@ describe("MusiciansController — ordem de rota", () => {
     });
 
     expect(literalGetsAfterId).toEqual([]);
+  });
+});
+
+/**
+ * 🔴 Duas rotas que NÃO podem voltar a existir.
+ *
+ * O risco real não é alguém restaurar o método com o mesmo nome: é nascer um
+ * `@Post()` ou um `@Delete(":id")` novo, de quem não sabe por que eles não
+ * existiam. Por isso o teste varre a metadata do Nest, e não nomes de método.
+ */
+describe("MusiciansController — rotas removidas de propósito", () => {
+  const handlers = () => {
+    const proto = MusiciansController.prototype as unknown as Record<
+      string,
+      any
+    >;
+    return Object.getOwnPropertyNames(proto)
+      .filter(
+        (name) => typeof proto[name] === "function" && name !== "constructor",
+      )
+      .map((name) => ({
+        name,
+        // RequestMethod do Nest: 0 GET, 1 POST, 2 PUT, 3 DELETE, 4 PATCH.
+        verb: Reflect.getMetadata("method", proto[name]) as number | undefined,
+        path: Reflect.getMetadata("path", proto[name]) as string | undefined,
+      }))
+      .filter((route) => route.verb !== undefined);
+  };
+
+  const isRoot = (path?: string) =>
+    path === "/" || path === "" || path === undefined;
+
+  it("não há POST na raiz: músico só nasce pelo registro, com o sub do Keycloak", () => {
+    const rootPosts = handlers().filter(
+      (route) => route.verb === 1 && isRoot(route.path),
+    );
+
+    expect(rootPosts.map((route) => route.name)).toEqual([]);
+  });
+
+  it("não há DELETE de `:id`: excluir conta não é um repository.delete", () => {
+    const deletesOfAggregate = handlers().filter(
+      (route) => route.verb === 3 && route.path === ":id",
+    );
+
+    expect(deletesOfAggregate.map((route) => route.name)).toEqual([]);
+  });
+
+  it("as rotas de sub-recurso continuam de pé (o guarda acima não é um corta-tudo)", () => {
+    const deletes = handlers()
+      .filter((route) => route.verb === 3)
+      .map((route) => route.path)
+      .sort();
+
+    expect(deletes).toEqual([
+      ":id/presentation-audio",
+      ":id/push-token",
+      ":id/touring-location",
+    ]);
+  });
+});
+
+describe("MusiciansController — token de push", () => {
+  it("registrar responde sem corpo (204): o app chama a cada abertura e descarta a resposta", async () => {
+    const controller = new MusiciansController();
+    const execute = jest.fn().mockResolvedValue({ id: "x" });
+    (controller as any).registerPushTokenUseCase = { execute };
+    const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+
+    const response = await controller.registerPushToken(id, {
+      push_token: "ExponentPushToken[abc]",
+      push_token_platform: "android",
+    } as any);
+
+    expect(response).toBeUndefined();
+    expect(execute).toHaveBeenCalledWith({
+      id,
+      push_token: "ExponentPushToken[abc]",
+      push_token_platform: "android",
+    });
+    expect(
+      Reflect.getMetadata(
+        "__httpCode__",
+        MusiciansController.prototype.registerPushToken,
+      ),
+    ).toBe(204);
+  });
+
+  it("apagar delega ao use-case e responde 204", async () => {
+    const controller = new MusiciansController();
+    const execute = jest.fn().mockResolvedValue(undefined);
+    (controller as any).clearPushTokenUseCase = { execute };
+    const id = "9366b7dc-2d71-4799-b91c-c64adb205104";
+
+    await expect(controller.clearPushToken(id)).resolves.toBeUndefined();
+
+    expect(execute).toHaveBeenCalledWith({ id });
+    expect(
+      Reflect.getMetadata(
+        "__httpCode__",
+        MusiciansController.prototype.clearPushToken,
+      ),
+    ).toBe(204);
+  });
+});
+
+describe("MusiciansController — status documentado é o status respondido", () => {
+  // `@Post` responde 201 por padrão; `verify` e `customize` não criam recurso
+  // e o Swagger sempre os documentou como 200.
+  it.each(["verify", "customizeQRCode"] as const)(
+    "%s responde 200",
+    (method) => {
+      expect(
+        Reflect.getMetadata(
+          "__httpCode__",
+          MusiciansController.prototype[method],
+        ),
+      ).toBe(200);
+    },
+  );
+});
+
+/*
+ * 🔴 O Multer não decide formato de imagem pelo `Content-Type` DECLARADO.
+ *
+ * Avatar e logo do QR tinham um `fileFilter` que lançava `new Error(...)`
+ * quando o tipo declarado não era JPEG/PNG/WEBP. O Nest só traduz os erros
+ * que o próprio Multer conhece (`transformException`), então aquele `Error`
+ * cru chegava ao filtro global e virava 500 + Sentry por causa de um arquivo
+ * errado. E era redundante: o `assertFileSignature` do handler lê os BYTES e
+ * responde 422. O áudio de apresentação já era assim.
+ */
+describe("MusiciansController — uploads de imagem não filtram pelo tipo declarado", () => {
+  const multerOf = (
+    method: "uploadAvatar" | "uploadQrLogo" | "uploadPresentationAudio",
+  ) => {
+    const [Interceptor] = Reflect.getMetadata(
+      "__interceptors__",
+      MusiciansController.prototype[method],
+    ) as (new () => {
+      multer: {
+        fileFilter: (
+          req: unknown,
+          file: { mimetype: string; originalname: string },
+          cb: (error: Error | null, accept: boolean) => void,
+        ) => void;
+        limits?: { fileSize?: number };
+      };
+    })[];
+    return new Interceptor().multer;
+  };
+
+  it.each(["uploadAvatar", "uploadQrLogo", "uploadPresentationAudio"] as const)(
+    "%s aceita o arquivo no Multer mesmo com tipo declarado estranho",
+    (method) => {
+      const callback = jest.fn();
+
+      multerOf(method).fileFilter(
+        {},
+        { mimetype: "application/octet-stream", originalname: "foto.heic" },
+        callback,
+      );
+
+      expect(callback).toHaveBeenCalledWith(null, true);
+    },
+  );
+
+  it("os tetos de tamanho continuam valendo", () => {
+    expect(multerOf("uploadAvatar").limits?.fileSize).toBe(5 * 1024 * 1024);
+    expect(multerOf("uploadQrLogo").limits?.fileSize).toBe(2 * 1024 * 1024);
+  });
+
+  it("avatar e logo do QR têm limite próprio de envios, como o áudio", () => {
+    for (const method of [
+      "uploadAvatar",
+      "uploadQrLogo",
+      "uploadPresentationAudio",
+    ] as const) {
+      const handler = MusiciansController.prototype[method];
+      expect(Reflect.getMetadata("THROTTLER:LIMITdefault", handler)).toBe(5);
+      expect(Reflect.getMetadata("THROTTLER:TTLdefault", handler)).toBe(60000);
+    }
+  });
+});
+
+describe("MusiciansController — identidades em lote", () => {
+  it("delega os ids ao use-case e devolve só a identidade", async () => {
+    const controller = new MusiciansController();
+    const items = [
+      {
+        id: "9366b7dc-2d71-4799-b91c-c64adb205104",
+        display_name: "Carlão do Piano",
+        avatar: null,
+        instruments: ["Piano"],
+        genres: ["Jazz"],
+        rating: 4.8,
+        total_ratings: 27,
+        is_verified: true,
+      },
+    ];
+    const execute = jest.fn().mockResolvedValue({ items });
+    (controller as any).listIdentitiesUseCase = { execute };
+
+    const presenters = await controller.findIdentities({
+      ids: ["9366b7dc-2d71-4799-b91c-c64adb205104"],
+    });
+
+    expect(execute).toHaveBeenCalledWith({
+      ids: ["9366b7dc-2d71-4799-b91c-c64adb205104"],
+    });
+    expect(presenters.map((presenter) => ({ ...presenter }))).toStrictEqual(
+      items,
+    );
   });
 });

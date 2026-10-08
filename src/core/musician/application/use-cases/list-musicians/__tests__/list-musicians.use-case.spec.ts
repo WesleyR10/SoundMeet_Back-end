@@ -1,9 +1,16 @@
+import { Location } from "../../../../../shared/domain/value-objects/location.vo";
 import { PriceRange } from "../../../../../shared/domain/value-objects/price-range.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianSearchResult } from "../../../../domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { MusicianOutputMapper } from "../../common/musician-profile-output";
 import { ListMusiciansUseCase } from "../list-musicians.use-case";
+
+/** Item da LISTA: o output do músico mais a distância (nula sem origem). */
+const toListOutput = (entity: Musician) => ({
+  ...MusicianOutputMapper.toOutput(entity),
+  distance_km: null,
+});
 
 describe("ListMusiciansUseCase Unit Tests", () => {
   let useCase: ListMusiciansUseCase;
@@ -40,7 +47,7 @@ describe("ListMusiciansUseCase Unit Tests", () => {
 
     output = useCase["toOutput"](result);
     expect(output).toStrictEqual({
-      items: [entity].map(MusicianOutputMapper.toOutput),
+      items: [entity].map(toListOutput),
       total: 1,
       current_page: 1,
       per_page: 2,
@@ -61,7 +68,7 @@ describe("ListMusiciansUseCase Unit Tests", () => {
 
     const output = await useCase.execute({});
     expect(output).toStrictEqual({
-      items: [...items].reverse().map(MusicianOutputMapper.toOutput),
+      items: [...items].reverse().map(toListOutput),
       total: 2,
       current_page: 1,
       per_page: 15,
@@ -93,7 +100,7 @@ describe("ListMusiciansUseCase Unit Tests", () => {
     // O filtro 'AA' é case-insensitive, então retorna 'AAA' e 'AaA'
     // 2 itens passam no filtro, ordenados por nome: AAA, AaA
     expect(output).toStrictEqual({
-      items: [items[1], items[2]].map(MusicianOutputMapper.toOutput), // AAA, AaA
+      items: [items[1], items[2]].map(toListOutput), // AAA, AaA
       total: 2, // 2 itens passam no filtro
       current_page: 1,
       per_page: 2,
@@ -110,7 +117,7 @@ describe("ListMusiciansUseCase Unit Tests", () => {
     // Ordenados por nome: AAA, AaA, charlie
     // Página 2 com 2 por página: charlie
     expect(output).toStrictEqual({
-      items: [items[4]].map(MusicianOutputMapper.toOutput),
+      items: [items[4]].map(toListOutput),
       total: 3,
       current_page: 2,
       per_page: 2,
@@ -128,7 +135,7 @@ describe("ListMusiciansUseCase Unit Tests", () => {
     // Ordenados por nome desc: charlie, AaA, AAA
     // Página 1 com 2 por página: charlie, AaA
     expect(output).toStrictEqual({
-      items: [items[4], items[2]].map(MusicianOutputMapper.toOutput),
+      items: [items[4], items[2]].map(toListOutput),
       total: 3,
       current_page: 1,
       per_page: 2,
@@ -176,7 +183,7 @@ describe("ListMusiciansUseCase Unit Tests", () => {
     });
 
     expect(output).toStrictEqual({
-      items: [items[1]].map(MusicianOutputMapper.toOutput),
+      items: [items[1]].map(toListOutput),
       total: 1,
       current_page: 1,
       per_page: 15,
@@ -194,7 +201,103 @@ describe("ListMusiciansUseCase Unit Tests", () => {
       filter: { open_to_gigs: false } as any,
     });
 
-    expect(output.items).toEqual([MusicianOutputMapper.toOutput(optedIn)]);
+    expect(output.items).toEqual([toListOutput(optedIn)]);
     expect(output.total).toBe(1);
+  });
+
+  /*
+   * 🔴 A busca só aplicava o gate de consentimento. Músico desativado seguia
+   * na grade das casas e no Explorar do fã, embora pedido, scan de QR e
+   * convite de banda já o recusassem.
+   */
+  it("never lists a deactivated musician, even if the caller asks for it", async () => {
+    const active = Musician.fake().aMusician().withOpenToGigs(true).build();
+    const inactive = Musician.fake()
+      .aMusician()
+      .withOpenToGigs(true)
+      .deactivate()
+      .build();
+    repository.items = [active, inactive];
+
+    const byDefault = await useCase.execute({});
+    const asked = await useCase.execute({
+      filter: { is_active: false } as any,
+    });
+
+    expect(byDefault.items.map((item) => item.id)).toEqual([
+      active.musician_id.id,
+    ]);
+    expect(asked.items.map((item) => item.id)).toEqual([active.musician_id.id]);
+  });
+
+  describe("distância até a origem da busca", () => {
+    const at = (name: string, latitude: number, longitude: number) => {
+      const musician = Musician.fake()
+        .aMusician()
+        .withName(name)
+        .withOpenToGigs(true)
+        .build();
+      musician
+        .ensureProfile()
+        .changeLocation(
+          new Location({ city: "São Paulo", state: "SP", latitude, longitude }),
+        );
+      return musician;
+    };
+
+    it("com origem, cada item leva km INTEIROS", async () => {
+      repository.items = [at("Perto", -23.5614, -46.6559)];
+
+      const output = await useCase.execute({
+        filter: { lat: -23.5338, lng: -46.6559 } as any,
+      });
+
+      expect(output.items[0].distance_km).toBe(3);
+      expect(Number.isInteger(output.items[0].distance_km)).toBe(true);
+    });
+
+    it("sem origem, a distância é nula — nunca zero", async () => {
+      repository.items = [at("Perto", -23.5614, -46.6559)];
+
+      const output = await useCase.execute({});
+
+      expect(output.items[0].distance_km).toBeNull();
+    });
+
+    it("músico sem coordenada fica com distância nula mesmo com origem", async () => {
+      const semCoordenada = Musician.fake()
+        .aMusician()
+        .withOpenToGigs(true)
+        .build();
+      repository.items = [semCoordenada];
+
+      const output = await useCase.execute({
+        filter: { lat: -23.5338, lng: -46.6559 } as any,
+      });
+
+      expect(output.items[0].distance_km).toBeNull();
+    });
+
+    /*
+     * 🔴 A distância NÃO pode separar duas casas da mesma célula da grade: se
+     * separasse, mover a origem e repetir a busca apontaria a porta.
+     */
+    it("duas casas na mesma célula recebem a mesma distância, de qualquer origem", async () => {
+      repository.items = [
+        at("Casa A", -23.5628, -46.654),
+        at("Casa B", -23.5571, -46.6492),
+      ];
+
+      for (const origin of [
+        { lat: -23.5538, lng: -46.654 },
+        { lat: -23.5201, lng: -46.7003 },
+        { lat: -23.61, lng: -46.6 },
+      ]) {
+        const output = await useCase.execute({ filter: origin as any });
+        const [first, second] = output.items.map((item) => item.distance_km);
+
+        expect(first).toBe(second);
+      }
+    });
   });
 });

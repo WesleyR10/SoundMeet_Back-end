@@ -89,13 +89,21 @@ export class UploadQrLogoUseCase implements IUseCase<
 
     const publicUrl = this.storage.getPublicUrl(objectKey) ?? objectKey;
 
-    musician.customizeQRCode({ logo_url: publicUrl });
+    const previousKey = musician.changeQrLogo(publicUrl, objectKey);
 
     if (musician.notification.hasErrors()) {
       throw new EntityValidationError(musician.notification.toJSON());
     }
 
     await this.musicianRepo.update(musician);
+
+    // O logo anterior sai do bucket depois do update — mesma ordem e mesmo
+    // motivo do upload de avatar.
+    if (previousKey) {
+      await this.storage
+        .deleteObject({ object_key: previousKey })
+        .catch(() => undefined);
+    }
 
     return MusicianOutputMapper.toOutput(musician);
   }

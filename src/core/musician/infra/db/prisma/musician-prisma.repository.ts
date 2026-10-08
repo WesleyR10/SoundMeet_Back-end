@@ -1,18 +1,20 @@
 import { CurrencyEnum, Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import {
-  boundingBoxForRadius,
-  haversineKm,
-} from "../../../../shared/domain/geo.utils";
+import { boundingBoxForRadius } from "../../../../shared/domain/geo.utils";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
   IMusicianRepository,
   MusicianFilter,
+  MusicianIdentity,
   MusicianSearchParams,
   MusicianSearchResult,
 } from "../../../domain/musician.repository";
+import {
+  PUBLIC_GRID_MARGIN_KM,
+  publicDistanceKm,
+} from "../../../domain/musician-location-privacy";
 import { MusicianModel } from "./musician-model";
 import { MusicianModelMapper } from "./musician-model-mapper";
 
@@ -249,6 +251,32 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     );
   }
 
+  /*
+   * `select` enxuto de propósito: sem `include: { profile }` e sem montar o
+   * agregado. É a consulta que substitui N leituras de perfil inteiro quando
+   * uma lista só precisa de nome e foto.
+   */
+  async findIdentitiesByIds(ids: MusicianId[]): Promise<MusicianIdentity[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return this.prisma.musician.findMany({
+      where: { id: { in: ids.map((id) => id.id) } },
+      select: {
+        id: true,
+        name: true,
+        stage_name: true,
+        avatar: true,
+        instruments: true,
+        genres: true,
+        rating: true,
+        total_ratings: true,
+        is_verified: true,
+      },
+    });
+  }
+
   async findAll(): Promise<Musician[]> {
     const models = await this.prisma.musician.findMany({
       include: { profile: true },
@@ -326,13 +354,47 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       total,
       current_page: props.page,
       per_page: props.per_page,
+      distances: this.distancesFromOrigin(entities, props.filter),
     });
+  }
+
+  /**
+   * Distância de cada músico até a origem da busca, quando há origem — mesmo
+   * SEM raio (o chamador quer mostrar "a X km", não filtrar). Base ou turnê
+   * vigente, o que estiver mais perto, sempre na grade pública.
+   */
+  private distancesFromOrigin(
+    entities: Musician[],
+    filter: MusicianFilter | null,
+  ): Map<string, number> {
+    const distances = new Map<string, number>();
+    if (
+      filter?.lat === null ||
+      filter?.lat === undefined ||
+      filter?.lng === null ||
+      filter?.lng === undefined
+    ) {
+      return distances;
+    }
+
+    const origin = { lat: filter.lat, lng: filter.lng };
+    for (const musician of entities) {
+      const profile = musician.profile;
+      const distance = publicDistanceKm(origin, [
+        profile?.location,
+        profile?.isTouring ? profile.touring_location : null,
+      ]);
+      if (distance !== null) {
+        distances.set(musician.musician_id.id, distance);
+      }
+    }
+    return distances;
   }
 
   // Busca por proximidade (roadmap 7.13c): bounding box indexável em SQL
   // (colunas denormalizadas location_lat/location_lng no profile, índice
-  // composto) como pré-filtro + Haversine exato em memória para o corte
-  // circular e ordenação por distância. Duas queries (ids→página) para manter
+  // composto) como pré-filtro + Haversine em memória, NA GRADE PÚBLICA, para o
+  // corte circular e ordenação por distância. Duas queries (ids→página) para manter
   // paginação/total exatos sem SQL cru — mesmo desenho do
   // EstablishmentPrismaRepository.searchByProximity.
   // 7.13d — modo turnê: considera OS DOIS pontos (base OU turnê ainda
@@ -345,7 +407,17 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     radiusKm: number,
   ): Promise<MusicianSearchResult> {
     const where = this.buildWhereClause(props.filter);
-    const box = boundingBoxForRadius(lat, lng, radiusKm);
+    /*
+     * 🔴 A caixa roda sobre as colunas EXATAS, mas o corte abaixo é feito na
+     * grade pública — por isso ela é alargada pela margem da grade. Sem a
+     * margem, um músico cuja célula cai dentro do raio mas cuja coordenada
+     * exata fica um pouco fora sumiria do resultado.
+     */
+    const box = boundingBoxForRadius(
+      lat,
+      lng,
+      radiusKm + PUBLIC_GRID_MARGIN_KM,
+    );
     const now = new Date();
     where.profile = {
       is: {
@@ -380,29 +452,45 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       },
     });
 
+    /*
+     * 🔴 A distância é medida na GRADE PÚBLICA (`publicDistanceKm`), nunca na
+     * coordenada exata. Com a exata, esta rota — que é anônima — entregava a
+     * casa do músico: bastava mover a origem e ver em que ponto ele entrava
+     * ou saía do raio (verificado por HTTP: a 100 m, `radius_km=0.09` não o
+     * devolvia e `0.11` devolvia). Na grade, o máximo que se recupera é o
+     * centro de uma célula de ~1 km.
+     */
+    const origin = { lat, lng };
     const withinRadius = candidates
       .map((candidate) => {
         const profile = candidate.profile!;
-        const distances: number[] = [];
-        if (profile.location_lat !== null && profile.location_lng !== null) {
-          distances.push(
-            haversineKm(lat, lng, profile.location_lat, profile.location_lng),
-          );
-        }
-        if (
-          profile.touring_lat !== null &&
-          profile.touring_lng !== null &&
+        const touringActive =
           profile.touring_expires_at !== null &&
-          profile.touring_expires_at.getTime() > now.getTime()
-        ) {
-          distances.push(
-            haversineKm(lat, lng, profile.touring_lat, profile.touring_lng),
-          );
-        }
-        return { id: candidate.id, distance: Math.min(...distances) };
+          profile.touring_expires_at.getTime() > now.getTime();
+
+        return {
+          id: candidate.id,
+          distance: publicDistanceKm(origin, [
+            { latitude: profile.location_lat, longitude: profile.location_lng },
+            touringActive
+              ? {
+                  latitude: profile.touring_lat,
+                  longitude: profile.touring_lng,
+                }
+              : null,
+          ]),
+        };
       })
-      .filter((candidate) => candidate.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance);
+      .filter(
+        (candidate): candidate is { id: string; distance: number } =>
+          candidate.distance !== null && candidate.distance <= radiusKm,
+      )
+      /*
+       * Desempate por id: muitos músicos caem na MESMA célula e ficam à mesma
+       * distância exata. Sem desempate a ordem entre eles dependeria da ordem
+       * em que o banco os devolveu, e a paginação repetiria e pularia gente.
+       */
+      .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
 
     const offset = (props.page - 1) * props.per_page;
     const pageIds = withinRadius
@@ -423,11 +511,18 @@ export class MusicianPrismaRepository implements IMusicianRepository {
         MusicianModelMapper.toEntity(model as unknown as MusicianModel),
       );
 
+    const distanceById = new Map(
+      withinRadius.map((candidate) => [candidate.id, candidate.distance]),
+    );
+
     return new MusicianSearchResult({
       items,
       total: withinRadius.length,
       current_page: props.page,
       per_page: props.per_page,
+      distances: new Map(
+        pageIds.map((id) => [id, distanceById.get(id)!] as [string, number]),
+      ),
     });
   }
 
@@ -460,11 +555,21 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       };
     }
 
-    if (filter.email) {
-      where.email = {
-        contains: filter.email,
-        mode: "insensitive",
-      };
+    /*
+     * `q` casa com o nome que a tela mostra: artístico OU de cadastro, o mesmo
+     * par de `Musician.displayName`. Fica num `AND` próprio para não disputar
+     * a chave `OR` com quem mais precisar dela neste `where`.
+     */
+    if (filter.q) {
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            { stage_name: { contains: filter.q, mode: "insensitive" } },
+            { name: { contains: filter.q, mode: "insensitive" } },
+          ],
+        },
+      ];
     }
 
     if (filter.genres && filter.genres.length > 0) {
@@ -537,14 +642,25 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     return where;
   }
 
+  /*
+   * 🔴 O `id` no fim NÃO é enfeite: é o que torna a ordem ÚNICA.
+   *
+   * O Postgres não promete ordem entre linhas empatadas, e o plano muda com o
+   * `LIMIT`/`OFFSET` — então ordenar só por `rating` (quase todo mundo começa
+   * em 0) fazia o mesmo músico aparecer em duas páginas e outro não aparecer
+   * em nenhuma, sem erro. A própria documentação do `LIMIT` avisa: sem ordem
+   * que restrinja o resultado a uma sequência única, cada página é um
+   * subconjunto imprevisível.
+   */
   private buildOrderByClause(sort?: string | null, sort_dir?: string | null) {
     if (!sort || !this.sortableFields.includes(sort)) {
-      return { created_at: "desc" as const };
+      return [{ created_at: "desc" as const }, { id: "asc" as const }];
     }
 
-    return {
-      [sort]: sort_dir === "asc" ? ("asc" as const) : ("desc" as const),
-    };
+    return [
+      { [sort]: sort_dir === "asc" ? ("asc" as const) : ("desc" as const) },
+      { id: "asc" as const },
+    ];
   }
 
   getEntity(): new (...args: any[]) => Musician {

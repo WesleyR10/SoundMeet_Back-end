@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  UnauthorizedException,
   UnprocessableEntityException,
   UploadedFile,
   UseGuards,
@@ -25,19 +26,16 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import { randomUUID } from "crypto";
 import { createReadStream, promises as fs } from "fs";
-import { diskStorage } from "multer";
-import { tmpdir } from "os";
 
 import { ClearMusicianTouringLocationUseCase } from "../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
+import { ClearPushTokenUseCase } from "../../core/musician/application/use-cases/clear-push-token/clear-push-token.use-case";
 import { MusicianOutput } from "../../core/musician/application/use-cases/common/musician-profile-output";
-import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
-import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { DeleteMusicianPresentationAudioUseCase } from "../../core/musician/application/use-cases/delete-musician-presentation-audio/delete-musician-presentation-audio.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListFeaturedMusiciansUseCase } from "../../core/musician/application/use-cases/list-featured-musicians/list-featured-musicians.use-case";
+import { ListMusicianIdentitiesUseCase } from "../../core/musician/application/use-cases/list-musician-identities/list-musician-identities.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
@@ -59,13 +57,15 @@ import {
   CurrentUserContextGuard,
   MusicianOwnershipGuard,
   Public,
+  RejectedTokenSub,
   Roles,
   RolesGuard,
 } from "../auth-module";
 import { assertFileSignature } from "../shared-module/upload/detect-file-mime";
 import { readAudioDurationSeconds } from "../shared-module/upload/read-audio-duration";
-import { CreateMusicianDto } from "./dto/create-musician.dto";
+import { tempDiskUpload } from "../shared-module/upload/temp-disk-upload";
 import { CustomizeQRCodeDto } from "./dto/customize-qr-code.dto";
+import { ListMusicianIdentitiesDto } from "./dto/list-musician-identities.dto";
 import { RegisterPushTokenDto } from "./dto/register-push-token.dto";
 import { SearchMusiciansDto } from "./dto/search-musicians.dto";
 import { SetMusicianOpenToGigsDto } from "./dto/set-musician-open-to-gigs.dto";
@@ -74,7 +74,9 @@ import { SetMusicianTouringLocationDto } from "./dto/set-musician-touring-locati
 import { UpdateMusicianDto } from "./dto/update-musician.dto";
 import { UpdateMusicianProfileDto } from "./dto/update-musician-profile.dto";
 import {
+  MusicianCardPresenter,
   MusicianCollectionPresenter,
+  MusicianIdentityPresenter,
   MusicianPresenter,
   PublicMusicianPresenter,
 } from "./musician.presenter";
@@ -84,9 +86,6 @@ import {
 @UseGuards(AuthGuard, RolesGuard, CurrentUserContextGuard)
 @Controller("musicians")
 export class MusiciansController {
-  @Inject(CreateMusicianUseCase)
-  private createUseCase: CreateMusicianUseCase;
-
   @Inject(UpdateMusicianUseCase)
   private updateUseCase: UpdateMusicianUseCase;
 
@@ -102,14 +101,14 @@ export class MusiciansController {
   @Inject(RegisterPushTokenUseCase)
   private registerPushTokenUseCase: RegisterPushTokenUseCase;
 
+  @Inject(ClearPushTokenUseCase)
+  private clearPushTokenUseCase: ClearPushTokenUseCase;
+
   @Inject(SetMusicianOpenToGigsUseCase)
   private setOpenToGigsUseCase: SetMusicianOpenToGigsUseCase;
 
   @Inject(SetMusicianRequestScopeUseCase)
   private setRequestScopeUseCase: SetMusicianRequestScopeUseCase;
-
-  @Inject(DeleteMusicianUseCase)
-  private deleteUseCase: DeleteMusicianUseCase;
 
   @Inject(GetMusicianUseCase)
   private getUseCase: GetMusicianUseCase;
@@ -119,6 +118,9 @@ export class MusiciansController {
 
   @Inject(ListFeaturedMusiciansUseCase)
   private listFeaturedUseCase: ListFeaturedMusiciansUseCase;
+
+  @Inject(ListMusicianIdentitiesUseCase)
+  private listIdentitiesUseCase: ListMusicianIdentitiesUseCase;
 
   @Inject(VerifyMusicianUseCase)
   private verifyUseCase: VerifyMusicianUseCase;
@@ -138,17 +140,23 @@ export class MusiciansController {
   @Inject(UploadQrLogoUseCase)
   private uploadQrLogoUseCase: UploadQrLogoUseCase;
 
-  @Post()
-  @Roles("musician", "admin")
-  @ApiOperation({
-    summary: "Criar músico",
-    description: "Cria um perfil de músico e gera QR Code permanente.",
-  })
-  @ApiResponse({ status: 201, type: MusicianPresenter })
-  async create(@Body() createMusicianDto: CreateMusicianDto) {
-    const output = await this.createUseCase.execute(createMusicianDto);
-    return MusiciansController.serialize(output);
-  }
+  /*
+   * 🔴 NÃO existe `POST /musicians`, e a ausência é a correção (out/2026).
+   *
+   * O único caminho de nascimento de um `Musician` é o registro
+   * (`RegisterUseCase` e o cadastro social), que faz
+   * `new MusicianId(externalId)` — o `sub` do Keycloak. A rota que existia
+   * aqui criava o agregado com UUID ALEATÓRIO e bastava ter o papel
+   * `musician` para chamá-la: perfil que ninguém consegue logar, mas que
+   * aparecia na grade das casas (`open_to_gigs` vinha do corpo) e, por ocupar
+   * o e-mail, bloqueava o cadastro do dono verdadeiro daquele endereço.
+   *
+   * É o mesmo defeito do `POST /audiences` removido no SM-021, e a mesma
+   * conclusão: restringir a `admin` não resolveria — uma capacidade que só
+   * sabe produzir agregado violando a invariante de identidade não fica
+   * melhor com autorização. Há regressão em `musicians.controller.spec.ts`
+   * que falha se um `@Post()` nascer na raiz deste controller.
+   */
 
   @Get()
   @Public()
@@ -178,15 +186,31 @@ export class MusiciansController {
     description:
       "Os artistas da faixa 'Em destaque' da grade: assinantes de plano pago, ordenados por nota. 🔴 NÃO é ordenação da busca — é uma faixa separada e rotulada, para que 'Melhor avaliados' continue significando o que diz. O `plan_tier` não sai na resposta (dado comercial do artista), e o gate de consentimento não é contornado: quem não ligou 'disponível para shows' não aparece, pagando ou não.",
   })
-  @ApiResponse({ status: 200, type: [PublicMusicianPresenter] })
+  @ApiResponse({ status: 200, type: [MusicianCardPresenter] })
   async findFeatured() {
     const output = await this.listFeaturedUseCase.execute({});
     /*
-     * `PublicMusicianPresenter` mesmo sendo lido pelo estabelecimento
+     * O mesmo cartão da busca, mesmo sendo lido pelo estabelecimento
      * autenticado: a faixa é vitrine, e vitrine não precisa de e-mail nem
-     * telefone do artista. A allowlist de campo é a do presenter público.
+     * telefone do artista. A allowlist de campo é a do cartão de lista.
      */
-    return output.items.map((item) => new PublicMusicianPresenter(item));
+    return output.items.map((item) => new MusicianCardPresenter(item));
+  }
+
+  /*
+   * 🔴 Também ANTES de `@Get(":id")` — mesma razão de `featured` acima.
+   */
+  @Get("identities")
+  @Public()
+  @ApiOperation({
+    summary: "Identidade de vários músicos",
+    description:
+      "Nome exibido, foto, instrumentos e gêneros de até 50 músicos numa chamada (`?ids=a,b,c`). Existe para as listas que guardam só o id (line-up, contratações, conversas) não fazerem um `GET /musicians/:id` por artista. Não é descoberta: só resolve ids que o chamador já tem, e por isso não passa pelo gate de `open_to_gigs` — como o `GET /musicians/:id`. Id inexistente não volta.",
+  })
+  @ApiResponse({ status: 200, type: [MusicianIdentityPresenter] })
+  async findIdentities(@Query() query: ListMusicianIdentitiesDto) {
+    const output = await this.listIdentitiesUseCase.execute({ ids: query.ids });
+    return output.items.map((item) => new MusicianIdentityPresenter(item));
   }
 
   @Get(":id")
@@ -198,13 +222,41 @@ export class MusiciansController {
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
   @ApiResponse({ status: 200, type: MusicianPresenter })
+  @ApiResponse({
+    status: 401,
+    description:
+      "O token enviado é do próprio músico, mas foi recusado (expirado). O cliente renova a sessão e repete.",
+  })
   async findOne(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @CurrentUser() currentUser?: AuthenticatedUser,
+    @RejectedTokenSub() rejectedTokenSub?: string,
   ) {
-    const output = await this.getUseCase.execute({ id });
-    const isOwnerOrAdmin =
-      currentUser?.isAdmin || currentUser?.userId === output.id;
+    /*
+     * 🔴 O dono com token expirado recebe 401, não a versão pública.
+     *
+     * Esta rota é `@Public()` com autenticação opcional: token recusado vira
+     * anônimo. Para um terceiro isso é inofensivo — ele recebe a mesma versão
+     * pública de qualquer jeito. Para o DONO era um defeito intermitente por
+     * desenho: o access token dura 15 minutos, o app só renova a sessão ao
+     * receber 401, e daqui saía 200 com o perfil SEM e-mail, telefone, CNPJ e
+     * endereço. A tela de edição abria com o CNPJ vazio, e salvar gravava
+     * `cnpj: null`.
+     *
+     * O `sub` aqui NÃO foi verificado e por isso só serve para recusar mais:
+     * forjar o id de outro músico rende um 401, nunca um dado.
+     */
+    if (!currentUser && rejectedTokenSub === id) {
+      throw new UnauthorizedException();
+    }
+
+    const isOwnerOrAdmin = Boolean(
+      currentUser?.isAdmin || currentUser?.userId === id,
+    );
+    const output = await this.getUseCase.execute({
+      id,
+      include_plan_tier: isOwnerOrAdmin,
+    });
     return isOwnerOrAdmin
       ? MusiciansController.serialize(output)
       : new PublicMusicianPresenter(output);
@@ -233,6 +285,10 @@ export class MusiciansController {
   @Post(":id/avatar")
   @Roles("musician", "admin")
   @UseGuards(MusicianOwnershipGuard)
+  // Mesmo teto do áudio de apresentação: cada envio grava um objeto novo no
+  // bucket, e o limite global (100/min) deixava uma conta subir 500 MB por
+  // minuto em fotos que ninguém vai ver.
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({
     summary: "Upload de foto de perfil",
     description:
@@ -242,34 +298,22 @@ export class MusiciansController {
   @ApiConsumes("multipart/form-data")
   @ApiResponse({ status: 201, type: MusicianPresenter })
   @UseInterceptors(
-    FileInterceptor("file", {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => cb(null, tmpdir()),
-        filename: (_req, file, cb) => {
-          const safeName = (file.originalname || "avatar").replace(
-            /[^a-zA-Z0-9._-]/g,
-            "_",
-          );
-          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
-        },
-      }),
-      limits: {
-        fileSize: Number(
+    FileInterceptor(
+      "file",
+      /*
+       * Sem `fileFilter` (ver `tempDiskUpload`): o que havia aqui lançava
+       * `new Error(...)` quando o `Content-Type` DECLARADO não era imagem, e a
+       * resposta era 500 + Sentry para um arquivo errado. Quem decide o
+       * formato é o `assertFileSignature` abaixo, que lê os bytes e responde
+       * 422.
+       */
+      tempDiskUpload({
+        fallbackName: "avatar",
+        maxFileSize: Number(
           process.env.MUSICIAN_AVATAR_MAX_SIZE ?? 5 * 1024 * 1024,
         ),
-      },
-      fileFilter: (_req, file, cb) => {
-        if (
-          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
-        ) {
-          return cb(
-            new Error("Only JPEG, PNG or WEBP images are allowed"),
-            false,
-          );
-        }
-        cb(null, true);
-      },
-    }),
+      }),
+    ),
   )
   async uploadAvatar(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
@@ -283,7 +327,7 @@ export class MusiciansController {
       const detectedMime = await assertFileSignature(
         file.path,
         ["image/jpeg", "image/png", "image/webp"],
-        "Invalid file: only JPEG, PNG or WEBP images are accepted",
+        "Formato não suportado. Envie uma imagem JPEG, PNG ou WEBP.",
       );
 
       const output = await this.uploadAvatarUseCase.execute({
@@ -320,31 +364,15 @@ export class MusiciansController {
   @ApiConsumes("multipart/form-data")
   @ApiResponse({ status: 201, type: MusicianPresenter })
   @UseInterceptors(
-    FileInterceptor("file", {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => cb(null, tmpdir()),
-        filename: (_req, file, cb) => {
-          const safeName = (file.originalname || "presentation-audio").replace(
-            /[^a-zA-Z0-9._-]/g,
-            "_",
-          );
-          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
-        },
-      }),
-      limits: {
-        fileSize: Number(
+    FileInterceptor(
+      "file",
+      tempDiskUpload({
+        fallbackName: "presentation-audio",
+        maxFileSize: Number(
           process.env.MUSICIAN_PRESENTATION_AUDIO_MAX_SIZE ?? 10 * 1024 * 1024,
         ),
-      },
-      /*
-       * Sem `fileFilter`, e é deliberado — mesmo desenho dos uploads de IA.
-       * O `file.mimetype` é o que o CLIENTE escreveu, e os seletores de arquivo
-       * de celular mandam `application/octet-stream` para um MP3 legítimo com
-       * frequência. Filtrar pela afirmação recusaria arquivo bom e não impediria
-       * arquivo ruim: quem decide é o `assertFileSignature` logo abaixo, que lê
-       * os bytes.
-       */
-    }),
+      }),
+    ),
   )
   async uploadPresentationAudio(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
@@ -403,6 +431,7 @@ export class MusiciansController {
   @Post(":id/qr-code/logo")
   @Roles("musician")
   @UseGuards(MusicianOwnershipGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({
     summary: "Upload de logo do QR Code (PRO)",
     description:
@@ -412,34 +441,15 @@ export class MusiciansController {
   @ApiConsumes("multipart/form-data")
   @ApiResponse({ status: 201, type: MusicianPresenter })
   @UseInterceptors(
-    FileInterceptor("file", {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => cb(null, tmpdir()),
-        filename: (_req, file, cb) => {
-          const safeName = (file.originalname || "qr-logo").replace(
-            /[^a-zA-Z0-9._-]/g,
-            "_",
-          );
-          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
-        },
-      }),
-      limits: {
-        fileSize: Number(
+    FileInterceptor(
+      "file",
+      tempDiskUpload({
+        fallbackName: "qr-logo",
+        maxFileSize: Number(
           process.env.MUSICIAN_QR_LOGO_MAX_SIZE ?? 2 * 1024 * 1024,
         ),
-      },
-      fileFilter: (_req, file, cb) => {
-        if (
-          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
-        ) {
-          return cb(
-            new Error("Only JPEG, PNG or WEBP images are allowed"),
-            false,
-          );
-        }
-        cb(null, true);
-      },
-    }),
+      }),
+    ),
   )
   async uploadQrLogo(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
@@ -453,7 +463,7 @@ export class MusiciansController {
       const detectedMime = await assertFileSignature(
         file.path,
         ["image/jpeg", "image/png", "image/webp"],
-        "Invalid file: only JPEG, PNG or WEBP images are accepted",
+        "Formato não suportado. Envie uma imagem JPEG, PNG ou WEBP.",
       );
 
       const output = await this.uploadQrLogoUseCase.execute({
@@ -566,27 +576,45 @@ export class MusiciansController {
   }
 
   @Patch(":id/push-token")
+  @HttpCode(204)
   @Roles("musician", "admin")
   @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({
     summary: "Registrar token de push notification",
     description:
-      "Registra/atualiza o Expo push token do dispositivo do músico (último dispositivo registrado sobrescreve o anterior).",
+      "Registra/atualiza o Expo push token do dispositivo do músico (último dispositivo registrado sobrescreve o anterior). Sem corpo na resposta: o app chama a cada abertura e nunca leu o perfil que vinha de volta.",
   })
   @ApiParam({ name: "id", required: true, format: "uuid" })
-  @ApiResponse({ status: 200, type: MusicianPresenter })
+  @ApiResponse({ status: 204 })
   async registerPushToken(
     @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
     @Body() dto: RegisterPushTokenDto,
   ) {
-    const output = await this.registerPushTokenUseCase.execute({
+    await this.registerPushTokenUseCase.execute({
       ...dto,
       id,
     });
-    return MusiciansController.serialize(output);
+  }
+
+  @Delete(":id/push-token")
+  @HttpCode(204)
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Apagar token de push notification",
+    description:
+      "Chamado pelo app ao sair da conta: o aparelho deixa de receber os avisos deste músico. Idempotente — quem já não tem token recebe o mesmo 204.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 204 })
+  async clearPushToken(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    await this.clearPushTokenUseCase.execute({ id });
   }
 
   @Post(":id/verify")
+  @HttpCode(200)
   @Roles("admin")
   @ApiOperation({
     summary: "Verificar músico",
@@ -601,23 +629,26 @@ export class MusiciansController {
     return MusiciansController.serialize(output);
   }
 
-  @HttpCode(204)
-  @Delete(":id")
-  @Roles("musician", "admin")
-  @UseGuards(MusicianOwnershipGuard)
-  @ApiOperation({
-    summary: "Remover músico",
-    description: "Remove o perfil do músico.",
-  })
-  @ApiParam({ name: "id", required: true, format: "uuid" })
-  @ApiResponse({ status: 204 })
-  async remove(
-    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
-  ) {
-    await this.deleteUseCase.execute({ id });
-  }
+  /*
+   * 🔴 NÃO existe `DELETE /musicians/:id`, e a ausência é a correção
+   * (out/2026).
+   *
+   * A rota apagava a linha de `musicians` a pedido do próprio músico, numa
+   * chamada, sem confirmação. Pelo schema a cascata leva carteira, pedidos,
+   * biblioteca, repertórios, performances e a linha da assinatura; contrato,
+   * custódia, gorjeta e transação ficam com o músico nulo. E o use-case não
+   * tocava em mais nada: o login no Keycloak, a cobrança recorrente no
+   * provedor e os arquivos no bucket continuavam existindo — conta que loga e
+   * não tem perfil, cartão que segue sendo cobrado.
+   *
+   * "Excluir conta" é um fluxo de produto (exigido pelas lojas), com as suas
+   * próprias regras: o que bloqueia, o que se anonimiza, o que a lei manda
+   * guardar. Não é um `repository.delete`. Ver
+   * `Docs/regras-de-negocio/ainda-nao-implementado.md`.
+   */
 
   @Post(":id/qr-code/customize")
+  @HttpCode(200)
   @Roles("musician")
   @UseGuards(MusicianOwnershipGuard)
   @ApiOperation({

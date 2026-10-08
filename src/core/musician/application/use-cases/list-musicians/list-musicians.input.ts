@@ -1,4 +1,4 @@
-import { IsOptional, validateSync } from "class-validator";
+import { IsOptional } from "class-validator";
 
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { MusicianFilter } from "../../../domain/musician.repository";
@@ -33,11 +33,5 @@ export class ListMusiciansInput {
     this.sort = props.sort;
     this.sort_dir = props.sort_dir;
     this.filter = props.filter;
-  }
-}
-
-export class ValidateListMusiciansInput {
-  static validate(input: ListMusiciansInput) {
-    return validateSync(input);
   }
 }

@@ -30,9 +30,11 @@ export type MusicianProfileOutput = {
   touring_expires_at: Date | null;
   is_touring: boolean;
   social_links: Record<string, unknown> | null;
-  experience: number;
-  instruments: string[];
-  genres: string[];
+  /*
+   * Sem `experience`, `instruments` e `genres`: são do `Musician` e saem no
+   * topo do output (`experience_years`, `instruments`, `genres`). Até out/2026
+   * vinham repetidos aqui, e o app chegou a tratar a cópia como a fonte.
+   */
   created_at: Date;
   updated_at: Date;
 };
@@ -81,6 +83,12 @@ export type MusicianOutput = {
   display_name: string;
   is_experienced: boolean;
   is_highly_rated: boolean;
+  /**
+   * Distância em km INTEIROS até a origem da busca, medida na grade pública
+   * (`musician-location-privacy.ts`). Só `ListMusiciansUseCase` preenche, e
+   * só quando a busca trouxe `lat`/`lng`; `null` para músico sem coordenada.
+   */
+  distance_km?: number | null;
   // Só populado por GetMusicianUseCase (injeta PlanCheckService) — demais
   // use-cases que reaproveitam este mapper (create/update/upload-avatar/etc.)
   // deixam undefined; o mobile sempre revalida via GET após qualquer mutation,
@@ -134,9 +142,6 @@ export class MusicianOutputMapper {
             touring_expires_at: entity.profile.touring_expires_at,
             is_touring: entity.profile.isTouring,
             social_links: entity.profile.socialLinks,
-            experience: entity.profile.experience,
-            instruments: entity.profile.instruments,
-            genres: entity.profile.genres,
             created_at: entity.profile.created_at,
             updated_at: entity.profile.updated_at,
           }

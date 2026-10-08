@@ -2,12 +2,13 @@ import { Test, TestingModule } from "@nestjs/testing";
 
 import { IMusicianStorage } from "../../../core/musician/application/ports/musician-storage.interface";
 import { ClearMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/clear-musician-touring-location/clear-musician-touring-location.use-case";
+import { ClearPushTokenUseCase } from "../../../core/musician/application/use-cases/clear-push-token/clear-push-token.use-case";
 import { MusicianOutputMapper } from "../../../core/musician/application/use-cases/common/musician-profile-output";
-import { CreateMusicianUseCase } from "../../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
-import { DeleteMusicianUseCase } from "../../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
 import { DeleteMusicianPresentationAudioUseCase } from "../../../core/musician/application/use-cases/delete-musician-presentation-audio/delete-musician-presentation-audio.use-case";
 import { GetMusicianUseCase } from "../../../core/musician/application/use-cases/get-musician/get-musician.use-case";
+import { ListFeaturedMusiciansUseCase } from "../../../core/musician/application/use-cases/list-featured-musicians/list-featured-musicians.use-case";
+import { ListMusicianIdentitiesUseCase } from "../../../core/musician/application/use-cases/list-musician-identities/list-musician-identities.use-case";
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
@@ -26,9 +27,9 @@ import {
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
 import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
-import { ListFeaturedMusiciansUseCase } from "../../../core/musician/application/use-cases/list-featured-musicians/list-featured-musicians.use-case";
 import { PlanCheckService } from "../../../core/plans/domain/plan-check.service";
 import { SubscriptionInMemoryRepository } from "../../../core/plans/infra/db/in-memory/subscription-in-memory.repository";
+import { Location } from "../../../core/shared/domain/value-objects/location.vo";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import {
   MusicianCollectionPresenter,
@@ -37,7 +38,6 @@ import {
 } from "../musician.presenter";
 import { MusiciansController } from "../musicians.controller";
 import {
-  CreateMusicianFixture,
   ListMusiciansFixture,
   UpdateMusicianFixture,
 } from "../testing/musician-fixture";
@@ -57,9 +57,15 @@ describe("MusiciansController Integration Tests", () => {
           useValue: repositoryInstance,
         },
         {
-          provide: CreateMusicianUseCase,
+          provide: ListMusicianIdentitiesUseCase,
           useFactory: (repo: IMusicianRepository) =>
-            new CreateMusicianUseCase(repo),
+            new ListMusicianIdentitiesUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
+          provide: ClearPushTokenUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new ClearPushTokenUseCase(repo),
           inject: ["MusicianRepository"],
         },
         {
@@ -117,12 +123,6 @@ describe("MusiciansController Integration Tests", () => {
             planCheck: PlanCheckService,
           ) => new GetMusicianUseCase(repo, planCheck),
           inject: ["MusicianRepository", "PlanCheckService"],
-        },
-        {
-          provide: DeleteMusicianUseCase,
-          useFactory: (repo: IMusicianRepository) =>
-            new DeleteMusicianUseCase(repo),
-          inject: ["MusicianRepository"],
         },
         {
           provide: VerifyMusicianUseCase,
@@ -199,11 +199,12 @@ describe("MusiciansController Integration Tests", () => {
 
   it("should be defined", () => {
     expect(controller).toBeDefined();
-    expect(controller["createUseCase"]).toBeInstanceOf(CreateMusicianUseCase);
     expect(controller["updateUseCase"]).toBeInstanceOf(UpdateMusicianUseCase);
     expect(controller["listUseCase"]).toBeInstanceOf(ListMusiciansUseCase);
     expect(controller["getUseCase"]).toBeInstanceOf(GetMusicianUseCase);
-    expect(controller["deleteUseCase"]).toBeInstanceOf(DeleteMusicianUseCase);
+    expect(controller["clearPushTokenUseCase"]).toBeInstanceOf(
+      ClearPushTokenUseCase,
+    );
   });
 
   describe("qr-code/customize — gate de plano", () => {
@@ -217,27 +218,6 @@ describe("MusiciansController Integration Tests", () => {
         }),
       ).rejects.toThrow(PlanLimitExceededError);
     });
-  });
-
-  describe("should create a musician", () => {
-    const arrange = CreateMusicianFixture.arrangeForCreate();
-
-    test.each(arrange)(
-      "when body is $send_data",
-      async ({ send_data, expected }) => {
-        const presenter = await controller.create(send_data as any);
-        const entity = await repository.findById(new MusicianId(presenter.id));
-
-        expect(entity).toBeInstanceOf(Musician);
-        expect(entity!.toJSON()).toMatchObject(expected);
-        expect(presenter.qr_code).toBe(
-          `https://soundmeet.com.br/musico/${presenter.id}`,
-        );
-
-        const output = MusicianOutputMapper.toOutput(entity!);
-        expect(presenter).toEqual(new MusicianPresenter(output));
-      },
-    );
   });
 
   describe("should update a musician", () => {
@@ -273,16 +253,6 @@ describe("MusiciansController Integration Tests", () => {
         expect(presenter).toEqual(new MusicianPresenter(output));
       },
     );
-  });
-
-  it("should delete a musician", async () => {
-    const musician = Musician.fake().aMusician().build();
-    await repository.insert(musician);
-
-    const response = await controller.remove(musician.musician_id.id);
-    expect(response).not.toBeDefined();
-
-    await expect(repository.findById(musician.musician_id)).resolves.toBeNull();
   });
 
   it("should get a musician — dono autenticado recebe email/telefone", async () => {
@@ -397,6 +367,160 @@ describe("MusiciansController Integration Tests", () => {
           );
         },
       );
+    });
+  });
+
+  it("push token: registra, apaga, e nenhum dos dois devolve o perfil", async () => {
+    const musician = Musician.fake().aMusician().build();
+    await repository.insert(musician);
+    const id = musician.musician_id.id;
+
+    const registered = await controller.registerPushToken(id, {
+      push_token: "ExpoPushToken[novo-formato]",
+      push_token_platform: "ios",
+    } as any);
+    expect(registered).toBeUndefined();
+    expect((await repository.findById(musician.musician_id))!.push_token).toBe(
+      "ExpoPushToken[novo-formato]",
+    );
+
+    const cleared = await controller.clearPushToken(id);
+    expect(cleared).toBeUndefined();
+    const found = await repository.findById(musician.musician_id);
+    expect(found!.push_token).toBeNull();
+    expect(found!.push_token_platform).toBeNull();
+  });
+
+  describe("busca pública", () => {
+    it("não lista músico desativado, mesmo com o radar ligado", async () => {
+      const active = Musician.fake()
+        .aMusician()
+        .withName("Ativo")
+        .withOpenToGigs(true)
+        .build();
+      const inactive = Musician.fake()
+        .aMusician()
+        .withName("Desativado")
+        .withOpenToGigs(true)
+        .deactivate()
+        .build();
+      await repository.bulkInsert([active, inactive]);
+
+      const presenter = await controller.findAll({} as any);
+
+      expect(presenter.data.map((item) => item.name)).toEqual(["Ativo"]);
+    });
+
+    it("`q` acha pelo nome ARTÍSTICO, que é o que a tela mostra", async () => {
+      const carlao = Musician.fake()
+        .aMusician()
+        .withName("Carlos Teclas")
+        .withStageName("Carlão do Piano")
+        .withOpenToGigs(true)
+        .build();
+      const other = Musician.fake()
+        .aMusician()
+        .withName("Beatriz Cordas")
+        .withStageName("Bia Viola")
+        .withOpenToGigs(true)
+        .build();
+      await repository.bulkInsert([carlao, other]);
+
+      const byStage = await controller.findAll({
+        filter: { q: "carlão" },
+      } as any);
+      const byLegal = await controller.findAll({
+        filter: { q: "Beatriz" },
+      } as any);
+
+      expect(byStage.data.map((item) => item.stage_name)).toEqual([
+        "Carlão do Piano",
+      ]);
+      expect(byLegal.data.map((item) => item.stage_name)).toEqual([
+        "Bia Viola",
+      ]);
+    });
+
+    it("a lista sai sem endereço nem coordenada: só cidade e estado", async () => {
+      const musician = Musician.fake().aMusician().withOpenToGigs(true).build();
+      musician.ensureProfile().changeLocation(
+        new Location({
+          city: "Curitiba",
+          state: "PR",
+          street: "Rua XV de Novembro",
+          number: "1742-K",
+          neighborhood: "Centro",
+          zip_code: "80020310",
+          latitude: -25.42896,
+          longitude: -49.26713,
+        }),
+      );
+      await repository.insert(musician);
+
+      const presenter = await controller.findAll({} as any);
+      const serialized = JSON.stringify(presenter);
+
+      expect(presenter.data[0].profile!.location).toEqual({
+        city: "Curitiba",
+        state: "PR",
+      });
+      for (const leaked of [
+        "Rua XV",
+        "1742-K",
+        "80020310",
+        "Centro",
+        "25.42",
+      ]) {
+        expect(serialized).not.toContain(leaked);
+      }
+    });
+
+    it("com origem na busca, cada item traz a distância em km inteiros", async () => {
+      const musician = Musician.fake().aMusician().withOpenToGigs(true).build();
+      musician.ensureProfile().changeLocation(
+        new Location({
+          city: "São Paulo",
+          state: "SP",
+          latitude: -23.5614,
+          longitude: -46.6559,
+        }),
+      );
+      await repository.insert(musician);
+
+      const withOrigin = await controller.findAll({
+        filter: { lat: -23.5338, lng: -46.6559 },
+      } as any);
+      const withoutOrigin = await controller.findAll({} as any);
+
+      expect(withOrigin.data[0].distance_km).toBe(3);
+      expect(withoutOrigin.data[0].distance_km).toBeNull();
+    });
+  });
+
+  describe("GET /musicians/identities", () => {
+    it("resolve vários ids de uma vez, inclusive quem está com o radar desligado", async () => {
+      const visible = Musician.fake()
+        .aMusician()
+        .withStageName("Rafa Sax")
+        .withOpenToGigs(true)
+        .build();
+      const radarOff = Musician.fake()
+        .aMusician()
+        .withName("Maria Voz")
+        .withStageName("Maria Bossa")
+        .withOpenToGigs(null)
+        .build();
+      await repository.bulkInsert([visible, radarOff]);
+
+      const presenters = await controller.findIdentities({
+        ids: [radarOff.musician_id.id, visible.musician_id.id],
+      });
+
+      expect(presenters.map((item) => item.display_name)).toEqual([
+        "Maria Bossa",
+        "Rafa Sax",
+      ]);
+      expect(JSON.stringify(presenters)).not.toContain(radarOff.email.value);
     });
   });
 

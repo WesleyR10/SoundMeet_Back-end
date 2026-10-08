@@ -172,12 +172,18 @@ const ALLOWED_PUBLIC_HANDLERS: Record<string, string> = {
   // estranho vê a versão sem PII (ver `PublicMusicianPresenter`).
   "MusiciansController.findAll": "busca pública de músicos",
   "MusiciansController.findFeatured":
-    "faixa de assinantes em destaque; serve o presenter público, sem PII nem plan_tier",
+    "faixa de assinantes em destaque; serve o cartão de lista, sem contato, endereço nem plan_tier",
+  "MusiciansController.findIdentities":
+    "nome exibido e foto de músicos cujo id o chamador JÁ tem (até 50); não lista nem busca, e não leva contato, endereço, preço nem plano — é o que o GET /musicians/:id público já entregava, um por vez",
   "MusiciansController.findOne": "perfil público do músico (destino do QR)",
   "EstablishmentsController.findAll": "busca pública de estabelecimentos",
   "EstablishmentsController.findOne": "perfil público do local (CPF mascarado)",
-  "BandsController.findAll": "busca pública de bandas",
-  "BandsController.findOne": "perfil público da banda",
+  "BandsController.findAll":
+    "busca pública de bandas; só as que estão no radar e ativas, na visão pública (cidade/estado, integrantes aceitos)",
+  "BandsController.findIdentities":
+    "nome e foto de bandas cujo id o chamador JÁ tem (até 50); não lista nem busca, e não leva endereço, preço nem convites — menos do que o GET /bands/:id público entrega",
+  "BandsController.findOne":
+    "perfil público da banda; integrante aceito com Bearer válido recebe a visão completa, terceiros a pública (sem endereço completo nem convites em aberto)",
   "EventsController.listEvents": "agenda pública de shows",
   "EventsController.listActiveEvents": "shows acontecendo agora",
   "EventsController.getEvent": "página pública do evento",

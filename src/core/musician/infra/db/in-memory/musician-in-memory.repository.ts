@@ -1,13 +1,26 @@
-import { haversineKm } from "../../../../shared/domain/geo.utils";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import { Musician, MusicianId } from "../../../domain/musician.aggregate";
 import {
   IMusicianRepository,
   MusicianFilter,
+  MusicianIdentity,
   MusicianSearchParams,
   MusicianSearchResult,
 } from "../../../domain/musician.repository";
+import { publicDistanceKm } from "../../../domain/musician-location-privacy";
+
+/** Distância na grade pública: base ou turnê vigente, o que estiver mais perto. */
+function distanceFromOrigin(
+  musician: Musician,
+  origin: { lat: number; lng: number },
+): number | null {
+  const profile = musician.profile;
+  return publicDistanceKm(origin, [
+    profile?.location,
+    profile?.isTouring ? profile.touring_location : null,
+  ]);
+}
 
 export class MusicianInMemoryRepository
   extends InMemorySearchableRepository<Musician, MusicianId, MusicianFilter>
@@ -33,13 +46,51 @@ export class MusicianInMemoryRepository
     return this.items.find((m) => m.phone?.value === phone) ?? null;
   }
 
+  async findIdentitiesByIds(ids: MusicianId[]): Promise<MusicianIdentity[]> {
+    const wanted = new Set(ids.map((id) => id.id));
+    return this.items
+      .filter((musician) => wanted.has(musician.musician_id.id))
+      .map((musician) => ({
+        id: musician.musician_id.id,
+        name: musician.name,
+        stage_name: musician.stage_name,
+        avatar: musician.avatar,
+        instruments: musician.instruments,
+        genres: musician.genres,
+        rating: musician.rating.value,
+        total_ratings: musician.total_ratings,
+        is_verified: musician.is_verified,
+      }));
+  }
+
   async search(props: MusicianSearchParams): Promise<MusicianSearchResult> {
     const result = await super.search(props);
+    const filter = props.filter;
+    const distances = new Map<string, number>();
+
+    // Espelho do Prisma: com origem (`lat`+`lng`), cada item ganha a sua
+    // distância — com ou sem raio.
+    if (
+      filter?.lat !== null &&
+      filter?.lat !== undefined &&
+      filter?.lng !== null &&
+      filter?.lng !== undefined
+    ) {
+      const origin = { lat: filter.lat, lng: filter.lng };
+      for (const musician of result.items) {
+        const distance = distanceFromOrigin(musician, origin);
+        if (distance !== null) {
+          distances.set(musician.musician_id.id, distance);
+        }
+      }
+    }
+
     return new MusicianSearchResult({
       items: result.items,
       total: result.total,
       current_page: result.current_page,
       per_page: result.per_page,
+      distances,
     });
   }
   sortableFields: string[] = ["name", "stage_name", "created_at", "rating"];
@@ -78,12 +129,13 @@ export class MusicianInMemoryRepository
             false);
       }
 
-      if (filter.email) {
+      // Espelho do Prisma: `q` casa com o artístico OU com o de cadastro.
+      if (filter.q) {
+        const term = filter.q.toLowerCase();
         matches =
           matches &&
-          musician.email.value
-            .toLowerCase()
-            .includes(filter.email.toLowerCase());
+          (musician.name.toLowerCase().includes(term) ||
+            (musician.stage_name?.toLowerCase().includes(term) ?? false));
       }
 
       if (filter.genres && filter.genres.length > 0) {
@@ -159,6 +211,8 @@ export class MusicianInMemoryRepository
       // Busca por raio (7.13c) — espelho do Prisma: considera a base
       // permanente OU o turnê ainda ativo (7.13d), o que estiver dentro do
       // raio; nunca substitui a base, só amplia onde o músico é encontrado.
+      // 🔴 Medido na grade pública, como no Prisma: a coordenada exata nunca
+      // decide quem entra no raio.
       if (
         filter.lat !== null &&
         filter.lat !== undefined &&
@@ -167,36 +221,11 @@ export class MusicianInMemoryRepository
         filter.radius_km !== null &&
         filter.radius_km !== undefined
       ) {
-        const location = musician.profile?.location ?? null;
-        const withinHome =
-          !!location &&
-          location.latitude !== null &&
-          location.latitude !== undefined &&
-          location.longitude !== null &&
-          location.longitude !== undefined &&
-          haversineKm(
-            filter.lat,
-            filter.lng,
-            location.latitude,
-            location.longitude,
-          ) <= filter.radius_km;
-
-        const touringLocation = musician.profile?.touring_location ?? null;
-        const withinTouring =
-          !!touringLocation &&
-          !!musician.profile?.isTouring &&
-          touringLocation.latitude !== null &&
-          touringLocation.latitude !== undefined &&
-          touringLocation.longitude !== null &&
-          touringLocation.longitude !== undefined &&
-          haversineKm(
-            filter.lat,
-            filter.lng,
-            touringLocation.latitude,
-            touringLocation.longitude,
-          ) <= filter.radius_km;
-
-        matches = matches && (withinHome || withinTouring);
+        const distance = distanceFromOrigin(musician, {
+          lat: filter.lat,
+          lng: filter.lng,
+        });
+        matches = matches && distance !== null && distance <= filter.radius_km;
       }
 
       return matches;

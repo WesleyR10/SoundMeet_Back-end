@@ -142,8 +142,6 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         genres?: string[];
         instruments?: string[];
         experience_years?: number;
-        is_active?: boolean;
-        is_verified?: boolean;
       };
       expected: {
         name: string;
@@ -305,33 +303,6 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           is_highly_rated: entity.isHighlyRated,
         },
       },
-      {
-        input: {
-          is_active: false,
-        },
-        expected: {
-          name: entity.name,
-          stage_name: "New Stage Name",
-          email: entity.email.value,
-          phone: entity.phone?.value || null,
-          cnpj: entity.cnpj?.value || null,
-          bio: "Updated bio",
-          avatar: entity.avatar,
-          genres: ["Jazz", "Blues"],
-          instruments: ["Guitar", "Drums"],
-          experience_years: 15,
-          rating: entity.rating.value,
-          total_ratings: entity.total_ratings,
-          is_active: false,
-          is_verified: entity.is_verified,
-          qr_code: entity.qr_code!.code,
-          qr_customization: entity.qr_code!.customization ?? null,
-          created_at: entity.created_at,
-          display_name: "New Stage Name",
-          is_experienced: entity.isExperienced,
-          is_highly_rated: entity.isHighlyRated,
-        },
-      },
     ];
 
     for (const i of arrange) {
@@ -351,8 +322,6 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         ...("experience_years" in i.input && {
           experience_years: i.input.experience_years,
         }),
-        ...("is_active" in i.input && { is_active: i.input.is_active }),
-        ...("is_verified" in i.input && { is_verified: i.input.is_verified }),
       });
       expect(output).toStrictEqual({
         id: freshEntity.musician_id.id,
@@ -377,12 +346,8 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
             : freshEntity.experience_years,
         rating: freshEntity.rating.value,
         total_ratings: freshEntity.total_ratings,
-        is_active:
-          "is_active" in i.input ? i.input.is_active : freshEntity.is_active,
-        is_verified:
-          "is_verified" in i.input
-            ? i.input.is_verified
-            : freshEntity.is_verified,
+        is_active: freshEntity.is_active,
+        is_verified: freshEntity.is_verified,
         open_to_gigs: freshEntity.open_to_gigs,
         accepts_requests_outside_repertoire:
           freshEntity.accepts_requests_outside_repertoire,
@@ -399,5 +364,114 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         is_highly_rated: freshEntity.isHighlyRated,
       });
     }
+  });
+
+  /*
+   * 🔴 Campos que saíram do input em out/2026. Nenhum cliente os mandava, e
+   * cada um era uma segunda porta: `avatar` aceitava URL livre contornando o
+   * upload, `is_active` deixava o músico reativar um perfil desligado por
+   * moderação, `open_to_gigs` e `priceRanges` têm rota própria.
+   */
+  describe("campos que não entram por aqui", () => {
+    it.each([
+      ["avatar", "https://evil.example/pixel.png"],
+      ["is_active", false],
+      ["open_to_gigs", true],
+      ["priceRanges", [{ model: "per_hour", min: 1, max: 2 }]],
+    ])("%s vindo no input é ignorado pelo use-case", async (field, value) => {
+      const entity = Musician.fake().aMusician().build();
+      entity.deactivate();
+      repository.items = [entity];
+      const before = entity.toJSON();
+
+      await useCase.execute({
+        id: entity.musician_id.id,
+        ...({ [field]: value } as object),
+      });
+
+      const after = (await repository.findById(entity.musician_id))!.toJSON();
+      expect(after.avatar).toBe(before.avatar);
+      expect(after.is_active).toBe(false);
+      expect(after.open_to_gigs).toBe(before.open_to_gigs);
+      expect(after.profile).toStrictEqual(before.profile);
+    });
+  });
+
+  describe("limites de tamanho", () => {
+    it("recusa bio acima de 1000 caracteres", async () => {
+      const entity = Musician.fake().aMusician().build();
+      repository.items = [entity];
+
+      await expect(() =>
+        useCase.execute({ id: entity.musician_id.id, bio: "b".repeat(1001) }),
+      ).rejects.toThrow(EntityValidationError);
+    });
+
+    it("recusa nome artístico acima de 255 caracteres", async () => {
+      const entity = Musician.fake().aMusician().build();
+      repository.items = [entity];
+
+      await expect(() =>
+        useCase.execute({
+          id: entity.musician_id.id,
+          stage_name: "s".repeat(256),
+        }),
+      ).rejects.toThrow(EntityValidationError);
+    });
+
+    it("aceita os dois no limite", async () => {
+      const entity = Musician.fake().aMusician().build();
+      repository.items = [entity];
+
+      const output = await useCase.execute({
+        id: entity.musician_id.id,
+        bio: "b".repeat(1000),
+        stage_name: "s".repeat(255),
+      });
+
+      expect(output.bio).toHaveLength(1000);
+      expect(output.stage_name).toHaveLength(255);
+    });
+  });
+
+  /*
+   * `Musician.phone` é `@unique`. Sem a checagem a colisão chegava como P2002
+   * e o músico lia "Unique constraint violation" — o e-mail e o CNPJ já tinham
+   * o cuidado, o telefone não.
+   */
+  describe("telefone", () => {
+    it("recusa telefone já usado por outro músico, dizendo o campo", async () => {
+      const owner = Musician.fake()
+        .aMusician()
+        .withPhone("11999990001")
+        .build();
+      const other = Musician.fake()
+        .aMusician()
+        .withPhone("11999990002")
+        .build();
+      repository.items = [owner, other];
+
+      await expect(() =>
+        useCase.execute({ id: other.musician_id.id, phone: "(11) 99999-0001" }),
+      ).rejects.toThrow(EntityValidationError);
+
+      const untouched = await repository.findById(other.musician_id);
+      expect(untouched!.phone!.value).toBe(other.phone!.value);
+    });
+
+    it("permite reenviar o próprio telefone", async () => {
+      const entity = Musician.fake()
+        .aMusician()
+        .withPhone("11999990001")
+        .build();
+      repository.items = [entity];
+
+      const output = await useCase.execute({
+        id: entity.musician_id.id,
+        phone: "11999990001",
+      });
+
+      expect(output.phone).toBe(entity.phone!.value);
+    });
   });
 });

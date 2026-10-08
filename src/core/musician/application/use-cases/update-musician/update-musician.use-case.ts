@@ -2,7 +2,7 @@ import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
 import { DomainEventMediator } from "../../../../shared/domain/events/domain-event-mediator";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
-import { PriceRange } from "../../../../shared/domain/value-objects/price-range.vo";
+import { Phone } from "../../../../shared/domain/value-objects/phone.vo";
 import { Musician } from "../../../domain/musician.aggregate";
 import { MusicianId } from "../../../domain/musician.aggregate";
 import { IMusicianRepository } from "../../../domain/musician.repository";
@@ -57,48 +57,38 @@ export class UpdateMusicianUseCase implements IUseCase<
       entity.changeCnpj(input.cnpj);
     }
 
+    /*
+     * O telefone também é `@unique`. Sem esta checagem a colisão chegava como
+     * P2002 e o músico lia "Unique constraint violation" (409), sem saber qual
+     * campo — o e-mail e o CNPJ acima já tinham o cuidado, o telefone não.
+     * Formato inválido não é tratado aqui: `changePhone` o reporta logo abaixo.
+     */
+    if (input.phone) {
+      const phoneOrError = Phone.create(input.phone);
+      if (
+        phoneOrError.isOk() &&
+        phoneOrError.ok.value !== entity.phone?.value
+      ) {
+        const existing = await this.musicianRepo.findByPhone(
+          phoneOrError.ok.value,
+        );
+        if (existing && existing.musician_id.id !== entity.musician_id.id) {
+          throw new EntityValidationError([
+            { phone: ["Phone already in use by another musician"] },
+          ]);
+        }
+      }
+    }
+
     input.name !== undefined && entity.changeName(input.name);
     input.stage_name !== undefined && entity.changeStageName(input.stage_name);
     input.bio !== undefined && entity.changeBio(input.bio);
-    input.avatar !== undefined && entity.changeAvatar(input.avatar);
     input.phone !== undefined && entity.changePhone(input.phone);
     input.genres !== undefined && entity.updateGenres(input.genres);
     input.instruments !== undefined &&
       entity.updateInstruments(input.instruments);
     input.experience_years !== undefined &&
       entity.updateExperience(input.experience_years);
-
-    if (entity.profile) {
-      input.genres !== undefined && entity.profile.updateGenres(input.genres);
-      input.instruments !== undefined &&
-        entity.profile.updateInstruments(input.instruments);
-      input.experience_years !== undefined &&
-        entity.profile.updateExperience(input.experience_years);
-    }
-
-    if (input.priceRanges !== undefined) {
-      try {
-        const priceRanges = (input.priceRanges ?? []).map(
-          (props) => new PriceRange(props),
-        );
-        entity.updatePriceRanges(priceRanges);
-      } catch (error: any) {
-        entity.notification.addError(
-          error?.message ?? "Invalid price range",
-          "priceRanges",
-        );
-      }
-    }
-
-    if (input.is_active === true) {
-      entity.activate();
-    }
-    if (input.is_active === false) {
-      entity.deactivate();
-    }
-
-    input.open_to_gigs !== undefined &&
-      entity.setOpenToGigs(input.open_to_gigs);
 
     if (entity.notification.hasErrors()) {
       throw new EntityValidationError(entity.notification.toJSON());

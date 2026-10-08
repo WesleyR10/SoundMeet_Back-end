@@ -28,164 +28,6 @@ export class GetMusicianFixture {
   static keysInResponse = _keysInResponse;
 }
 
-export class CreateMusicianFixture {
-  static keysInResponse = _keysInResponse;
-
-  static arrangeForCreate() {
-    const faker = Musician.fake()
-      .aMusician()
-      .withName("John Doe")
-      .withEmail("john@example.com")
-      .withPhone("11999999999")
-      .withGenres(["Rock", "Blues"])
-      .withInstruments(["Guitar", "Piano"])
-      .withStageName("Johnny Rock")
-      .withBio("Professional musician")
-      .withExperienceYears(10)
-      .activate();
-
-    return [
-      {
-        send_data: {
-          name: faker.name,
-          email: faker.email,
-        },
-        expected: {
-          name: faker.name,
-          email: faker.email,
-          stage_name: null,
-          bio: null,
-          avatar: null,
-          phone: null,
-          genres: [],
-          instruments: [],
-          experience_years: 0,
-          is_active: true,
-          is_verified: false,
-          rating: 0,
-          total_ratings: 0,
-        },
-      },
-      {
-        send_data: {
-          name: faker.name,
-          email: faker.email,
-          phone: faker.phone,
-          genres: faker.genres,
-          instruments: faker.instruments,
-          stage_name: faker.stage_name,
-          bio: faker.bio,
-          experience_years: faker.experience_years,
-          is_active: true,
-        },
-        expected: {
-          name: faker.name,
-          email: faker.email,
-          stage_name: faker.stage_name,
-          bio: faker.bio,
-          avatar: null,
-          phone: faker.phone,
-          genres: faker.genres,
-          instruments: faker.instruments,
-          experience_years: faker.experience_years,
-          is_active: true,
-          is_verified: false,
-          rating: 0,
-          total_ratings: 0,
-        },
-      },
-      {
-        send_data: {
-          name: faker.name,
-          email: faker.email,
-          is_active: false,
-        },
-        expected: {
-          name: faker.name,
-          email: faker.email,
-          stage_name: null,
-          bio: null,
-          avatar: null,
-          phone: null,
-          genres: [],
-          instruments: [],
-          experience_years: 0,
-          is_active: false,
-          is_verified: false,
-          rating: 0,
-          total_ratings: 0,
-        },
-      },
-    ];
-  }
-
-  static arrangeInvalidRequest() {
-    const defaultExpected = {
-      statusCode: 422,
-      error: "Unprocessable Entity",
-    };
-
-    return {
-      EMPTY: {
-        send_data: {},
-        expected: {
-          message: [
-            "email should not be empty",
-            "email must be an email",
-            "name should not be empty",
-            "name must be a string",
-          ],
-          ...defaultExpected,
-        },
-      },
-      EMAIL_INVALID: {
-        send_data: {
-          name: "John",
-          email: "invalid-email",
-        },
-        expected: {
-          message: ["email must be an email"],
-          ...defaultExpected,
-        },
-      },
-      NAME_EMPTY: {
-        send_data: {
-          name: "",
-          email: "john@example.com",
-        },
-        expected: {
-          message: ["name should not be empty"],
-          ...defaultExpected,
-        },
-      },
-      GENRES_NOT_ARRAY: {
-        send_data: {
-          name: "John",
-          email: "john@example.com",
-          genres: "Rock",
-        },
-        expected: {
-          message: ["genres must be an array"],
-          ...defaultExpected,
-        },
-      },
-      EXPERIENCE_NOT_NUMBER: {
-        send_data: {
-          name: "John",
-          email: "john@example.com",
-          experience_years: "10",
-        },
-        expected: {
-          message: [
-            "experience_years must be a number conforming to the specified constraints",
-          ],
-          ...defaultExpected,
-        },
-      },
-    };
-  }
-}
-
 export class UpdateMusicianFixture {
   static keysInResponse = _keysInResponse;
 
@@ -195,7 +37,6 @@ export class UpdateMusicianFixture {
       .withName("Updated Name")
       .withStageName("Updated Stage")
       .withBio("Updated bio")
-      .withAvatar("https://cdn.example.com/avatar.png")
       .withPhone("11888888888")
       .withGenres(["Jazz"])
       .withInstruments(["Piano"])
@@ -207,23 +48,19 @@ export class UpdateMusicianFixture {
           name: faker.name,
           stage_name: faker.stage_name,
           bio: faker.bio,
-          avatar: faker.avatar,
           phone: faker.phone,
           genres: faker.genres,
           instruments: faker.instruments,
           experience_years: faker.experience_years,
-          is_active: false,
         },
         expected: {
           name: faker.name,
           stage_name: faker.stage_name,
           bio: faker.bio,
-          avatar: faker.avatar,
           phone: faker.phone,
           genres: faker.genres,
           instruments: faker.instruments,
           experience_years: faker.experience_years,
-          is_active: false,
         },
       },
       {
@@ -254,15 +91,6 @@ export class UpdateMusicianFixture {
           message: [
             "experience_years must be a number conforming to the specified constraints",
           ],
-          ...defaultExpected,
-        },
-      },
-      IS_ACTIVE_NOT_BOOLEAN: {
-        send_data: {
-          is_active: "a",
-        },
-        expected: {
-          message: ["is_active must be a boolean value"],
           ...defaultExpected,
         },
       },

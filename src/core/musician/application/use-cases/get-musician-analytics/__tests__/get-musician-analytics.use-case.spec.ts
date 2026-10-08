@@ -164,7 +164,9 @@ describe("GetMusicianAnalyticsUseCase — pedidos, gorjetas e músicas mais pedi
   });
 
   it("total_tips_amount é GORJETA confirmada — o cachê liberado da carteira não entra", async () => {
-    const { useCase, musician, walletRepo, tipRepo } = await setup(MusicianPlanTier.PRO);
+    const { useCase, musician, walletRepo, tipRepo } = await setup(
+      MusicianPlanTier.PRO,
+    );
 
     // A carteira soma cachê liberado em `total_earned`: era esse o número que
     // saía como "total em gorjetas" até 30/set/2026.

@@ -154,11 +154,115 @@ describe("Musician Unit Tests without validator", () => {
       genres: ["Rock"],
       instruments: ["Guitar"],
     });
-    musician.changeAvatar("https://example.com/new-avatar.jpg");
+    musician.changeAvatar(
+      "https://example.com/new-avatar.jpg",
+      "musicians/x/avatar/a.jpg",
+    );
     expect(musician.avatar).toBe("https://example.com/new-avatar.jpg");
+    expect(musician.avatar_key).toBe("musicians/x/avatar/a.jpg");
 
-    musician.changeAvatar(null);
+    musician.removeAvatar();
     expect(musician.avatar).toBeNull();
+    expect(musician.avatar_key).toBeNull();
+  });
+
+  /*
+   * 🔴 A chave do objeto é o que permite apagar a foto ANTERIOR. Sem ela,
+   * cada troca deixava um arquivo de até 5 MB no bucket sem nada apontando
+   * para ele — o defeito que o comentário de `presentation_audio_key` no
+   * schema registrava para `avatar`.
+   */
+  describe("chave do objeto da foto e do logo do QR", () => {
+    const make = () =>
+      new Musician({
+        name: "John Doe",
+        email: "john@example.com",
+        genres: ["Rock"],
+        instruments: ["Guitar"],
+      });
+
+    test("a primeira foto não tem anterior a apagar", () => {
+      expect(make().changeAvatar("https://cdn/a.jpg", "k/a.jpg")).toBeNull();
+    });
+
+    test("trocar a foto devolve a chave da ANTERIOR", () => {
+      const musician = make();
+      musician.changeAvatar("https://cdn/a.jpg", "k/a.jpg");
+
+      expect(musician.changeAvatar("https://cdn/b.jpg", "k/b.jpg")).toBe(
+        "k/a.jpg",
+      );
+      expect(musician.avatar_key).toBe("k/b.jpg");
+    });
+
+    test("foto sem chave (Google, ou anterior à coluna) não gera exclusão", () => {
+      const musician = new Musician({
+        name: "John Doe",
+        email: "john@example.com",
+        genres: [],
+        instruments: [],
+        avatar: "https://lh3.googleusercontent.com/foto",
+      });
+
+      expect(musician.changeAvatar("https://cdn/b.jpg", "k/b.jpg")).toBeNull();
+      expect(musician.removeAvatar()).toBe("k/b.jpg");
+    });
+
+    test("reenviar a MESMA chave não manda apagar o objeto em uso", () => {
+      const musician = make();
+      musician.changeAvatar("https://cdn/a.jpg", "k/a.jpg");
+
+      expect(musician.changeAvatar("https://cdn/a.jpg", "k/a.jpg")).toBeNull();
+    });
+
+    test("trocar o logo do QR devolve a chave do anterior e preserva o resto", () => {
+      const musician = make();
+      musician.customizeQRCode({
+        foreground_color: "#000000",
+        label: "Meu QR",
+      });
+
+      expect(
+        musician.changeQrLogo("https://cdn/l1.png", "qr/l1.png"),
+      ).toBeNull();
+      expect(musician.changeQrLogo("https://cdn/l2.png", "qr/l2.png")).toBe(
+        "qr/l1.png",
+      );
+      expect(musician.qr_logo_key).toBe("qr/l2.png");
+      expect(musician.qr_code!.customization).toEqual({
+        foreground_color: "#000000",
+        label: "Meu QR",
+        logo_url: "https://cdn/l2.png",
+      });
+    });
+
+    test("remover o logo (logo_url: null) devolve a chave e a solta", () => {
+      const musician = make();
+      musician.changeQrLogo("https://cdn/l1.png", "qr/l1.png");
+
+      expect(musician.customizeQRCode({ logo_url: null })).toBe("qr/l1.png");
+      expect(musician.qr_logo_key).toBeNull();
+      expect(musician.qr_code!.customization?.logo_url).toBeUndefined();
+    });
+
+    test("mexer só na cor ou na legenda NÃO toca no logo nem na chave", () => {
+      const musician = make();
+      musician.changeQrLogo("https://cdn/l1.png", "qr/l1.png");
+
+      expect(musician.customizeQRCode({ label: "Outra" })).toBeNull();
+      expect(musician.qr_logo_key).toBe("qr/l1.png");
+      expect(musician.qr_code!.customization?.logo_url).toBe(
+        "https://cdn/l1.png",
+      );
+    });
+
+    test("as chaves não saem no toJSON", () => {
+      const musician = make();
+      musician.changeAvatar("https://cdn/a.jpg", "segredo/a.jpg");
+      musician.changeQrLogo("https://cdn/l.png", "segredo/l.png");
+
+      expect(JSON.stringify(musician.toJSON())).not.toContain("segredo/");
+    });
   });
 
   test("should change phone", () => {
@@ -222,20 +326,95 @@ describe("Musician Unit Tests without validator", () => {
     expect(musician.qr_code?.url).toContain(musician.musician_id.id);
   });
 
-  test("should add rating", () => {
-    const musician = new Musician({
-      name: "John Doe",
-      email: "john@example.com",
-      genres: ["Rock"],
-      instruments: ["Guitar"],
-    });
-    musician.addRating(4);
-    expect(musician.rating.value).toBe(4);
-    expect(musician.total_ratings).toBe(1);
+  /*
+   * 🔴 `updated_at` só anda se o agregado o mover (o mapper grava o valor
+   * explícito, então o `@updatedAt` do Prisma não atua). Trocar nome, bio ou
+   * foto não o movia, e o sitemap publicava `lastModified` velho.
+   */
+  describe("updated_at acompanha as mudanças do perfil", () => {
+    const makeOld = () =>
+      new Musician({
+        name: "John Doe",
+        email: "john@example.com",
+        genres: ["Rock"],
+        instruments: ["Guitar"],
+        updated_at: new Date("2020-01-01T00:00:00.000Z"),
+      });
 
-    musician.addRating(5);
-    expect(musician.rating.value).toBe(4.5);
-    expect(musician.total_ratings).toBe(2);
+    test.each([
+      ["changeName", (m: Musician) => m.changeName("Novo Nome")],
+      ["changeStageName", (m: Musician) => m.changeStageName("Palco")],
+      ["changeBio", (m: Musician) => m.changeBio("Nova bio")],
+      [
+        "changeAvatar",
+        (m: Musician) => m.changeAvatar("https://cdn/x.jpg", "k/x.jpg"),
+      ],
+      ["removeAvatar", (m: Musician) => m.removeAvatar()],
+      [
+        "changeQrLogo",
+        (m: Musician) => m.changeQrLogo("https://cdn/l.png", "k/l.png"),
+      ],
+      ["changePhone", (m: Musician) => m.changePhone("11999990000")],
+      ["changeCnpj", (m: Musician) => m.changeCnpj(null)],
+      ["updateGenres", (m: Musician) => m.updateGenres(["MPB"])],
+      ["updateInstruments", (m: Musician) => m.updateInstruments(["Voz"])],
+      ["updateExperience", (m: Musician) => m.updateExperience(7)],
+      ["customizeQRCode", (m: Musician) => m.customizeQRCode({ label: "x" })],
+      ["activate", (m: Musician) => m.activate()],
+      ["deactivate", (m: Musician) => m.deactivate()],
+      ["verify", (m: Musician) => m.verify()],
+      ["unverify", (m: Musician) => m.unverify()],
+      ["setOpenToGigs", (m: Musician) => m.setOpenToGigs(true)],
+    ])("%s move updated_at", (_name, mutate) => {
+      const musician = makeOld();
+
+      mutate(musician);
+
+      expect(musician.updated_at.getFullYear()).toBeGreaterThan(2020);
+    });
+
+    test.each([
+      [
+        "registerPushToken",
+        (m: Musician) => m.registerPushToken("ExponentPushToken[x]", "ios"),
+      ],
+      ["clearPushToken", (m: Musician) => m.clearPushToken()],
+      [
+        "syncRatingProjection",
+        (m: Musician) => m.syncRatingProjection(4.5, 10),
+      ],
+    ])("%s NÃO move: não é mudança do perfil", (_name, mutate) => {
+      const musician = makeOld();
+
+      mutate(musician);
+
+      expect(musician.updated_at.toISOString()).toBe(
+        "2020-01-01T00:00:00.000Z",
+      );
+    });
+
+    test("experiência negativa é recusada e não conta como mudança", () => {
+      const musician = makeOld();
+
+      musician.updateExperience(-1);
+
+      expect(musician.updated_at.toISOString()).toBe(
+        "2020-01-01T00:00:00.000Z",
+      );
+      expect(musician.notification.hasErrors()).toBe(true);
+    });
+  });
+
+  test("não existe addRating: a nota vem do ledger, via syncRatingProjection", () => {
+    const musician = Musician.fake().aMusician().build();
+
+    expect(
+      (musician as unknown as Record<string, unknown>).addRating,
+    ).toBeUndefined();
+
+    musician.syncRatingProjection(4.26, 12);
+    expect(musician.rating.value).toBe(4.3);
+    expect(musician.total_ratings).toBe(12);
   });
 
   test("should activate and deactivate", () => {

@@ -35,6 +35,7 @@ describe("MusicianModelMapper", () => {
         stage_name: musician.stage_name,
         bio: musician.bio,
         avatar: musician.avatar,
+        avatar_key: null,
         presentation_audio_url: null,
         presentation_audio_key: null,
         presentation_audio_duration_seconds: null,
@@ -49,6 +50,7 @@ describe("MusicianModelMapper", () => {
         qr_foreground_color: null,
         qr_background_color: null,
         qr_logo_url: null,
+        qr_logo_key: null,
         qr_label: null,
         push_token: null,
         push_token_platform: null,
@@ -79,6 +81,7 @@ describe("MusicianModelMapper", () => {
         stage_name: null,
         bio: null,
         avatar: null,
+        avatar_key: null,
         presentation_audio_url: null,
         presentation_audio_key: null,
         presentation_audio_duration_seconds: null,
@@ -93,6 +96,7 @@ describe("MusicianModelMapper", () => {
         qr_foreground_color: null,
         qr_background_color: null,
         qr_logo_url: null,
+        qr_logo_key: null,
         qr_label: null,
         push_token: null,
         push_token_platform: null,
@@ -436,6 +440,61 @@ describe("MusicianModelMapper", () => {
       expect(convertedMusician.is_active).toBe(originalMusician.is_active);
       expect(convertedMusician.is_verified).toBe(originalMusician.is_verified);
       expect(convertedMusician.created_at).toEqual(originalMusician.created_at);
+    });
+  });
+
+  /*
+   * As chaves de objeto precisam SOBREVIVER à ida e volta pelo banco: é a
+   * linha relida que diz qual arquivo apagar na próxima troca. O teste do
+   * use-case com o repositório em memória não prova isso — ele guarda a
+   * instância viva.
+   */
+  describe("chaves de objeto da foto e do logo do QR", () => {
+    it("toModel grava as duas chaves", () => {
+      const musician = Musician.fake().aMusician().build();
+      musician.changeAvatar("https://cdn/a.jpg", "musicians/x/avatar/a.jpg");
+      musician.changeQrLogo("https://cdn/l.png", "qr-logos/x/l.png");
+
+      const model = MusicianModelMapper.toModel(musician);
+
+      expect(model.avatar_key).toBe("musicians/x/avatar/a.jpg");
+      expect(model.qr_logo_key).toBe("qr-logos/x/l.png");
+      expect(model.qr_logo_url).toBe("https://cdn/l.png");
+    });
+
+    it("toEntity relê as duas chaves, e a próxima troca sabe o que apagar", () => {
+      const original = Musician.fake().aMusician().build();
+      original.changeAvatar("https://cdn/a.jpg", "musicians/x/avatar/a.jpg");
+      original.changeQrLogo("https://cdn/l.png", "qr-logos/x/l.png");
+
+      const reloaded = MusicianModelMapper.toEntity({
+        ...MusicianModelMapper.toModel(original),
+        profile: null,
+      });
+
+      expect(reloaded.avatar_key).toBe("musicians/x/avatar/a.jpg");
+      expect(reloaded.qr_logo_key).toBe("qr-logos/x/l.png");
+      expect(reloaded.changeAvatar("https://cdn/b.jpg", "k/b.jpg")).toBe(
+        "musicians/x/avatar/a.jpg",
+      );
+      expect(reloaded.customizeQRCode({ logo_url: null })).toBe(
+        "qr-logos/x/l.png",
+      );
+    });
+
+    it("linha antiga, sem as colunas preenchidas, carrega com chaves nulas", () => {
+      const original = Musician.fake().aMusician().build();
+      const model = MusicianModelMapper.toModel(original);
+      delete (model as Record<string, unknown>).avatar_key;
+      delete (model as Record<string, unknown>).qr_logo_key;
+
+      const reloaded = MusicianModelMapper.toEntity({
+        ...model,
+        profile: null,
+      });
+
+      expect(reloaded.avatar_key).toBeNull();
+      expect(reloaded.qr_logo_key).toBeNull();
     });
   });
 });

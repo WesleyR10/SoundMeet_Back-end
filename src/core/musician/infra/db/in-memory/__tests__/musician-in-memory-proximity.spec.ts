@@ -83,12 +83,70 @@ describe("MusicianInMemoryRepository — busca por raio (7.13c)", () => {
     });
   });
 
-  it("ignora o trio geo incompleto (sem radius_km)", () => {
+  it("sem radius_km a origem NÃO filtra: todos voltam, com a distância ao lado", async () => {
     const params = MusicianSearchParams.create({
       filter: { lat: -23.5614, lng: -46.6559 } as any,
     });
 
-    expect(params.filter).toBeNull();
+    expect(params.filter).toStrictEqual({ lat: -23.5614, lng: -46.6559 });
+
+    const result = await repository.search(params);
+
+    expect(result.total).toBe(4);
+    // Três têm coordenada; "Sem Coordenadas" fica fora do mapa de distâncias.
+    expect(result.distances.size).toBe(3);
+  });
+
+  /*
+   * 🔴 O raio é medido na GRADE PÚBLICA, não na coordenada exata. Com a
+   * exata, a busca — que é anônima — entregava a casa do músico: bastava
+   * mover a origem e ver em que ponto ele entrava ou saía do raio.
+   */
+  describe("o raio não revela a posição dentro da célula", () => {
+    // As duas casas caem na mesma célula de 2 casas decimais (-23.56, -46.65).
+    const CASA_A = { latitude: -23.5628, longitude: -46.654 };
+    const CASA_B = { latitude: -23.5571, longitude: -46.6492 };
+
+    beforeEach(async () => {
+      repository = new MusicianInMemoryRepository();
+      await repository.insert(musicianAt("Casa A", CASA_A));
+      await repository.insert(musicianAt("Casa B", CASA_B));
+    });
+
+    it("de qualquer origem e com qualquer raio, as duas entram ou saem JUNTAS", async () => {
+      // 100 m ao norte da Casa A: com distância exata, 0,09 km a deixava de
+      // fora e 0,11 km a trazia — e a Casa B, a 800 m, ficava de fora nos dois.
+      const origins = [
+        { lat: -23.561901, lng: -46.654 },
+        { lat: -23.5538, lng: -46.654 },
+        { lat: -23.57, lng: -46.66 },
+      ];
+      const radii = [0.09, 0.11, 0.5, 1, 1.5, 3];
+
+      for (const origin of origins) {
+        for (const radius_km of radii) {
+          const result = await repository.search(
+            MusicianSearchParams.create({
+              filter: { ...origin, radius_km } as any,
+            }),
+          );
+
+          expect([0, 2]).toContain(result.total);
+        }
+      }
+    });
+
+    it("as duas ficam à mesma distância da origem", async () => {
+      const result = await repository.search(
+        MusicianSearchParams.create({
+          filter: { lat: -23.5538, lng: -46.654, radius_km: 5 } as any,
+        }),
+      );
+      const [first, second] = [...result.distances.values()];
+
+      expect(result.total).toBe(2);
+      expect(first).toBe(second);
+    });
   });
 });
 

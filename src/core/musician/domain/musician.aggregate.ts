@@ -30,6 +30,7 @@ export type MusicianConstructorProps = {
   stage_name?: string | null;
   bio?: string | null;
   avatar?: string | null;
+  avatar_key?: string | null;
   presentation_audio?: PresentationAudio | null;
   phone?: string | null;
   cpf?: string | null;
@@ -39,6 +40,7 @@ export type MusicianConstructorProps = {
   experience_years?: number;
   qr_code?: string | null;
   qr_customization?: QRCustomization;
+  qr_logo_key?: string | null;
   rating?: number;
   total_ratings?: number;
   is_active?: boolean;
@@ -83,6 +85,15 @@ export class Musician extends AggregateRoot {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  /**
+   * Chave do objeto da foto no storage — o que permite APAGAR a foto anterior
+   * quando o músico troca. `null` quando a URL não é objeto nosso (foto vinda
+   * do Google no cadastro, ou subida antes de a coluna existir): ali não há o
+   * que apagar. Nunca sai em output — é detalhe de storage.
+   */
+  avatar_key: string | null;
+  /** Chave do objeto do logo do QR. Mesmo papel, mesma regra de `avatar_key`. */
+  qr_logo_key: string | null;
   /**
    * Trecho de até 40s que o estabelecimento ouve antes de contratar.
    *
@@ -138,6 +149,8 @@ export class Musician extends AggregateRoot {
     this.stage_name = props.stage_name ?? null;
     this.bio = props.bio ?? null;
     this.avatar = props.avatar ?? null;
+    this.avatar_key = props.avatar_key ?? null;
+    this.qr_logo_key = props.qr_logo_key ?? null;
     this.presentation_audio = props.presentation_audio ?? null;
     if (!props.phone) {
       this.phone = null;
@@ -249,19 +262,53 @@ export class Musician extends AggregateRoot {
 
   changeName(name: string): void {
     this.name = name;
+    this.touch();
     this.validate(["name"]);
   }
 
+  /*
+   * Os dois validam, como `changeName`. As regras de tamanho sempre existiram
+   * em `MusicianRules` (255 e 1000), mas ninguém as chamava na escrita: o
+   * limite era só o do corpo do JSON, e uma bio de dezenas de KB ia parar em
+   * cada item da busca pública.
+   */
   changeStageName(stage_name: string | null): void {
     this.stage_name = stage_name;
+    this.touch();
+    this.validate(["stage_name"]);
   }
 
   changeBio(bio: string | null): void {
     this.bio = bio;
+    this.touch();
+    this.validate(["bio"]);
   }
 
-  changeAvatar(avatar: string | null): void {
+  /**
+   * Troca a foto e **devolve a chave do objeto anterior**, para quem chamou
+   * apagar do bucket — mesmo contrato de `changePresentationAudio` e de
+   * `Establishment.changeAvatar`.
+   *
+   * 🔴 Só existe a forma COM chave. A foto do músico tinha uma segunda porta
+   * (o `avatar` do PATCH, texto livre sem chave), removida em out/2026: duas
+   * portas para o mesmo campo fariam a segunda apagar o vínculo com o objeto
+   * que a primeira subiu, e o arquivo viraria lixo pago no bucket.
+   */
+  changeAvatar(avatar: string, avatarKey: string): string | null {
+    const previousKey = this.avatar_key;
     this.avatar = avatar;
+    this.avatar_key = avatarKey;
+    this.touch();
+    return previousKey && previousKey !== avatarKey ? previousKey : null;
+  }
+
+  /** Remove a foto. Devolve a chave a ser apagada do bucket, se for nossa. */
+  removeAvatar(): string | null {
+    const previousKey = this.avatar_key;
+    this.avatar = null;
+    this.avatar_key = null;
+    this.touch();
+    return previousKey;
   }
 
   /**
@@ -291,9 +338,18 @@ export class Musician extends AggregateRoot {
 
   // Bookkeeping de device, não evento de negócio — não dispara domain event.
   // Último dispositivo registrado sobrescreve o anterior (sem histórico multi-device).
+  // De propósito NÃO chama `touch()`: o app registra o token a cada abertura,
+  // e isso não é uma mudança do PERFIL — `updated_at` alimenta o `lastModified`
+  // do sitemap.
   registerPushToken(token: string, platform: string): void {
     this.push_token = token;
     this.push_token_platform = platform;
+  }
+
+  /** O aparelho deixa de receber push desta conta — chamado no logout. */
+  clearPushToken(): void {
+    this.push_token = null;
+    this.push_token_platform = null;
   }
 
   /**
@@ -322,6 +378,7 @@ export class Musician extends AggregateRoot {
   }
 
   changePhone(phone: string | null): void {
+    this.touch();
     if (!phone) {
       this.phone = null;
     } else {
@@ -332,6 +389,7 @@ export class Musician extends AggregateRoot {
   }
 
   changeCpf(cpf: string | null): void {
+    this.touch();
     if (!cpf) {
       this.cpf = null;
       return;
@@ -355,6 +413,7 @@ export class Musician extends AggregateRoot {
    * física — é a saída de quem baixou o MEI, e por isso é permitido.
    */
   changeCnpj(cnpj: string | null): void {
+    this.touch();
     if (!cnpj) {
       this.cnpj = null;
       return;
@@ -375,11 +434,13 @@ export class Musician extends AggregateRoot {
 
   updateGenres(genres: string[]): void {
     this.genres = genres;
+    this.touch();
     this.validate(["genres"]);
   }
 
   updateInstruments(instruments: string[]): void {
     this.instruments = instruments;
+    this.touch();
     this.validate(["instruments"]);
   }
 
@@ -392,6 +453,7 @@ export class Musician extends AggregateRoot {
       return;
     }
     this.experience_years = years;
+    this.touch();
   }
 
   updatePriceRanges(priceRanges: PriceRange[]): void {
@@ -410,9 +472,6 @@ export class Musician extends AggregateRoot {
       this.profile = MusicianProfile.create({
         musician_id: this.musician_id,
         location: new Location({}),
-        instruments: this.instruments,
-        genres: this.genres,
-        experience: this.experience_years,
       });
     }
     return this.profile;
@@ -433,10 +492,23 @@ export class Musician extends AggregateRoot {
     this.qr_code = new QRCode({ code: link, url: link });
   }
 
-  customizeQRCode(patch: QRCustomizationPatch): void {
+  /**
+   * Aplica a customização e **devolve a chave do logo a apagar** quando o
+   * patch REMOVE o logo (`logo_url: null`); `null` em qualquer outro caso.
+   *
+   * Definir um logo novo não passa por aqui: é `changeQrLogo`, que recebe a
+   * chave do objeto junto. Um `logo_url` com valor neste patch grava só a URL
+   * e solta a chave anterior, de propósito — é caminho de teste e de seed, e a
+   * rota HTTP só aceita `null` (ver `CustomizeQRCodeDto`).
+   */
+  customizeQRCode(patch: QRCustomizationPatch): string | null {
     if (!this.qr_code) {
       this.generateQRCode();
     }
+    const removesLogo = patch.logo_url === null;
+    const replacesLogo =
+      typeof patch.logo_url === "string" && patch.logo_url.length > 0;
+    const previousLogoKey = this.qr_logo_key;
     const current = this.qr_code!.customization ?? {};
     const merged: QRCustomization = { ...current };
     // Merge por chave (JSON merge patch) — customizar só a cor não pode apagar
@@ -457,28 +529,33 @@ export class Musician extends AggregateRoot {
       expiresAt: this.qr_code!.expiresAt,
       customization: merged,
     });
+    if (removesLogo || replacesLogo) {
+      this.qr_logo_key = null;
+    }
+    this.touch();
+    return removesLogo ? previousLogoKey : null;
   }
 
-  addRating(rating: number): void {
-    if (rating < 1 || rating > 5) {
-      this.notification.addError("Rating must be between 1 and 5", "rating");
-      return;
-    }
-
-    const totalScore = this.rating.value * this.total_ratings + rating;
-    this.total_ratings += 1;
-    const newAverage = totalScore / this.total_ratings;
-    this.rating = new Rating(Math.round(newAverage * 10) / 10);
+  /**
+   * Troca o logo do QR e devolve a chave do logo ANTERIOR, para apagar do
+   * bucket. Preserva cores e legenda (merge, como `customizeQRCode`).
+   */
+  changeQrLogo(logoUrl: string, logoKey: string): string | null {
+    const previousKey = this.qr_logo_key;
+    this.customizeQRCode({ logo_url: logoUrl });
+    this.qr_logo_key = logoKey;
+    return previousKey && previousKey !== logoKey ? previousKey : null;
   }
 
   /**
    * Reescreve a projeção a partir do ledger de avaliações (`reviews`,
    * Bloco 9.3), em vez de incrementar.
    *
-   * `addRating` acima só sabe somar — o que fica **errado** assim que alguém
-   * reavalia (a nota antiga continuaria no acumulado) ou uma avaliação é
-   * removida por moderação. Com o ledger como fonte de verdade, a média é
-   * recalculada e simplesmente aplicada aqui.
+   * Havia um `addRating` incremental, removido em out/2026 por ser código
+   * morto: somar fica **errado** assim que alguém reavalia (a nota antiga
+   * continuaria no acumulado) ou uma avaliação é removida por moderação. Com o
+   * ledger como fonte de verdade, a média é recalculada e simplesmente
+   * aplicada aqui.
    *
    * Mesmo par que gamificação já usa: `UserScore` (ledger) → `UserPoints`
    * (projeção).
@@ -495,14 +572,17 @@ export class Musician extends AggregateRoot {
 
   activate(): void {
     this.is_active = true;
+    this.touch();
   }
 
   deactivate(): void {
     this.is_active = false;
+    this.touch();
   }
 
   verify(): void {
     this.is_verified = true;
+    this.touch();
     this.applyEvent(
       new MusicianVerifiedEvent({
         musician_id: this.musician_id,
@@ -513,6 +593,22 @@ export class Musician extends AggregateRoot {
 
   unverify(): void {
     this.is_verified = false;
+    this.touch();
+  }
+
+  /**
+   * Marca que o PERFIL mudou.
+   *
+   * 🔴 O mapper grava `updated_at` explícito, então o `@updatedAt` do Prisma
+   * não atua nesta tabela: a data só anda se o agregado a mover. Até out/2026
+   * só três métodos faziam isso — trocar nome, bio ou foto deixava
+   * `updated_at` parado, e o sitemap publicava um `lastModified` velho para a
+   * página do artista. Todo mutador de dado VISÍVEL passa por aqui; token de
+   * push e projeção de nota ficam de fora de propósito (ver os comentários
+   * neles).
+   */
+  private touch(): void {
+    this.updated_at = new Date();
   }
 
   setOpenToGigs(value: boolean): void {

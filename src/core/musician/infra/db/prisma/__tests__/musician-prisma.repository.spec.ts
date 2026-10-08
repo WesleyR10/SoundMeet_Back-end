@@ -251,7 +251,7 @@ describe("MusicianPrismaRepository", () => {
           },
         },
         include: { profile: true },
-        orderBy: { name: "asc" },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
         skip: 0,
         take: 2,
       });
@@ -443,25 +443,74 @@ describe("MusicianPrismaRepository", () => {
     });
   });
 
+  /*
+   * 🔴 O `id` no fim de TODA ordenação é o que a torna única. Sem ele o
+   * Postgres devolve linhas empatadas em ordem indefinida, e a paginação
+   * repete um músico e pula outro — sem erro (ver a doc do `LIMIT`).
+   */
   describe("buildOrderByClause", () => {
     it("should return default order when no sort", () => {
       const result = repository["buildOrderByClause"](null, null);
-      expect(result).toEqual({ created_at: "desc" });
+      expect(result).toEqual([{ created_at: "desc" }, { id: "asc" }]);
     });
 
     it("should return default order when invalid sort field", () => {
       const result = repository["buildOrderByClause"]("invalid_field", "asc");
-      expect(result).toEqual({ created_at: "desc" });
+      expect(result).toEqual([{ created_at: "desc" }, { id: "asc" }]);
     });
 
     it("should return correct order for valid sort field", () => {
       const result = repository["buildOrderByClause"]("name", "asc");
-      expect(result).toEqual({ name: "asc" });
+      expect(result).toEqual([{ name: "asc" }, { id: "asc" }]);
     });
 
     it("should default to desc when invalid sort direction", () => {
       const result = repository["buildOrderByClause"]("name", "invalid");
-      expect(result).toEqual({ name: "desc" });
+      expect(result).toEqual([{ name: "desc" }, { id: "asc" }]);
+    });
+
+    it("toda ordenação termina com um desempate único", () => {
+      for (const sort of [null, "rating", "name", "stage_name", "created_at"]) {
+        const result = repository["buildOrderByClause"](sort, "desc");
+        expect(result[result.length - 1]).toEqual({ id: "asc" });
+      }
+    });
+  });
+
+  describe("buildWhereClause — busca pelo nome exibido e ausência de e-mail", () => {
+    it("`q` casa com o artístico OU com o de cadastro", () => {
+      const where = repository["buildWhereClause"]({ q: "carlão" });
+
+      expect(where).toEqual({
+        AND: [
+          {
+            OR: [
+              { stage_name: { contains: "carlão", mode: "insensitive" } },
+              { name: { contains: "carlão", mode: "insensitive" } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("`q` convive com os outros filtros sem disputar a chave OR", () => {
+      const where = repository["buildWhereClause"]({
+        q: "bia",
+        price_min: 100,
+        open_to_gigs: true,
+      });
+
+      expect(where.open_to_gigs).toBe(true);
+      expect(where.AND).toHaveLength(1);
+      expect(where.profile.is.OR).toHaveLength(2);
+    });
+
+    it("não existe filtro por e-mail: o campo é ignorado", () => {
+      const where = repository["buildWhereClause"]({
+        email: "musico5",
+      } as any);
+
+      expect(where).toEqual({});
     });
   });
 

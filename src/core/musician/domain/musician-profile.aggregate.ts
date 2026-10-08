@@ -16,9 +16,6 @@ export type MusicianProfileConstructorProps = {
   touring_location?: Location | null;
   touring_expires_at?: Date | null;
   socialLinks?: MusicianProfileSocialLinks | null;
-  experience?: number;
-  instruments?: string[];
-  genres?: string[];
   created_at?: Date;
   updated_at?: Date;
 };
@@ -29,9 +26,6 @@ export type MusicianProfileCreateCommand = {
   priceRanges?: PriceRange[];
   location?: Location;
   socialLinks?: MusicianProfileSocialLinks | null;
-  experience?: number;
-  instruments?: string[];
-  genres?: string[];
 };
 
 // Duração máxima de uma ativação do modo turnê (7.13d) — evita virar uma
@@ -41,6 +35,20 @@ export const MAX_TOURING_DAYS = 30;
 
 export class MusicianProfileId extends Uuid {}
 
+/**
+ * O lado COMERCIAL do músico: quanto cobra, de onde é, por onde está passando
+ * e as redes. Persistido em `musician_profiles`.
+ *
+ * 🔴 Gêneros, instrumentos e anos de estrada NÃO moram aqui (out/2026).
+ * Existiam duplicados neste agregado, mas `musician_profiles` nunca teve
+ * coluna para eles: na carga eram copiados de `musicians`, e na escrita só os
+ * do `Musician` chegavam ao banco. Duas cópias em memória de um dado com uma
+ * coluna só — o doc de arquitetura proíbe ("duplicar fonte de verdade entre
+ * agregados") e a consequência foi concreta: `PATCH .../profile` com
+ * `experience` alterava a cópia daqui, respondia 200 com o valor novo e não
+ * gravava nada. A fonte é única: `Musician.genres`, `Musician.instruments` e
+ * `Musician.experience_years`.
+ */
 export class MusicianProfile extends AggregateRoot {
   profile_id: MusicianProfileId;
   musician_id: Uuid;
@@ -51,9 +59,6 @@ export class MusicianProfile extends AggregateRoot {
   touring_location: Location | null;
   touring_expires_at: Date | null;
   socialLinks: MusicianProfileSocialLinks | null;
-  experience: number;
-  instruments: string[];
-  genres: string[];
   created_at: Date;
   updated_at: Date;
 
@@ -66,9 +71,6 @@ export class MusicianProfile extends AggregateRoot {
     this.touring_location = props.touring_location ?? null;
     this.touring_expires_at = props.touring_expires_at ?? null;
     this.socialLinks = props.socialLinks ?? null;
-    this.experience = props.experience ?? 0;
-    this.instruments = props.instruments ?? [];
-    this.genres = props.genres ?? [];
     this.created_at = props.created_at ?? new Date();
     this.updated_at = props.updated_at ?? new Date();
   }
@@ -162,25 +164,6 @@ export class MusicianProfile extends AggregateRoot {
     this.updated_at = new Date();
   }
 
-  updateExperience(years: number) {
-    if (years < 0) {
-      this.notification.addError("Experience cannot be negative", "experience");
-      return;
-    }
-    this.experience = years;
-    this.updated_at = new Date();
-  }
-
-  updateInstruments(instruments: string[]) {
-    this.instruments = instruments;
-    this.updated_at = new Date();
-  }
-
-  updateGenres(genres: string[]) {
-    this.genres = genres;
-    this.updated_at = new Date();
-  }
-
   toJSON() {
     return {
       profile_id: this.profile_id.id,
@@ -190,9 +173,6 @@ export class MusicianProfile extends AggregateRoot {
       touring_location: this.touring_location?.toJSON() ?? null,
       touring_expires_at: this.touring_expires_at,
       socialLinks: this.socialLinks,
-      experience: this.experience,
-      instruments: this.instruments,
-      genres: this.genres,
       created_at: this.created_at,
       updated_at: this.updated_at,
     };

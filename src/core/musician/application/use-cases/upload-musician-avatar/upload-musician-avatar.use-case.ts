@@ -80,13 +80,27 @@ export class UploadMusicianAvatarUseCase implements IUseCase<
 
     const publicUrl = this.storage.getPublicUrl(objectKey) ?? objectKey;
 
-    musician.changeAvatar(publicUrl);
+    const previousKey = musician.changeAvatar(publicUrl, objectKey);
 
     if (musician.notification.hasErrors()) {
       throw new EntityValidationError(musician.notification.toJSON());
     }
 
     await this.musicianRepo.update(musician);
+
+    /*
+     * 🔴 A foto ANTERIOR sai do bucket, e só depois de a nova estar gravada.
+     * Até out/2026 ela nunca saía: cada troca deixava um arquivo de até 5 MB
+     * sem nada apontando para ele, pago para sempre. Mesma ordem do áudio de
+     * apresentação — apagar antes deixaria o perfil com imagem quebrada se o
+     * `update` falhasse, e a falha da limpeza não pode derrubar uma troca que
+     * deu certo.
+     */
+    if (previousKey) {
+      await this.storage
+        .deleteObject({ object_key: previousKey })
+        .catch(() => undefined);
+    }
 
     return MusicianOutputMapper.toOutput(musician);
   }

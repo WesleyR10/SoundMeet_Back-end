@@ -45,18 +45,55 @@ describe("MusicianInMemoryRepository", () => {
     expect(itemsFiltered).toStrictEqual([items[0]]);
   });
 
-  it("should filter items using email parameter", async () => {
+  /*
+   * 🔴 Não existe filtro por e-mail. A busca é pública e o presenter esconde o
+   * e-mail; um `contains` aqui deixava reconstruir o endereço de qualquer
+   * artista letra a letra.
+   */
+  it("should NOT filter by email: o campo é ignorado", async () => {
     const items = [
       Musician.fake().aMusician().withEmail("john@example.com").build(),
       Musician.fake().aMusician().withEmail("jane@test.com").build(),
       Musician.fake().aMusician().withEmail("bob@example.org").build(),
     ];
 
-
     const itemsFiltered = await repository["applyFilter"](items, {
       email: "example",
-    });
-    expect(itemsFiltered).toStrictEqual([items[0], items[2]]);
+    } as any);
+    expect(itemsFiltered).toStrictEqual(items);
+  });
+
+  it("should filter by `q` no nome artístico OU no de cadastro", async () => {
+    const items = [
+      Musician.fake()
+        .aMusician()
+        .withName("Carlos Teclas")
+        .withStageName("Carlão do Piano")
+        .build(),
+      Musician.fake()
+        .aMusician()
+        .withName("Beatriz Cordas")
+        .withStageName("Bia Viola")
+        .build(),
+      Musician.fake()
+        .aMusician()
+        .withName("Diego Eletrônico")
+        .withStageName(null)
+        .build(),
+    ];
+
+    expect(
+      await repository["applyFilter"](items, { q: "CARLÃO" }),
+    ).toStrictEqual([items[0]]);
+    expect(
+      await repository["applyFilter"](items, { q: "beatriz" }),
+    ).toStrictEqual([items[1]]);
+    expect(
+      await repository["applyFilter"](items, { q: "diego" }),
+    ).toStrictEqual([items[2]]);
+    expect(await repository["applyFilter"](items, { q: "zzz" })).toStrictEqual(
+      [],
+    );
   });
 
   it("should filter items using genres parameter", async () => {

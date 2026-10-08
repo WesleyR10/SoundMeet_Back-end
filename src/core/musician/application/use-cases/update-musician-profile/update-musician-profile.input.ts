@@ -83,6 +83,7 @@ export class SocialLinksInput {
   spotify?: string;
 }
 
+/** O que `PATCH /musicians/:id/profile` aceita: preço, base e redes. */
 export class UpdateMusicianProfileInput {
   @IsUUID()
   id: string;
@@ -101,19 +102,14 @@ export class UpdateMusicianProfileInput {
   @Type(() => LocationInput)
   location?: LocationInput;
 
-  @IsOptional()
-  @IsNumber()
-  experience?: number;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  instruments?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  genres?: string[];
+  /*
+   * 🔴 `experience`, `instruments` e `genres` NÃO entram por aqui (out/2026).
+   * São do `Musician` e têm uma porta só: `PATCH /musicians/:id`
+   * (`experience_years`, `instruments`, `genres`). Esta rota os aceitava
+   * também — os dois últimos regravavam o que a outra rota já gravava, e
+   * `experience` não gravava nada, respondendo 200. Com
+   * `forbidNonWhitelisted`, mandá-los agora responde 422.
+   */
 
   @IsOptional()
   @IsObject()

@@ -140,6 +140,7 @@ export class MusicianModelMapper {
       stage_name: entity.stage_name ?? null,
       bio: entity.bio ?? null,
       avatar: entity.avatar ?? null,
+      avatar_key: entity.avatar_key ?? null,
       presentation_audio_url: entity.presentation_audio?.url ?? null,
       presentation_audio_key: entity.presentation_audio?.object_key ?? null,
       presentation_audio_duration_seconds:
@@ -158,6 +159,7 @@ export class MusicianModelMapper {
       qr_background_color:
         entity.qr_code?.customization?.background_color ?? null,
       qr_logo_url: entity.qr_code?.customization?.logo_url ?? null,
+      qr_logo_key: entity.qr_logo_key ?? null,
       qr_label: entity.qr_code?.customization?.label ?? null,
       push_token: entity.push_token ?? null,
       push_token_platform: entity.push_token_platform ?? null,
@@ -273,9 +275,6 @@ export class MusicianModelMapper {
             : null,
           touring_expires_at: model.profile.touring_expires_at ?? null,
           socialLinks: toSocialLinks(model.profile.socialLinks),
-          experience: model.experience_years ?? 0,
-          instruments: model.instruments ?? [],
-          genres: model.genres ?? [],
           created_at: model.profile.created_at,
           updated_at: model.profile.updated_at,
         });
@@ -303,6 +302,8 @@ export class MusicianModelMapper {
       stage_name: model.stage_name ?? undefined,
       bio: model.bio ?? undefined,
       avatar: model.avatar ?? undefined,
+      avatar_key: model.avatar_key ?? undefined,
+      qr_logo_key: model.qr_logo_key ?? undefined,
       presentation_audio: toPresentationAudio(model),
       phone: model.phone ?? undefined,
       cpf: model.cpf ?? undefined,

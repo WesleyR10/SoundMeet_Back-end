@@ -30,7 +30,10 @@ describe("ListFeaturedMusiciansUseCase Unit Tests", () => {
    * builder NÃO tem `withRating` — `rating` é projeção, escrita a partir do
    * ledger de avaliações, e é assim que o seed também faz.
    */
-  const aVisibleMusician = (rating: number, openToGigs: boolean | null = true) => {
+  const aVisibleMusician = (
+    rating: number,
+    openToGigs: boolean | null = true,
+  ) => {
     const musician = Musician.fake()
       .aMusician()
       .withOpenToGigs(openToGigs)

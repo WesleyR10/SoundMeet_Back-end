@@ -154,4 +154,29 @@ describe("UploadQrLogoUseCase Unit Tests", () => {
     ).rejects.toThrow(EntityValidationError);
     expect(storage.putObject).not.toHaveBeenCalled();
   });
+
+  it("PRO: trocar o logo apaga o objeto anterior, depois do update", async () => {
+    const { useCase, musician, repo, storage } = await setup(
+      MusicianPlanTier.PRO,
+    );
+    const send = () =>
+      useCase.execute({
+        musician_id: musician.musician_id.id,
+        data: Buffer.from("fake-image-bytes"),
+        content_type: "image/png",
+        file_size: 1024,
+      });
+
+    await send();
+    const firstKey = storage.putObject.mock.calls[0][0].object_key;
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect((await repo.findById(musician.musician_id))!.qr_logo_key).toBe(
+      firstKey,
+    );
+
+    const output = await send();
+
+    expect(storage.deleteObject).toHaveBeenCalledWith({ object_key: firstKey });
+    expect(JSON.stringify(output)).not.toContain("qr_logo_key");
+  });
 });

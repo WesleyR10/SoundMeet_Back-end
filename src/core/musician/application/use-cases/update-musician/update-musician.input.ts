@@ -1,22 +1,16 @@
-import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
-  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateIf,
-  ValidateNested,
-  validateSync,
 } from "class-validator";
-
-import { PriceRangeProps } from "../../../../shared/domain/value-objects/price-range.vo";
-import { PriceRangeInput } from "../common/price-range.input";
 
 export type UpdateMusicianInputConstructorProps = {
   id: string;
@@ -24,17 +18,37 @@ export type UpdateMusicianInputConstructorProps = {
   name?: string;
   stage_name?: string;
   bio?: string;
-  avatar?: string;
   phone?: string;
   cnpj?: string | null;
   genres?: string[];
   instruments?: string[];
   experience_years?: number;
-  priceRanges?: PriceRangeProps[] | null;
-  is_active?: boolean;
-  open_to_gigs?: boolean;
 };
 
+/** Teto de itens em `genres`/`instruments` — folga sobre os catálogos do app. */
+const MAX_TAGS = 50;
+/** Um rótulo de gênero ou instrumento; nenhum do catálogo chega perto. */
+const MAX_TAG_LENGTH = 60;
+
+/**
+ * O que `PATCH /musicians/:id` aceita: a IDENTIDADE do músico.
+ *
+ * 🔴 Quatro campos saíram daqui em out/2026, e nenhum cliente os mandava:
+ *
+ * - **`avatar`** — a foto tem rota própria (`POST :id/avatar`), que valida
+ *   tamanho e formato e sobe o arquivo. Aceitar uma URL livre aqui contornava
+ *   tudo isso: qualquer endereço virava a foto do perfil, carregado pelo app
+ *   de cada fã que abrisse o artista. É a mesma decisão já tomada para
+ *   `logo_url` do QR e para o `avatar` do estabelecimento.
+ * - **`is_active`** — desativar é ato de moderação. Com o campo no corpo, o
+ *   músico reativava sozinho um perfil que um admin tivesse desligado.
+ * - **`open_to_gigs`** — é consentimento e tem rota própria
+ *   (`PATCH :id/open-to-gigs`).
+ * - **`priceRanges`** — a faixa de preço mora em `PATCH :id/profile`.
+ *
+ * Um campo, uma porta. Com `forbidNonWhitelisted`, mandar qualquer um deles
+ * agora responde 422 em vez de ser aceito por um caminho que ninguém olhava.
+ */
 export class UpdateMusicianInput {
   @IsString()
   @IsNotEmpty()
@@ -45,22 +59,22 @@ export class UpdateMusicianInput {
   email?: string;
 
   @IsString()
+  @MaxLength(255)
   @IsOptional()
   name?: string;
 
   @IsString()
+  @MaxLength(255)
   @IsOptional()
   stage_name?: string;
 
   @IsString()
+  @MaxLength(1000)
   @IsOptional()
   bio?: string;
 
   @IsString()
-  @IsOptional()
-  avatar?: string;
-
-  @IsString()
+  @MaxLength(20)
   @IsOptional()
   phone?: string;
 
@@ -78,12 +92,16 @@ export class UpdateMusicianInput {
   cnpj?: string | null;
 
   @IsArray()
+  @ArrayMaxSize(MAX_TAGS)
   @IsString({ each: true })
+  @MaxLength(MAX_TAG_LENGTH, { each: true })
   @IsOptional()
   genres?: string[];
 
   @IsArray()
+  @ArrayMaxSize(MAX_TAGS)
   @IsString({ each: true })
+  @MaxLength(MAX_TAG_LENGTH, { each: true })
   @IsOptional()
   instruments?: string[];
 
@@ -93,21 +111,6 @@ export class UpdateMusicianInput {
   @IsOptional()
   experience_years?: number;
 
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(2)
-  @ValidateNested({ each: true })
-  @Type(() => PriceRangeInput)
-  priceRanges?: PriceRangeInput[] | null;
-
-  @IsBoolean()
-  @IsOptional()
-  is_active?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  open_to_gigs?: boolean;
-
   constructor(props: UpdateMusicianInputConstructorProps) {
     if (!props) return;
     this.id = props.id;
@@ -115,20 +118,10 @@ export class UpdateMusicianInput {
     this.name = props.name;
     this.stage_name = props.stage_name;
     this.bio = props.bio;
-    this.avatar = props.avatar;
     this.phone = props.phone;
     this.cnpj = props.cnpj;
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years;
-    this.priceRanges = props.priceRanges;
-    this.is_active = props.is_active;
-    this.open_to_gigs = props.open_to_gigs;
-  }
-}
-
-export class ValidateUpdateMusicianInput {
-  static validate(input: UpdateMusicianInput) {
-    return validateSync(input);
   }
 }
