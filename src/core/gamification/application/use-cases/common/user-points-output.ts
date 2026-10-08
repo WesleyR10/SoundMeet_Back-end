@@ -1,4 +1,5 @@
 import { UserPoints } from "../../../domain/user-points.aggregate";
+import { UserPointsLeaderboardEntry } from "../../../domain/user-points.repository";
 
 export type UserPointsOutput = {
   id: string;
@@ -21,6 +22,10 @@ export type UserPointsOutput = {
   is_active_supporter: boolean;
   created_at: Date;
   updated_at: Date;
+  // Só populado no leaderboard (7.16b) — GetUserPointsUseCase (consulta do
+  // próprio usuário) não precisa do próprio nome/avatar, então não enriquece.
+  nickname?: string | null;
+  avatar?: string | null;
 };
 
 export class UserPointsOutputMapper {
@@ -30,5 +35,15 @@ export class UserPointsOutputMapper {
       id: user_points_id,
       ...otherProps,
     } as UserPointsOutput;
+  }
+
+  static toLeaderboardOutput(
+    entry: UserPointsLeaderboardEntry,
+  ): UserPointsOutput {
+    return {
+      ...UserPointsOutputMapper.toOutput(entry.user_points),
+      nickname: entry.nickname,
+      avatar: entry.avatar,
+    };
   }
 }

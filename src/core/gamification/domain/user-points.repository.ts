@@ -62,6 +62,15 @@ export class UserPointsSearchParams extends DefaultSearchParams<UserPointsFilter
 
 export class UserPointsSearchResult extends DefaultSearchResult<UserPoints> {}
 
+// Leaderboard precisa de nickname/avatar (Audience) pra deixar de ser
+// anônimo, sem duplicar esse dado no aggregate UserPoints (fronteira entre
+// bounded contexts). nickname/avatar são null quando o fã não preencheu.
+export type UserPointsLeaderboardEntry = {
+  user_points: UserPoints;
+  nickname: string | null;
+  avatar: string | null;
+};
+
 export interface IUserPointsRepository extends ISearchableRepository<
   UserPoints,
   UserPointsId,
@@ -72,4 +81,7 @@ export interface IUserPointsRepository extends ISearchableRepository<
   findByUserId(user_id: string): Promise<UserPoints | null>;
   findTopUsers(limit?: number): Promise<UserPoints[]>;
   findByLevel(level: number): Promise<UserPoints[]>;
+  findTopUsersWithProfile(
+    limit?: number,
+  ): Promise<UserPointsLeaderboardEntry[]>;
 }

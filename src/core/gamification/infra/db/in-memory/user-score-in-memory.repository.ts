@@ -62,6 +62,19 @@ export class UserScoreInMemoryRepository
     );
   }
 
+  async existsByUserTypeAndReference(
+    user_id: string,
+    score_type: string,
+    reference_id: string,
+  ): Promise<boolean> {
+    return this.items.some(
+      (item) =>
+        item.user_id.id === user_id &&
+        item.score_type === score_type &&
+        item.reference_id === reference_id,
+    );
+  }
+
   async getTotalPointsByUser(user_id: string): Promise<number> {
     return this.items
       .filter((item) => item.user_id.id === user_id)
@@ -77,6 +90,17 @@ export class UserScoreInMemoryRepository
         (item) => item.user_id.id === user_id && item.score_type === score_type,
       )
       .reduce((total, item) => total + item.points, 0);
+  }
+
+  async getPointsByUserGroupedByType(
+    user_id: string,
+  ): Promise<Record<string, number>> {
+    const sums: Record<string, number> = {};
+    for (const item of this.items) {
+      if (item.user_id.id !== user_id) continue;
+      sums[item.score_type] = (sums[item.score_type] ?? 0) + item.points;
+    }
+    return sums;
   }
 
   getEntity(): new (...args: any[]) => UserScore {

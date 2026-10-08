@@ -21,6 +21,8 @@ export function scoreTypeFromPointsSource(
       return ScoreTypeEnum.TIP_GIVEN;
     case PointsSourceEnum.SOCIAL_SHARE:
       return ScoreTypeEnum.SOCIAL_SHARE;
+    case PointsSourceEnum.INDICATION:
+      return ScoreTypeEnum.INDICATION;
     case PointsSourceEnum.BONUS:
       return ScoreTypeEnum.BONUS;
   }
@@ -59,6 +61,12 @@ export function applyPointsProjection(
       break;
     case PointsSourceEnum.SOCIAL_SHARE:
       userPoints.shareOnSocial();
+      break;
+    // `UserPoints` não tem coluna `total_indications` — some ao total pelo
+    // caminho genérico. Criar a coluna exigiria migration para um contador que
+    // ninguém lê hoje; o ledger (`UserScore`) já guarda cada indicação.
+    case PointsSourceEnum.INDICATION:
+      userPoints.addPoints(ledgerPoints);
       break;
     case PointsSourceEnum.ACCEPTED_REQUEST:
       userPoints.acceptedMusicRequest();

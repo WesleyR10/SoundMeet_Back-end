@@ -13,10 +13,12 @@ export class GetLeaderboardUseCase implements IUseCase<
   constructor(private readonly userPointsRepo: IUserPointsRepository) {}
 
   async execute(input: GetLeaderboardInput): Promise<UserPointsOutput[]> {
-    const topUsers = await this.userPointsRepo.findTopUsers(input.limit || 10);
+    const topUsers = await this.userPointsRepo.findTopUsersWithProfile(
+      input.limit || 10,
+    );
 
-    return topUsers.map((userPoints) =>
-      UserPointsOutputMapper.toOutput(userPoints),
+    return topUsers.map((entry) =>
+      UserPointsOutputMapper.toLeaderboardOutput(entry),
     );
   }
 }

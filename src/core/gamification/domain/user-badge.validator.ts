@@ -6,7 +6,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Max,
   Min,
 } from "class-validator";
 
@@ -26,8 +25,12 @@ export class UserBadgeRules {
   @IsIn(Object.values(BadgeTypeEnum), { groups: ["badge_type"] })
   badge_type: string;
 
+  // 🔴 `progress` é medido em PONTOS, não em percentual: `canUnlock` compara
+  // com `getRequiredPoints()` (100 a 10.000). Havia um `@Max(100)` aqui, e
+  // qualquer conquista acima de 100 pontos nascia inválida — o que só não
+  // aparecia porque nada avançava conquista nenhuma (ver `badge-tracks.ts`).
+  // O percentual é `getProgressPercentage()`.
   @Min(0, { groups: ["progress"] })
-  @Max(100, { groups: ["progress"] })
   @IsNotEmpty({ groups: ["progress"] })
   @IsNumber({}, { groups: ["progress"] })
   progress: number;

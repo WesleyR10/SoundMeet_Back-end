@@ -1,3 +1,5 @@
+import { Logger } from "@nestjs/common";
+
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { EntityValidationError } from "../../../../shared/domain/validators/validation.error";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
@@ -17,15 +19,19 @@ import {
   UserPointsOutput,
   UserPointsOutputMapper,
 } from "../common/user-points-output";
+import { SyncUserBadgesUseCase } from "../sync-user-badges/sync-user-badges.use-case";
 import { AddPointsInput } from "./add-points.input";
 
 export class AddPointsUseCase implements IUseCase<
   AddPointsInput,
   UserPointsOutput
 > {
+  private readonly logger = new Logger(AddPointsUseCase.name);
+
   constructor(
     private readonly userPointsRepo: IUserPointsRepository,
     private readonly userScoreRepo: IUserScoreRepository,
+    private readonly syncUserBadges: SyncUserBadgesUseCase,
   ) {}
 
   async execute(input: AddPointsInput): Promise<UserPointsOutput> {
@@ -77,6 +83,31 @@ export class AddPointsUseCase implements IUseCase<
       await this.userPointsRepo.update(userPoints);
     }
 
+    await this.syncBadges(input.user_id);
+
     return UserPointsOutputMapper.toOutput(userPoints);
+  }
+
+  /**
+   * Conquistas DEPOIS dos pontos, e sem derrubá-los.
+   *
+   * Os pontos já estão gravados quando isto roda. Se a falha aqui subisse, o
+   * handler que pediu o crédito (scan, pedido, gorjeta) veria erro num crédito
+   * que ACONTECEU — e um retry creditaria de novo. Como o progresso é derivado
+   * do ledger inteiro (`badge-tracks.ts`), o próximo crédito recalcula tudo e
+   * corrige o que ficou para trás. Por isso loga alto, mas não propaga.
+   */
+  private async syncBadges(userId: string): Promise<void> {
+    try {
+      await this.syncUserBadges.execute({ user_id: userId });
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          event: "gamification.badges.sync_failed",
+          user_id: userId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 }

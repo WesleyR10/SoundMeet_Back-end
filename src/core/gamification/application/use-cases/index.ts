@@ -21,6 +21,7 @@ export * from "./list-rankings/list-rankings.use-case";
 export * from "./list-user-interactions/list-user-interactions.use-case";
 export * from "./list-user-points/list-user-points.use-case";
 export * from "./list-user-scores/list-user-scores.use-case";
+export * from "./sync-user-badges/sync-user-badges.use-case";
 export * from "./update-badge/update-badge.use-case";
 export * from "./update-ranking/update-ranking.use-case";
 export * from "./update-user-badge/update-user-badge.use-case";

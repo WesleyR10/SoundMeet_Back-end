@@ -7,6 +7,7 @@ import {
 } from "../../../domain/user-points.aggregate";
 import { IUserPointsRepository } from "../../../domain/user-points.repository";
 import {
+  UserPointsLeaderboardEntry,
   UserPointsSearchParams,
   UserPointsSearchResult,
 } from "../../../domain/user-points.repository";
@@ -182,6 +183,25 @@ export class UserPointsPrismaRepository implements IUserPointsRepository {
       where: { current_level: level },
     });
     return models.map((model) => UserPointsModelMapper.toEntity(model));
+  }
+
+  // Um único SQL (JOIN via include, relação já existe no schema) — evita a
+  // alternativa de 2 queries (UserPoints + Audience.findByIds) que o padrão
+  // de enriquecimento cross-agregado do projeto usa em outros lugares (chat).
+  // Preferido aqui porque a relação 1:1 já existe nativamente no Prisma.
+  async findTopUsersWithProfile(
+    limit: number = 10,
+  ): Promise<UserPointsLeaderboardEntry[]> {
+    const models = await this.prismaClient.userPoints.findMany({
+      orderBy: { total_points: "desc" },
+      take: limit,
+      include: { audience: { select: { nickname: true, avatar: true } } },
+    });
+    return models.map((model) => ({
+      user_points: UserPointsModelMapper.toEntity(model),
+      nickname: model.audience.nickname,
+      avatar: model.audience.avatar,
+    }));
   }
 
   async findAll(): Promise<UserPoints[]> {

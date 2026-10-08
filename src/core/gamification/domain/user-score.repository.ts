@@ -55,6 +55,27 @@ export interface IUserScoreRepository extends ISearchableRepository<
   UserScoreSearchResult
 > {
   findByUserAndType(user_id: string, score_type: string): Promise<UserScore[]>;
+  /**
+   * Já existe lançamento deste usuário, deste tipo, para ESTA referência?
+   *
+   * 🔴 É o dedupe de crédito, e mora no ledger de propósito: `UserScore` já é a
+   * fonte de verdade dos pontos, então uma segunda tabela só para "o que já foi
+   * pago" poderia divergir dele. As três colunas juntas são obrigatórias — só
+   * `(user_id, score_type)` bloquearia o segundo compartilhamento de QUALQUER
+   * conteúdo, e só `reference_id` bloquearia o crédito de outro usuário sobre
+   * o mesmo conteúdo.
+   */
+  existsByUserTypeAndReference(
+    user_id: string,
+    score_type: string,
+    reference_id: string,
+  ): Promise<boolean>;
   getTotalPointsByUser(user_id: string): Promise<number>;
   getPointsByUserAndType(user_id: string, score_type: string): Promise<number>;
+  /**
+   * Soma dos pontos do usuário por `score_type`, numa consulta só — é o que
+   * alimenta o progresso das conquistas (`badge-tracks.ts`). Tipo sem
+   * lançamento não aparece na resposta.
+   */
+  getPointsByUserGroupedByType(user_id: string): Promise<Record<string, number>>;
 }

@@ -1,3 +1,4 @@
+import { AudienceId, IAudienceRepository } from "../../../../audience";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
 import {
@@ -7,6 +8,7 @@ import {
 import {
   IUserPointsRepository,
   UserPointsFilter,
+  UserPointsLeaderboardEntry,
   UserPointsSearchParams,
   UserPointsSearchResult,
 } from "../../../domain/user-points.repository";
@@ -20,6 +22,15 @@ export class UserPointsInMemoryRepository
   implements IUserPointsRepository
 {
   sortableFields: string[] = ["total_points", "current_level", "created_at"];
+
+  // Opcional: sem repo injetado, findTopUsersWithProfile devolve
+  // nickname/avatar null (mesmo padrão de EventInMemoryRepository ↔
+  // EstablishmentInMemoryRepository pra join cross-agregado em memória —
+  // aqui é enriquecimento opcional, não crítico, então degrada em vez de
+  // lançar quando o repo não é injetado).
+  constructor(private readonly audienceRepo?: IAudienceRepository) {
+    super();
+  }
 
   async search(props: UserPointsSearchParams): Promise<UserPointsSearchResult> {
     const result = await super.search(props);
@@ -40,6 +51,26 @@ export class UserPointsInMemoryRepository
     return this.items
       .sort((a, b) => b.total_points - a.total_points)
       .slice(0, limit);
+  }
+
+  async findTopUsersWithProfile(
+    limit: number = 10,
+  ): Promise<UserPointsLeaderboardEntry[]> {
+    const top = await this.findTopUsers(limit);
+    return Promise.all(
+      top.map(async (user_points) => {
+        const audience = this.audienceRepo
+          ? await this.audienceRepo.findById(
+              new AudienceId(user_points.user_id.id),
+            )
+          : null;
+        return {
+          user_points,
+          nickname: audience?.nickname ?? null,
+          avatar: audience?.avatar ?? null,
+        };
+      }),
+    );
   }
 
   async findByLevel(level: number): Promise<UserPoints[]> {

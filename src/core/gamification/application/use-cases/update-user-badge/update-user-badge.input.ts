@@ -3,7 +3,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  Max,
   Min,
   validateSync,
 } from "class-validator";
@@ -19,8 +18,8 @@ export class UpdateUserBadgeInput {
   id: string;
 
   @IsNumber()
+  // Pontos, não percentual — ver `user-badge.validator.ts`.
   @Min(0)
-  @Max(100)
   @IsOptional()
   progress?: number;
 

@@ -10,6 +10,7 @@ export enum PointsSourceEnum {
   ACCEPTED_REQUEST = "accepted_request",
   TIP = "tip",
   SOCIAL_SHARE = "social_share",
+  INDICATION = "indication",
   BONUS = "bonus",
 }
 
@@ -56,6 +57,10 @@ export class PointsSource extends ValueObject {
 
   static socialShare(): PointsSource {
     return new PointsSource({ value: PointsSourceEnum.SOCIAL_SHARE });
+  }
+
+  static indication(): PointsSource {
+    return new PointsSource({ value: PointsSourceEnum.INDICATION });
   }
 
   static bonus(): PointsSource {

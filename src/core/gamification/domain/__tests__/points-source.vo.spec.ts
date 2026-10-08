@@ -40,7 +40,9 @@ describe("PointsSource Unit Tests", () => {
   test("should create PointsSource with SOCIAL_SHARE", () => {
     const pointsSource = PointsSource.socialShare();
     expect(pointsSource.value).toBe(PointsSourceEnum.SOCIAL_SHARE);
-    expect(pointsSource.getPointsValue()).toBe(50);
+    // 28/set/2026: era 50 — empatado com o pedido ACEITO — numa ação
+    // auto-declarada, sem prova possível e sem dedupe. Ver gamification-points.ts.
+    expect(pointsSource.getPointsValue()).toBe(10);
     expect(pointsSource.isScanQr()).toBe(false);
     expect(pointsSource.isRequest()).toBe(false);
     expect(pointsSource.isTip()).toBe(false);
@@ -84,7 +86,7 @@ describe("PointsSource Unit Tests", () => {
     expect(PointsSource.scanQr().getPointsValue()).toBe(10);
     expect(PointsSource.request().getPointsValue()).toBe(25);
     expect(PointsSource.tip().getPointsValue()).toBe(1);
-    expect(PointsSource.socialShare().getPointsValue()).toBe(50);
+    expect(PointsSource.socialShare().getPointsValue()).toBe(10);
     expect(PointsSource.acceptedRequest().getPointsValue()).toBe(50);
   });
 });

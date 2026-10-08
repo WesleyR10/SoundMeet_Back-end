@@ -10,6 +10,7 @@ import { GetUserBadgesUseCase } from "../../core/gamification/application/use-ca
 import { GetUserPointsUseCase } from "../../core/gamification/application/use-cases/get-user-points/get-user-points.use-case";
 import { ListBadgesUseCase } from "../../core/gamification/application/use-cases/list-badges/list-badges.use-case";
 import { ListRankingsUseCase } from "../../core/gamification/application/use-cases/list-rankings/list-rankings.use-case";
+import { SyncUserBadgesUseCase } from "../../core/gamification/application/use-cases/sync-user-badges/sync-user-badges.use-case";
 import { UpdateBadgeUseCase } from "../../core/gamification/application/use-cases/update-badge/update-badge.use-case";
 import { IBadgeRepository } from "../../core/gamification/domain/badge.repository";
 import { IRankingRepository } from "../../core/gamification/domain/ranking.repository";
@@ -82,17 +83,36 @@ export const REPOSITORIES = {
 };
 
 export const USE_CASES = {
+  SYNC_USER_BADGES_USE_CASE: {
+    provide: SyncUserBadgesUseCase,
+    useFactory: (
+      userScoreRepo: IUserScoreRepository,
+      userBadgeRepo: IUserBadgeRepository,
+    ) => {
+      return new SyncUserBadgesUseCase(userScoreRepo, userBadgeRepo);
+    },
+    inject: [
+      REPOSITORIES.USER_SCORE_REPOSITORY.provide,
+      REPOSITORIES.USER_BADGE_REPOSITORY.provide,
+    ],
+  },
   ADD_POINTS_USE_CASE: {
     provide: AddPointsUseCase,
     useFactory: (
       userPointsRepo: IUserPointsRepository,
       userScoreRepo: IUserScoreRepository,
+      syncUserBadges: SyncUserBadgesUseCase,
     ) => {
-      return new AddPointsUseCase(userPointsRepo, userScoreRepo);
+      return new AddPointsUseCase(
+        userPointsRepo,
+        userScoreRepo,
+        syncUserBadges,
+      );
     },
     inject: [
       REPOSITORIES.USER_POINTS_REPOSITORY.provide,
       REPOSITORIES.USER_SCORE_REPOSITORY.provide,
+      SyncUserBadgesUseCase,
     ],
   },
   CALCULATE_POINTS_USE_CASE: {

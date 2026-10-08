@@ -161,6 +161,24 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
     return models.map((model) => UserScoreModelMapper.toEntity(model));
   }
 
+  async existsByUserTypeAndReference(
+    userId: string,
+    scoreType: string,
+    referenceId: string,
+  ): Promise<boolean> {
+    // `count` com teto 1, não `findFirst`: só interessa a existência, e não há
+    // por que trazer a linha inteira do ledger para descartá-la.
+    const found = await this.prismaClient.userScore.count({
+      where: {
+        user_id: userId,
+        score_type: scoreType,
+        reference_id: referenceId,
+      },
+      take: 1,
+    });
+    return found > 0;
+  }
+
   async getTotalPointsByUser(userId: string): Promise<number> {
     const result = await this.prismaClient.userScore.aggregate({
       where: { user_id: userId },
@@ -181,6 +199,21 @@ export class UserScorePrismaRepository implements IUserScoreRepository {
       _sum: { points: true },
     });
     return result._sum.points || 0;
+  }
+
+  async getPointsByUserGroupedByType(
+    userId: string,
+  ): Promise<Record<string, number>> {
+    const groups = await this.prismaClient.userScore.groupBy({
+      by: ["score_type"],
+      where: { user_id: userId },
+      _sum: { points: true },
+    });
+    const sums: Record<string, number> = {};
+    for (const group of groups) {
+      sums[group.score_type] = group._sum.points ?? 0;
+    }
+    return sums;
   }
 
   async findAll(): Promise<UserScore[]> {
