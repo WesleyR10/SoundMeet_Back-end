@@ -132,7 +132,7 @@ export const CONFIG_AUTH_SCHEMA = {
   // realm passaria a emitir token aceito por esta API. Mesma postura de
   // `AUTH_JWT_VALIDATION_MODE`, que é `.valid("keycloak")` em prod. Fora de
   // produção continua opcional (ligar exige o audience mapper no realm —
-  // scripts/keycloak-sync.mjs, ver Docs/auth/keycloak.md).
+  // scripts/keycloak-sync.mjs, ver Docs/autenticacao/keycloak.md).
   KEYCLOAK_VERIFY_AUDIENCE: Joi.boolean().when("NODE_ENV", {
     is: "production",
     then: Joi.boolean().valid(true).default(true),
@@ -233,6 +233,15 @@ export const CONFIG_LIMITS_SCHEMA = {
   POINTS_TIP_MULTIPLIER: Joi.number().default(1), // Multiplicador de pontos ao dar um "tip"
   POINTS_SOCIAL_SHARE: Joi.number().default(50), // Pontos ganhos ao compartilhar uma solicitação socialmente
   MAX_REQUESTS_PER_USER_PER_EVENT: Joi.number().default(10), // Máximo de solicitações por usuário por evento
+  /*
+   * Hora LOCAL (fuso da casa) em que o "dia" do limite acima vira. 6 = dia da
+   * noite: um show das 22h às 2h conta como um dia só. 0 = meia-noite local.
+   */
+  REQUEST_LIMIT_DAY_START_HOUR: Joi.number()
+    .integer()
+    .min(0)
+    .max(23)
+    .default(6),
   REQUEST_COOLDOWN_MINUTES: Joi.number().default(120), // Cooldown ( Tempo mínimo entre solicitações) entre solicitações em minutos
   REQUEST_RESPONSE_TIME_MINUTES: Joi.number().default(60), // Tempo máximo para resposta de uma solicitação em minutos
   /*
@@ -248,10 +257,19 @@ export const CONFIG_LIMITS_SCHEMA = {
    * promessa — ver `RequestBoost.charged_at`.
    */
   REQUEST_BOOST_PAYMENT_WINDOW_MINUTES: Joi.number().positive().default(15),
+  /*
+   * Presença verificada no show (out/2026): pedido de música só de quem está a
+   * até RADIUS metros da casa, mais a incerteza do GPS limitada a
+   * ACCURACY_TOLERANCE_CAP. Leitura com incerteza acima de MAX_ACCURACY é
+   * recusada ("sinal fraco"). Ver `PresenceVerifier`.
+   */
+  PRESENCE_RADIUS_METERS: Joi.number().positive().default(250),
+  PRESENCE_ACCURACY_TOLERANCE_CAP_METERS: Joi.number().min(0).default(150),
+  PRESENCE_MAX_ACCURACY_METERS: Joi.number().positive().default(500),
   VOTING_INTERVAL_MINUTES: Joi.number().default(3), // Intervalo de votação em minutos
 
   BOOKING_DEFAULT_FREE_CANCELLATION_HOURS: Joi.number().min(0).default(72),
-  BOOKING_COMPLETION_DELAY_HOURS: Joi.number().min(0).default(24), // Janela de disputa pós-show (Docs/payment-gateway-decisions.md) antes de completar automaticamente
+  BOOKING_COMPLETION_DELAY_HOURS: Joi.number().min(0).default(24), // Janela de disputa pós-show (Docs/_privado/pagamentos/decisoes-de-gateway.md) antes de completar automaticamente
   // A1 camada 2 — carência de saque após troca de chave PIX. 24h por padrão; 0 desliga.
   PIX_KEY_CHANGE_COOLDOWN_HOURS: Joi.number().min(0).default(24),
 };
@@ -286,6 +304,8 @@ export const CONFIG_AI_CIFRA_SCHEMA = {
   AI_CIFRA_STORAGE_PROVIDER: Joi.string()
     .valid("minio", "aws_s3", "cloudflare_r2")
     .optional(),
+  MUSICIAN_PRESENTATION_AUDIO_MAX_SIZE: Joi.number().optional(),
+  MUSICIAN_PRESENTATION_AUDIO_MAX_SECONDS: Joi.number().optional(),
   AI_CIFRA_MAX_FILE_SIZE: Joi.number().optional(),
   AI_CIFRA_ALLOWED_MIME_TYPES: Joi.string().optional(),
   AI_CIFRA_DEFAULT_MODEL_ID: Joi.string().optional(),
@@ -364,6 +384,8 @@ export const CONFIG_GOOGLE_CALENDAR_SCHEMA = {
     then: Joi.string().uri().required(),
     otherwise: Joi.string().allow("").optional(),
   }),
+  // Opcional: o controller cai em `soundmeet://agenda/google` quando ausente.
+  GOOGLE_CALENDAR_APP_RETURN_URL: Joi.string().allow("").optional(),
   GOOGLE_CALENDAR_SYNC_TRANSPORT: Joi.string()
     .valid("noop", "rabbitmq")
     .default("noop"),

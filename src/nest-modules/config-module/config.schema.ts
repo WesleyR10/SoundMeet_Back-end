@@ -110,6 +110,10 @@ export type EnvConfig = {
   AI_AUDIO_PROCESSING_MAX_LOADAVG_1?: number | null;
   AI_AUDIO_PROCESSING_GPU_MAX_MEMORY_PERCENT?: number | null;
   AI_AUDIO_PROCESSING_GPU_CHECK_INTERVAL_MS?: number;
+  /** Teto do áudio de apresentação do músico, em bytes (default 10 MB). */
+  MUSICIAN_PRESENTATION_AUDIO_MAX_SIZE?: number;
+  /** Duração máxima do áudio de apresentação, em segundos (default 40). */
+  MUSICIAN_PRESENTATION_AUDIO_MAX_SECONDS?: number;
   AI_AUDIO_MAX_FILE_SIZE?: number;
   AI_AUDIO_ALLOWED_MIME_TYPES?: string;
   AI_AUDIO_DEFAULT_MODEL_ID?: string;
@@ -214,6 +218,12 @@ export type EnvConfig = {
   GOOGLE_CALENDAR_CLIENT_ID?: string;
   GOOGLE_CALENDAR_CLIENT_SECRET?: string;
   GOOGLE_CALENDAR_REDIRECT_URI?: string;
+  /**
+   * Deep link para onde o callback do Google devolve o navegador.
+   * É o que faz a Chrome Custom Tab do app fechar sozinha ao fim do
+   * consentimento (mesmo papel de MERCADOPAGO_APP_RETURN_URL).
+   */
+  GOOGLE_CALENDAR_APP_RETURN_URL?: string;
   GOOGLE_CALENDAR_SYNC_TRANSPORT?: "noop" | "rabbitmq";
   RABBITMQ_ROUTING_KEY_GOOGLE_CALENDAR_BOOKING_CONFIRMED?: string;
   RABBITMQ_ROUTING_KEY_GOOGLE_CALENDAR_BOOKING_CANCELLED?: string;
@@ -232,7 +242,7 @@ export type EnvConfig = {
   /**
    * O vértice da gorjeta roda no MP, e não no Asaas: 0,99% **sem piso** contra
    * R$1,99 **fixos**. Num ticket de R$5–60 a taxa fixa dá prejuízo abaixo de
-   * R$22 no plano FREE. Ver `Docs/payment-gateway-research-2026-08.md`.
+   * R$22 no plano FREE. Ver `Docs/_privado/pagamentos/pesquisa-de-gateways-2026-08.md`.
    *
    * Ausente = gorjeta cai no `PixGatewayMock` (nada real é processado).
    */
@@ -328,12 +338,18 @@ export type EnvConfig = {
 
   // Anti-Spam
   MAX_REQUESTS_PER_USER_PER_EVENT: number;
+  /** Hora local em que o dia do limite de pedidos vira (0–23). */
+  REQUEST_LIMIT_DAY_START_HOUR: number;
   REQUEST_COOLDOWN_MINUTES: number;
   REQUEST_RESPONSE_TIME_MINUTES: number;
   /** Piso do destaque pago (R$). Ver `BoostMinimumAmountPolicy`. */
   REQUEST_BOOST_MIN_AMOUNT: number;
   /** Janela para pagar o destaque depois do aceite. Conta do aceite. */
   REQUEST_BOOST_PAYMENT_WINDOW_MINUTES: number;
+  /** Presença verificada no show — ver `PresenceVerifier`. */
+  PRESENCE_RADIUS_METERS: number;
+  PRESENCE_ACCURACY_TOLERANCE_CAP_METERS: number;
+  PRESENCE_MAX_ACCURACY_METERS: number;
   VOTING_INTERVAL_MINUTES: number;
 
   // Scheduling

@@ -29,6 +29,29 @@ class StubController {
   unexpected() {
     throw new DomainError("boom");
   }
+
+  /*
+   * O Multer lança isto quando o arquivo passa do `limits.fileSize`. Não é
+   * HttpException nem DomainError: antes deste ramo no filtro, um upload
+   * grande demais virava 500 "erro inesperado" + alerta no Sentry — o usuário
+   * sem saber que bastava mandar um arquivo menor, e o monitoramento
+   * contabilizando regra de negócio como defeito de servidor.
+   */
+  @Get("multer-too-large")
+  multerTooLarge() {
+    const error = new Error("File too large");
+    error.name = "MulterError";
+    (error as any).code = "LIMIT_FILE_SIZE";
+    throw error;
+  }
+
+  @Get("multer-other")
+  multerOther() {
+    const error = new Error("Unexpected field");
+    error.name = "MulterError";
+    (error as any).code = "LIMIT_UNEXPECTED_FILE";
+    throw error;
+  }
 }
 
 describe("GlobalExceptionFilter Unit Tests", () => {
@@ -85,5 +108,22 @@ describe("GlobalExceptionFilter Unit Tests", () => {
         error: "Internal Server Error",
         message: ["Internal server error"],
       });
+  });
+
+  it("mapeia MulterError de tamanho para 413, não para o 500 genérico", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/stub-global-exception-filter/multer-too-large")
+      .expect(413);
+
+    expect(response.body.error).toBe("Payload Too Large");
+    expect(response.body.message[0]).toContain("grande demais");
+  });
+
+  it("mapeia os demais MulterError para 422", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/stub-global-exception-filter/multer-other")
+      .expect(422);
+
+    expect(response.body.message[0]).toContain("LIMIT_UNEXPECTED_FILE");
   });
 });

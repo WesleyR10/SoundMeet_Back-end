@@ -22,9 +22,10 @@ import { ContractModule } from "./nest-modules/contract-module/contract.module";
 import { DatabaseModule } from "./nest-modules/database-module/database.module";
 import { EstablishmentsModule } from "./nest-modules/establishments-module/establishments.module";
 import { EventModule } from "./nest-modules/events-module/events.module";
+import { FollowsModule } from "./nest-modules/follows-module/follows.module";
 import { GamificationModule } from "./nest-modules/gamification-module/gamification.module";
-import { IndicationsModule } from "./nest-modules/indications-module/indications.module";
 import { GoogleCalendarModule } from "./nest-modules/google-calendar-module/google-calendar.module";
+import { IndicationsModule } from "./nest-modules/indications-module/indications.module";
 import { MailModule } from "./nest-modules/mail-module/mail.module";
 import { MusicLibraryModule } from "./nest-modules/music-library-module/music-library.module";
 import { MusicianAnalyticsModule } from "./nest-modules/musician-analytics-module/musician-analytics.module";
@@ -110,6 +111,7 @@ const shouldRegisterRabbitmqHandlers =
     SchedulingModule,
     GamificationModule,
     IndicationsModule,
+    FollowsModule,
     MusicLibraryModule,
     PaymentModule,
     PlansModule,

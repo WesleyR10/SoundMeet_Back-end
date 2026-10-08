@@ -235,6 +235,35 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    /*
+     * 🔴 Multer não é HttpException nem DomainError — sem este ramo, um arquivo
+     * acima do limite caía no genérico lá embaixo e virava **500 + Sentry**: o
+     * usuário lia "erro inesperado" sem descobrir que só precisava mandar um
+     * arquivo menor, e o monitoramento contabilizava um upload grande demais
+     * como defeito de servidor. O heurístico de `payloadTooLarge` mais adiante
+     * não pega este caso: a mensagem do Multer é "File too large", não "entity
+     * too large".
+     *
+     * Checado por `name`, e não por `instanceof MulterError`, para o filtro
+     * global não passar a depender do pacote de upload.
+     */
+    if (exception instanceof Error && exception.name === "MulterError") {
+      const code = (exception as any).code;
+      const isTooLarge = code === "LIMIT_FILE_SIZE";
+      const statusCode = isTooLarge ? 413 : 422;
+
+      response.status(statusCode).json({
+        statusCode,
+        error: getErrorText(statusCode),
+        message: [
+          isTooLarge
+            ? "Arquivo grande demais para este envio."
+            : `Não foi possível ler o arquivo enviado (${code ?? exception.message}).`,
+        ],
+      });
+      return;
+    }
+
     if (exception instanceof Error) {
       if (
         exception.name.startsWith("Invalid") &&
