@@ -109,11 +109,44 @@ Cada uma já quebrou algo em silêncio, sem erro de compilação nem teste verme
 - **`ClassValidatorFields.validate`: `fields` vira `groups`.** Passe `[]` quando não houver campos.
 - **Dinheiro é `Money`, em centavos inteiros.** Nunca some/subtraia reais em float. Repartir entre
   pessoas é `allocate(n)`, não `divide`.
-- **Sub-recurso usa `:<recurso>_id`, nunca `:id`.** O `MusicianOwnershipGuard` lê `id` primeiro e
-  dá 403 no dono legítimo. O guard prova quem é o usuário, nunca de quem é o sub-recurso: a posse do
-  filho é checada no use-case.
+- **Sub-recurso usa `:<recurso>_id`, nunca `:id`.** Os ownership guards leem o nome específico
+  primeiro (`musician_id`, `musicianId`) e `id` por último — um `:id` de filho numa rota sem
+  `:musician_id` é lido como o id do músico e dá 403 no dono legítimo. O guard prova quem é o
+  usuário, nunca de quem é o sub-recurso: a posse do filho é checada no use-case.
+- **Resposta para terceiro é ALLOWLIST, campo a campo.** `PublicMusicianPresenter` copiava `profile`
+  inteiro e a busca anônima entregava rua, número e CEP de cada músico. Presenter público e cartão
+  de lista montam o objeto campo por campo; campo novo no output não sai por herança.
+- **Posição de músico só existe para terceiros numa grade de ~1 km**
+  (`core/musician/domain/musician-location-privacy.ts`). Vale para o que sai no JSON **e** para o
+  que a busca responde: filtro por raio e distância medidos na coordenada exata permitem achar a
+  casa movendo a origem. Nunca use `haversineKm` direto sobre `location_lat`/`location_lng` numa
+  rota pública.
+- **Filtro de busca pública é um DTO próprio**, com `@ValidateNested` + `@Type`, não o `Filter` do
+  domínio com `@IsOptional()`. Query string é texto: sem conversão, número e booleano são
+  descartados em silêncio e a busca devolve a lista inteira; sem allowlist, o filtro interno
+  (`email`, `ids`) fica alcançável por HTTP. Modelo: `search-musicians.dto.ts`.
+- **Um campo, uma porta de escrita.** Dois caminhos para o mesmo campo divergem em silêncio (a
+  experiência do músico era aceita por duas rotas e uma delas não gravava).
+- **Rota `@Public()` que responde diferente para o dono** devolve 401 quando o token recusado é do
+  próprio dono (`@RejectedTokenSub()`), senão o cliente recebe a versão pública do próprio recurso e
+  não renova a sessão. Ver `Docs/autenticacao/autorizacao-e-ownership.md`.
 - **Identidade:** `musician_id` e `audience_id` == `sub` do Keycloak. Estabelecimento e banda têm
-  UUID próprio e são autorizados pelos claims `establishment_ids` / `band_ids`.
+  UUID próprio. O estabelecimento é autorizado pelo claim `establishment_ids`. A banda, não: quem
+  pode alterá-la é o líder atual, lido do banco (`assertBandLeader`); o claim `band_ids` só põe
+  os shows e contratos da banda nas listas do líder.
+- **Papel que muda dentro de um agregado não se autoriza por claim.** O JWT vale 15 minutos e a
+  liderança de uma banda muda entre duas requisições: com o claim, a nova líder levava 403 e o
+  ex-líder seguia podendo apagar a banda. Confira o papel no banco, dentro do use-case.
+- **`ValueObject.equals` exige a MESMA classe.** `new Uuid(id).equals(new MusicianId(id))` é
+  `false`. O mapper do Prisma monta ids como `Uuid` e os use-cases chegam com a subclasse; o
+  repositório em memória esconde isso porque devolve a instância que o teste criou. Entre um id
+  carregado e um id montado no use-case, compare `.id`.
+- **Coluna `Decimal` volta do Prisma como objeto, não como número.** Converta no mapper
+  (`Number(...)`) antes de montar um value object: `PriceRange` recusa o objeto e a entidade
+  deixa de carregar.
+- **`ON DELETE SET NULL` não combina com CHECK "um OU outro".** `bookings` e `inquiries` exigem
+  músico OU banda: apagar a banda faz o `SET NULL` violar a CHECK e o banco recusa. Banda com
+  histórico é arquivada (`DissolveBandUseCase`), nunca apagada.
 - **Ordem de rota:** `@Get(":id")` depois das rotas literais; entre controllers, a ordem no array
   `controllers` do módulo também conta.
 - **Índices e CHECKs fora do Prisma** (ex.: `performances_one_live_per_event_musician`,
