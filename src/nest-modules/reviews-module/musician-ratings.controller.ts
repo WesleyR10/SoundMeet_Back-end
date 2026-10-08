@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
+import { GetRatingBreakdownUseCase } from "../../core/review/application/use-cases/get-rating-breakdown/get-rating-breakdown.use-case";
 import { ListReviewsUseCase } from "../../core/review/application/use-cases/list-reviews/list-reviews.use-case";
 import { SubmitReviewUseCase } from "../../core/review/application/use-cases/submit-review/submit-review.use-case";
 import {
@@ -31,6 +32,7 @@ import { AuthenticatedUser } from "../auth-module/interfaces/authenticated-user.
 import { SearchReviewsDto } from "./dto/search-reviews.dto";
 import { SubmitReviewDto } from "./dto/submit-review.dto";
 import {
+  RatingBreakdownPresenter,
   ReviewCollectionPresenter,
   SubmitReviewPresenter,
 } from "./review.presenter";
@@ -46,6 +48,9 @@ export class MusicianRatingsController {
 
   @Inject(ListReviewsUseCase)
   private listUseCase: ListReviewsUseCase;
+
+  @Inject(GetRatingBreakdownUseCase)
+  private breakdownUseCase: GetRatingBreakdownUseCase;
 
   @Post(":id/ratings")
   @Roles("audience", "establishment", "admin")
@@ -86,6 +91,40 @@ export class MusicianRatingsController {
     });
 
     return new SubmitReviewPresenter(output);
+  }
+
+  /*
+   * ⚠️ ANTES de `@Get(":id/ratings")`. A contagem de segmentos já distingue os
+   * dois, mas a ordem explícita é a convenção registrada deste repo depois de
+   * `@Get("live")` casar como `:performance_id` — a próxima rota a nascer aqui
+   * não terá essa sorte.
+   */
+  @Get(":id/ratings/summary")
+  @Public()
+  @ApiOperation({
+    summary: "Nota do músico, quebrada por quem avaliou",
+    description:
+      "A nota agregada (`overall`) mais a mesma nota separada por tipo de autor: público, estabelecimentos e músicos. 🔴 `overall` NÃO é a média das parciais — os pesos diferem e o cliente não deve recompor. Cada parcial vem com o seu total porque '5,0 do público' com uma avaliação e com trinta são afirmações de força diferente. Tipo de autor sem avaliação vem `null`, nunca zero.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: RatingBreakdownPresenter })
+  async summary(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    /*
+     * Sem checagem de existência do músico, de propósito: alvo inexistente tem
+     * ledger vazio e devolve zeros com todas as parciais nulas, que é a mesma
+     * resposta de um músico real ainda não avaliado. Um 404 aqui obrigaria a
+     * uma leitura extra do agregado para informar o que a própria resposta já
+     * diz, e a rota é `@Public()` — 404 distinguiria id que existe de id que
+     * não existe para quem só tem a URL.
+     */
+    return new RatingBreakdownPresenter(
+      await this.breakdownUseCase.execute({
+        target_type: "musician",
+        target_id: id,
+      }),
+    );
   }
 
   @Get(":id/ratings")

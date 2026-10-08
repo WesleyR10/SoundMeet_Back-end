@@ -6,6 +6,7 @@ import { IEventAttendeeRepository } from "../../core/events/domain/event-attende
 import { IEventMusicianRepository } from "../../core/events/domain/event-musician.repository";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
 import { ReviewEligibilityService } from "../../core/review/application/services/review-eligibility.service";
+import { GetRatingBreakdownUseCase } from "../../core/review/application/use-cases/get-rating-breakdown/get-rating-breakdown.use-case";
 import { ListReviewsUseCase } from "../../core/review/application/use-cases/list-reviews/list-reviews.use-case";
 import { SubmitReviewUseCase } from "../../core/review/application/use-cases/submit-review/submit-review.use-case";
 import { IReviewRepository } from "../../core/review/domain/review.repository";
@@ -75,6 +76,12 @@ export const USE_CASES = {
     provide: ListReviewsUseCase,
     useFactory: (reviewRepo: IReviewRepository) =>
       new ListReviewsUseCase(reviewRepo),
+    inject: [REPOSITORIES.REVIEW_REPOSITORY.provide],
+  },
+  GET_RATING_BREAKDOWN_USE_CASE: {
+    provide: GetRatingBreakdownUseCase,
+    useFactory: (reviewRepo: IReviewRepository) =>
+      new GetRatingBreakdownUseCase(reviewRepo),
     inject: [REPOSITORIES.REVIEW_REPOSITORY.provide],
   },
 };

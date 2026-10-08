@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 
 import { ReviewOutput } from "../../core/review/application/use-cases/common/review-output";
+import { GetRatingBreakdownOutput } from "../../core/review/application/use-cases/get-rating-breakdown/get-rating-breakdown.use-case";
 import { PaginationOutput } from "../../core/shared/application/pagination-output";
 import { CollectionPresenter } from "../shared-module/collection.presenter";
 
@@ -78,5 +79,86 @@ export class ReviewCollectionPresenter extends CollectionPresenter {
     const { items, ...paginationProps } = output;
     super(paginationProps);
     this.data = items.map((i) => new ReviewPresenter(i));
+  }
+}
+
+/** Uma fatia da nota: média e o total que a sustenta. */
+export class RatingSlicePresenter {
+  @ApiProperty({ example: 4.6, minimum: 1, maximum: 5 })
+  average: number;
+
+  @ApiProperty({ example: 27, minimum: 1 })
+  total: number;
+
+  constructor(slice: { average: number; total: number }) {
+    this.average = slice.average;
+    this.total = slice.total;
+  }
+}
+
+/**
+ * A nota quebrada por quem avaliou.
+ *
+ * ⚠️ Cada fatia é `null` quando aquele tipo de autor não avaliou — nunca
+ * `{ average: 0, total: 0 }`. Um zero aqui lê como "avaliado mal", e a
+ * diferença entre "não avaliado" e "avaliado mal" é exatamente o que esta
+ * quebra existe para mostrar.
+ */
+export class RatingByAuthorPresenter {
+  @ApiProperty({
+    type: RatingSlicePresenter,
+    nullable: true,
+    description: "Fãs que estiveram no evento.",
+  })
+  audience: RatingSlicePresenter | null;
+
+  @ApiProperty({
+    type: RatingSlicePresenter,
+    nullable: true,
+    description: "Casas que contrataram e tiveram o show concluído.",
+  })
+  establishment: RatingSlicePresenter | null;
+
+  @ApiProperty({
+    type: RatingSlicePresenter,
+    nullable: true,
+    description: "Outros músicos com quem dividiu palco.",
+  })
+  musician: RatingSlicePresenter | null;
+
+  constructor(byAuthor: GetRatingBreakdownOutput["by_author"]) {
+    this.audience = byAuthor.audience
+      ? new RatingSlicePresenter(byAuthor.audience)
+      : null;
+    this.establishment = byAuthor.establishment
+      ? new RatingSlicePresenter(byAuthor.establishment)
+      : null;
+    this.musician = byAuthor.musician
+      ? new RatingSlicePresenter(byAuthor.musician)
+      : null;
+  }
+}
+
+/**
+ * Nota inteira + quebra por autor.
+ *
+ * 🔴 `overall` NÃO é a média de `by_author`: os pesos diferem e o cliente não
+ * deve recompor. A UI que somasse as três médias e dividisse por três
+ * mostraria um número que não existe no banco.
+ */
+export class RatingBreakdownPresenter {
+  @ApiProperty({
+    type: RatingSlicePresenter,
+    description:
+      "A nota do artista, de todos os autores somados — o mesmo número que a busca ordena.",
+  })
+  overall: RatingSlicePresenter;
+
+  @ApiProperty({ type: RatingByAuthorPresenter })
+  by_author: RatingByAuthorPresenter;
+
+  constructor(output: GetRatingBreakdownOutput) {
+    this.overall = new RatingSlicePresenter(output.overall);
+    this.by_author = new RatingByAuthorPresenter(output.by_author);
   }
 }
