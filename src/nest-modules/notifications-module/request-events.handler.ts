@@ -31,7 +31,8 @@ export class RequestEventsHandler {
   ) {}
 
   /**
-   * O músico aceitou um pedido com destaque — agora o fã precisa pagar.
+   * O PIX do destaque nasceu (junto com o pedido, desde 28/set/2026) — agora
+   * o fã precisa pagar.
    *
    * ⚠️ **Só socket, sem push.** `Audience` não tem `push_token` (só `Musician`
    * tem), então quem estiver com o app fechado neste instante não é avisado.

@@ -57,7 +57,7 @@ export class NotificationsChatEventsHandler {
 
       if (musician?.push_token) {
         // Sem preview de conteúdo na notificação (decisão de produto,
-        // seguindo a própria recomendação do chat-design-debate.md contra
+        // seguindo a própria recomendação do debate-de-design-do-chat.md contra
         // vazar dados de negociação numa tela de bloqueio).
         await this.pushNotificationService.send(musician.push_token, {
           title: "Nova mensagem 💬",

@@ -1,12 +1,13 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { OnEvent } from "@nestjs/event-emitter";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 import { AudienceEmailChangedEvent } from "../../core/audience/domain/events/audience-email-changed.event";
 import { EstablishmentEmailChangedEvent } from "../../core/establishment/domain/events/establishment-email-changed.event";
 import { MusicianEmailChangedEvent } from "../../core/musician/domain/events/musician-email-changed.event";
 import { PixKeyChangedEvent } from "../../core/payment/domain/events/pix-key-changed.event";
+import { resolveVenueTimezone } from "../../core/shared/domain/brazil-timezone";
 import { PrismaService } from "../database-module/prisma/prisma.service";
 import { MailService } from "./mail.service";
 
@@ -33,11 +34,26 @@ export class MailEventHandler {
     try {
       const musician = await this.prisma.musician.findUnique({
         where: { id: event.musician_id.id },
-        select: { email: true, name: true },
+        select: {
+          email: true,
+          name: true,
+          profile: { select: { location: true } },
+        },
       });
       if (!musician?.email) {
         return;
       }
+
+      // Hora no fuso de onde o músico mora (perfil), não Brasília fixo: o
+      // alerta é para ele reconhecer se foi ele mesmo quem trocou.
+      const location = (musician.profile?.location ?? null) as {
+        state?: unknown;
+        city?: unknown;
+      } | null;
+      const timezone = resolveVenueTimezone({
+        state: typeof location?.state === "string" ? location.state : null,
+        city: typeof location?.city === "string" ? location.city : null,
+      });
 
       const cooldownHours =
         this.configService.get<number>("PIX_KEY_CHANGE_COOLDOWN_HOURS") ?? 24;
@@ -45,7 +61,7 @@ export class MailEventHandler {
       await this.mailService.sendPixKeyChanged(musician.email, {
         name: musician.name ?? "músico",
         changedAt: event.occurred_on.toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo",
+          timeZone: timezone,
         }),
         cooldownHours,
       });
@@ -66,7 +82,7 @@ export class MailEventHandler {
       where: { id: event.musician_id.id },
       data: {
         email_pending: event.new_email,
-        email_token: token,
+        ...this.tokenFields(token),
         email_token_expires_at: expiresAt,
       },
     });
@@ -83,7 +99,7 @@ export class MailEventHandler {
       where: { id: event.establishment_id.id },
       data: {
         email_pending: event.new_email,
-        email_token: token,
+        ...this.tokenFields(token),
         email_token_expires_at: expiresAt,
       },
     });
@@ -100,7 +116,7 @@ export class MailEventHandler {
       where: { id: event.audience_id.id },
       data: {
         email_pending: event.new_email,
-        email_token: token,
+        ...this.tokenFields(token),
         email_token_expires_at: expiresAt,
       },
     });
@@ -126,6 +142,18 @@ export class MailEventHandler {
         error,
       );
     }
+  }
+
+  /**
+   * Só o hash vai ao banco (SM-016, mesmo de `VerifyEmailService`). Estes
+   * handlers ainda gravavam o token em claro em `email_token` — quem lesse a
+   * tabela confirmaria a troca de e-mail de qualquer conta.
+   */
+  private tokenFields(token: string) {
+    return {
+      email_token: null,
+      email_token_hash: createHash("sha256").update(token).digest("hex"),
+    };
   }
 
   private expiresAt(): Date {

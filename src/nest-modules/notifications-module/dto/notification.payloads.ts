@@ -42,7 +42,11 @@ export type ChatMessageNewPayload = {
  */
 export type BookingUpdatePayload = {
   booking_id: string;
-  status: "confirmed" | "cancelled";
+  /**
+   * `proposed`/`revised` (18/set/2026) só vão para o MÚSICO: são ofertas que
+   * pedem resposta dele. O estabelecimento não é avisado da própria proposta.
+   */
+  status: "confirmed" | "cancelled" | "proposed" | "revised";
   establishment_id: string;
   musician_id: string | null;
   band_id: string | null;

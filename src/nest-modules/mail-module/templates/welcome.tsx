@@ -15,7 +15,12 @@ import * as React from "react";
 export type WelcomeProps = {
   name: string;
   role: "musician" | "establishment" | "audience";
-  profileUrl: string;
+  /**
+   * Só o estabelecimento tem destino na web (o painel). Músico e público usam
+   * o app, e não há link que o abra antes de o domínio servir os App Links —
+   * um botão para a página pública levaria a outro lugar.
+   */
+  profileUrl: string | null;
 };
 
 const roleMessages: Record<WelcomeProps["role"], string> = {
@@ -36,14 +41,18 @@ export function Welcome({ name, role, profileUrl }: WelcomeProps) {
         <Container style={container}>
           <Heading style={h1}>🎵 Bem-vindo ao SoundMeet!</Heading>
           <Text style={text}>Olá, {name}!</Text>
-          <Text style={text}>
-            Sua conta foi criada com sucesso. {roleMessages[role]}
-          </Text>
-          <Section style={btnContainer}>
-            <Button style={btn} href={profileUrl}>
-              Completar meu perfil
-            </Button>
-          </Section>
+          <Text style={text}>Sua conta está pronta. {roleMessages[role]}</Text>
+          {profileUrl ? (
+            <Section style={btnContainer}>
+              <Button style={btn} href={profileUrl}>
+                Completar meu perfil
+              </Button>
+            </Section>
+          ) : (
+            <Text style={text}>
+              Abra o app SoundMeet para completar seu perfil.
+            </Text>
+          )}
           <Hr style={hr} />
           <Text style={footer}>
             Se você tiver dúvidas, entre em contato com nosso suporte.

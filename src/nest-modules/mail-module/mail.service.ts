@@ -172,6 +172,11 @@ export class MailService {
     );
   }
 
+  /** Painel do estabelecimento — destino do botão das boas-vindas. */
+  buildEstablishmentProfileUrl(): string {
+    return `${this.baseUrl}/dashboard/perfil`;
+  }
+
   /**
    * Link do e-mail de verificação → página do web.
    *

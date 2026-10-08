@@ -18,11 +18,14 @@ import {
 import { IBookingRepository } from "../../core/scheduling/domain/booking.repository";
 import { BookingCancelledEvent } from "../../core/scheduling/domain/events/booking-cancelled.event";
 import { BookingConfirmedEvent } from "../../core/scheduling/domain/events/booking-confirmed.event";
+import { BookingProposalRevisedEvent } from "../../core/scheduling/domain/events/booking-proposal-revised.event";
+import { BookingProposedEvent } from "../../core/scheduling/domain/events/booking-proposed.event";
 import { InquiryAcceptedEvent } from "../../core/scheduling/domain/events/inquiry-accepted.event";
 import { InquiryCreatedEvent } from "../../core/scheduling/domain/events/inquiry-created.event";
 import { InquiryRejectedEvent } from "../../core/scheduling/domain/events/inquiry-rejected.event";
 import { InquiryId } from "../../core/scheduling/domain/inquiry.aggregate";
 import { IInquiryRepository } from "../../core/scheduling/domain/inquiry.repository";
+import { DEFAULT_BRAZIL_TIMEZONE } from "../../core/shared/domain/brazil-timezone";
 import { MailService } from "../mail-module/mail.service";
 import {
   BookingUpdatePayload,
@@ -39,7 +42,7 @@ import { PushNotificationService } from "./push-notification.service";
  * existiam sem nenhum chamador — o estabelecimento fechava um show e ninguém
  * era avisado.
  *
- * Divisão de canal seguindo `Docs/email.md`:
+ * Divisão de canal seguindo `Docs/funcionalidades/emails-do-produto.md`:
  * - **Booking → e-mail** para os dois lados. É *comprovante*: o músico precisa
  *   do registro com data, horário e cachê meses depois. Push some, e-mail fica.
  * - **Inquiry → tempo real** (socket + push). É etapa de negociação, resolvida
@@ -166,7 +169,9 @@ export class NotificationsSchedulingEventsHandler {
   ): Promise<void> {
     const musicianName = musician?.stage_name ?? musician?.name ?? "Músico";
     const establishmentName = establishment?.name ?? "Estabelecimento";
-    const eventDate = formatDate(booking.start_at);
+    // Fuso da CASA, onde o show acontece — nunca o do servidor nem Brasília fixo.
+    const timezone = establishment?.venueTimezone() ?? DEFAULT_BRAZIL_TIMEZONE;
+    const eventDate = formatDate(booking.start_at, timezone);
 
     const recipients: Array<{
       email: string | null;
@@ -198,8 +203,8 @@ export class NotificationsSchedulingEventsHandler {
             otherPartyName: recipient.otherParty,
             role: recipient.role,
             eventDate,
-            startTime: formatTime(booking.start_at),
-            endTime: formatTime(booking.end_at),
+            startTime: formatTime(booking.start_at, timezone),
+            endTime: formatTime(booking.end_at, timezone),
             fee: formatFee(booking.fee),
             location: establishment?.name ?? null,
           });
@@ -240,6 +245,119 @@ export class NotificationsSchedulingEventsHandler {
           : `Seu show em ${venue} foi cancelado.`,
       data: { type: `booking.${status}` },
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Propostas de show — tempo real + push para o artista, sem e-mail
+  // ------------------------------------------------------------------
+
+  /**
+   * 🔴 Até 18/set/2026 uma proposta de show (booking) não avisava o artista de
+   * jeito nenhum — só a inquiry tinha push. "Propor um show" mandava data e
+   * cachê e dependia de o artista abrir o app por acaso. Sem e-mail pelo mesmo
+   * motivo da inquiry: é etapa de negociação, e o comprovante é o e-mail da
+   * CONFIRMAÇÃO.
+   */
+  @OnEvent(BookingProposedEvent.name)
+  async handleBookingProposed(event: BookingProposedEvent): Promise<void> {
+    await this.notifyProposalToMusician({
+      bookingId: event.aggregate_id.id,
+      status: "proposed",
+      establishmentId: event.establishment_id,
+      musicianId: event.musician_id,
+      bandId: event.band_id,
+      startAt: event.start_at,
+      endAt: event.end_at,
+      body: (venue) =>
+        event.from_inquiry_id
+          ? `${venue} transformou a conversa numa proposta com data e cachê.`
+          : `${venue} te mandou uma proposta com data e cachê.`,
+    });
+  }
+
+  @OnEvent(BookingProposalRevisedEvent.name)
+  async handleBookingProposalRevised(
+    event: BookingProposalRevisedEvent,
+  ): Promise<void> {
+    /*
+     * Revisão feita PELO artista (contraproposta dele) não notifica o próprio
+     * artista — quem precisaria saber é o estabelecimento, que recebe pela
+     * mensagem no chat.
+     */
+    if (event.proposed_by !== "establishment") return;
+
+    await this.notifyProposalToMusician({
+      bookingId: event.aggregate_id.id,
+      status: "revised",
+      establishmentId: event.establishment_id,
+      musicianId: event.musician_id,
+      bandId: event.band_id,
+      startAt: event.start_at,
+      endAt: event.end_at,
+      body: (venue) =>
+        event.previous_status === "cancelled"
+          ? `${venue} mandou uma nova proposta depois da sua resposta.`
+          : event.previous_status === "expired"
+            ? `${venue} renovou a proposta que tinha vencido.`
+            : `${venue} ajustou a proposta de show.`,
+    });
+  }
+
+  /**
+   * ⚠️ Booking de BANDA não gera push: `musician_id` é nulo e o push token é
+   * do músico, não da banda. Mesmo limite de `pushBookingToMusician` — a banda
+   * vê a proposta pela conversa.
+   */
+  private async notifyProposalToMusician(args: {
+    bookingId: string;
+    status: "proposed" | "revised";
+    establishmentId: string;
+    musicianId: string | null;
+    bandId: string | null;
+    startAt: Date;
+    endAt: Date;
+    body: (venue: string) => string;
+  }): Promise<void> {
+    if (!args.musicianId) return;
+
+    try {
+      this.gateway.notifyBookingUpdate(args.musicianId, {
+        booking_id: args.bookingId,
+        status: args.status,
+        establishment_id: args.establishmentId,
+        musician_id: args.musicianId,
+        band_id: args.bandId,
+        start_at: args.startAt.toISOString(),
+        end_at: args.endAt.toISOString(),
+        occurred_at: new Date().toISOString(),
+      });
+
+      const [musician, establishment] = await Promise.all([
+        this.musicianRepo.findById(new MusicianId(args.musicianId)),
+        this.establishmentRepo.findById(
+          new EstablishmentId(args.establishmentId),
+        ),
+      ]);
+
+      if (!musician?.push_token) return;
+
+      await this.pushNotificationService.send(musician.push_token, {
+        title:
+          args.status === "proposed"
+            ? "Nova proposta de show 🎤"
+            : "Proposta atualizada 🎤",
+        body: args.body(establishment?.name ?? "Um estabelecimento"),
+        data: { type: `booking.${args.status}`, booking_id: args.bookingId },
+      });
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: `booking.${args.status}.notification_failed`,
+          booking_id: args.bookingId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   // ------------------------------------------------------------------
@@ -345,13 +463,13 @@ export class NotificationsSchedulingEventsHandler {
   }
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+function formatDate(date: Date, timezone: string): string {
+  return date.toLocaleDateString("pt-BR", { timeZone: timezone });
 }
 
-function formatTime(date: Date): string {
+function formatTime(date: Date, timezone: string): string {
   return date.toLocaleTimeString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
+    timeZone: timezone,
     hour: "2-digit",
     minute: "2-digit",
   });

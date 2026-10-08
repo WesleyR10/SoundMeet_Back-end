@@ -5,6 +5,8 @@ import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-m
 import { Booking } from "../../../core/scheduling/domain/booking.aggregate";
 import { BookingCancelledEvent } from "../../../core/scheduling/domain/events/booking-cancelled.event";
 import { BookingConfirmedEvent } from "../../../core/scheduling/domain/events/booking-confirmed.event";
+import { BookingProposalRevisedEvent } from "../../../core/scheduling/domain/events/booking-proposal-revised.event";
+import { BookingProposedEvent } from "../../../core/scheduling/domain/events/booking-proposed.event";
 import { InquiryCreatedEvent } from "../../../core/scheduling/domain/events/inquiry-created.event";
 import { Inquiry } from "../../../core/scheduling/domain/inquiry.aggregate";
 import { BookingInMemoryRepository } from "../../../core/scheduling/infra/db/in-memory/booking-in-memory.repository";
@@ -181,6 +183,110 @@ describe("NotificationsSchedulingEventsHandler (Bloco 9.5)", () => {
         establishment.establishment_id.id,
         expect.objectContaining({ status: "accepted" }),
       );
+    });
+  });
+
+  describe("proposta de show → tempo real + push para o artista (18/set/2026)", () => {
+    const TOKEN = "ExponentPushToken[abc123]";
+
+    beforeEach(async () => {
+      musician.push_token = TOKEN;
+      await musicianRepo.update(musician);
+    });
+
+    function proposed(overrides: Partial<{ from_inquiry_id: string | null; musician_id: string | null }> = {}) {
+      return {
+        aggregate_id: booking.entity_id,
+        from_inquiry_id: null,
+        establishment_id: establishment.establishment_id.id,
+        musician_id: musician.musician_id.id,
+        band_id: null,
+        start_at: new Date("2026-10-02T01:00:00Z"),
+        end_at: new Date("2026-10-02T04:00:00Z"),
+        ...overrides,
+      } as unknown as BookingProposedEvent;
+    }
+
+    it("🔴 avisa o artista de uma proposta DIRETA — antes nada era enviado", async () => {
+      await handler.handleBookingProposed(proposed());
+
+      expect(gateway.notifyBookingUpdate).toHaveBeenCalledWith(
+        musician.musician_id.id,
+        expect.objectContaining({ status: "proposed" }),
+      );
+      expect(push.send).toHaveBeenCalledWith(
+        TOKEN,
+        expect.objectContaining({
+          title: "Nova proposta de show 🎤",
+          body: expect.stringContaining("te mandou uma proposta"),
+          data: expect.objectContaining({ type: "booking.proposed" }),
+        }),
+      );
+      // Negociação, não comprovante: e-mail só na confirmação.
+      expect(mailService.sendBookingConfirmed).not.toHaveBeenCalled();
+    });
+
+    it("diz que a CONVERSA virou proposta quando veio de uma inquiry", async () => {
+      await handler.handleBookingProposed(
+        proposed({ from_inquiry_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
+      );
+
+      expect(push.send).toHaveBeenCalledWith(
+        TOKEN,
+        expect.objectContaining({
+          body: expect.stringContaining("transformou a conversa"),
+        }),
+      );
+    });
+
+    it("não avisa ninguém em booking de BANDA — o token é do músico", async () => {
+      await handler.handleBookingProposed(proposed({ musician_id: null }));
+
+      expect(gateway.notifyBookingUpdate).not.toHaveBeenCalled();
+      expect(push.send).not.toHaveBeenCalled();
+    });
+
+    function revised(proposed_by: string, previous_status: string) {
+      return {
+        aggregate_id: booking.entity_id,
+        establishment_id: establishment.establishment_id.id,
+        musician_id: musician.musician_id.id,
+        band_id: null,
+        start_at: new Date("2026-10-03T01:00:00Z"),
+        end_at: new Date("2026-10-03T04:00:00Z"),
+        fee: 900,
+        proposed_by,
+        previous_status,
+        expires_at: null,
+        revised_at: new Date(),
+      } as unknown as BookingProposalRevisedEvent;
+    }
+
+    it("avisa a nova oferta depois de uma recusa com texto próprio", async () => {
+      await handler.handleBookingProposalRevised(
+        revised("establishment", "cancelled"),
+      );
+
+      expect(gateway.notifyBookingUpdate).toHaveBeenCalledWith(
+        musician.musician_id.id,
+        expect.objectContaining({ status: "revised" }),
+      );
+      expect(push.send).toHaveBeenCalledWith(
+        TOKEN,
+        expect.objectContaining({
+          title: "Proposta atualizada 🎤",
+          body: expect.stringContaining("nova proposta depois da sua resposta"),
+        }),
+      );
+    });
+
+    it("contraproposta feita PELO artista não notifica o próprio artista", async () => {
+      await handler.handleBookingProposalRevised(
+        revised("musician", "pending"),
+      );
+
+      expect(gateway.notifyBookingUpdate).not.toHaveBeenCalled();
+      expect(push.send).not.toHaveBeenCalled();
     });
   });
 });

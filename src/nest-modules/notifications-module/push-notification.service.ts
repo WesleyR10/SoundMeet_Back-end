@@ -51,4 +51,42 @@ export class PushNotificationService {
       );
     }
   }
+
+  /**
+   * Envio em massa (aviso a seguidores). `chunkPushNotifications` respeita o
+   * limite de 100 mensagens por requisição do Expo; um lote que falha não
+   * derruba os outros — cada um é logado e o resto segue.
+   */
+  async sendMany(messages: Array<PushMessage & { to: string }>): Promise<void> {
+    const valid = messages.filter((m) => Expo.isExpoPushToken(m.to));
+    if (valid.length < messages.length) {
+      this.logger.warn(
+        `Skipping ${messages.length - valid.length} invalid Expo push token(s)`,
+      );
+    }
+
+    const chunks = this.expo.chunkPushNotifications(
+      valid.map((m) => ({
+        to: m.to,
+        sound: "default" as const,
+        title: m.title,
+        body: m.body,
+        data: m.data,
+      })),
+    );
+
+    for (const chunk of chunks) {
+      try {
+        const tickets = await this.expo.sendPushNotificationsAsync(chunk);
+        const errors = tickets.filter((t) => t.status === "error").length;
+        if (errors) {
+          this.logger.warn(
+            `Push batch: ${errors}/${tickets.length} ticket(s) with error`,
+          );
+        }
+      } catch (error) {
+        this.logger.error(`Push batch failed: ${(error as Error).message}`);
+      }
+    }
+  }
 }
