@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 import { randomUUID } from "crypto";
 
 import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
@@ -23,7 +25,7 @@ const ALLOWED_CONTENT_TYPES: Record<string, string> = {
 
 export type UploadQrLogoInput = {
   musician_id: string;
-  data: NodeJS.ReadableStream | Buffer;
+  data: Buffer | Readable;
   content_type: string;
   file_size: number;
 };
@@ -34,9 +36,10 @@ export type UploadQrLogoOutput = MusicianOutput;
 // validação de tamanho/mimetype) — diferença: exige plano PRO (mesmo gate de
 // CustomizeQRCodeUseCase) e grava em customizeQRCode() em vez de changeAvatar,
 // preservando cores/label já definidos (merge, ver Musician.customizeQRCode).
-export class UploadQrLogoUseCase
-  implements IUseCase<UploadQrLogoInput, UploadQrLogoOutput>
-{
+export class UploadQrLogoUseCase implements IUseCase<
+  UploadQrLogoInput,
+  UploadQrLogoOutput
+> {
   constructor(
     private readonly musicianRepo: IMusicianRepository,
     private readonly storage: IMusicianStorage,

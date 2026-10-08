@@ -1,7 +1,8 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
-import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
 import { QRCustomization } from "../../../../../shared/domain/value-objects/qr-code.vo";
+import { InvalidUuidError } from "../../../../../shared/domain/value-objects/uuid.vo";
+import { generateValidCnpj } from "../../../../../shared/infra/testing/cnpj.fixture";
 import { Musician, MusicianId } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { UpdateMusicianUseCase } from "../update-musician.use-case";
@@ -38,6 +39,59 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
     ).rejects.toThrow(EntityValidationError);
   });
 
+  describe("cnpj (MEI)", () => {
+    it("should set the cnpj of a musician who opened a MEI", async () => {
+      const entity = Musician.fake().aMusician().build();
+      repository.items = [entity];
+      const cnpj = generateValidCnpj("112223330001");
+
+      const output = await useCase.execute({ id: entity.musician_id.id, cnpj });
+
+      expect(output.cnpj).toBe(cnpj);
+    });
+
+    it("should clear the cnpj when null is passed", async () => {
+      const entity = Musician.fake()
+        .aMusician()
+        .withCnpj(generateValidCnpj("112223330001"))
+        .build();
+      repository.items = [entity];
+
+      const output = await useCase.execute({
+        id: entity.musician_id.id,
+        cnpj: null,
+      });
+
+      expect(output.cnpj).toBeNull();
+    });
+
+    /*
+     * `Musician.cnpj` é `@unique`. Sem esta checagem o Prisma estoura P2002 e o
+     * músico recebe 500 em vez de saber que aquele MEI já está em outra conta —
+     * o mesmo motivo pelo qual o e-mail já era verificado aqui.
+     */
+    it("should reject a cnpj already used by another musician", async () => {
+      const cnpj = generateValidCnpj("112223330001");
+      const owner = Musician.fake().aMusician().withCnpj(cnpj).build();
+      const other = Musician.fake().aMusician().build();
+      repository.items = [owner, other];
+
+      await expect(() =>
+        useCase.execute({ id: other.musician_id.id, cnpj }),
+      ).rejects.toThrow(EntityValidationError);
+    });
+
+    it("should allow re-sending the same cnpj the musician already owns", async () => {
+      const cnpj = generateValidCnpj("112223330001");
+      const entity = Musician.fake().aMusician().withCnpj(cnpj).build();
+      repository.items = [entity];
+
+      const output = await useCase.execute({ id: entity.musician_id.id, cnpj });
+
+      expect(output.cnpj).toBe(cnpj);
+    });
+  });
+
   it("should update a musician", async () => {
     const spyUpdate = jest.spyOn(repository, "update");
     const entity = Musician.fake().aMusician().build();
@@ -54,8 +108,10 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       stage_name: entity.stage_name,
       email: entity.email.value,
       phone: entity.phone?.value || null,
+      cnpj: entity.cnpj?.value || null,
       bio: entity.bio,
       avatar: entity.avatar,
+      presentation_audio: null,
       genres: entity.genres,
       instruments: entity.instruments,
       experience_years: entity.experience_years,
@@ -64,6 +120,8 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
       is_active: entity.is_active,
       is_verified: entity.is_verified,
       open_to_gigs: entity.open_to_gigs,
+      accepts_requests_outside_repertoire:
+        entity.accepts_requests_outside_repertoire,
       profile: entity.profile?.toJSON() ?? null,
       qr_code: entity.qr_code!.code,
       qr_customization: entity.qr_code!.customization ?? null,
@@ -92,6 +150,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         stage_name: string | null;
         email: string;
         phone: string | null;
+        cnpj: string | null;
         bio: string | null;
         avatar: string | null;
         genres: string[];
@@ -120,6 +179,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           stage_name: "New Stage Name",
           email: entity.email.value,
           phone: entity.phone?.value || null,
+          cnpj: entity.cnpj?.value || null,
           bio: entity.bio,
           avatar: entity.avatar,
           genres: entity.genres,
@@ -146,6 +206,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           stage_name: "New Stage Name",
           email: entity.email.value,
           phone: entity.phone?.value || null,
+          cnpj: entity.cnpj?.value || null,
           bio: "Updated bio",
           avatar: entity.avatar,
           genres: entity.genres,
@@ -172,6 +233,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           stage_name: "New Stage Name",
           email: entity.email.value,
           phone: entity.phone?.value || null,
+          cnpj: entity.cnpj?.value || null,
           bio: "Updated bio",
           avatar: entity.avatar,
           genres: ["Jazz", "Blues"],
@@ -198,6 +260,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           stage_name: "New Stage Name",
           email: entity.email.value,
           phone: entity.phone?.value || null,
+          cnpj: entity.cnpj?.value || null,
           bio: "Updated bio",
           avatar: entity.avatar,
           genres: ["Jazz", "Blues"],
@@ -224,6 +287,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           stage_name: "New Stage Name",
           email: entity.email.value,
           phone: entity.phone?.value || null,
+          cnpj: entity.cnpj?.value || null,
           bio: "Updated bio",
           avatar: entity.avatar,
           genres: ["Jazz", "Blues"],
@@ -250,6 +314,7 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
           stage_name: "New Stage Name",
           email: entity.email.value,
           phone: entity.phone?.value || null,
+          cnpj: entity.cnpj?.value || null,
           bio: "Updated bio",
           avatar: entity.avatar,
           genres: ["Jazz", "Blues"],
@@ -297,8 +362,10 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
         email: "email" in i.input ? i.input.email : freshEntity.email.value,
         phone:
           "phone" in i.input ? i.input.phone : freshEntity.phone?.value || null,
+        cnpj: freshEntity.cnpj?.value || null,
         bio: "bio" in i.input ? i.input.bio : freshEntity.bio,
         avatar: freshEntity.avatar,
+        presentation_audio: null,
         genres: "genres" in i.input ? i.input.genres : freshEntity.genres,
         instruments:
           "instruments" in i.input
@@ -317,6 +384,8 @@ describe("UpdateMusicianUseCase Unit Tests", () => {
             ? i.input.is_verified
             : freshEntity.is_verified,
         open_to_gigs: freshEntity.open_to_gigs,
+        accepts_requests_outside_repertoire:
+          freshEntity.accepts_requests_outside_repertoire,
         profile: freshEntity.profile?.toJSON() ?? null,
         qr_code: freshEntity.qr_code!.code,
         qr_customization: freshEntity.qr_code!.customization ?? null,

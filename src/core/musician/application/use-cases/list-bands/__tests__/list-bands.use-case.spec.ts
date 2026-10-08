@@ -37,6 +37,7 @@ describe("ListBandsUseCase Unit Tests", () => {
         id: i.band_id.id,
         name: i.name,
         description: i.description,
+        formed_in: i.formed_in,
         avatar: i.avatar,
         genres: i.genres,
         members: i.members.map((m) => ({
@@ -87,6 +88,7 @@ describe("ListBandsUseCase Unit Tests", () => {
         id: i.band_id.id,
         name: i.name,
         description: i.description,
+        formed_in: i.formed_in,
         avatar: i.avatar,
         genres: i.genres,
         members: i.members.map((m) => ({
@@ -126,6 +128,7 @@ describe("ListBandsUseCase Unit Tests", () => {
         id: i.band_id.id,
         name: i.name,
         description: i.description,
+        formed_in: i.formed_in,
         avatar: i.avatar,
         genres: i.genres,
         members: i.members.map((m) => ({
@@ -206,6 +209,7 @@ describe("ListBandsUseCase Unit Tests", () => {
           id: i.band_id.id,
           name: i.name,
           description: i.description,
+          formed_in: i.formed_in,
           avatar: i.avatar,
           genres: i.genres,
           members: i.members.map((m) => ({
@@ -245,6 +249,7 @@ describe("ListBandsUseCase Unit Tests", () => {
         id: i.band_id.id,
         name: i.name,
         description: i.description,
+        formed_in: i.formed_in,
         avatar: i.avatar,
         genres: i.genres,
         members: i.members.map((m) => ({
@@ -274,57 +279,42 @@ describe("ListBandsUseCase Unit Tests", () => {
     });
   });
 
-  it("should filter output by musician_id (minhas bandas), bypassing the open_to_gigs gate", async () => {
-    const targetMusicianId = new Uuid().id;
+  it("🔴 `musician_id` não contorna o opt-in: banda fora do radar não aparece na busca pública", async () => {
+    const targetMusicianId = new Uuid();
 
-    // open_to_gigs nunca setado (null) — a banda ainda não optou por
-    // aparecer para estabelecimentos, mas o próprio membro precisa
-    // continuar vendo a própria banda.
-    const bandWithTarget = Band.fake()
-      .aBand()
-      .withName("Band With Target")
-      .build();
-    bandWithTarget.addMember(new Uuid(targetMusicianId), "Vocal", "Voz");
+    // open_to_gigs nunca setado (null): o líder ainda não pôs a banda na
+    // busca. Até out/2026 o filtro `musician_id` pulava o gate — passando o id
+    // de um integrante, qualquer um listava as bandas dele fora do radar.
+    const hidden = Band.fake().aBand().withName("Hidden").build();
+    hidden.inviteMember(targetMusicianId, "member", "Voz");
+    hidden.acceptInvite(targetMusicianId);
 
-    const otherBand = Band.fake()
+    const visible = Band.fake()
       .aBand()
-      .withName("Other Band")
+      .withName("Visible")
       .withOpenToGigs(true)
       .build();
+    visible.inviteMember(targetMusicianId, "member", "Voz");
+    visible.acceptInvite(targetMusicianId);
 
-    repository.items = [bandWithTarget, otherBand];
+    repository.items = [hidden, visible];
 
     const output = await useCase.execute({
-      filter: { musician_id: targetMusicianId },
+      filter: { musician_id: targetMusicianId.id },
     });
 
-    expect(output.items).toHaveLength(1);
-    expect(output.items[0].id).toBe(bandWithTarget.band_id.id);
-    expect(output.items[0].open_to_gigs).toBeNull();
+    expect(output.items.map((item) => item.id)).toEqual([visible.band_id.id]);
   });
 
-  it("should not list a pending/declined invite as one of 'my bands'", async () => {
-    const musicianId = new Uuid();
+  it("banda dissolvida (arquivada) não aparece na busca pública", async () => {
+    const active = Band.fake().aBand().withOpenToGigs(true).build();
+    const archived = Band.fake().aBand().withOpenToGigs(true).build();
+    archived.deactivate();
+    repository.items = [active, archived];
 
-    const pendingBand = Band.fake().aBand().withName("Pending").build();
-    pendingBand.inviteMember(musicianId, "member", "guitar");
+    const output = await useCase.execute({});
 
-    const declinedBand = Band.fake().aBand().withName("Declined").build();
-    declinedBand.inviteMember(musicianId, "member", "bass");
-    declinedBand.declineInvite(musicianId);
-
-    const acceptedBand = Band.fake().aBand().withName("Accepted").build();
-    acceptedBand.inviteMember(musicianId, "member", "drums");
-    acceptedBand.acceptInvite(musicianId);
-
-    repository.items = [pendingBand, declinedBand, acceptedBand];
-
-    const output = await useCase.execute({
-      filter: { musician_id: musicianId.id },
-    });
-
-    expect(output.items).toHaveLength(1);
-    expect(output.items[0].id).toBe(acceptedBand.band_id.id);
+    expect(output.items.map((item) => item.id)).toEqual([active.band_id.id]);
   });
 
   it("never lets the caller override the open_to_gigs consent gate", async () => {

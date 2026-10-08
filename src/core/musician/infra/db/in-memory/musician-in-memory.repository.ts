@@ -25,6 +25,10 @@ export class MusicianInMemoryRepository
     return this.items.find((m) => m.cpf?.value === cpf) ?? null;
   }
 
+  async findByCnpj(cnpj: string): Promise<Musician | null> {
+    return this.items.find((m) => m.cnpj?.value === cnpj) ?? null;
+  }
+
   async findByPhone(phone: string): Promise<Musician | null> {
     return this.items.find((m) => m.phone?.value === phone) ?? null;
   }
@@ -50,6 +54,13 @@ export class MusicianInMemoryRepository
 
     const filtered = items.filter((musician) => {
       let matches = true;
+
+      // `Array.isArray` sem `length`: lista vazia significa "nenhum id" e tem
+      // de zerar o resultado, nunca desaparecer do filtro. Mesma razão do
+      // `where.id = { in: [] }` no repositório Prisma.
+      if (Array.isArray(filter.ids)) {
+        matches = matches && filter.ids.includes(musician.musician_id.id);
+      }
 
       if (filter.name) {
         const nameMatch = musician.name
@@ -163,8 +174,12 @@ export class MusicianInMemoryRepository
           location.latitude !== undefined &&
           location.longitude !== null &&
           location.longitude !== undefined &&
-          haversineKm(filter.lat, filter.lng, location.latitude, location.longitude) <=
-            filter.radius_km;
+          haversineKm(
+            filter.lat,
+            filter.lng,
+            location.latitude,
+            location.longitude,
+          ) <= filter.radius_km;
 
         const touringLocation = musician.profile?.touring_location ?? null;
         const withinTouring =

@@ -36,7 +36,25 @@ export class UpdateMusicianUseCase implements IUseCase<
           { email: ["Email already in use by another musician"] },
         ]);
       }
-      entity.changeEmail(input.email);
+      // Só PEDE a troca: o e-mail muda quando o link for clicado.
+      entity.requestEmailChange(input.email);
+    }
+
+    /*
+     * O CNPJ é `@unique`: sem esta checagem, dois músicos com o mesmo MEI
+     * estouram P2002 do Prisma e o usuário recebe 500 em vez da mensagem.
+     * Mesmo cuidado que o e-mail acima já tomava.
+     */
+    if (input.cnpj !== undefined && input.cnpj !== entity.cnpj?.value) {
+      if (input.cnpj) {
+        const existing = await this.musicianRepo.findByCnpj(input.cnpj);
+        if (existing && existing.musician_id.id !== entity.musician_id.id) {
+          throw new EntityValidationError([
+            { cnpj: ["CNPJ already in use by another musician"] },
+          ]);
+        }
+      }
+      entity.changeCnpj(input.cnpj);
     }
 
     input.name !== undefined && entity.changeName(input.name);

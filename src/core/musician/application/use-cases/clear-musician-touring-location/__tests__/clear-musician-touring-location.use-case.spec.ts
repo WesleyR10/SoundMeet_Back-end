@@ -18,7 +18,12 @@ describe("ClearMusicianTouringLocationUseCase — 7.13d", () => {
     const profile = musician.ensureProfile();
     profile.changeLocation(new Location({ city: "São Paulo", state: "SP" }));
     profile.setTouringLocation(
-      new Location({ city: "Recife", state: "PE", latitude: -8.0476, longitude: -34.877 }),
+      new Location({
+        city: "Recife",
+        state: "PE",
+        latitude: -8.0476,
+        longitude: -34.877,
+      }),
       new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
     );
     await repository.insert(musician);

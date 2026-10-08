@@ -1,6 +1,6 @@
 import { GetMusicianAnalyticsUseCase } from "../../core/musician/application/use-cases/get-musician-analytics/get-musician-analytics.use-case";
 import { IMusicianRepository } from "../../core/musician/domain/musician.repository";
-import { IMusicianWalletRepository } from "../../core/payment/domain/repositories/musician-wallet.repository";
+import { ITipRepository } from "../../core/payment/domain/repositories/tip.repository";
 import { PlanCheckService } from "../../core/plans/domain/plan-check.service";
 import { IRequestRepository } from "../../core/request/domain/request.repository";
 
@@ -11,20 +11,20 @@ export const USE_CASES = {
       musicianRepo: IMusicianRepository,
       planCheckService: PlanCheckService,
       requestRepo: IRequestRepository,
-      walletRepo: IMusicianWalletRepository,
+      tipRepo: ITipRepository,
     ) => {
       return new GetMusicianAnalyticsUseCase(
         musicianRepo,
         planCheckService,
         requestRepo,
-        walletRepo,
+        tipRepo,
       );
     },
     inject: [
       "MusicianRepository",
       PlanCheckService,
       "RequestRepository",
-      "MusicianWalletRepository",
+      "TipRepository",
     ],
   },
 };

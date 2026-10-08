@@ -12,10 +12,12 @@ import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-case
 import { DeclineBandInviteUseCase } from "../../core/musician/application/use-cases/decline-band-invite/decline-band-invite.use-case";
 import { DeleteBandUseCase } from "../../core/musician/application/use-cases/delete-band/delete-band.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
+import { DeleteMusicianPresentationAudioUseCase } from "../../core/musician/application/use-cases/delete-musician-presentation-audio/delete-musician-presentation-audio.use-case";
 import { GetBandUseCase } from "../../core/musician/application/use-cases/get-band/get-band.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { InviteBandMemberUseCase } from "../../core/musician/application/use-cases/invite-band-member/invite-band-member.use-case";
 import { ListBandsUseCase } from "../../core/musician/application/use-cases/list-bands/list-bands.use-case";
+import { ListFeaturedMusiciansUseCase } from "../../core/musician/application/use-cases/list-featured-musicians/list-featured-musicians.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { RemoveBandMemberUseCase } from "../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
@@ -28,6 +30,7 @@ import { UpdateBandUseCase } from "../../core/musician/application/use-cases/upd
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
+import { UploadMusicianPresentationAudioUseCase } from "../../core/musician/application/use-cases/upload-musician-presentation-audio/upload-musician-presentation-audio.use-case";
 import { UploadQrLogoUseCase } from "../../core/musician/application/use-cases/upload-qr-logo/upload-qr-logo.use-case";
 import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import { IBandRepository } from "../../core/musician/domain/band.repository";
@@ -234,6 +237,16 @@ export const USE_CASES = {
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide],
   },
+  LIST_FEATURED_MUSICIANS_USE_CASE: {
+    provide: ListFeaturedMusiciansUseCase,
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      planCheckService: PlanCheckService,
+    ) => {
+      return new ListFeaturedMusiciansUseCase(musicianRepo, planCheckService);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, PlanCheckService],
+  },
   GET_MUSICIAN_USE_CASE: {
     provide: GetMusicianUseCase,
     useFactory: (
@@ -385,6 +398,26 @@ export const USE_CASES = {
       storage: IMusicianStorage,
     ) => {
       return new UploadMusicianAvatarUseCase(musicianRepo, storage);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, MUSICIAN_STORAGE_TOKEN],
+  },
+  UPLOAD_MUSICIAN_PRESENTATION_AUDIO_USE_CASE: {
+    provide: UploadMusicianPresentationAudioUseCase,
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      storage: IMusicianStorage,
+    ) => {
+      return new UploadMusicianPresentationAudioUseCase(musicianRepo, storage);
+    },
+    inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, MUSICIAN_STORAGE_TOKEN],
+  },
+  DELETE_MUSICIAN_PRESENTATION_AUDIO_USE_CASE: {
+    provide: DeleteMusicianPresentationAudioUseCase,
+    useFactory: (
+      musicianRepo: IMusicianRepository,
+      storage: IMusicianStorage,
+    ) => {
+      return new DeleteMusicianPresentationAudioUseCase(musicianRepo, storage);
     },
     inject: [REPOSITORIES.MUSICIAN_REPOSITORY.provide, MUSICIAN_STORAGE_TOKEN],
   },

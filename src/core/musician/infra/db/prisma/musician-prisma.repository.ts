@@ -213,6 +213,17 @@ export class MusicianPrismaRepository implements IMusicianRepository {
       : null;
   }
 
+  async findByCnpj(cnpj: string): Promise<Musician | null> {
+    const model = await this.prisma.musician.findFirst({
+      where: { cnpj },
+      include: { profile: true },
+    });
+
+    return model
+      ? MusicianModelMapper.toEntity(model as unknown as MusicianModel)
+      : null;
+  }
+
   async findByPhone(phone: string): Promise<Musician | null> {
     const model = await this.prisma.musician.findFirst({
       where: { phone },
@@ -424,6 +435,16 @@ export class MusicianPrismaRepository implements IMusicianRepository {
     if (!filter) return {};
 
     const where: any = {};
+
+    /*
+     * 🔴 `Array.isArray`, sem checar `length`. Lista vazia tem de virar
+     * `id: { in: [] }` — que não casa com nada — e NÃO desaparecer do `where`.
+     * Um `if (filter.ids?.length)` faria a faixa "Em destaque" sem nenhum
+     * assinante pago devolver a base inteira de músicos, em silêncio.
+     */
+    if (Array.isArray(filter.ids)) {
+      where.id = { in: filter.ids };
+    }
 
     if (filter.name) {
       where.name = {

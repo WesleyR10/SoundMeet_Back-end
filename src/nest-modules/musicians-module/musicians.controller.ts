@@ -24,6 +24,7 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { randomUUID } from "crypto";
 import { createReadStream, promises as fs } from "fs";
 import { diskStorage } from "multer";
@@ -34,7 +35,9 @@ import { MusicianOutput } from "../../core/musician/application/use-cases/common
 import { CreateMusicianUseCase } from "../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeleteMusicianUseCase } from "../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
+import { DeleteMusicianPresentationAudioUseCase } from "../../core/musician/application/use-cases/delete-musician-presentation-audio/delete-musician-presentation-audio.use-case";
 import { GetMusicianUseCase } from "../../core/musician/application/use-cases/get-musician/get-musician.use-case";
+import { ListFeaturedMusiciansUseCase } from "../../core/musician/application/use-cases/list-featured-musicians/list-featured-musicians.use-case";
 import { ListMusiciansUseCase } from "../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
@@ -43,6 +46,10 @@ import { SetMusicianTouringLocationUseCase } from "../../core/musician/applicati
 import { UpdateMusicianUseCase } from "../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
+import {
+  PRESENTATION_AUDIO_ALLOWED_MIME_TYPES,
+  UploadMusicianPresentationAudioUseCase,
+} from "../../core/musician/application/use-cases/upload-musician-presentation-audio/upload-musician-presentation-audio.use-case";
 import { UploadQrLogoUseCase } from "../../core/musician/application/use-cases/upload-qr-logo/upload-qr-logo.use-case";
 import { VerifyMusicianUseCase } from "../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import {
@@ -56,6 +63,7 @@ import {
   RolesGuard,
 } from "../auth-module";
 import { assertFileSignature } from "../shared-module/upload/detect-file-mime";
+import { readAudioDurationSeconds } from "../shared-module/upload/read-audio-duration";
 import { CreateMusicianDto } from "./dto/create-musician.dto";
 import { CustomizeQRCodeDto } from "./dto/customize-qr-code.dto";
 import { RegisterPushTokenDto } from "./dto/register-push-token.dto";
@@ -109,6 +117,9 @@ export class MusiciansController {
   @Inject(ListMusiciansUseCase)
   private listUseCase: ListMusiciansUseCase;
 
+  @Inject(ListFeaturedMusiciansUseCase)
+  private listFeaturedUseCase: ListFeaturedMusiciansUseCase;
+
   @Inject(VerifyMusicianUseCase)
   private verifyUseCase: VerifyMusicianUseCase;
 
@@ -117,6 +128,12 @@ export class MusiciansController {
 
   @Inject(UploadMusicianAvatarUseCase)
   private uploadAvatarUseCase: UploadMusicianAvatarUseCase;
+
+  @Inject(UploadMusicianPresentationAudioUseCase)
+  private uploadPresentationAudioUseCase: UploadMusicianPresentationAudioUseCase;
+
+  @Inject(DeleteMusicianPresentationAudioUseCase)
+  private deletePresentationAudioUseCase: DeleteMusicianPresentationAudioUseCase;
 
   @Inject(UploadQrLogoUseCase)
   private uploadQrLogoUseCase: UploadQrLogoUseCase;
@@ -143,6 +160,33 @@ export class MusiciansController {
   async findAll(@Query() query: SearchMusiciansDto) {
     const output = await this.listUseCase.execute(query);
     return new MusicianCollectionPresenter(output);
+  }
+
+  /*
+   * 🔴 ANTES de `@Get(":id")`, e isto NÃO é preferência de estilo.
+   *
+   * Depois dele, "featured" casaria como `:id`, o `ParseUUIDPipe` responderia
+   * 422 e a faixa "Em destaque" deixaria de existir — sem erro de compilação,
+   * sem teste vermelho, e com este handler correto logo abaixo. É o mesmo
+   * defeito que `@Get("live")` teve em `PerformanceController` e que só
+   * apareceu em tela.
+   */
+  @Get("featured")
+  @Public()
+  @ApiOperation({
+    summary: "Artistas em destaque (assinantes)",
+    description:
+      "Os artistas da faixa 'Em destaque' da grade: assinantes de plano pago, ordenados por nota. 🔴 NÃO é ordenação da busca — é uma faixa separada e rotulada, para que 'Melhor avaliados' continue significando o que diz. O `plan_tier` não sai na resposta (dado comercial do artista), e o gate de consentimento não é contornado: quem não ligou 'disponível para shows' não aparece, pagando ou não.",
+  })
+  @ApiResponse({ status: 200, type: [PublicMusicianPresenter] })
+  async findFeatured() {
+    const output = await this.listFeaturedUseCase.execute({});
+    /*
+     * `PublicMusicianPresenter` mesmo sendo lido pelo estabelecimento
+     * autenticado: a faixa é vitrine, e vitrine não precisa de e-mail nem
+     * telefone do artista. A allowlist de campo é a do presenter público.
+     */
+    return output.items.map((item) => new PublicMusicianPresenter(item));
   }
 
   @Get(":id")
@@ -253,6 +297,107 @@ export class MusiciansController {
     } finally {
       await fs.unlink(file.path).catch(() => undefined);
     }
+  }
+
+  @Post(":id/presentation-audio")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  /*
+   * Limite próprio e apertado: um áudio custa banda de subida, espaço no bucket
+   * e um parser de metadados por requisição. O `UserThrottlerGuard` global é
+   * generoso demais para isso, e ninguém troca o áudio de apresentação cinco
+   * vezes por minuto de boa-fé.
+   */
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @ApiOperation({
+    summary: "Upload do áudio de apresentação",
+    description:
+      "Trecho de 5 a 40 segundos que o estabelecimento ouve antes de contratar. " +
+      "Formatos: MP3, M4A, AAC ou WAV (o tipo é deduzido dos BYTES, não do Content-Type enviado). " +
+      "Substituir apaga o áudio anterior do storage.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiConsumes("multipart/form-data")
+  @ApiResponse({ status: 201, type: MusicianPresenter })
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, tmpdir()),
+        filename: (_req, file, cb) => {
+          const safeName = (file.originalname || "presentation-audio").replace(
+            /[^a-zA-Z0-9._-]/g,
+            "_",
+          );
+          cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
+        },
+      }),
+      limits: {
+        fileSize: Number(
+          process.env.MUSICIAN_PRESENTATION_AUDIO_MAX_SIZE ?? 10 * 1024 * 1024,
+        ),
+      },
+      /*
+       * Sem `fileFilter`, e é deliberado — mesmo desenho dos uploads de IA.
+       * O `file.mimetype` é o que o CLIENTE escreveu, e os seletores de arquivo
+       * de celular mandam `application/octet-stream` para um MP3 legítimo com
+       * frequência. Filtrar pela afirmação recusaria arquivo bom e não impediria
+       * arquivo ruim: quem decide é o `assertFileSignature` logo abaixo, que lê
+       * os bytes.
+       */
+    }),
+  )
+  async uploadPresentationAudio(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new UnprocessableEntityException("Envie um arquivo de áudio.");
+    }
+
+    try {
+      const detectedMime = await assertFileSignature(
+        file.path,
+        PRESENTATION_AUDIO_ALLOWED_MIME_TYPES,
+        "Formato não suportado. Envie um arquivo MP3, M4A, AAC ou WAV.",
+      );
+
+      // Só depois dos magic bytes: o parser de metadados não deve ver arquivo
+      // que sequer é áudio (ver read-audio-duration.ts).
+      const durationSeconds = await readAudioDurationSeconds(file.path);
+
+      const output = await this.uploadPresentationAudioUseCase.execute({
+        musician_id: id,
+        data: createReadStream(file.path),
+        content_type: detectedMime,
+        file_size: file.size,
+        duration_seconds: durationSeconds,
+      });
+
+      return MusiciansController.serialize(output);
+    } finally {
+      await fs.unlink(file.path).catch(() => undefined);
+    }
+  }
+
+  @Delete(":id/presentation-audio")
+  @Roles("musician", "admin")
+  @UseGuards(MusicianOwnershipGuard)
+  @ApiOperation({
+    summary: "Remove o áudio de apresentação",
+    description:
+      "Idempotente: quem não tem áudio recebe 200 com presentation_audio nulo. " +
+      "Aceita admin para takedown de conteúdo.",
+  })
+  @ApiParam({ name: "id", required: true, format: "uuid" })
+  @ApiResponse({ status: 200, type: MusicianPresenter })
+  async deletePresentationAudio(
+    @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 422 })) id: string,
+  ) {
+    const output = await this.deletePresentationAudioUseCase.execute({
+      musician_id: id,
+    });
+
+    return MusiciansController.serialize(output);
   }
 
   @Post(":id/qr-code/logo")

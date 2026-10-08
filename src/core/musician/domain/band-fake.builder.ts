@@ -17,6 +17,10 @@ export class BandFakeBuilder<TBuild = any> {
     this.chance.word(),
     this.chance.word(),
   ];
+  // `null` por default, e não um ano sorteado: o estado normal de uma banda
+  // recém-cadastrada é NÃO ter declarado o ano. Um default preenchido faria o
+  // ramo "não informado" da UI nunca ser exercido por teste nenhum.
+  private _formed_in: PropOrFactory<number | null> = (_index) => null;
   private _members: PropOrFactory<BandMemberProps[]> = [];
   private _address: PropOrFactory<Location | null> = (_index) => null;
   private _open_to_gigs: PropOrFactory<boolean | null> = (_index) => null;
@@ -63,6 +67,11 @@ export class BandFakeBuilder<TBuild = any> {
 
   withGenres(valueOrFactory: PropOrFactory<string[]>) {
     this._genres = valueOrFactory;
+    return this;
+  }
+
+  withFormedIn(valueOrFactory: PropOrFactory<number | null>) {
+    this._formed_in = valueOrFactory;
     return this;
   }
 
@@ -113,6 +122,7 @@ export class BandFakeBuilder<TBuild = any> {
         description: this.callFactory(this._description, index),
         avatar: this.callFactory(this._avatar, index),
         genres: this.callFactory(this._genres, index),
+        formed_in: this.callFactory(this._formed_in, index),
         members: this.callFactory(this._members, index),
         address: this.callFactory(this._address, index),
         open_to_gigs: this.callFactory(this._open_to_gigs, index),
@@ -149,6 +159,10 @@ export class BandFakeBuilder<TBuild = any> {
 
   get genres() {
     return this.getValue("genres");
+  }
+
+  get formed_in() {
+    return this.getValue("formed_in");
   }
 
   get members() {

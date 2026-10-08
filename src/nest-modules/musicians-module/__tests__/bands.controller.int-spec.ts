@@ -1,110 +1,96 @@
+import { ForbiddenException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { AcceptBandInviteUseCase } from "../../../core/musician/application/use-cases/accept-band-invite/accept-band-invite.use-case";
-import { BandOutputMapper } from "../../../core/musician/application/use-cases/common/band-output";
 import { CreateBandUseCase } from "../../../core/musician/application/use-cases/create-band/create-band.use-case";
 import { DeclineBandInviteUseCase } from "../../../core/musician/application/use-cases/decline-band-invite/decline-band-invite.use-case";
-import { DeleteBandUseCase } from "../../../core/musician/application/use-cases/delete-band/delete-band.use-case";
+import { DissolveBandUseCase } from "../../../core/musician/application/use-cases/dissolve-band/dissolve-band.use-case";
 import { GetBandUseCase } from "../../../core/musician/application/use-cases/get-band/get-band.use-case";
 import { InviteBandMemberUseCase } from "../../../core/musician/application/use-cases/invite-band-member/invite-band-member.use-case";
+import { ListBandIdentitiesUseCase } from "../../../core/musician/application/use-cases/list-band-identities/list-band-identities.use-case";
 import { ListBandsUseCase } from "../../../core/musician/application/use-cases/list-bands/list-bands.use-case";
+import { ListMyBandsUseCase } from "../../../core/musician/application/use-cases/list-my-bands/list-my-bands.use-case";
 import { RemoveBandMemberUseCase } from "../../../core/musician/application/use-cases/remove-band-member/remove-band-member.use-case";
 import { SetBandOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-band-open-to-gigs/set-band-open-to-gigs.use-case";
 import { TransferBandLeadershipUseCase } from "../../../core/musician/application/use-cases/transfer-band-leadership/transfer-band-leadership.use-case";
 import { UpdateBandUseCase } from "../../../core/musician/application/use-cases/update-band/update-band.use-case";
-import { Band, BandId } from "../../../core/musician/domain/band.aggregate";
+import { BandId } from "../../../core/musician/domain/band.aggregate";
 import { IBandRepository } from "../../../core/musician/domain/band.repository";
+import { IBandCommitmentsReader } from "../../../core/musician/domain/band-commitments.reader";
 import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
+import { BandCommitmentsInMemoryReader } from "../../../core/musician/infra/db/in-memory/band-commitments-in-memory.reader";
 import { BandInMemoryRepository } from "../../../core/musician/infra/db/in-memory/band-in-memory.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
+import { UnauthorizedError } from "../../../core/shared/domain/errors/unauthorized.error";
+import { Location } from "../../../core/shared/domain/value-objects/location.vo";
+import { AuthenticatedUser } from "../../auth-module";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
-import { BandPresenter } from "../band.presenter";
+import {
+  BandPresenter,
+  DissolveBandPresenter,
+  PublicBandPresenter,
+} from "../band.presenter";
 import { BandsController } from "../bands.controller";
-import { CreateBandFixture } from "../testing/band-fixture";
+
+const asMusician = (musician: Musician): AuthenticatedUser => ({
+  userId: musician.musician_id.id,
+  roles: ["musician"],
+  establishmentIds: [],
+  bandIds: [],
+  isAdmin: false,
+});
 
 describe("BandsController Integration Tests", () => {
   let controller: BandsController;
-  let bandRepository: IBandRepository;
-  let musicianRepository: IMusicianRepository;
+  let bandRepository: BandInMemoryRepository;
+  let musicianRepository: MusicianInMemoryRepository;
+  let commitments: BandCommitmentsInMemoryReader;
+  let leader: Musician;
+  let other: Musician;
 
   beforeEach(async () => {
     const bandRepositoryInstance = new BandInMemoryRepository();
     const musicianRepositoryInstance = new MusicianInMemoryRepository();
+    const commitmentsInstance = new BandCommitmentsInMemoryReader();
+    const bandRepo = {
+      provide: "BandRepository",
+      useValue: bandRepositoryInstance,
+    };
+    const single = (useCase: new (repo: IBandRepository) => unknown) => ({
+      provide: useCase,
+      useFactory: (repo: IBandRepository) => new useCase(repo),
+      inject: ["BandRepository"],
+    });
 
     const moduleBuilder = Test.createTestingModule({
       controllers: [BandsController],
       providers: [
+        bandRepo,
+        { provide: "MusicianRepository", useValue: musicianRepositoryInstance },
+        { provide: "BandCommitmentsReader", useValue: commitmentsInstance },
+        single(CreateBandUseCase),
+        single(UpdateBandUseCase),
+        single(GetBandUseCase),
+        single(ListBandsUseCase),
+        single(ListMyBandsUseCase),
+        single(ListBandIdentitiesUseCase),
+        single(RemoveBandMemberUseCase),
+        single(AcceptBandInviteUseCase),
+        single(DeclineBandInviteUseCase),
+        single(SetBandOpenToGigsUseCase),
+        single(TransferBandLeadershipUseCase),
         {
-          provide: "BandRepository",
-          useValue: bandRepositoryInstance,
-        },
-        {
-          provide: "MusicianRepository",
-          useValue: musicianRepositoryInstance,
-        },
-        {
-          provide: CreateBandUseCase,
-          useFactory: (repo: IBandRepository) => new CreateBandUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: UpdateBandUseCase,
-          useFactory: (repo: IBandRepository) => new UpdateBandUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: DeleteBandUseCase,
-          useFactory: (repo: IBandRepository) => new DeleteBandUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: GetBandUseCase,
-          useFactory: (repo: IBandRepository) => new GetBandUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: ListBandsUseCase,
-          useFactory: (repo: IBandRepository) => new ListBandsUseCase(repo),
-          inject: ["BandRepository"],
+          provide: DissolveBandUseCase,
+          useFactory: (repo: IBandRepository, reader: IBandCommitmentsReader) =>
+            new DissolveBandUseCase(repo, reader),
+          inject: ["BandRepository", "BandCommitmentsReader"],
         },
         {
           provide: InviteBandMemberUseCase,
-          useFactory: (
-            bandRepo: IBandRepository,
-            musicianRepo: IMusicianRepository,
-          ) => new InviteBandMemberUseCase(bandRepo, musicianRepo),
+          useFactory: (repo: IBandRepository, musicians: IMusicianRepository) =>
+            new InviteBandMemberUseCase(repo, musicians),
           inject: ["BandRepository", "MusicianRepository"],
-        },
-        {
-          provide: RemoveBandMemberUseCase,
-          useFactory: (repo: IBandRepository) =>
-            new RemoveBandMemberUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: AcceptBandInviteUseCase,
-          useFactory: (repo: IBandRepository) =>
-            new AcceptBandInviteUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: DeclineBandInviteUseCase,
-          useFactory: (repo: IBandRepository) =>
-            new DeclineBandInviteUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: SetBandOpenToGigsUseCase,
-          useFactory: (repo: IBandRepository) =>
-            new SetBandOpenToGigsUseCase(repo),
-          inject: ["BandRepository"],
-        },
-        {
-          provide: TransferBandLeadershipUseCase,
-          useFactory: (repo: IBandRepository) =>
-            new TransferBandLeadershipUseCase(repo),
-          inject: ["BandRepository"],
         },
       ],
     });
@@ -113,178 +99,406 @@ describe("BandsController Integration Tests", () => {
       await applyAuthGuardMocks(moduleBuilder).compile();
 
     controller = module.get<BandsController>(BandsController);
-    bandRepository = module.get<IBandRepository>("BandRepository");
-    musicianRepository = module.get<IMusicianRepository>("MusicianRepository");
+    bandRepository = bandRepositoryInstance;
+    musicianRepository = musicianRepositoryInstance;
+    commitments = commitmentsInstance;
+
+    leader = Musician.fake().aMusician().build();
+    other = Musician.fake().aMusician().build();
+    await musicianRepository.bulkInsert([leader, other]);
   });
+
+  const createBand = (over: Record<string, unknown> = {}) =>
+    controller.create(
+      { name: "The Rockers", genres: ["Rock"], ...over } as never,
+      asMusician(leader),
+    );
 
   it("should be defined", () => {
     expect(controller).toBeDefined();
     expect(controller["createBandUseCase"]).toBeInstanceOf(CreateBandUseCase);
-    expect(controller["updateBandUseCase"]).toBeInstanceOf(UpdateBandUseCase);
-    expect(controller["deleteBandUseCase"]).toBeInstanceOf(DeleteBandUseCase);
-    expect(controller["getBandUseCase"]).toBeInstanceOf(GetBandUseCase);
-    expect(controller["listBandsUseCase"]).toBeInstanceOf(ListBandsUseCase);
-    expect(controller["inviteBandMemberUseCase"]).toBeInstanceOf(
-      InviteBandMemberUseCase,
+    expect(controller["dissolveBandUseCase"]).toBeInstanceOf(
+      DissolveBandUseCase,
     );
-    expect(controller["removeBandMemberUseCase"]).toBeInstanceOf(
-      RemoveBandMemberUseCase,
+    expect(controller["listMyBandsUseCase"]).toBeInstanceOf(ListMyBandsUseCase);
+    expect(controller["listBandIdentitiesUseCase"]).toBeInstanceOf(
+      ListBandIdentitiesUseCase,
     );
   });
 
-  describe("should create a band", () => {
-    const arrange = CreateBandFixture.arrangeForCreate();
+  describe("criar", () => {
+    it("quem cria vira líder aceito e recebe a banda por dentro", async () => {
+      const presenter = await createBand({ description: "A rock band" });
 
-    test.each(arrange)(
-      "when body is $send_data",
-      async ({ send_data, expected }) => {
-        const presenter = await controller.create(send_data as any);
-        const entity = await bandRepository.findById(new BandId(presenter.id));
+      expect(presenter).toBeInstanceOf(BandPresenter);
+      expect(presenter.members).toEqual([
+        expect.objectContaining({
+          musician_id: leader.musician_id.id,
+          role: "leader",
+          status: "accepted",
+        }),
+      ]);
+      expect(presenter.is_active).toBe(true);
+      expect(presenter.open_to_gigs).toBeNull();
+      const saved = await bandRepository.findById(new BandId(presenter.id));
+      expect(saved!.isLeader(leader.musician_id)).toBe(true);
+    });
 
-        expect(entity).toBeInstanceOf(Band);
-        expect(entity!.toJSON()).toMatchObject(expected);
-
-        const output = BandOutputMapper.toOutput(entity!);
-        expect(presenter).toEqual(new BandPresenter(output));
-      },
-    );
+    it("🔴 só `musician` cria: admin lideraria com um `sub` que não é músico", () => {
+      const roles = Reflect.getMetadata(
+        "roles",
+        BandsController.prototype.create,
+      );
+      expect(roles).toEqual(["musician"]);
+    });
   });
 
-  it("should get a band", async () => {
-    const band = Band.fake()
-      .aBand()
-      .withName("My Band")
-      .withGenres(["Rock"])
-      .build();
-    await bandRepository.insert(band);
-
-    const presenter = await controller.findOne(band.band_id.id);
-
-    expect(presenter.id).toBe(band.band_id.id);
-    expect(presenter.name).toBe(band.name);
-    expect(presenter.genres).toEqual(band.genres);
-    expect(presenter.members).toEqual([]);
-  });
-
-  it("should add and remove a member", async () => {
-    const musician = Musician.fake()
-      .aMusician()
-      .withName("Member")
-      .withEmail("member@example.com")
-      .withGenres(["Rock"])
-      .withInstruments(["Guitar"])
-      .build();
-    await musicianRepository.insert(musician);
-
-    const band = Band.fake()
-      .aBand()
-      .withName("My Band")
-      .withGenres(["Rock"])
-      .build();
-    await bandRepository.insert(band);
-
-    const presenterAfterAdd = await controller.addMember(band.band_id.id, {
-      musician_id: musician.musician_id.id,
-      role: "member",
-      instrument: "Guitar",
-    } as any);
-
-    expect(presenterAfterAdd.members).toHaveLength(1);
-    expect(presenterAfterAdd.members[0].musician_id).toBe(
-      musician.musician_id.id,
-    );
-
-    const bandAfterAdd = await bandRepository.findById(band.band_id);
-    expect(bandAfterAdd!.members).toHaveLength(1);
-
-    const response = await controller.removeMember(
-      band.band_id.id,
-      musician.musician_id.id,
-    );
-    expect(response).not.toBeDefined();
-
-    const bandAfterRemove = await bandRepository.findById(band.band_id);
-    expect(bandAfterRemove!.members).toHaveLength(0);
-  });
-
-  it("should invite a member as pending, then let the invited musician accept", async () => {
-    const musician = Musician.fake()
-      .aMusician()
-      .withName("Invited")
-      .withEmail("invited@example.com")
-      .build();
-    await musicianRepository.insert(musician);
-
-    const band = Band.fake().aBand().withName("My Band").build();
-    await bandRepository.insert(band);
-
-    const presenterAfterInvite = await controller.addMember(band.band_id.id, {
-      musician_id: musician.musician_id.id,
-      role: "member",
-      instrument: "Guitar",
-    } as any);
-
-    expect(presenterAfterInvite.members[0].status).toBe("pending");
-
-    const currentUser = {
-      userId: musician.musician_id.id,
-      roles: ["musician"],
-      establishmentIds: [],
-      bandIds: [],
-      isAdmin: false,
+  describe("🔴 ler: visão pública × visão de integrante", () => {
+    const seedBandWithAddress = async () => {
+      const created = await createBand();
+      const band = (await bandRepository.findById(new BandId(created.id)))!;
+      band.changeAddress(
+        new Location({
+          city: "São Paulo",
+          state: "SP",
+          street: "Rua das Flores",
+          number: "42",
+          zip_code: "01310100",
+          latitude: -23.56,
+          longitude: -46.65,
+        }),
+      );
+      band.inviteMember(other.musician_id, "member", "Baixo");
+      await bandRepository.update(band);
+      return created.id;
     };
 
-    const presenterAfterAccept = await controller.acceptInvite(
-      band.band_id.id,
-      currentUser as any,
-    );
+    it("anônimo recebe a pública: sem rua, CEP, coordenada nem convite em aberto", async () => {
+      const id = await seedBandWithAddress();
 
-    expect(presenterAfterAccept.members[0].status).toBe("accepted");
+      const presenter = await controller.findOne(id);
+
+      expect(presenter).toBeInstanceOf(PublicBandPresenter);
+      expect(presenter.address).toEqual({ city: "São Paulo", state: "SP" });
+      // O convite pendente do `other` não é da conta de terceiros.
+      expect(presenter.members.map((m) => m.musician_id)).toEqual([
+        leader.musician_id.id,
+      ]);
+      const raw = JSON.stringify(presenter);
+      for (const leak of [
+        "Rua das Flores",
+        "01310100",
+        "-23.56",
+        "responded_at",
+      ]) {
+        expect(raw).not.toContain(leak);
+      }
+    });
+
+    it("o líder recebe a banda por dentro, com o endereço completo e os convites", async () => {
+      const id = await seedBandWithAddress();
+
+      const presenter = await controller.findOne(id, asMusician(leader));
+
+      expect(presenter).toBeInstanceOf(BandPresenter);
+      expect(presenter.address).toMatchObject({
+        street: "Rua das Flores",
+        zip_code: "01310100",
+      });
+      expect(presenter.members).toHaveLength(2);
+    });
+
+    it("convidado pendente ainda é terceiro", async () => {
+      const id = await seedBandWithAddress();
+
+      const presenter = await controller.findOne(id, asMusician(other));
+
+      expect(presenter).toBeInstanceOf(PublicBandPresenter);
+    });
+
+    it("token recusado do próprio líder vira 401, não a versão pública", async () => {
+      const id = await seedBandWithAddress();
+
+      await expect(
+        controller.findOne(id, undefined, leader.musician_id.id),
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    it("a busca devolve a pública, só de quem está no radar", async () => {
+      const id = await seedBandWithAddress();
+      expect((await controller.findAll({})).data).toHaveLength(0);
+
+      await controller.setOpenToGigs(
+        id,
+        { open_to_gigs: true } as never,
+        asMusician(leader),
+      );
+      const listed = await controller.findAll({});
+
+      expect(listed.data).toHaveLength(1);
+      expect(listed.data[0]).toBeInstanceOf(PublicBandPresenter);
+      expect(listed.data[0].address).toEqual({
+        city: "São Paulo",
+        state: "SP",
+      });
+    });
   });
 
-  it("should let the invited musician decline a pending invite", async () => {
-    const musician = Musician.fake()
-      .aMusician()
-      .withName("Invited")
-      .withEmail("invited2@example.com")
-      .build();
-    await musicianRepository.insert(musician);
+  describe("🔴 minhas bandas — o convite pendente chega ao convidado", () => {
+    it("o convidado vê o convite, com a própria linha e sem o endereço da banda", async () => {
+      const created = await createBand();
+      await controller.addMember(
+        created.id,
+        { musician_id: other.musician_id.id, instrument: "Baixo" } as never,
+        asMusician(leader),
+      );
 
-    const band = Band.fake().aBand().withName("My Band").build();
-    await bandRepository.insert(band);
+      const mine = await controller.findMine(asMusician(other));
 
-    await controller.addMember(band.band_id.id, {
-      musician_id: musician.musician_id.id,
-      role: "member",
-      instrument: "Guitar",
-    } as any);
+      expect(mine).toHaveLength(1);
+      expect(mine[0]).toBeInstanceOf(PublicBandPresenter);
+      expect(
+        mine[0].members.find((m) => m.musician_id === other.musician_id.id),
+      ).toMatchObject({ status: "pending", instrument: "Baixo" });
+    });
 
-    const currentUser = {
-      userId: musician.musician_id.id,
-      roles: ["musician"],
-      establishmentIds: [],
-      bandIds: [],
-      isAdmin: false,
+    it("quem integra a banda a recebe por dentro", async () => {
+      const created = await createBand();
+
+      const mine = await controller.findMine(asMusician(leader));
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0]).toBeInstanceOf(BandPresenter);
+      expect(mine[0].id).toBe(created.id);
+    });
+  });
+
+  describe("convite: aceitar, recusar, sair", () => {
+    const invite = async () => {
+      const created = await createBand();
+      await controller.addMember(
+        created.id,
+        { musician_id: other.musician_id.id, instrument: "Baixo" } as never,
+        asMusician(leader),
+      );
+      return created.id;
     };
 
-    const presenterAfterDecline = await controller.declineInvite(
-      band.band_id.id,
-      currentUser as any,
-    );
+    it("aceitar transforma o convidado em integrante", async () => {
+      const id = await invite();
 
-    expect(presenterAfterDecline.members[0].status).toBe("declined");
+      const presenter = await controller.acceptInvite(id, asMusician(other));
+
+      expect(presenter).toBeInstanceOf(BandPresenter);
+      const saved = await bandRepository.findById(new BandId(id));
+      expect(saved!.isAcceptedMember(other.musician_id)).toBe(true);
+    });
+
+    it("recusar mantém o músico de fora, e ele recebe a banda como terceiro", async () => {
+      const id = await invite();
+
+      const presenter = await controller.declineInvite(id, asMusician(other));
+
+      expect(presenter).toBeInstanceOf(PublicBandPresenter);
+      const saved = await bandRepository.findById(new BandId(id));
+      expect(saved!.findMember(other.musician_id)?.status).toBe("declined");
+    });
+
+    it("🔴 o integrante sai sozinho, sem depender do líder", async () => {
+      const id = await invite();
+      await controller.acceptInvite(id, asMusician(other));
+
+      await controller.removeMember(
+        id,
+        other.musician_id.id,
+        asMusician(other),
+      );
+
+      const saved = await bandRepository.findById(new BandId(id));
+      expect(saved!.findMember(other.musician_id)).toBeNull();
+    });
+
+    it("quem não é líder não convida", async () => {
+      const id = await invite();
+      await controller.acceptInvite(id, asMusician(other));
+      const third = Musician.fake().aMusician().build();
+      await musicianRepository.insert(third);
+
+      await expect(
+        controller.addMember(
+          id,
+          { musician_id: third.musician_id.id, instrument: "Voz" } as never,
+          asMusician(other),
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
-  it("should set band open_to_gigs, never defaulting to true", async () => {
-    const band = Band.fake().aBand().withName("My Band").build();
-    await bandRepository.insert(band);
+  describe("atualizar", () => {
+    it("🔴 `formed_in` é gravado — o controller o descartava e respondia 200", async () => {
+      const created = await createBand();
 
-    expect(band.open_to_gigs).toBeNull();
+      const presenter = await controller.update(
+        created.id,
+        { formed_in: 2015 } as never,
+        asMusician(leader),
+      );
 
-    const presenter = await controller.setOpenToGigs(band.band_id.id, {
-      open_to_gigs: true,
-    } as any);
+      expect(presenter.formed_in).toBe(2015);
+      const saved = await bandRepository.findById(new BandId(created.id));
+      expect(saved!.formed_in).toBe(2015);
 
-    expect(presenter.open_to_gigs).toBe(true);
+      const cleared = await controller.update(
+        created.id,
+        { formed_in: null } as never,
+        asMusician(leader),
+      );
+      expect(cleared.formed_in).toBeNull();
+    });
+
+    it("nada do corpo sobrescreve o id da URL nem o ator do token", async () => {
+      const created = await createBand();
+      const stranger = Musician.fake().aMusician().build();
+
+      await expect(
+        controller.update(
+          created.id,
+          {
+            name: "tomada",
+            // Se o spread do corpo viesse depois, isto promoveria o estranho.
+            requesting_musician_id: leader.musician_id.id,
+            is_admin: true,
+          } as never,
+          asMusician(stranger),
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe("🔴 transferir a liderança muda quem opera a banda, na hora", () => {
+    it("a nova líder passa a editar e o ex-líder deixa de poder", async () => {
+      const created = await createBand();
+      await controller.addMember(
+        created.id,
+        { musician_id: other.musician_id.id, instrument: "Baixo" } as never,
+        asMusician(leader),
+      );
+      await controller.acceptInvite(created.id, asMusician(other));
+
+      await controller.transferLeadership(
+        created.id,
+        { new_leader_musician_id: other.musician_id.id },
+        asMusician(leader),
+      );
+
+      const renamed = await controller.update(
+        created.id,
+        { name: "da nova líder" } as never,
+        asMusician(other),
+      );
+      expect(renamed.name).toBe("da nova líder");
+
+      await expect(
+        controller.update(
+          created.id,
+          { name: "do ex-líder" } as never,
+          asMusician(leader),
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.remove(created.id, asMusician(leader)),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe("dissolver", () => {
+    it("banda sem histórico é apagada", async () => {
+      const created = await createBand();
+
+      const presenter = await controller.remove(created.id, asMusician(leader));
+
+      expect(presenter).toEqual(
+        new DissolveBandPresenter({ outcome: "deleted" }),
+      );
+      expect(await bandRepository.findById(new BandId(created.id))).toBeNull();
+    });
+
+    it("banda com histórico é arquivada e sai da busca", async () => {
+      const created = await createBand();
+      await controller.setOpenToGigs(
+        created.id,
+        { open_to_gigs: true } as never,
+        asMusician(leader),
+      );
+      commitments.set(new BandId(created.id), { has_history: true });
+
+      const presenter = await controller.remove(created.id, asMusician(leader));
+
+      expect(presenter.outcome).toBe("archived");
+      expect((await controller.findAll({})).data).toHaveLength(0);
+      // Continua resolvível por id: o nome aparece nos shows antigos.
+      const stillThere = await controller.findOne(created.id);
+      expect(stillThere.is_active).toBe(false);
+    });
+  });
+});
+
+/**
+ * 🔴 Ordem de rota dentro do controller — mesmo guarda de
+ * `MusiciansController`. `mine` e `identities` são segmentos literais e `:id`
+ * é curinga: declarados depois, casariam como `findOne`, o `ParseUUIDPipe`
+ * responderia 422 e "Minhas bandas" deixaria de carregar sem erro nenhum.
+ */
+describe("BandsController — ordem de rota", () => {
+  const proto = BandsController.prototype as unknown as Record<string, any>;
+  const methodOrder = () =>
+    Object.getOwnPropertyNames(proto).filter(
+      (name) => typeof proto[name] === "function" && name !== "constructor",
+    );
+  const pathOf = (method: string) =>
+    Reflect.getMetadata("path", proto[method]) as string | undefined;
+  const verbOf = (method: string) =>
+    Reflect.getMetadata("method", proto[method]) as number | undefined;
+
+  it.each(["findMine", "findIdentities"])(
+    "declara %s ANTES de findOne",
+    (method) => {
+      const order = methodOrder();
+
+      expect(order.indexOf(method)).toBeGreaterThanOrEqual(0);
+      expect(order.indexOf(method)).toBeLessThan(order.indexOf("findOne"));
+    },
+  );
+
+  it("os handlers continuam nos caminhos que este teste assume", () => {
+    expect(pathOf("findMine")).toBe("mine");
+    expect(pathOf("findIdentities")).toBe("identities");
+    expect(pathOf("findOne")).toBe(":id");
+  });
+
+  it("nenhum segmento literal de GET nasce depois de :id", () => {
+    const order = methodOrder();
+    const findOneIndex = order.indexOf("findOne");
+    // RequestMethod.GET === 0
+    const literalGetsAfter = order
+      .slice(findOneIndex + 1)
+      .filter((name) => verbOf(name) === 0)
+      .filter((name) => {
+        const path = pathOf(name) ?? "";
+        return path !== "" && !path.startsWith(":");
+      });
+
+    expect(literalGetsAfter).toEqual([]);
+  });
+
+  it("nenhuma rota de escrita ficou pública", () => {
+    const publicWrites = methodOrder().filter(
+      (name) =>
+        verbOf(name) !== undefined &&
+        verbOf(name) !== 0 &&
+        Reflect.getMetadata("isPublic", proto[name]) === true,
+    );
+
+    expect(publicWrites).toEqual([]);
   });
 });

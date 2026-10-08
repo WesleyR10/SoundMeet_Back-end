@@ -61,9 +61,15 @@ describe("BandPrismaRepository", () => {
       expect(txClient.bandMember.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            bandId_musicianId: { bandId: band.band_id.id, musicianId: musicianA },
+            bandId_musicianId: {
+              bandId: band.band_id.id,
+              musicianId: musicianA,
+            },
           },
-          create: expect.objectContaining({ musicianId: musicianA, status: "pending" }),
+          create: expect.objectContaining({
+            musicianId: musicianA,
+            status: "pending",
+          }),
           update: expect.objectContaining({ status: "pending" }),
         }),
       );
@@ -81,7 +87,7 @@ describe("BandPrismaRepository", () => {
     });
   });
 
-  describe("search — musician_id filter (\"minhas bandas\")", () => {
+  describe('search — musician_id filter ("minhas bandas")', () => {
     it("only matches accepted membership, not pending/declined invites", async () => {
       prisma.band.findMany.mockResolvedValue([]);
       prisma.band.count.mockResolvedValue(0);

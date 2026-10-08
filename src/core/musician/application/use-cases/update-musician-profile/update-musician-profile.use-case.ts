@@ -79,7 +79,12 @@ export class UpdateMusicianProfileUseCase implements IUseCase<
     }
 
     if (input.socialLinks !== undefined) {
-      profile.changeSocialLinks(input.socialLinks);
+      // Spread para objeto plano: `SocialLinksInput` é uma classe (precisa
+      // ser, para o `@ValidateNested` do class-validator), e o agregado guarda
+      // `Record<string, unknown>`.
+      profile.changeSocialLinks(
+        input.socialLinks ? { ...input.socialLinks } : null,
+      );
     }
 
     const notification = new Notification();

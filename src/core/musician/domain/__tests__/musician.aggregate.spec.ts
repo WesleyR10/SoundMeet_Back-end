@@ -2,6 +2,7 @@ import { Email } from "../../../shared/domain/value-objects/email.vo";
 import { Phone } from "../../../shared/domain/value-objects/phone.vo";
 import { QRCode } from "../../../shared/domain/value-objects/qr-code.vo";
 import { Rating } from "../../../shared/domain/value-objects/rating.vo";
+import { generateValidCnpj } from "../../../shared/infra/testing/cnpj.fixture";
 import { Musician, MusicianId } from "../musician.aggregate";
 
 describe("Musician Unit Tests without validator", () => {
@@ -48,7 +49,8 @@ describe("Musician Unit Tests without validator", () => {
       genres: ["Rock", "Pop"],
       instruments: ["Guitar", "Piano"],
       experience_years: 10,
-      qr_code: "QR123456",
+      qr_code:
+        "https://soundmeet.com.br/musico/9366b7dc-2d71-4799-b91c-c64adb205104",
       rating: 4.5,
       total_ratings: 100,
       is_active: false,
@@ -67,7 +69,9 @@ describe("Musician Unit Tests without validator", () => {
     expect(musician.instruments).toEqual(["Guitar", "Piano"]);
     expect(musician.experience_years).toBe(10);
     expect(musician.qr_code).toBeInstanceOf(QRCode);
-    expect(musician.qr_code?.code).toBe("QR123456");
+    expect(musician.qr_code?.code).toBe(
+      "https://soundmeet.com.br/musico/9366b7dc-2d71-4799-b91c-c64adb205104",
+    );
     expect(musician.rating.value).toBe(4.5);
     expect(musician.total_ratings).toBe(100);
     expect(musician.is_active).toBe(false);
@@ -356,7 +360,8 @@ describe("Musician Unit Tests without validator", () => {
       genres: ["Rock", "Pop"],
       instruments: ["Guitar", "Piano"],
       experience_years: 10,
-      qr_code: "QR123456",
+      qr_code:
+        "https://soundmeet.com.br/musico/9366b7dc-2d71-4799-b91c-c64adb205104",
       rating: 4.5,
       total_ratings: 100,
       is_active: true,
@@ -371,18 +376,22 @@ describe("Musician Unit Tests without validator", () => {
       stage_name: "John Rock",
       bio: "Professional musician",
       avatar: "https://example.com/avatar.jpg",
+      presentation_audio: null,
       phone: "+5511999999999",
       cpf: "52998224725",
+      cnpj: null,
       genres: ["Rock", "Pop"],
       instruments: ["Guitar", "Piano"],
       experience_years: 10,
-      qr_code: "QR123456",
+      qr_code:
+        "https://soundmeet.com.br/musico/9366b7dc-2d71-4799-b91c-c64adb205104",
       qr_customization: null,
       rating: 4.5,
       total_ratings: 100,
       is_active: true,
       is_verified: true,
       open_to_gigs: null,
+      accepts_requests_outside_repertoire: true,
       profile: null,
       created_at: musician.created_at,
       updated_at: musician.updated_at,
@@ -467,6 +476,59 @@ describe("Musician Unit Tests with validator", () => {
       const musician = Musician.fake().aMusician().build();
       expect(() => musician.changePhone("+5511888888888")).not.toThrow();
       expect(musician.phone!.value).toBe("+5511888888888");
+    });
+  });
+
+  describe("changeCnpj method (MEI)", () => {
+    test("should set a valid cnpj", () => {
+      const musician = Musician.fake().aMusician().build();
+      const cnpj = generateValidCnpj("112223330001");
+
+      musician.changeCnpj(cnpj);
+
+      expect(musician.cnpj!.value).toBe(cnpj);
+      expect(musician.notification.hasErrors()).toBe(false);
+    });
+
+    test("should accept a masked cnpj and store only digits", () => {
+      const musician = Musician.fake().aMusician().build();
+
+      musician.changeCnpj("11.222.333/0001-81");
+
+      expect(musician.cnpj!.value).toBe("11222333000181");
+    });
+
+    // Baixar o MEI é um evento real: quem o faz volta a contratar como pessoa
+    // física, e o contrato precisa acompanhar.
+    test("should clear the cnpj when null is passed", () => {
+      const musician = Musician.fake()
+        .aMusician()
+        .withCnpj(generateValidCnpj("112223330001"))
+        .build();
+
+      musician.changeCnpj(null);
+
+      expect(musician.cnpj).toBeNull();
+      expect(musician.notification.hasErrors()).toBe(false);
+    });
+
+    test("should notify and keep null when the check digits do not match", () => {
+      const musician = Musician.fake().aMusician().build();
+
+      musician.changeCnpj("11222333000199");
+
+      expect(musician.cnpj).toBeNull();
+      expect(musician.notification.hasErrors()).toBe(true);
+      expect(musician.notification.toJSON()).toContainEqual(
+        expect.objectContaining({ cnpj: expect.anything() }),
+      );
+    });
+
+    test("should not throw for a musician without cnpj — the field is optional", () => {
+      const musician = Musician.fake().aMusician().build();
+
+      expect(musician.cnpj).toBeNull();
+      expect(musician.toJSON().cnpj).toBeNull();
     });
   });
 

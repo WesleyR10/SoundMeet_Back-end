@@ -1,7 +1,7 @@
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
-import { FakeGeocodingService } from "../../../../../shared/infra/geocoding/fake-geocoding.service";
 import { Location } from "../../../../../shared/domain/value-objects/location.vo";
+import { FakeGeocodingService } from "../../../../../shared/infra/geocoding/fake-geocoding.service";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { SetMusicianTouringLocationUseCase } from "../set-musician-touring-location.use-case";
@@ -47,8 +47,14 @@ describe("SetMusicianTouringLocationUseCase — 7.13d", () => {
     const musician = Musician.fake().aMusician().build();
     await repository.insert(musician);
 
-    const geocoding = new FakeGeocodingService({ latitude: -8.0476, longitude: -34.877 });
-    const useCase = new SetMusicianTouringLocationUseCase(repository, geocoding);
+    const geocoding = new FakeGeocodingService({
+      latitude: -8.0476,
+      longitude: -34.877,
+    });
+    const useCase = new SetMusicianTouringLocationUseCase(
+      repository,
+      geocoding,
+    );
 
     const output = await useCase.execute({
       id: musician.musician_id.id,
@@ -83,7 +89,10 @@ describe("SetMusicianTouringLocationUseCase — 7.13d", () => {
     await repository.insert(musician);
 
     const geocoding = new FakeGeocodingService(null);
-    const useCase = new SetMusicianTouringLocationUseCase(repository, geocoding);
+    const useCase = new SetMusicianTouringLocationUseCase(
+      repository,
+      geocoding,
+    );
 
     await expect(
       useCase.execute({

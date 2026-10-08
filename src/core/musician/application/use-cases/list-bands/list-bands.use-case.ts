@@ -13,6 +13,17 @@ import { ListBandsInput } from "./list-bands.input";
 
 export type ListBandsOutput = PaginationOutput<BandOutput>;
 
+/**
+ * A busca PÚBLICA de bandas — descoberta por quem contrata.
+ *
+ * 🔴 Sempre passa por `BandSearchParams.createPublic` (no radar E ativa), sem
+ * exceção. Até out/2026 havia uma: `filter.musician_id` ("minhas bandas")
+ * pulava o gate, porque o músico precisa ver a própria banda mesmo fora do
+ * radar. Só que a rota é anônima e o filtro era de qualquer um — passando o id
+ * de um integrante, vinham as bandas dele que o líder NÃO tinha posto na
+ * busca. "Minhas bandas" hoje é `ListMyBandsUseCase`, autenticada, com o id
+ * tirado do token.
+ */
 export class ListBandsUseCase implements IUseCase<
   ListBandsInput,
   ListBandsOutput
@@ -20,17 +31,9 @@ export class ListBandsUseCase implements IUseCase<
   constructor(private readonly bandRepo: IBandRepository) {}
 
   async execute(input: ListBandsInput): Promise<ListBandsOutput> {
-    // "Minhas bandas" (filter.musician_id) é o próprio músico vendo bandas
-    // das quais é membro aceito — visibilidade não depende do opt-in de
-    // descoberta por estabelecimento, então o gate de consentimento NÃO se
-    // aplica aqui (senão o músico ficaria sem ver a própria banda até o
-    // líder ativar open_to_gigs). Qualquer outra busca é pública/descoberta
-    // por terceiros e passa pelo gate via BandSearchParams.createPublic.
-    const isSelfLookup = !!input.filter?.musician_id;
-    const params = isSelfLookup
-      ? BandSearchParams.create(input)
-      : BandSearchParams.createPublic(input);
-    const searchResult = await this.bandRepo.search(params);
+    const searchResult = await this.bandRepo.search(
+      BandSearchParams.createPublic(input),
+    );
 
     return this.toOutput(searchResult);
   }

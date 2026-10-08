@@ -1,19 +1,32 @@
-import { haversineKm } from "../../../../shared/domain/geo.utils";
 import { SortDirection } from "../../../../shared/domain/repository/search-params";
+import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { InMemorySearchableRepository } from "../../../../shared/infra/db/in-memory/in-memory.repository";
-import { Band, BandId } from "../../../domain/band.aggregate";
+import { Band, BandId, BandMemberStatus } from "../../../domain/band.aggregate";
 import {
   BandFilter,
   BandSearchParams,
   BandSearchResult,
   IBandRepository,
 } from "../../../domain/band.repository";
+import { publicDistanceKm } from "../../../domain/musician-location-privacy";
 
 export class BandInMemoryRepository
   extends InMemorySearchableRepository<Band, BandId, BandFilter>
   implements IBandRepository
 {
   sortableFields: string[] = ["name", "created_at"];
+
+  async findByMember(
+    musician_id: Uuid,
+    statuses: BandMemberStatus[],
+  ): Promise<Band[]> {
+    return this.items
+      .filter((band) => {
+        const member = band.findMember(musician_id);
+        return !!member && statuses.includes(member.status);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   async search(props: BandSearchParams): Promise<BandSearchResult> {
     const result = await super.search(props);
@@ -42,10 +55,10 @@ export class BandInMemoryRepository
           band.name.toLowerCase().includes(filter.name.toLowerCase());
       }
 
+      // `some`, como o `hasSome` do Prisma: escolher dois gêneros traz quem
+      // toca QUALQUER um deles. Com `every` o teste afirmava outra busca.
       if (filter.genres?.length) {
-        matches =
-          matches &&
-          filter.genres.every((g) => band.genres.some((bg) => bg === g));
+        matches = matches && filter.genres.some((g) => band.genres.includes(g));
       }
 
       const priceRange = band.priceRange;
@@ -92,7 +105,9 @@ export class BandInMemoryRepository
           );
       }
 
-      // Busca por raio — paridade com MusicianInMemoryRepository (7.13c).
+      // Busca por raio, medida na GRADE PÚBLICA — nunca na coordenada exata.
+      // Ver `musician-location-privacy.ts`: com a posição precisa, mover a
+      // origem e repetir acha o endereço da banda em poucas requisições.
       if (
         filter.lat !== null &&
         filter.lat !== undefined &&
@@ -101,16 +116,11 @@ export class BandInMemoryRepository
         filter.radius_km !== null &&
         filter.radius_km !== undefined
       ) {
-        const address = band.address;
-        matches =
-          matches &&
-          !!address &&
-          address.latitude !== null &&
-          address.latitude !== undefined &&
-          address.longitude !== null &&
-          address.longitude !== undefined &&
-          haversineKm(filter.lat, filter.lng, address.latitude, address.longitude) <=
-            filter.radius_km;
+        const distance = publicDistanceKm(
+          { lat: filter.lat, lng: filter.lng },
+          [band.address],
+        );
+        matches = matches && distance !== null && distance <= filter.radius_km;
       }
 
       return matches;

@@ -6,7 +6,8 @@ import {
 import { SearchResult as DefaultSearchResult } from "../../shared/domain/repository/search-result";
 import { Currency } from "../../shared/domain/value-objects/money.vo";
 import { PriceModel } from "../../shared/domain/value-objects/price-range.vo";
-import { Band, BandId } from "./band.aggregate";
+import { Uuid } from "../../shared/domain/value-objects/uuid.vo";
+import { Band, BandId, BandMemberStatus } from "./band.aggregate";
 
 export type BandFilter = {
   name?: string | null;
@@ -24,8 +25,9 @@ export type BandFilter = {
   lat?: number | null;
   lng?: number | null;
   radius_km?: number | null;
-  // "Minhas bandas" — bandas onde o músico é membro. Roster de banda já é
-  // público via GET /bands/:id, então esse filtro não precisa de ownership.
+  // Bandas onde o músico é integrante ACEITO. Uso interno (currículo do
+  // músico): NÃO é filtro da busca pública — por HTTP ele listava bandas fora
+  // do radar e contornava o opt-in. "Minhas bandas" é `findByMember`.
   musician_id?: string | null;
 };
 
@@ -46,14 +48,16 @@ export class BandSearchParams extends DefaultSearchParams<BandFilter> {
     return new BandSearchParams(props);
   }
 
-  // Gate de consentimento — mesmo raciocínio de MusicianSearchParams.createPublic:
-  // único ponto de aplicação, sempre vence o filtro do chamador. NÃO use para
-  // "minhas bandas" (filter.musician_id) — visibilidade da própria banda para
-  // quem já é membro dela não depende do opt-in de descoberta por terceiros.
+  // Gate de descoberta — mesmo raciocínio de MusicianSearchParams.createPublic:
+  // único ponto de aplicação, sempre vence o filtro do chamador.
+  //
+  // Duas condições, e as duas são do líder: `open_to_gigs` é o consentimento
+  // para aparecer; `is_active` falso é banda dissolvida (arquivada), que não
+  // pode ser sugerida a um estabelecimento como se ainda tocasse.
   static createPublic(props: SearchParamsConstructorProps<BandFilter> = {}) {
     return new BandSearchParams({
       ...props,
-      filter: { ...(props.filter ?? {}), open_to_gigs: true },
+      filter: { ...(props.filter ?? {}), open_to_gigs: true, is_active: true },
     });
   }
 
@@ -102,9 +106,10 @@ export class BandSearchParams extends DefaultSearchParams<BandFilter> {
           lng: Number(_value.lng),
           radius_km: Math.min(Number(_value.radius_km), 500),
         }),
-      ...(_value && _value.musician_id && {
-        musician_id: `${_value.musician_id}`,
-      }),
+      ...(_value &&
+        _value.musician_id && {
+          musician_id: `${_value.musician_id}`,
+        }),
     };
 
     this._filter = Object.keys(filter).length === 0 ? null : filter;
@@ -119,4 +124,16 @@ export interface IBandRepository extends ISearchableRepository<
   BandFilter,
   BandSearchParams,
   BandSearchResult
-> {}
+> {
+  /**
+   * As bandas em que o músico tem linha de integrante num dos `statuses`.
+   *
+   * É a consulta de "Minhas bandas": aceitas E convites pendentes saem da
+   * mesma leitura. Não passa pelo gate de `open_to_gigs` nem por `is_active` —
+   * o músico vê as próprias bandas, no radar ou não, arquivadas ou não.
+   */
+  findByMember(
+    musician_id: Uuid,
+    statuses: BandMemberStatus[],
+  ): Promise<Band[]>;
+}

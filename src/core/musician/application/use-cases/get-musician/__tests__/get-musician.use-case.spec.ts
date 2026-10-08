@@ -1,8 +1,3 @@
-import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
-import {
-  InvalidUuidError,
-  Uuid,
-} from "../../../../../shared/domain/value-objects/uuid.vo";
 import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { MusicianPlanTier } from "../../../../../plans/domain/plan-tier.enum";
 import {
@@ -10,6 +5,11 @@ import {
   SubscriptionStatus,
 } from "../../../../../plans/domain/subscription.aggregate";
 import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
+import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
+import {
+  InvalidUuidError,
+  Uuid,
+} from "../../../../../shared/domain/value-objects/uuid.vo";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { GetMusicianInput } from "../get-musician.input";
@@ -67,8 +67,10 @@ describe("GetMusicianUseCase Unit Tests", () => {
       stage_name: musician.stage_name,
       email: musician.email.value,
       phone: musician.phone?.value ?? null,
+      cnpj: musician.cnpj?.value ?? null,
       bio: musician.bio,
       avatar: musician.avatar,
+      presentation_audio: null,
       genres: musician.genres,
       instruments: musician.instruments,
       experience_years: musician.experience_years,
@@ -77,6 +79,8 @@ describe("GetMusicianUseCase Unit Tests", () => {
       is_active: musician.is_active,
       is_verified: musician.is_verified,
       open_to_gigs: musician.open_to_gigs,
+      accepts_requests_outside_repertoire:
+        musician.accepts_requests_outside_repertoire,
       profile: musician.profile?.toJSON() ?? null,
       qr_code: musician.qr_code!.code,
       qr_customization: musician.qr_code!.customization ?? null,

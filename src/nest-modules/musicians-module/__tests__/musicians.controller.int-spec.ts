@@ -6,14 +6,17 @@ import { MusicianOutputMapper } from "../../../core/musician/application/use-cas
 import { CreateMusicianUseCase } from "../../../core/musician/application/use-cases/create-musician/create-musician.use-case";
 import { CustomizeQRCodeUseCase } from "../../../core/musician/application/use-cases/customize-qr-code/customize-qr-code.use-case";
 import { DeleteMusicianUseCase } from "../../../core/musician/application/use-cases/delete-musician/delete-musician.use-case";
+import { DeleteMusicianPresentationAudioUseCase } from "../../../core/musician/application/use-cases/delete-musician-presentation-audio/delete-musician-presentation-audio.use-case";
 import { GetMusicianUseCase } from "../../../core/musician/application/use-cases/get-musician/get-musician.use-case";
 import { ListMusiciansUseCase } from "../../../core/musician/application/use-cases/list-musicians/list-musicians.use-case";
 import { RegisterPushTokenUseCase } from "../../../core/musician/application/use-cases/register-push-token/register-push-token.use-case";
 import { SetMusicianOpenToGigsUseCase } from "../../../core/musician/application/use-cases/set-musician-open-to-gigs/set-musician-open-to-gigs.use-case";
+import { SetMusicianRequestScopeUseCase } from "../../../core/musician/application/use-cases/set-musician-request-scope/set-musician-request-scope.use-case";
 import { SetMusicianTouringLocationUseCase } from "../../../core/musician/application/use-cases/set-musician-touring-location/set-musician-touring-location.use-case";
 import { UpdateMusicianUseCase } from "../../../core/musician/application/use-cases/update-musician/update-musician.use-case";
 import { UpdateMusicianProfileUseCase } from "../../../core/musician/application/use-cases/update-musician-profile/update-musician-profile.use-case";
 import { UploadMusicianAvatarUseCase } from "../../../core/musician/application/use-cases/upload-musician-avatar/upload-musician-avatar.use-case";
+import { UploadMusicianPresentationAudioUseCase } from "../../../core/musician/application/use-cases/upload-musician-presentation-audio/upload-musician-presentation-audio.use-case";
 import { UploadQrLogoUseCase } from "../../../core/musician/application/use-cases/upload-qr-logo/upload-qr-logo.use-case";
 import { VerifyMusicianUseCase } from "../../../core/musician/application/use-cases/verify-musician/verify-musician.use-case";
 import {
@@ -23,6 +26,7 @@ import {
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
 import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
+import { ListFeaturedMusiciansUseCase } from "../../../core/musician/application/use-cases/list-featured-musicians/list-featured-musicians.use-case";
 import { PlanCheckService } from "../../../core/plans/domain/plan-check.service";
 import { SubscriptionInMemoryRepository } from "../../../core/plans/infra/db/in-memory/subscription-in-memory.repository";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
@@ -101,6 +105,12 @@ describe("MusiciansController Integration Tests", () => {
           inject: ["MusicianRepository"],
         },
         {
+          provide: SetMusicianRequestScopeUseCase,
+          useFactory: (repo: IMusicianRepository) =>
+            new SetMusicianRequestScopeUseCase(repo),
+          inject: ["MusicianRepository"],
+        },
+        {
           provide: GetMusicianUseCase,
           useFactory: (
             repo: IMusicianRepository,
@@ -141,11 +151,31 @@ describe("MusiciansController Integration Tests", () => {
           inject: ["MusicianRepository", "MusicianStorage"],
         },
         {
+          provide: UploadMusicianPresentationAudioUseCase,
+          useFactory: (repo: IMusicianRepository, storage: IMusicianStorage) =>
+            new UploadMusicianPresentationAudioUseCase(repo, storage),
+          inject: ["MusicianRepository", "MusicianStorage"],
+        },
+        {
+          provide: DeleteMusicianPresentationAudioUseCase,
+          useFactory: (repo: IMusicianRepository, storage: IMusicianStorage) =>
+            new DeleteMusicianPresentationAudioUseCase(repo, storage),
+          inject: ["MusicianRepository", "MusicianStorage"],
+        },
+        {
           provide: CustomizeQRCodeUseCase,
           useFactory: (
             repo: IMusicianRepository,
             planCheck: PlanCheckService,
           ) => new CustomizeQRCodeUseCase(repo, planCheck),
+          inject: ["MusicianRepository", "PlanCheckService"],
+        },
+        {
+          provide: ListFeaturedMusiciansUseCase,
+          useFactory: (
+            repo: IMusicianRepository,
+            planCheck: PlanCheckService,
+          ) => new ListFeaturedMusiciansUseCase(repo, planCheck),
           inject: ["MusicianRepository", "PlanCheckService"],
         },
         {

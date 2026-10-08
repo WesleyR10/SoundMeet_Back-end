@@ -1,13 +1,13 @@
 import { PlanLimitExceededError } from "../../../../../plans/domain/errors/plan-limit-exceeded.error";
+import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { MusicianPlanTier } from "../../../../../plans/domain/plan-tier.enum";
 import {
   Subscription,
   SubscriptionStatus,
 } from "../../../../../plans/domain/subscription.aggregate";
-import { PlanCheckService } from "../../../../../plans/domain/plan-check.service";
 import { SubscriptionInMemoryRepository } from "../../../../../plans/infra/db/in-memory/subscription-in-memory.repository";
-import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { Musician } from "../../../../domain/musician.aggregate";
+import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { CustomizeQRCodeUseCase } from "../customize-qr-code.use-case";
 
 async function setup(tier?: MusicianPlanTier, cancelled = false) {
@@ -26,7 +26,9 @@ async function setup(tier?: MusicianPlanTier, cancelled = false) {
         musician_id: musicianId,
         plan_tier: tier,
         persona: "musician",
-        status: cancelled ? SubscriptionStatus.CANCELLED : SubscriptionStatus.ACTIVE,
+        status: cancelled
+          ? SubscriptionStatus.CANCELLED
+          : SubscriptionStatus.ACTIVE,
       }),
     );
   }

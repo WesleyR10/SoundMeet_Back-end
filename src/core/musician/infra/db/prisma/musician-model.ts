@@ -12,8 +12,14 @@ export type MusicianModel = {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  // Áudio de apresentação: os quatro andam juntos (ver presentation-audio.vo.ts).
+  presentation_audio_url?: string | null;
+  presentation_audio_key?: string | null;
+  presentation_audio_duration_seconds?: number | null;
+  presentation_audio_uploaded_at?: Date | null;
   phone: string | null;
   cpf: string | null;
+  cnpj: string | null;
   genres: string[];
   instruments: string[];
   experience_years: number | null;
@@ -29,6 +35,7 @@ export type MusicianModel = {
   is_active: boolean;
   is_verified: boolean;
   open_to_gigs: boolean | null;
+  accepts_requests_outside_repertoire: boolean;
   email_verified_at?: Date | null;
   email_pending?: string | null;
   email_token?: string | null;

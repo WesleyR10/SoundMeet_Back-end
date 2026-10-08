@@ -12,6 +12,7 @@ import {
   MusicianProfile,
   MusicianProfileId,
 } from "../../../domain/musician-profile.aggregate";
+import { PresentationAudio } from "../../../domain/value-objects/presentation-audio.vo";
 import {
   CurrencyDb,
   JsonValue,
@@ -32,10 +33,7 @@ const toSocialLinks = (value: unknown): Record<string, unknown> | null => {
 const toQrCustomization = (
   model: Pick<
     MusicianModel,
-    | "qr_foreground_color"
-    | "qr_background_color"
-    | "qr_logo_url"
-    | "qr_label"
+    "qr_foreground_color" | "qr_background_color" | "qr_logo_url" | "qr_label"
   >,
 ): QRCustomization | undefined => {
   const { qr_foreground_color, qr_background_color, qr_logo_url, qr_label } =
@@ -54,6 +52,61 @@ const toQrCustomization = (
     logo_url: qr_logo_url ?? undefined,
     label: qr_label ?? undefined,
   };
+};
+
+/**
+ * Reconstrói o áudio de apresentação, ou `null` quando não há nenhum.
+ *
+ * 🔴 **Linha parcial é erro de carga, não um `null` silencioso.** URL sem
+ * chave significa objeto que nunca será apagado do bucket; chave sem URL
+ * significa arquivo pago que ninguém consegue ouvir. Os dois estados só
+ * aparecem se alguém escrever no banco por fora do agregado, e devolver `null`
+ * neles esconderia exatamente o problema que o VO existe para impedir.
+ */
+const toPresentationAudio = (
+  model: Pick<
+    MusicianModel,
+    | "id"
+    | "presentation_audio_url"
+    | "presentation_audio_key"
+    | "presentation_audio_duration_seconds"
+    | "presentation_audio_uploaded_at"
+  >,
+): PresentationAudio | null => {
+  const url = model.presentation_audio_url ?? null;
+  const key = model.presentation_audio_key ?? null;
+
+  if (!url && !key) {
+    return null;
+  }
+
+  if (!url || !key) {
+    throw new LoadEntityError([
+      {
+        presentation_audio: [
+          `Musician ${model.id} has a partial presentation audio row (url and key must both exist)`,
+        ],
+      },
+    ]);
+  }
+
+  try {
+    return new PresentationAudio({
+      url,
+      object_key: key,
+      duration_seconds: model.presentation_audio_duration_seconds ?? 0,
+      uploaded_at: model.presentation_audio_uploaded_at ?? undefined,
+    });
+  } catch (error: any) {
+    throw new LoadEntityError([
+      {
+        presentation_audio: [
+          error?.message ??
+            `Musician ${model.id} has invalid presentation audio data in database`,
+        ],
+      },
+    ]);
+  }
 };
 
 const toDbCurrency = (currency: Currency): CurrencyDb => {
@@ -87,14 +140,23 @@ export class MusicianModelMapper {
       stage_name: entity.stage_name ?? null,
       bio: entity.bio ?? null,
       avatar: entity.avatar ?? null,
+      presentation_audio_url: entity.presentation_audio?.url ?? null,
+      presentation_audio_key: entity.presentation_audio?.object_key ?? null,
+      presentation_audio_duration_seconds:
+        entity.presentation_audio?.duration_seconds ?? null,
+      presentation_audio_uploaded_at:
+        entity.presentation_audio?.uploaded_at ?? null,
       phone: entity.phone?.value ?? null,
       cpf: entity.cpf?.value ?? null,
+      cnpj: entity.cnpj?.value ?? null,
       genres: entity.genres ?? [],
       instruments: entity.instruments ?? [],
       experience_years: entity.experience_years ?? null,
       qr_code: entity.qr_code?.code ?? null,
-      qr_foreground_color: entity.qr_code?.customization?.foreground_color ?? null,
-      qr_background_color: entity.qr_code?.customization?.background_color ?? null,
+      qr_foreground_color:
+        entity.qr_code?.customization?.foreground_color ?? null,
+      qr_background_color:
+        entity.qr_code?.customization?.background_color ?? null,
       qr_logo_url: entity.qr_code?.customization?.logo_url ?? null,
       qr_label: entity.qr_code?.customization?.label ?? null,
       push_token: entity.push_token ?? null,
@@ -104,6 +166,8 @@ export class MusicianModelMapper {
       is_active: entity.is_active,
       is_verified: entity.is_verified,
       open_to_gigs: entity.open_to_gigs,
+      accepts_requests_outside_repertoire:
+        entity.accepts_requests_outside_repertoire,
       created_at: entity.created_at,
       updated_at: entity.updated_at,
     };
@@ -111,9 +175,7 @@ export class MusicianModelMapper {
 
   static toProfileModel(profile: MusicianProfile): MusicianProfileModel {
     const hourRange = profile.priceRanges.find((r) => r.model === "per_hour");
-    const eventRange = profile.priceRanges.find(
-      (r) => r.model === "per_event",
-    );
+    const eventRange = profile.priceRanges.find((r) => r.model === "per_event");
     return {
       id: profile.profile_id.id,
       musicianId: profile.musician_id.id,
@@ -241,8 +303,10 @@ export class MusicianModelMapper {
       stage_name: model.stage_name ?? undefined,
       bio: model.bio ?? undefined,
       avatar: model.avatar ?? undefined,
+      presentation_audio: toPresentationAudio(model),
       phone: model.phone ?? undefined,
       cpf: model.cpf ?? undefined,
+      cnpj: model.cnpj ?? undefined,
       genres: model.genres ?? [],
       instruments: model.instruments ?? [],
       experience_years: model.experience_years ?? undefined,
@@ -253,6 +317,8 @@ export class MusicianModelMapper {
       is_active: model.is_active,
       is_verified: model.is_verified,
       open_to_gigs: model.open_to_gigs,
+      accepts_requests_outside_repertoire:
+        model.accepts_requests_outside_repertoire ?? true,
       push_token: model.push_token ?? undefined,
       push_token_platform: model.push_token_platform ?? undefined,
       created_at: model.created_at,

@@ -25,9 +25,7 @@ export class GetMusicianUseCase implements IUseCase<
       throw new NotFoundError(input.id, Musician);
     }
 
-    const plan_tier = await this.planCheckService.getMusicianPlanTier(
-      input.id,
-    );
+    const plan_tier = await this.planCheckService.getMusicianPlanTier(input.id);
 
     return { ...MusicianOutputMapper.toOutput(entity), plan_tier };
   }

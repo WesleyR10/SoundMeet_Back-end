@@ -1,6 +1,6 @@
+import { ITipRepository } from "../../../../payment/domain/repositories/tip.repository";
 import { PlanCheckService } from "../../../../plans/domain/plan-check.service";
 import { MusicianPlanTier } from "../../../../plans/domain/plan-tier.enum";
-import { IMusicianWalletRepository } from "../../../../payment/domain/repositories/musician-wallet.repository";
 import { IRequestRepository } from "../../../../request/domain/request.repository";
 import { IUseCase } from "../../../../shared/application/use-case.interface";
 import { NotFoundError } from "../../../../shared/domain/errors/not-found.error";
@@ -22,6 +22,11 @@ export type GetMusicianAnalyticsOutput = {
   average_rating: number;
   total_ratings: number;
   plan_tier: string;
+  /**
+   * Desde o 9.7a é sempre `true` para quem chega até aqui — o FREE não passa
+   * do gate. Mantido no output porque o mobile e o web já o leem, e porque
+   * volta a discriminar no dia em que houver um tier pago sem tempo real.
+   */
   realtime_available: boolean;
   accepted_requests_count: number;
   rejected_requests_count: number;
@@ -37,7 +42,7 @@ export class GetMusicianAnalyticsUseCase implements IUseCase<
     private readonly musicianRepo: IMusicianRepository,
     private readonly planCheckService: PlanCheckService,
     private readonly requestRepo: IRequestRepository,
-    private readonly walletRepo: IMusicianWalletRepository,
+    private readonly tipRepo: ITipRepository,
   ) {}
 
   async execute(
@@ -50,6 +55,19 @@ export class GetMusicianAnalyticsUseCase implements IUseCase<
       throw new NotFoundError(input.musician_id, Musician);
     }
 
+    // Gate real, decidido em 9.7a (16/ago/2026). Até então isto era um SOFT
+    // gate: o use-case lia `realtime_analytics` e apenas REPORTAVA a flag no
+    // output, entregando ao FREE exatamente os mesmos números do PRO — a
+    // promessa da tabela de preços não tinha lastro nenhum.
+    //
+    // Cobrado ANTES do Promise.all de propósito: o FREE não paga as quatro
+    // consultas cujo resultado ele não vai receber. E depois do findById, para
+    // que músico inexistente continue sendo 404 e não 402.
+    await this.planCheckService.assertMusicianFeature(
+      input.musician_id,
+      "realtime_analytics",
+    );
+
     const tier = await this.planCheckService.getMusicianPlanTier(
       input.musician_id,
     );
@@ -57,10 +75,13 @@ export class GetMusicianAnalyticsUseCase implements IUseCase<
       input.musician_id,
     );
 
-    const [accepted, rejected, wallet, topSongs] = await Promise.all([
+    const [accepted, rejected, tipsTotal, topSongs] = await Promise.all([
       this.requestRepo.findAcceptedRequestsByMusician(input.musician_id),
       this.requestRepo.findRejectedRequestsByMusician(input.musician_id),
-      this.walletRepo.findByMusicianId(input.musician_id),
+      // 🔴 Era `wallet.total_earned`, que soma também o CACHÊ liberado da
+      // custódia (e o ganho externo do Mercado Pago). O campo se chama "total
+      // em gorjetas" e passou a dizer só isso (30/set/2026).
+      this.tipRepo.sumCompletedByMusician(input.musician_id),
       this.requestRepo.findPopularSongs(input.musician_id, 5),
     ]);
 
@@ -72,7 +93,7 @@ export class GetMusicianAnalyticsUseCase implements IUseCase<
       realtime_available: features.realtime_analytics,
       accepted_requests_count: accepted.length,
       rejected_requests_count: rejected.length,
-      total_tips_amount: wallet?.total_earned.amount ?? 0,
+      total_tips_amount: tipsTotal,
       top_requested_songs: topSongs,
     };
   }

@@ -10,6 +10,19 @@ import { Musician, MusicianId } from "./musician.aggregate";
 
 export type MusicianFilter = {
   name?: string | null;
+  /**
+   * Restringe a busca a um conjunto fechado de ids.
+   *
+   * Existe para a faixa "Em destaque" da grade de artistas: os ids vêm do
+   * repositório de assinaturas e entram aqui, para que o resultado atravesse
+   * o MESMO gate de consentimento (`createPublic`) e a mesma ordenação da
+   * busca normal. Um `findManyByIds` paralelo teria de reimplementar
+   * `open_to_gigs`, e a segunda implementação é onde o gate se perde.
+   *
+   * 🔴 Lista VAZIA não é "sem filtro": é "nenhum id", e tem de devolver zero
+   * resultados. Ver a checagem explícita de `length` no setter abaixo.
+   */
+  ids?: string[] | null;
   stage_name?: string | null;
   email?: string | null;
   genres?: string[] | null;
@@ -77,6 +90,20 @@ export class MusicianSearchParams extends DefaultSearchParams<MusicianFilter> {
 
     const filter = {
       ...(_value && _value.name && { name: `${_value?.name}` }),
+      /*
+       * 🔴 `Array.isArray`, e NÃO truthiness. Um `_value.ids && {...}` deixaria
+       * `[]` passar (array vazio é truthy) — o que é o certo aqui —, mas um
+       * `_value.ids?.length && {...}` descartaria a lista vazia e o filtro
+       * sairia da query: a faixa "Em destaque" passaria a mostrar TODOS os
+       * músicos, sem erro nenhum. É exatamente o vazamento que o override
+       * deste setter existe para evitar (registrado no CLAUDE.md a partir de
+       * `repertoire`), só que ao contrário: aqui o perigo é o filtro sumir
+       * justamente quando não há ninguém para destacar.
+       */
+      ...(_value &&
+        Array.isArray(_value.ids) && {
+          ids: _value.ids.map((id) => `${id}`),
+        }),
       ...(_value &&
         _value.stage_name && { stage_name: `${_value?.stage_name}` }),
       ...(_value && _value.email && { email: `${_value?.email}` }),
@@ -137,5 +164,6 @@ export interface IMusicianRepository extends ISearchableRepository<
 > {
   findByEmail(email: string): Promise<Musician | null>;
   findByCpf(cpf: string): Promise<Musician | null>;
+  findByCnpj(cnpj: string): Promise<Musician | null>;
   findByPhone(phone: string): Promise<Musician | null>;
 }

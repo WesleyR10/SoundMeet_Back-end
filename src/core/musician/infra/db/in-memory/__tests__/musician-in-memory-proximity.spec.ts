@@ -39,7 +39,11 @@ describe("MusicianInMemoryRepository — busca por raio (7.13c)", () => {
   it("retorna só músicos dentro do raio", async () => {
     const result = await repository.search(
       MusicianSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 5,
+        },
       }),
     );
 
@@ -50,7 +54,11 @@ describe("MusicianInMemoryRepository — busca por raio (7.13c)", () => {
   it("exclui músicos sem coordenadas no perfil", async () => {
     const result = await repository.search(
       MusicianSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 500 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 500,
+        },
       }),
     );
 
@@ -90,13 +98,16 @@ describe("MusicianInMemoryRepository — modo turnê (7.13d)", () => {
   const buildTouringMusician = (
     name: string,
     home: { latitude: number; longitude: number } | null,
-    touring:
-      | { location: { latitude: number; longitude: number }; expires_at: Date }
-      | null,
+    touring: {
+      location: { latitude: number; longitude: number };
+      expires_at: Date;
+    } | null,
   ): Musician => {
     const musician = Musician.fake().aMusician().withName(name).build();
     const profile = musician.ensureProfile();
-    profile.changeLocation(new Location({ city: "Base", state: "UF", ...(home ?? {}) }));
+    profile.changeLocation(
+      new Location({ city: "Base", state: "UF", ...(home ?? {}) }),
+    );
     if (touring) {
       profile.setTouringLocation(
         new Location({ city: "Turnê", state: "UF", ...touring.location }),
@@ -120,7 +131,11 @@ describe("MusicianInMemoryRepository — modo turnê (7.13d)", () => {
 
     const result = await repository.search(
       MusicianSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 5,
+        },
       }),
     );
 
@@ -137,7 +152,11 @@ describe("MusicianInMemoryRepository — modo turnê (7.13d)", () => {
 
     const result = await repository.search(
       MusicianSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 5,
+        },
       }),
     );
 
@@ -154,7 +173,11 @@ describe("MusicianInMemoryRepository — modo turnê (7.13d)", () => {
 
     const result = await repository.search(
       MusicianSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 5,
+        },
       }),
     );
 
@@ -166,7 +189,11 @@ describe("MusicianInMemoryRepository — modo turnê (7.13d)", () => {
 
     const result = await repository.search(
       MusicianSearchParams.create({
-        filter: { lat: PAULISTA.latitude, lng: PAULISTA.longitude, radius_km: 5 },
+        filter: {
+          lat: PAULISTA.latitude,
+          lng: PAULISTA.longitude,
+          radius_km: 5,
+        },
       }),
     );
 

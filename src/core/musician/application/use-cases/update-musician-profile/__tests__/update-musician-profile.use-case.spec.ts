@@ -1,8 +1,8 @@
 import { Currency } from "@core/shared/domain/value-objects";
 
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
-import { FakeGeocodingService } from "../../../../../shared/infra/geocoding/fake-geocoding.service";
 import { PriceRange } from "../../../../../shared/domain/value-objects/price-range.vo";
+import { FakeGeocodingService } from "../../../../../shared/infra/geocoding/fake-geocoding.service";
 import { Musician } from "../../../../domain/musician.aggregate";
 import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { UpdateMusicianProfileUseCase } from "../update-musician-profile.use-case";
@@ -163,7 +163,12 @@ describe("UpdateMusicianProfileUseCase — geocodificação (7.13c)", () => {
 
     await useCase.execute({
       id: musician.musician_id.id,
-      location: { city: "Rio de Janeiro", state: "RJ", latitude: -22.9, longitude: -43.17 },
+      location: {
+        city: "Rio de Janeiro",
+        state: "RJ",
+        latitude: -22.9,
+        longitude: -43.17,
+      },
     });
 
     const updated = await repository.findById(musician.musician_id);

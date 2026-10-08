@@ -4,9 +4,10 @@ import { GetMusicianAnalyticsUseCase } from "../../../core/musician/application/
 import { Musician } from "../../../core/musician/domain/musician.aggregate";
 import { IMusicianRepository } from "../../../core/musician/domain/musician.repository";
 import { MusicianInMemoryRepository } from "../../../core/musician/infra/db/in-memory/musician-in-memory.repository";
-import { MusicianWallet } from "../../../core/payment/domain/musician-wallet.aggregate";
-import { IMusicianWalletRepository } from "../../../core/payment/domain/repositories/musician-wallet.repository";
-import { MusicianWalletInMemoryRepository } from "../../../core/payment/infra/db/in-memory/musician-wallet-in-memory.repository";
+import { ITipRepository } from "../../../core/payment/domain/repositories/tip.repository";
+import { Tip } from "../../../core/payment/domain/tip.aggregate";
+import { PaymentMethod } from "../../../core/payment/domain/tip-enums";
+import { TipInMemoryRepository } from "../../../core/payment/infra/db/in-memory/tip-in-memory.repository";
 import { PlanLimitExceededError } from "../../../core/plans/domain/errors/plan-limit-exceeded.error";
 import { PlanCheckService } from "../../../core/plans/domain/plan-check.service";
 import { MusicianPlanTier } from "../../../core/plans/domain/plan-tier.enum";
@@ -19,7 +20,6 @@ import { Request } from "../../../core/request/domain/request.aggregate";
 import { IRequestRepository } from "../../../core/request/domain/request.repository";
 import { RequestStatus } from "../../../core/request/domain/value-objects/request-status.vo";
 import { RequestInMemoryRepository } from "../../../core/request/infra/db/in-memory/request-in-memory.repository";
-import { Money } from "../../../core/shared/domain/value-objects/money.vo";
 import { applyAuthGuardMocks } from "../../shared-module/testing/auth-guard-mock";
 import { MusicianAnalyticsController } from "../musician-analytics.controller";
 
@@ -27,7 +27,7 @@ describe("MusicianAnalyticsController Integration Tests", () => {
   let controller: MusicianAnalyticsController;
   let repository: IMusicianRepository;
   let requestRepository: IRequestRepository;
-  let walletRepository: IMusicianWalletRepository;
+  let tipRepository: ITipRepository;
   let subscriptionRepository: SubscriptionInMemoryRepository;
 
   /** Gate 9.7a: sem assinatura ativa o músico é FREE e o endpoint responde 402. */
@@ -45,7 +45,7 @@ describe("MusicianAnalyticsController Integration Tests", () => {
   beforeEach(async () => {
     const repositoryInstance = new MusicianInMemoryRepository();
     const requestRepositoryInstance = new RequestInMemoryRepository();
-    const walletRepositoryInstance = new MusicianWalletInMemoryRepository();
+    const tipRepositoryInstance = new TipInMemoryRepository();
     const subscriptionRepositoryInstance = new SubscriptionInMemoryRepository();
     subscriptionRepository = subscriptionRepositoryInstance;
 
@@ -61,8 +61,8 @@ describe("MusicianAnalyticsController Integration Tests", () => {
           useValue: requestRepositoryInstance,
         },
         {
-          provide: "MusicianWalletRepository",
-          useValue: walletRepositoryInstance,
+          provide: "TipRepository",
+          useValue: tipRepositoryInstance,
         },
         {
           provide: PlanCheckService,
@@ -74,19 +74,19 @@ describe("MusicianAnalyticsController Integration Tests", () => {
             repo: IMusicianRepository,
             planCheck: PlanCheckService,
             requestRepo: IRequestRepository,
-            walletRepo: IMusicianWalletRepository,
+            tipRepo: ITipRepository,
           ) =>
             new GetMusicianAnalyticsUseCase(
               repo,
               planCheck,
               requestRepo,
-              walletRepo,
+              tipRepo,
             ),
           inject: [
             "MusicianRepository",
             PlanCheckService,
             "RequestRepository",
-            "MusicianWalletRepository",
+            "TipRepository",
           ],
         },
       ],
@@ -100,9 +100,7 @@ describe("MusicianAnalyticsController Integration Tests", () => {
     );
     repository = module.get<IMusicianRepository>("MusicianRepository");
     requestRepository = module.get<IRequestRepository>("RequestRepository");
-    walletRepository = module.get<IMusicianWalletRepository>(
-      "MusicianWalletRepository",
-    );
+    tipRepository = module.get<ITipRepository>("TipRepository");
   });
 
   it("should be defined", () => {
@@ -128,13 +126,14 @@ describe("MusicianAnalyticsController Integration Tests", () => {
           .withStatus(RequestStatus.rejected())
           .build(),
       );
-      await walletRepository.insert(
-        MusicianWallet.fake()
-          .aMusicianWallet()
-          .withMusicianId(musician.musician_id)
-          .withTotalEarned(new Money(250))
-          .build(),
-      );
+      const tip = Tip.create({
+        audience_id: musician.musician_id.id,
+        musician_id: musician.musician_id.id,
+        amount: 250,
+        payment_method: PaymentMethod.PIX,
+      });
+      tip.complete("tx-int-spec");
+      await tipRepository.insert(tip);
 
       await givenPaidPlan(musician.musician_id.id);
 

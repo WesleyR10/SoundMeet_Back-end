@@ -1,7 +1,9 @@
 import {
   AggregateRoot,
+  CNPJ,
   CPF,
   Email,
+  InvalidCNPJError,
   InvalidCPFError,
   Phone,
   QRCode,
@@ -12,12 +14,14 @@ import {
 } from "../../shared/domain";
 import { Location } from "../../shared/domain/value-objects/location.vo";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
+import { buildMusicianQrLink } from "../../shared/domain/value-objects/qr-code-link";
 import { MusicianCreatedEvent } from "./events/musician-created.event";
 import { MusicianEmailChangedEvent } from "./events/musician-email-changed.event";
 import { MusicianVerifiedEvent } from "./events/musician-verified.event";
 import { MusicianValidatorFactory } from "./musician.validator";
 import { MusicianFakeBuilder } from "./musician-fake.builder";
 import { MusicianProfile } from "./musician-profile.aggregate";
+import { PresentationAudio } from "./value-objects/presentation-audio.vo";
 
 export type MusicianConstructorProps = {
   musician_id?: MusicianId;
@@ -26,8 +30,10 @@ export type MusicianConstructorProps = {
   stage_name?: string | null;
   bio?: string | null;
   avatar?: string | null;
+  presentation_audio?: PresentationAudio | null;
   phone?: string | null;
   cpf?: string | null;
+  cnpj?: string | null;
   genres: string[];
   instruments: string[];
   experience_years?: number;
@@ -38,6 +44,7 @@ export type MusicianConstructorProps = {
   is_active?: boolean;
   is_verified?: boolean;
   open_to_gigs?: boolean | null;
+  accepts_requests_outside_repertoire?: boolean;
   profile?: MusicianProfile | null;
   push_token?: string | null;
   push_token_platform?: string | null;
@@ -60,6 +67,11 @@ export type MusicianCreateCommand = {
   is_active?: boolean;
   open_to_gigs?: boolean | null;
   profile?: MusicianProfile | null;
+  /**
+   * Base do link gravado no QR. Vem de `APP_URL` no use-case; o default do
+   * `buildMusicianQrLink` cobre fakes e testes.
+   */
+  qr_base_url?: string;
 };
 
 export class MusicianId extends Uuid {}
@@ -71,8 +83,27 @@ export class Musician extends AggregateRoot {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  /**
+   * Trecho de até 40s que o estabelecimento ouve antes de contratar.
+   *
+   * Fora de `MusicianCreateCommand` de propósito, como a capa do
+   * estabelecimento: nasce no upload, e `null` é o estado normal de quem
+   * acabou de se cadastrar — não uma pendência. Quem guarda a chave do objeto
+   * é o próprio VO; ver o porquê em `presentation-audio.vo.ts`.
+   */
+  presentation_audio: PresentationAudio | null;
   phone: Phone | null;
   cpf: CPF | null;
+  /**
+   * CNPJ do MEI, quando o músico tem um.
+   *
+   * Deliberadamente ausente de `MusicianCreateCommand`: o cadastro continua
+   * sendo de pessoa física, e o CNPJ entra depois, em configurações do perfil.
+   * Quem o tem passa a ser qualificado como pessoa jurídica no contrato — o
+   * que muda a cláusula de tributos, porque MEI não é contribuinte individual
+   * e não sofre retenção previdenciária do tomador.
+   */
+  cnpj: CNPJ | null;
   genres: string[];
   instruments: string[];
   experience_years: number;
@@ -81,6 +112,15 @@ export class Musician extends AggregateRoot {
   total_ratings: number;
   is_active: boolean;
   is_verified: boolean;
+  /**
+   * O público pode pedir música FORA deste repertório?
+   *
+   * Não é preferência de busca: é a regra que `CreateRequestUseCase` aplica.
+   * Com `false`, o pedido só passa acompanhado de um `library_id` desta
+   * biblioteca — um switch que só filtrasse a busca do cliente prometeria
+   * um limite que o campo de texto livre desfaz no primeiro toque.
+   */
+  accepts_requests_outside_repertoire: boolean;
   open_to_gigs: boolean | null;
   profile: MusicianProfile | null;
   push_token: string | null;
@@ -98,6 +138,7 @@ export class Musician extends AggregateRoot {
     this.stage_name = props.stage_name ?? null;
     this.bio = props.bio ?? null;
     this.avatar = props.avatar ?? null;
+    this.presentation_audio = props.presentation_audio ?? null;
     if (!props.phone) {
       this.phone = null;
     } else {
@@ -121,13 +162,36 @@ export class Musician extends AggregateRoot {
     } else {
       this.cpf = null;
     }
+    if (props.cnpj) {
+      try {
+        this.cnpj = new CNPJ(props.cnpj);
+      } catch (error) {
+        const message =
+          error instanceof InvalidCNPJError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Invalid cnpj";
+        this.notification.addError(message, "cnpj");
+        this.cnpj = null;
+      }
+    } else {
+      this.cnpj = null;
+    }
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years ?? 0;
+    /*
+     * `url` é o próprio `code` desde que o QR passou a gravar uma URL https.
+     * Antes eram valores diferentes (`soundmeet://` no code, https no url), e
+     * derivar o url de um padrão fixo aqui significava que uma linha antiga com
+     * `soundmeet://` era relida com um url que não correspondia ao que estava
+     * impresso no adesivo.
+     */
     this.qr_code = props.qr_code
       ? new QRCode({
           code: props.qr_code,
-          url: `https://soundmeet.app/musician/${this.musician_id.id}`,
+          url: props.qr_code,
           customization: props.qr_customization,
         })
       : null;
@@ -137,6 +201,14 @@ export class Musician extends AggregateRoot {
     this.is_verified = props.is_verified ?? false;
     // Nunca default true — consentimento explícito, decisão forçada no onboarding.
     this.open_to_gigs = props.open_to_gigs ?? null;
+    /*
+     * Aqui o default É true, ao contrário de `open_to_gigs`. Este campo não
+     * expõe o músico a ninguém: descreve o comportamento que o produto já tem
+     * (o fã pede o que quiser, o músico recusa o que não toca). Nascer `null`
+     * obrigaria todo leitor a inventar a resposta.
+     */
+    this.accepts_requests_outside_repertoire =
+      props.accepts_requests_outside_repertoire ?? true;
     this.profile = props.profile ?? null;
     this.push_token = props.push_token ?? null;
     this.push_token_platform = props.push_token_platform ?? null;
@@ -151,7 +223,7 @@ export class Musician extends AggregateRoot {
   static create(props: MusicianCreateCommand): Musician {
     const musician = new Musician(props);
     musician.validate(["name", "email"]);
-    musician.generateQRCode();
+    musician.generateQRCode(props.qr_base_url);
     musician.applyEvent(
       new MusicianCreatedEvent({
         musician_id: musician.musician_id,
@@ -192,6 +264,31 @@ export class Musician extends AggregateRoot {
     this.avatar = avatar;
   }
 
+  /**
+   * Troca o áudio de apresentação e **devolve a chave do objeto anterior**,
+   * para o chamador apagá-la do bucket.
+   *
+   * O retorno não é conveniência: é o que impede o arquivo antigo de ficar
+   * órfão e cobrado para sempre — mesmo contrato de `Establishment.changeCover`.
+   * A chave nunca é sobrescrita (é sempre um uuid novo) porque o CDN cacheia
+   * por caminho: reaproveitar a chave continuaria servindo o áudio velho até
+   * alguém invalidar o cache à mão.
+   */
+  changePresentationAudio(audio: PresentationAudio): string | null {
+    const previousKey = this.presentation_audio?.object_key ?? null;
+    this.presentation_audio = audio;
+    this.updated_at = new Date();
+    return previousKey && previousKey !== audio.object_key ? previousKey : null;
+  }
+
+  /** Remove o áudio. Devolve a chave a ser apagada do bucket. */
+  removePresentationAudio(): string | null {
+    const previousKey = this.presentation_audio?.object_key ?? null;
+    this.presentation_audio = null;
+    this.updated_at = new Date();
+    return previousKey;
+  }
+
   // Bookkeeping de device, não evento de negócio — não dispara domain event.
   // Último dispositivo registrado sobrescreve o anterior (sem histórico multi-device).
   registerPushToken(token: string, platform: string): void {
@@ -199,22 +296,29 @@ export class Musician extends AggregateRoot {
     this.push_token_platform = platform;
   }
 
-  changeEmail(email: string): void {
+  /**
+   * PEDE a troca de e-mail — o e-mail atual continua valendo até o dono do
+   * endereço novo clicar no link (`VerifyEmailService`), que só então troca o
+   * banco E o login no Keycloak.
+   *
+   * 🔴 Até out/2026 este método (então `changeEmail`) gravava o endereço novo
+   * na hora: o perfil passava a exibir um e-mail que ninguém provou ter, o
+   * `email_verified_at` do endereço ANTIGO continuava liberando o saque, e o
+   * login seguia no antigo — banco e Keycloak divergindo para sempre.
+   */
+  requestEmailChange(email: string): void {
     const emailOrError = Email.create(email);
-    this.email = emailOrError.ok;
-    emailOrError.isFail() &&
+    if (emailOrError.isFail()) {
       this.notification.setError(emailOrError.error.message, "email");
-    this.validate(["email"]);
-    this.updated_at = new Date();
-    if (!this.notification.hasErrors()) {
-      this.applyEvent(
-        new MusicianEmailChangedEvent({
-          musician_id: this.musician_id,
-          new_email: email,
-          name: this.name,
-        }),
-      );
+      return;
     }
+    this.applyEvent(
+      new MusicianEmailChangedEvent({
+        musician_id: this.musician_id,
+        new_email: emailOrError.ok.value,
+        name: this.name,
+      }),
+    );
   }
 
   changePhone(phone: string | null): void {
@@ -243,6 +347,29 @@ export class Musician extends AggregateRoot {
             : "Invalid cpf";
       this.notification.addError(message, "cpf");
       this.cpf = null;
+    }
+  }
+
+  /**
+   * Passar `null` remove o CNPJ e o músico volta a contratar como pessoa
+   * física — é a saída de quem baixou o MEI, e por isso é permitido.
+   */
+  changeCnpj(cnpj: string | null): void {
+    if (!cnpj) {
+      this.cnpj = null;
+      return;
+    }
+    try {
+      this.cnpj = new CNPJ(cnpj);
+    } catch (error) {
+      const message =
+        error instanceof InvalidCNPJError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Invalid cnpj";
+      this.notification.addError(message, "cnpj");
+      this.cnpj = null;
     }
   }
 
@@ -291,12 +418,19 @@ export class Musician extends AggregateRoot {
     return this.profile;
   }
 
-  generateQRCode(): void {
-    const qrData = `soundmeet://musician/${this.musician_id.id}`;
-    this.qr_code = new QRCode({
-      code: qrData,
-      url: `https://soundmeet.app/musician/${this.musician_id.id}`,
-    });
+  /**
+   * (Re)gera o QR permanente do músico.
+   *
+   * O conteúdo é uma URL https (ver `qr-code-link.ts`): o esquema
+   * `soundmeet://` não fazia nada na câmera de quem não tem o app, que é
+   * justamente quem o adesivo de mesa precisa alcançar.
+   *
+   * `baseUrl` chega do use-case (config `APP_URL`) para que staging imprima QR
+   * de staging; o default existe só para não quebrar fakes e testes.
+   */
+  generateQRCode(baseUrl?: string): void {
+    const link = buildMusicianQrLink(this.musician_id.id, baseUrl);
+    this.qr_code = new QRCode({ code: link, url: link });
   }
 
   customizeQRCode(patch: QRCustomizationPatch): void {
@@ -337,6 +471,28 @@ export class Musician extends AggregateRoot {
     this.rating = new Rating(Math.round(newAverage * 10) / 10);
   }
 
+  /**
+   * Reescreve a projeção a partir do ledger de avaliações (`reviews`,
+   * Bloco 9.3), em vez de incrementar.
+   *
+   * `addRating` acima só sabe somar — o que fica **errado** assim que alguém
+   * reavalia (a nota antiga continuaria no acumulado) ou uma avaliação é
+   * removida por moderação. Com o ledger como fonte de verdade, a média é
+   * recalculada e simplesmente aplicada aqui.
+   *
+   * Mesmo par que gamificação já usa: `UserScore` (ledger) → `UserPoints`
+   * (projeção).
+   */
+  syncRatingProjection(average: number, total: number): void {
+    if (total < 0 || average < 0 || average > 5) {
+      this.notification.addError("Invalid rating projection", "rating");
+      return;
+    }
+
+    this.rating = new Rating(Math.round(average * 10) / 10);
+    this.total_ratings = total;
+  }
+
   activate(): void {
     this.is_active = true;
   }
@@ -364,6 +520,11 @@ export class Musician extends AggregateRoot {
     this.updated_at = new Date();
   }
 
+  setAcceptsRequestsOutsideRepertoire(value: boolean): void {
+    this.accepts_requests_outside_repertoire = value;
+    this.updated_at = new Date();
+  }
+
   get displayName(): string {
     return this.stage_name || this.name;
   }
@@ -384,7 +545,8 @@ export class Musician extends AggregateRoot {
             !(
               (field === "email" && this.notification.errors.has("email")) ||
               (field === "phone" && this.notification.errors.has("phone")) ||
-              (field === "cpf" && this.notification.errors.has("cpf"))
+              (field === "cpf" && this.notification.errors.has("cpf")) ||
+              (field === "cnpj" && this.notification.errors.has("cnpj"))
             ),
         )
       : fields;
@@ -403,8 +565,10 @@ export class Musician extends AggregateRoot {
       stage_name: this.stage_name,
       bio: this.bio,
       avatar: this.avatar,
+      presentation_audio: this.presentation_audio?.toJSON() ?? null,
       phone: this.phone?.value || null,
       cpf: this.cpf?.value || null,
+      cnpj: this.cnpj?.value || null,
       genres: this.genres,
       instruments: this.instruments,
       experience_years: this.experience_years,
@@ -415,6 +579,8 @@ export class Musician extends AggregateRoot {
       is_active: this.is_active,
       is_verified: this.is_verified,
       open_to_gigs: this.open_to_gigs,
+      accepts_requests_outside_repertoire:
+        this.accepts_requests_outside_repertoire,
       profile: this.profile?.toJSON() || null,
       created_at: this.created_at,
       updated_at: this.updated_at,

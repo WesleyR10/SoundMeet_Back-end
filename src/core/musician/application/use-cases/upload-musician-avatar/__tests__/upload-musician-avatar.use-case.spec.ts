@@ -1,7 +1,7 @@
-import { Musician } from "../../../../domain/musician.aggregate";
-import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { NotFoundError } from "../../../../../shared/domain/errors/not-found.error";
 import { EntityValidationError } from "../../../../../shared/domain/validators/validation.error";
+import { Musician } from "../../../../domain/musician.aggregate";
+import { MusicianInMemoryRepository } from "../../../../infra/db/in-memory/musician-in-memory.repository";
 import { IMusicianStorage } from "../../../ports/musician-storage.interface";
 import { UploadMusicianAvatarUseCase } from "../upload-musician-avatar.use-case";
 

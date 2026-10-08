@@ -75,7 +75,11 @@ describe("ListMusiciansUseCase Unit Tests", () => {
       Musician.fake().aMusician().withName("AAA").withOpenToGigs(true).build(),
       Musician.fake().aMusician().withName("AaA").withOpenToGigs(true).build(),
       Musician.fake().aMusician().withName("bob").withOpenToGigs(true).build(),
-      Musician.fake().aMusician().withName("charlie").withOpenToGigs(true).build(),
+      Musician.fake()
+        .aMusician()
+        .withName("charlie")
+        .withOpenToGigs(true)
+        .build(),
     ];
     repository.items = items;
 
@@ -156,8 +160,12 @@ describe("ListMusiciansUseCase Unit Tests", () => {
         .build(),
     ];
 
-    items[0].updatePriceRanges([new PriceRange({ model: "per_event", min: 100, max: 200 })]);
-    items[1].updatePriceRanges([new PriceRange({ model: "per_event", min: 300, max: 400 })]);
+    items[0].updatePriceRanges([
+      new PriceRange({ model: "per_event", min: 100, max: 200 }),
+    ]);
+    items[1].updatePriceRanges([
+      new PriceRange({ model: "per_event", min: 300, max: 400 }),
+    ]);
 
     repository.items = items;
 

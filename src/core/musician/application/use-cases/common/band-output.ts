@@ -38,6 +38,12 @@ export type BandOutput = {
   description: string | null;
   avatar: string | null;
   genres: string[];
+  /**
+   * Ano de formação — "tempo de estrada" da banda, o par do
+   * `experience_years` do músico solo. `null` é "não informado", nunca
+   * derivado de `created_at` (que é "cadastrada na SoundMeet desde").
+   */
+  formed_in: number | null;
   members: BandMemberOutput[];
   priceRange: BandPriceRangeOutput | null;
   address: BandAddressOutput | null;
@@ -55,6 +61,7 @@ export class BandOutputMapper {
       description: entity.description,
       avatar: entity.avatar,
       genres: entity.genres,
+      formed_in: entity.formed_in,
       members: entity.members.map((member) => ({
         member_id: member.member_id!.id,
         musician_id: member.musician_id.id,

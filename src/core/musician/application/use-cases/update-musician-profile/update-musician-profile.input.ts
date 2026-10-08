@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from "class-validator";
 
+import { IsSocialLink } from "../../../../shared/application/validators/is-social-link.validator";
 import { PriceRangeInput } from "../common/price-range.input";
 
 export { PriceRangeInput };
@@ -58,6 +59,30 @@ export class LocationInput {
   zip_code?: string | null;
 }
 
+/**
+ * 🔴 INP-2: era `Record<string, unknown>` com `@IsObject()` — ou seja, qualquer
+ * chave e qualquer valor, incluindo `javascript:alert(1)` e
+ * `http://169.254.169.254/`, gravados verbatim por `changeSocialLinks`.
+ *
+ * A forma do payload é preservada de propósito (`{instagram?, youtube?,
+ * spotify?}`, exatamente o que `useEditProfileSectionSubmits.ts` envia); o que
+ * muda é que agora cada valor é validado, e chave desconhecida é descartada
+ * pelo `whitelist: true` do ValidationPipe global.
+ */
+export class SocialLinksInput {
+  @IsOptional()
+  @IsSocialLink("instagram")
+  instagram?: string;
+
+  @IsOptional()
+  @IsSocialLink("youtube")
+  youtube?: string;
+
+  @IsOptional()
+  @IsSocialLink("spotify")
+  spotify?: string;
+}
+
 export class UpdateMusicianProfileInput {
   @IsUUID()
   id: string;
@@ -92,5 +117,7 @@ export class UpdateMusicianProfileInput {
 
   @IsOptional()
   @IsObject()
-  socialLinks?: Record<string, unknown> | null;
+  @ValidateNested()
+  @Type(() => SocialLinksInput)
+  socialLinks?: SocialLinksInput | null;
 }

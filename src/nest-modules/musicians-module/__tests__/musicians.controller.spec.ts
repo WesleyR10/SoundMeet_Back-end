@@ -24,6 +24,7 @@ function makeMusicianOutput(
     stage_name: null,
     bio: null,
     avatar: null,
+    presentation_audio: null,
     phone: "+5511999999999",
     cnpj: null,
     genres: ["Rock"],
@@ -36,6 +37,7 @@ function makeMusicianOutput(
     is_active: true,
     is_verified: false,
     open_to_gigs: null,
+    accepts_requests_outside_repertoire: true,
     profile: null,
     created_at: now,
     updated_at: now,
@@ -460,5 +462,87 @@ describe("MusiciansController Unit Tests", () => {
       expect(presenter).toBeInstanceOf(MusicianPresenter);
       expect(presenter).toStrictEqual(new MusicianPresenter(output));
     });
+  });
+});
+
+/**
+ * 🔴 Ordem de rota dentro do controller.
+ *
+ * O Nest casa as rotas na ordem em que os métodos foram declarados. `featured`
+ * é um segmento literal e `:id` é curinga: declarado depois, `GET
+ * /musicians/featured` casaria como `findOne` com `id="featured"`, o
+ * `ParseUUIDPipe` responderia **422** e a faixa "Em destaque" da grade de
+ * artistas deixaria de existir — sem erro de compilação, sem teste vermelho e
+ * com o handler `findFeatured` correto logo abaixo, o que torna o defeito
+ * especialmente difícil de ver numa revisão.
+ *
+ * Precedente do repo: `@Get("live")` em `PerformanceController`, que casou
+ * como `:performance_id` e matou a tela do fã em silêncio.
+ */
+describe("MusiciansController — ordem de rota", () => {
+  const methodOrder = () => {
+    const proto = MusiciansController.prototype as unknown as Record<
+      string,
+      unknown
+    >;
+    return Object.getOwnPropertyNames(proto).filter(
+      (name) => typeof proto[name] === "function" && name !== "constructor",
+    );
+  };
+
+  const pathOf = (method: string) =>
+    Reflect.getMetadata(
+      "path",
+      (MusiciansController.prototype as unknown as Record<string, any>)[method],
+    ) as string | undefined;
+
+  it("declara findFeatured ANTES de findOne", () => {
+    const order = methodOrder();
+    const featuredIndex = order.indexOf("findFeatured");
+    const findOneIndex = order.indexOf("findOne");
+
+    expect(featuredIndex).toBeGreaterThanOrEqual(0);
+    expect(findOneIndex).toBeGreaterThanOrEqual(0);
+    expect(featuredIndex).toBeLessThan(findOneIndex);
+  });
+
+  it("os dois handlers continuam nos caminhos que este teste assume", () => {
+    // Sem isto, renomear `featured` para outro literal deixaria o teste acima
+    // verde enquanto o defeito voltava por outra porta.
+    expect(pathOf("findFeatured")).toBe("featured");
+    expect(pathOf("findOne")).toBe(":id");
+  });
+
+  it("nenhum segmento literal de GET nasce depois de :id", () => {
+    /*
+     * A regra geral, não só o caso conhecido: qualquer `@Get("algo")` literal
+     * declarado depois de `@Get(":id")` é inalcançável. É o guarda para a
+     * PRÓXIMA rota, que é o risco real — ninguém vai reintroduzir este bug no
+     * `featured`, vão introduzi-lo num handler que ainda não existe.
+     */
+    const order = methodOrder();
+    const idIndex = order.indexOf("findOne");
+
+    const literalGetsAfterId = order.slice(idIndex + 1).filter((method) => {
+      const handler = (
+        MusiciansController.prototype as unknown as Record<string, any>
+      )[method];
+      const verb = Reflect.getMetadata("method", handler);
+      const path = Reflect.getMetadata("path", handler) as string | undefined;
+      /*
+       * 0 === RequestMethod.GET no enum do Nest.
+       *
+       * A raiz da coleção (`"/"`, que é o que `@Get()` registra) fica FORA:
+       * `GET /musicians` tem um segmento a menos que `GET /musicians/:id` e
+       * não pode ser sombreada por ele. Sem esta exceção o teste acusaria
+       * `findAll` se alguém o movesse para baixo, e um teste que grita sem
+       * motivo é um teste que alguém apaga.
+       */
+      const isCollectionRoot =
+        path === "/" || path === "" || path === undefined;
+      return verb === 0 && !isCollectionRoot && !path!.includes(":");
+    });
+
+    expect(literalGetsAfterId).toEqual([]);
   });
 });

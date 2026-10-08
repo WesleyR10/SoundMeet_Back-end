@@ -1,6 +1,7 @@
 import { Chance } from "chance";
 
 import { Musician, MusicianId } from "./musician.aggregate";
+import { PresentationAudio } from "./value-objects/presentation-audio.vo";
 
 type PropOrFactory<T> = T | ((index: number) => T);
 
@@ -11,8 +12,12 @@ export class MusicianFakeBuilder<TBuild = any> {
   private _email: PropOrFactory<string> = (_index) => this.chance.email();
   private _bio: PropOrFactory<string | null> = (_index) => null;
   private _avatar: PropOrFactory<string | null> = (_index) => null;
+  private _presentation_audio: PropOrFactory<PresentationAudio | null> = (
+    _index,
+  ) => null;
   private _phone: PropOrFactory<string | null> = (_index) => null;
   private _cpf: PropOrFactory<string | null> = (_index) => null;
+  private _cnpj: PropOrFactory<string | null> = (_index) => null;
   private _genres: PropOrFactory<string[]> = (_index) => ["Rock", "Pop"];
   private _instruments: PropOrFactory<string[]> = (_index) => [
     "Guitar",
@@ -22,6 +27,9 @@ export class MusicianFakeBuilder<TBuild = any> {
     this.chance.integer({ min: 0, max: 50 });
   private _is_active: PropOrFactory<boolean> = (_index) => true;
   private _open_to_gigs: PropOrFactory<boolean | null> = (_index) => null;
+  private _accepts_requests_outside_repertoire: PropOrFactory<boolean> = (
+    _index,
+  ) => true;
   private _created_at: PropOrFactory<Date> | undefined = undefined;
 
   private countObjs;
@@ -71,6 +79,13 @@ export class MusicianFakeBuilder<TBuild = any> {
     return this;
   }
 
+  withPresentationAudio(
+    valueOrFactory: PropOrFactory<PresentationAudio | null>,
+  ) {
+    this._presentation_audio = valueOrFactory;
+    return this;
+  }
+
   withPhone(valueOrFactory: PropOrFactory<string | null>) {
     this._phone = valueOrFactory;
     return this;
@@ -78,6 +93,12 @@ export class MusicianFakeBuilder<TBuild = any> {
 
   withCpf(valueOrFactory: PropOrFactory<string | null>) {
     this._cpf = valueOrFactory;
+    return this;
+  }
+
+  /** Músico MEI. Use `generateValidCnpj()` para não colidir no índice único. */
+  withCnpj(valueOrFactory: PropOrFactory<string | null>) {
+    this._cnpj = valueOrFactory;
     return this;
   }
 
@@ -183,13 +204,19 @@ export class MusicianFakeBuilder<TBuild = any> {
           email: this.callFactory(this._email, index),
           bio: this.callFactory(this._bio, index),
           avatar: this.callFactory(this._avatar, index),
+          presentation_audio: this.callFactory(this._presentation_audio, index),
           phone: this.callFactory(this._phone, index),
           cpf: this.callFactory(this._cpf, index),
+          cnpj: this.callFactory(this._cnpj, index),
           genres: this.callFactory(this._genres, index),
           instruments: this.callFactory(this._instruments, index),
           experience_years: this.callFactory(this._experience_years, index),
           is_active: this.callFactory(this._is_active, index),
           open_to_gigs: this.callFactory(this._open_to_gigs, index),
+          accepts_requests_outside_repertoire: this.callFactory(
+            this._accepts_requests_outside_repertoire,
+            index,
+          ),
           ...(this._created_at && {
             created_at: this.callFactory(this._created_at, index),
           }),
@@ -233,6 +260,10 @@ export class MusicianFakeBuilder<TBuild = any> {
     return this.getValue("cpf");
   }
 
+  get cnpj() {
+    return this.getValue("cnpj");
+  }
+
   get genres() {
     return this.getValue("genres");
   }
@@ -247,6 +278,10 @@ export class MusicianFakeBuilder<TBuild = any> {
 
   get is_active() {
     return this.getValue("is_active");
+  }
+
+  get accepts_requests_outside_repertoire() {
+    return this.getValue("accepts_requests_outside_repertoire");
   }
 
   get open_to_gigs() {

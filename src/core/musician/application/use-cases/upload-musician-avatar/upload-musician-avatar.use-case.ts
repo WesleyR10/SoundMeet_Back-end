@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 import { randomUUID } from "crypto";
 
 import { IUseCase } from "../../../../shared/application/use-case.interface";
@@ -22,16 +24,17 @@ const ALLOWED_CONTENT_TYPES: Record<string, string> = {
 
 export type UploadMusicianAvatarInput = {
   musician_id: string;
-  data: NodeJS.ReadableStream | Buffer;
+  data: Buffer | Readable;
   content_type: string;
   file_size: number;
 };
 
 export type UploadMusicianAvatarOutput = MusicianOutput;
 
-export class UploadMusicianAvatarUseCase
-  implements IUseCase<UploadMusicianAvatarInput, UploadMusicianAvatarOutput>
-{
+export class UploadMusicianAvatarUseCase implements IUseCase<
+  UploadMusicianAvatarInput,
+  UploadMusicianAvatarOutput
+> {
   constructor(
     private readonly musicianRepo: IMusicianRepository,
     private readonly storage: IMusicianStorage,

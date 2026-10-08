@@ -44,7 +44,25 @@ export type MusicianOutput = {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  /**
+   * Áudio de apresentação (até 40s) que o estabelecimento ouve antes de
+   * contratar. `null` quando o músico não enviou nenhum.
+   *
+   * 🔴 **A `object_key` NÃO sai daqui.** O output alimenta os dois presenters,
+   * inclusive o público; a chave do objeto é detalhe interno de storage e não
+   * tem leitor do lado de fora.
+   */
+  presentation_audio: {
+    url: string;
+    duration_seconds: number;
+    uploaded_at: Date;
+  } | null;
   phone: string | null;
+  /**
+   * CNPJ do MEI. PII: só sai por `MusicianPresenter` (dono ou admin), nunca
+   * por `PublicMusicianPresenter` — o mesmo tratamento de email/telefone.
+   */
+  cnpj: string | null;
   genres: string[];
   instruments: string[];
   experience_years: number;
@@ -55,6 +73,8 @@ export type MusicianOutput = {
   is_active: boolean;
   is_verified: boolean;
   open_to_gigs: boolean | null;
+  /** O público pode pedir música fora deste repertório. */
+  accepts_requests_outside_repertoire: boolean;
   profile: MusicianProfileOutput | null;
   created_at: Date;
   updated_at: Date;
@@ -77,7 +97,15 @@ export class MusicianOutputMapper {
       stage_name: entity.stage_name,
       bio: entity.bio,
       avatar: entity.avatar,
+      presentation_audio: entity.presentation_audio
+        ? {
+            url: entity.presentation_audio.url,
+            duration_seconds: entity.presentation_audio.duration_seconds,
+            uploaded_at: entity.presentation_audio.uploaded_at,
+          }
+        : null,
       phone: entity.phone?.value ?? null,
+      cnpj: entity.cnpj?.value ?? null,
       genres: entity.genres,
       instruments: entity.instruments,
       experience_years: entity.experience_years,
@@ -88,6 +116,8 @@ export class MusicianOutputMapper {
       is_active: entity.is_active,
       is_verified: entity.is_verified,
       open_to_gigs: entity.open_to_gigs,
+      accepts_requests_outside_repertoire:
+        entity.accepts_requests_outside_repertoire,
       profile: entity.profile
         ? {
             id: entity.profile.profile_id.id,

@@ -1,19 +1,20 @@
 import { CurrencyEnum, Prisma, PrismaClient } from "@prisma/client";
 
 import { InvalidArgumentError } from "../../../../shared/domain/errors/invalid-argument.error";
-import {
-  boundingBoxForRadius,
-  haversineKm,
-} from "../../../../shared/domain/geo.utils";
+import { boundingBoxForRadius } from "../../../../shared/domain/geo.utils";
 import { Uuid } from "../../../../shared/domain/value-objects/uuid.vo";
 import { mapPrismaErrorToDomainError } from "../../../../shared/infra/db/prisma/prisma-error.mapper";
-import { Band, BandId } from "../../../domain/band.aggregate";
+import { Band, BandId, BandMemberStatus } from "../../../domain/band.aggregate";
 import {
   BandFilter,
   BandSearchParams,
   BandSearchResult,
   IBandRepository,
 } from "../../../domain/band.repository";
+import {
+  PUBLIC_GRID_MARGIN_KM,
+  publicDistanceKm,
+} from "../../../domain/musician-location-privacy";
 import { BandModelMapper } from "./band-model-mapper";
 
 export class BandPrismaRepository implements IBandRepository {
@@ -116,9 +117,19 @@ export class BandPrismaRepository implements IBandRepository {
           },
         });
 
-        for (const m of entity.members) {
+        // O índice parcial `band_members_one_accepted_leader` é verificado a
+        // cada statement, não no commit. Promover o novo líder antes de
+        // rebaixar o antigo estouraria a constraint no meio da transferência
+        // de liderança, então quem não é líder é gravado primeiro.
+        const orderedMembers = [...entity.members].sort(
+          (a, b) => Number(a.role === "leader") - Number(b.role === "leader"),
+        );
+
+        for (const m of orderedMembers) {
           await tx.bandMember.upsert({
-            where: { bandId_musicianId: { bandId: id, musicianId: m.musician_id.id } },
+            where: {
+              bandId_musicianId: { bandId: id, musicianId: m.musician_id.id },
+            },
             create: {
               id: m.member_id?.id ?? new Uuid().id,
               bandId: id,
@@ -186,6 +197,24 @@ export class BandPrismaRepository implements IBandRepository {
 
   async findAll(): Promise<Band[]> {
     const models = await this.prisma.band.findMany({
+      include: { members: { orderBy: { role: "asc" } } },
+    });
+    return models.map((model) => BandModelMapper.toEntity(model as any));
+  }
+
+  async findByMember(
+    musician_id: Uuid,
+    statuses: BandMemberStatus[],
+  ): Promise<Band[]> {
+    if (statuses.length === 0) return [];
+
+    const models = await this.prisma.band.findMany({
+      where: {
+        members: {
+          some: { musicianId: musician_id.id, status: { in: statuses } },
+        },
+      },
+      orderBy: { name: "asc" },
       include: { members: { orderBy: { role: "asc" } } },
     });
     return models.map((model) => BandModelMapper.toEntity(model as any));
@@ -262,8 +291,16 @@ export class BandPrismaRepository implements IBandRepository {
 
   // Busca por proximidade — paridade com MusicianPrismaRepository.searchByProximity:
   // bounding box indexável em SQL (location_lat/location_lng denormalizados
-  // direto na tabela bands, sem sub-tabela de profile) + Haversine exato em
-  // memória para o corte circular e ordenação por distância.
+  // direto na tabela bands, sem sub-tabela de profile) + Haversine em memória
+  // para o corte circular e ordenação por distância.
+  //
+  // 🔴 A distância é medida na GRADE PÚBLICA (`publicDistanceKm`), nunca na
+  // coordenada exata. O endereço da banda costuma ser a casa de alguém (o app
+  // preenche por CEP); com a posição precisa, quem move a origem e repete
+  // `radius_km` acha a porta em poucas requisições — verificado por HTTP em
+  // 08/out/2026: a 111 m de uma banda, raio 0,09 não a trazia e 0,13 trazia.
+  // A caixa do pré-filtro roda sobre as colunas exatas e por isso é alargada
+  // pela margem da grade, senão cortaria quem a grade empurrou para dentro.
   private async searchByProximity(
     props: BandSearchParams,
     lat: number,
@@ -271,7 +308,11 @@ export class BandPrismaRepository implements IBandRepository {
     radiusKm: number,
   ): Promise<BandSearchResult> {
     const where = this.buildWhereClause(props.filter);
-    const box = boundingBoxForRadius(lat, lng, radiusKm);
+    const box = boundingBoxForRadius(
+      lat,
+      lng,
+      radiusKm + PUBLIC_GRID_MARGIN_KM,
+    );
     where.location_lat = { gte: box.min_lat, lte: box.max_lat };
     where.location_lng = { gte: box.min_lng, lte: box.max_lng };
 
@@ -280,22 +321,24 @@ export class BandPrismaRepository implements IBandRepository {
       select: { id: true, location_lat: true, location_lng: true },
     });
 
+    const origin = { lat, lng };
     const withinRadius = candidates
-      .filter(
-        (candidate) =>
-          candidate.location_lat !== null && candidate.location_lng !== null,
-      )
       .map((candidate) => ({
         id: candidate.id,
-        distance: haversineKm(
-          lat,
-          lng,
-          candidate.location_lat!,
-          candidate.location_lng!,
-        ),
+        distance: publicDistanceKm(origin, [
+          {
+            latitude: candidate.location_lat,
+            longitude: candidate.location_lng,
+          },
+        ]),
       }))
-      .filter((candidate) => candidate.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance);
+      .filter(
+        (candidate): candidate is { id: string; distance: number } =>
+          candidate.distance !== null && candidate.distance <= radiusKm,
+      )
+      // Empate na grade é comum (várias bandas na mesma célula): o id desempata
+      // para a paginação não repetir nem pular ninguém entre páginas.
+      .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
 
     const offset = (props.page - 1) * props.per_page;
     const pageIds = withinRadius

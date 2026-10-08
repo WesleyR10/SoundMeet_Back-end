@@ -10,6 +10,7 @@ import {
   IsString,
   Max,
   Min,
+  ValidateIf,
   ValidateNested,
   validateSync,
 } from "class-validator";
@@ -25,6 +26,7 @@ export type UpdateMusicianInputConstructorProps = {
   bio?: string;
   avatar?: string;
   phone?: string;
+  cnpj?: string | null;
   genres?: string[];
   instruments?: string[];
   experience_years?: number;
@@ -61,6 +63,19 @@ export class UpdateMusicianInput {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  /**
+   * CNPJ do MEI. `null` remove e o músico volta a contratar como pessoa física.
+   *
+   * `ValidateIf` em vez de `IsOptional` porque `IsOptional` também deixaria
+   * passar `null` sem validar — e aqui `null` é um comando legítimo (baixou o
+   * MEI), enquanto string inválida não é. Os dígitos verificadores são
+   * conferidos pelo VO `CNPJ` no agregado.
+   */
+  @ValidateIf((_o, value) => value !== null && value !== undefined)
+  @IsString()
+  @IsNotEmpty()
+  cnpj?: string | null;
 
   @IsArray()
   @IsString({ each: true })
@@ -102,6 +117,7 @@ export class UpdateMusicianInput {
     this.bio = props.bio;
     this.avatar = props.avatar;
     this.phone = props.phone;
+    this.cnpj = props.cnpj;
     this.genres = props.genres;
     this.instruments = props.instruments;
     this.experience_years = props.experience_years;

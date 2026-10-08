@@ -14,6 +14,18 @@ describe("MusicianProfile — modo turnê (7.13d)", () => {
     longitude: -34.877,
   };
 
+  // `isTouring` lê o relógio real (Date.now()), mas o fixture `now` é uma data
+  // fixa — congela o relógio da suíte inteira nela, senão qualquer asserção
+  // sobre isTouring passa a depender do dia em que o teste roda (já quebrou
+  // duas vezes por isso: na escrita original e de novo dias depois).
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(now);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   const buildProfile = () => new MusicianProfile({ musician_id: new Uuid() });
 
   it("ativa o modo turnê preservando a base permanente", () => {
@@ -118,14 +130,12 @@ describe("MusicianProfile — modo turnê (7.13d)", () => {
     const expiresAt = new Date(now.getTime() + 1000);
     profile.setTouringLocation(new Location(coords), expiresAt, now);
 
-    // isTouring lê o relógio real — o fixture `now` é fixo no passado, então
-    // o relógio precisa ser mockado ANTES da primeira asserção (sem isso o
-    // teste era dependente da data em que rodava e quebrou um dia depois).
-    jest.useFakeTimers().setSystemTime(new Date(expiresAt.getTime() - 1));
+    // Relógio já congelado pelo beforeEach — aqui só viaja no tempo ao redor
+    // do instante exato de expiração.
+    jest.setSystemTime(new Date(expiresAt.getTime() - 1));
     expect(profile.isTouring).toBe(true);
 
     jest.setSystemTime(new Date(expiresAt.getTime() + 1));
     expect(profile.isTouring).toBe(false);
-    jest.useRealTimers();
   });
 });

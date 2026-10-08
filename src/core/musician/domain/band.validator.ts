@@ -15,15 +15,16 @@ import { ClassValidatorFields } from "../../shared/domain/validators/class-valid
 import { Notification } from "../../shared/domain/validators/notification";
 import { PriceRange } from "../../shared/domain/value-objects/price-range.vo";
 import { Band, BandMemberStatus } from "./band.aggregate";
+import { BAND_MEMBER_ROLES, BandMemberRole } from "./band-member-role";
+import { IsFormationYear } from "./formation-year";
 
 export class BandMemberRules {
   @IsNotEmpty({ groups: ["members"] })
   @IsString({ groups: ["members"] })
   musician_id: string;
 
-  @IsString({ groups: ["members"] })
-  @IsNotEmpty({ groups: ["members"] })
-  role: string;
+  @IsIn(BAND_MEMBER_ROLES, { groups: ["members"] })
+  role: BandMemberRole;
 
   @IsString({ groups: ["members"] })
   @IsNotEmpty({ groups: ["members"] })
@@ -62,6 +63,13 @@ export class BandRules {
   @IsString({ each: true, groups: ["genres"] })
   genres: string[];
 
+  // Teto no ano CORRENTE, calculado a cada validação — ver o comentário em
+  // `formation-year.ts` sobre por que `@Max(getFullYear())` seria um defeito
+  // que só aparece na virada do ano.
+  @IsFormationYear({ groups: ["formed_in"] })
+  @IsOptional({ groups: ["formed_in"] })
+  formed_in?: number | null;
+
   @IsOptional({ groups: ["members"] })
   @IsArray({ groups: ["members"] })
   @ValidateNested({ each: true, groups: ["members"] })
@@ -88,6 +96,7 @@ export class BandRules {
     this.description = entity.description;
     this.avatar = entity.avatar;
     this.genres = entity.genres;
+    this.formed_in = entity.formed_in;
     this.members = entity.members.map(
       (m) =>
         new BandMemberRules({
@@ -109,7 +118,7 @@ export class BandValidator extends ClassValidatorFields {
   validate(notification: Notification, data: any, fields?: string[]): boolean {
     const newFields = fields?.length
       ? fields
-      : ["name", "genres", "is_active", "members"];
+      : ["name", "genres", "is_active", "members", "formed_in"];
     return super.validate(notification, new BandRules(data), newFields);
   }
 }

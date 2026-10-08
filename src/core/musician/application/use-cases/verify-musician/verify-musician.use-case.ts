@@ -10,9 +10,10 @@ import {
 export type VerifyMusicianInput = { id: string };
 export type VerifyMusicianOutput = MusicianOutput;
 
-export class VerifyMusicianUseCase
-  implements IUseCase<VerifyMusicianInput, VerifyMusicianOutput>
-{
+export class VerifyMusicianUseCase implements IUseCase<
+  VerifyMusicianInput,
+  VerifyMusicianOutput
+> {
   constructor(private readonly musicianRepo: IMusicianRepository) {}
 
   async execute(input: VerifyMusicianInput): Promise<VerifyMusicianOutput> {

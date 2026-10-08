@@ -283,17 +283,30 @@ describe("MusicianPrismaRepository", () => {
         MusicianSearchParams.create({ filter: { lat, lng, radius_km: 5 } }),
       );
 
-      const [candidateCall] = (prisma.musician.findMany as jest.Mock).mock.calls;
+      const [candidateCall] = (prisma.musician.findMany as jest.Mock).mock
+        .calls;
       const profileWhere = candidateCall[0].where.profile.is;
 
       expect(profileWhere.OR).toHaveLength(2);
       expect(profileWhere.OR[0]).toEqual({
-        location_lat: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
-        location_lng: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+        location_lat: expect.objectContaining({
+          gte: expect.any(Number),
+          lte: expect.any(Number),
+        }),
+        location_lng: expect.objectContaining({
+          gte: expect.any(Number),
+          lte: expect.any(Number),
+        }),
       });
       expect(profileWhere.OR[1]).toEqual({
-        touring_lat: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
-        touring_lng: expect.objectContaining({ gte: expect.any(Number), lte: expect.any(Number) }),
+        touring_lat: expect.objectContaining({
+          gte: expect.any(Number),
+          lte: expect.any(Number),
+        }),
+        touring_lng: expect.objectContaining({
+          gte: expect.any(Number),
+          lte: expect.any(Number),
+        }),
         touring_expires_at: { gt: expect.any(Date) },
       });
     });

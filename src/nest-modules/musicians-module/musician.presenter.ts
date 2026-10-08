@@ -11,6 +11,7 @@ export class MusicianPresenter {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  presentation_audio: MusicianOutput["presentation_audio"];
   phone: string | null;
   cnpj: string | null;
   qr_code: string | null;
@@ -49,6 +50,7 @@ export class MusicianPresenter {
     this.stage_name = output.stage_name;
     this.bio = output.bio;
     this.avatar = output.avatar;
+    this.presentation_audio = output.presentation_audio;
     this.phone = output.phone;
     this.cnpj = output.cnpj;
     this.qr_code = output.qr_code;
@@ -83,6 +85,13 @@ export class PublicMusicianPresenter {
   stage_name: string | null;
   bio: string | null;
   avatar: string | null;
+  /**
+   * 🔴 Está no presenter PÚBLICO de propósito: é a busca de artistas
+   * (`GET /musicians`) que o estabelecimento usa para decidir contratar, e ela
+   * só devolve este presenter. Um preview que só existisse no presenter
+   * completo nunca apareceria na grade — o único lugar onde ele importa.
+   */
+  presentation_audio: MusicianOutput["presentation_audio"];
   qr_code: string | null;
   qr_customization: MusicianOutput["qr_customization"];
   rating: number;
@@ -118,6 +127,7 @@ export class PublicMusicianPresenter {
     this.stage_name = output.stage_name;
     this.bio = output.bio;
     this.avatar = output.avatar;
+    this.presentation_audio = output.presentation_audio;
     this.qr_code = output.qr_code;
     this.qr_customization = output.qr_customization;
     this.plan_tier = output.plan_tier;
