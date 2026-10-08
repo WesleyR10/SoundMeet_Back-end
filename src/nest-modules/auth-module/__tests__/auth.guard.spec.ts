@@ -125,5 +125,98 @@ describe("AuthGuard", () => {
       expect(verify).not.toHaveBeenCalled();
       expect((request as any).user).toBeUndefined();
     });
+
+    /*
+     * 🔴 O `sub` de um token RECUSADO fica registrado para o handler.
+     *
+     * Rota pública com representação dupla (`GET /musicians/:id`) precisa
+     * distinguir "estranho com token velho" de "o próprio dono com token
+     * velho": ao segundo ela responde 401, para o app renovar a sessão em vez
+     * de exibir a versão pública do perfil dele como se fosse a completa.
+     */
+    describe("token recusado deixa o `sub` não verificado em request", () => {
+      const tokenWith = (payload: unknown) =>
+        `h.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.s`;
+
+      const guardRejecting = () =>
+        new AuthGuard(
+          {
+            verify: jest.fn().mockRejectedValue(new Error("jwt expired")),
+          } as unknown as AuthJwtVerifier,
+          { getAllAndOverride: jest.fn().mockReturnValue(true) } as any,
+          { get: jest.fn() } as any,
+        );
+
+      it("registra o sub e NÃO popula request.user", async () => {
+        const request = {
+          headers: {
+            authorization: `Bearer ${tokenWith({ sub: "musico-1" })}`,
+          },
+        };
+
+        await expect(
+          guardRejecting().canActivate(createHttpContext(request)),
+        ).resolves.toBe(true);
+
+        expect((request as any).rejectedTokenSub).toBe("musico-1");
+        expect((request as any).user).toBeUndefined();
+      });
+
+      it.each([
+        ["token que não é JWT", "lixo"],
+        ["payload que não é JSON", "h.%%%.s"],
+        ["sub ausente", tokenWith({ aud: "x" })],
+        ["sub que não é texto", tokenWith({ sub: 42 })],
+        ["sub vazio", tokenWith({ sub: "" })],
+      ])("%s: não registra nada e não lança", async (_label, token) => {
+        const request = { headers: { authorization: `Bearer ${token}` } };
+
+        await expect(
+          guardRejecting().canActivate(createHttpContext(request)),
+        ).resolves.toBe(true);
+
+        expect((request as any).rejectedTokenSub).toBeUndefined();
+      });
+
+      it("token VÁLIDO não deixa sub recusado", async () => {
+        const request = {
+          headers: {
+            authorization: `Bearer ${tokenWith({ sub: "musico-1" })}`,
+          },
+        };
+        const guard = new AuthGuard(
+          {
+            verify: jest.fn().mockResolvedValue({ sub: "musico-1" }),
+          } as unknown as AuthJwtVerifier,
+          { getAllAndOverride: jest.fn().mockReturnValue(true) } as any,
+          { get: jest.fn() } as any,
+        );
+
+        await guard.canActivate(createHttpContext(request));
+
+        expect((request as any).rejectedTokenSub).toBeUndefined();
+        expect((request as any).user).toMatchObject({ sub: "musico-1" });
+      });
+
+      it("rota NÃO pública segue respondendo 401 e não registra sub nenhum", async () => {
+        const request = {
+          headers: {
+            authorization: `Bearer ${tokenWith({ sub: "musico-1" })}`,
+          },
+        };
+        const guard = new AuthGuard(
+          {
+            verify: jest.fn().mockRejectedValue(new Error("jwt expired")),
+          } as unknown as AuthJwtVerifier,
+          { getAllAndOverride: jest.fn().mockReturnValue(false) } as any,
+          { get: jest.fn() } as any,
+        );
+
+        await expect(
+          guard.canActivate(createHttpContext(request)),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+        expect((request as any).rejectedTokenSub).toBeUndefined();
+      });
+    });
   });
 });

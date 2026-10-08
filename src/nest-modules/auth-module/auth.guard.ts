@@ -14,6 +14,48 @@ import { IS_PUBLIC_KEY } from "./auth.decorators";
 import { AuthUser } from "./auth.roles";
 import { AuthJwtVerifier } from "./auth-jwt.verifier";
 
+/**
+ * `sub` de um token que a verificação RECUSOU, lido sem verificar nada.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * POR QUE GUARDAR ALGO DE UM TOKEN INVÁLIDO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O soft-auth acima degrada token recusado para anônimo, e isso é certo para
+ * dado que é igual para todo mundo. Mas há rotas `@Public()` que respondem
+ * DIFERENTE para o dono — `GET /musicians/:id` devolve e-mail, telefone, CNPJ
+ * e endereço só a ele. Ali a degradação era um defeito intermitente por
+ * desenho: o access token dura 15 minutos, o app só renova a sessão quando
+ * recebe 401, e esta rota respondia 200 com a versão PÚBLICA. O músico abria
+ * o próprio perfil e via o CNPJ vazio — e salvar aquele formulário gravava
+ * `cnpj: null`.
+ *
+ * Com este valor o handler consegue distinguir "estranho com token velho"
+ * (segue recebendo a versão pública) de "o próprio dono com token velho"
+ * (recebe 401, e o cliente renova e repete sozinho).
+ *
+ * 🔴 **Nunca use isto para AUTORIZAR.** O valor vem de um token que não passou
+ * na verificação: qualquer um escreve o `sub` que quiser. Ele só pode servir
+ * para RECUSAR mais (devolver 401 em vez de 200 público) — nunca para liberar
+ * um dado. Forjar o `sub` de outra pessoa rende ao atacante um 401.
+ */
+export function readUnverifiedSub(token: string): string | undefined {
+  try {
+    const [, encodedPayload] = token.split(".");
+    if (!encodedPayload) {
+      return undefined;
+    }
+    const payload = JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf8"),
+    ) as { sub?: unknown };
+    return typeof payload.sub === "string" && payload.sub.length > 0
+      ? payload.sub
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -48,7 +90,9 @@ export class AuthGuard implements CanActivate {
           const payload = await this.jwtVerifier.verify(token);
           (request as any).user = this.normalizeUser(payload);
         } catch {
-          // Anônimo — comportamento idêntico a não mandar token nenhum.
+          // Anônimo — comportamento idêntico a não mandar token nenhum, com
+          // uma exceção que o HANDLER decide: ver `readUnverifiedSub`.
+          (request as any).rejectedTokenSub = readUnverifiedSub(token);
         }
       }
       return true;
