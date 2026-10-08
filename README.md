@@ -1,176 +1,132 @@
-# SoundMeet Backend
+# SoundMeet — Backend
 
-## Docs e roadmap
+API do SoundMeet, a plataforma que conecta **músicos, público e estabelecimentos** em shows ao vivo:
+pedido de música ao palco, gorjeta por PIX, contratação de show com contrato digital, agenda e
+gamificação. Este repositório é a API; o app (`soundmeet-mobile`) e o painel web (`soundmeet-web`)
+são repositórios separados que consomem esta API.
 
-- Features do produto: [Features-SoundMeet.md](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/Docs/Features-SoundMeet.md)
-- Worker de cifras (MIR): [ai-cifra-mir-worker/README.md](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/ai-cifra-mir-worker/README.md)
+**Vai contribuir?** Comece pelo [`CONTRIBUTING.md`](CONTRIBUTING.md): ambiente, fluxo de Git e
+definição de pronto.
 
-### Futuras features (P&D)
+---
 
-- Mood/Emotion (recomendação, playlist, tags): referência em https://github.com/AMAAI-Lab/Music2Emotion
-- Restauração/masterização com prompts (feature premium): referência em https://github.com/AMAAI-Lab/SonicMaster
-- App referência de UX/contexto para playlists por emoção: https://github.com/AMAAI-Lab/calm-me-down
+## Stack
 
-## Rotas (HTTP)
+| Camada | Tecnologia |
+|---|---|
+| Framework | NestJS 11 + TypeScript (Express 5), Node 20 |
+| Arquitetura | DDD + Clean Architecture (domínio em `src/core/`, adaptadores NestJS em `src/nest-modules/`) |
+| Banco | PostgreSQL + Prisma 7 |
+| Autenticação | Keycloak (JWT validado por JWKS) |
+| Mensageria | RabbitMQ |
+| Cache | Redis |
+| Arquivos | S3 / Cloudflare R2 (MinIO no desenvolvimento local) |
+| Tempo real | Socket.io |
+| Documentação da API | Swagger (OpenAPI) |
+| Qualidade | Jest, ESLint, Prettier |
 
-### Prefixo global
+## Rodando localmente
 
-Todas as rotas de controllers usam o prefixo global:
+O passo a passo completo está no [`CONTRIBUTING.md`](CONTRIBUTING.md). Em resumo:
 
-- Base: `/api/v1`
-
-Esse prefixo é configurado em [main.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/main.ts#L23-L25).
-
-### Swagger
-
-- UI: `GET /api/docs`
-- JSON (OpenAPI): `GET /api/docs-json`
-
-O Swagger é configurado em [main.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/main.ts#L27-L57).
-
-### Health
-
-- Liveness: `GET /api/v1/health`
-
-Implementado em [health.controller.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/health.controller.ts) e registrado em [app.module.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/app.module.ts#L14-L42).
-
-### Músicos
-
-Controller: [musicians.controller.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/nest-modules/musicians-module/musicians.controller.ts)
-
-- `POST /api/v1/musicians`
-- `GET /api/v1/musicians`
-- `GET /api/v1/musicians/:id`
-- `PATCH /api/v1/musicians/:id`
-- `DELETE /api/v1/musicians/:id`
-
-### Bandas
-
-Controller: [bands.controller.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/nest-modules/musicians-module/bands.controller.ts)
-
-- `POST /api/v1/bands`
-- `GET /api/v1/bands/:id`
-- `POST /api/v1/bands/:id/members`
-- `DELETE /api/v1/bands/:id/members/:musicianId`
-
-### Público (Audience)
-
-Controller: [audiences.controller.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/nest-modules/audiences-module/audiences.controller.ts)
-
-- `POST /api/v1/audiences`
-- `GET /api/v1/audiences`
-- `GET /api/v1/audiences/:id`
-- `PATCH /api/v1/audiences/:id`
-- `DELETE /api/v1/audiences/:id`
-- `PATCH /api/v1/audiences/:id/complete-profile`
-- `POST /api/v1/audiences/:id/attend-event`
-- `POST /api/v1/audiences/:id/scan-qr`
-- `POST /api/v1/audiences/:id/music-requests`
-- `POST /api/v1/audiences/:id/votes`
-- `POST /api/v1/audiences/:id/tips`
-- `POST /api/v1/audiences/:id/social-shares`
-- `POST /api/v1/audiences/:id/indications`
-- `GET /api/v1/audiences/:id/recommendations/musicians`
-
-## Como criar novas rotas (padrão do projeto)
-
-### Onde colocar cada coisa
-
-- Core (DDD/Clean): `src/core/<dominio>/...`
-  - Use-cases em `application/use-cases`
-  - Entidades/VO em `domain`
-  - Repositórios em `domain/repositories` (interface) e `infra/db` (implementação)
-- Adaptador HTTP (NestJS): `src/nest-modules/<dominio>-module`
-  - Controller: recebe DTO, chama use-case e retorna presenter
-  - Providers: liga interface de repositório à implementação
-
-### Fluxo recomendado
-
-- Crie/ajuste o use-case no domínio (core) e seus validators/DTOs de input.
-- Crie um DTO no controller usando `OmitType`/`PickType`/classes do `class-validator` quando necessário.
-- No controller:
-  - Defina o prefixo com `@Controller("...")` (sem incluir `/api/v1`, porque o prefixo global já aplica)
-  - Use `@Inject(SeuUseCase)` e chame `execute()`
-  - Documente com `@ApiTags`, `@ApiOperation`, `@ApiResponse`, `@ApiParam`
-- Registre o controller no módulo correspondente (ex.: [musicians.module.ts](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/src/nest-modules/musicians-module/musicians.module.ts)).
-
-## Docker Compose: serviços, health, observabilidade e logging
-
-O arquivo de composição é [docker-compose.yml](file:///home/wesleyr10/Programação/Projetos/SoundMeet/soundmeet-backend/docker-compose.yml).
-
-### Serviços e portas
-
-- `app` (NestJS): `3000:3000`
-  - Swagger: `http://localhost:3000/api/docs`
-  - Health: `http://localhost:3000/api/v1/health`
-- `postgres` (principal): `5432:5432`
-- `postgres-keycloak` (Keycloak DB): sem porta externa (apenas rede interna)
-- `mongo`: `27017:27017`
-- `redis`: `6379:6379`
-- `rabbitmq`: `5672:5672` e management `15672:15672`
-- `keycloak`: `8080:8080`
-- `minio`: `9000:9000` e console `9001:9001`
-- `adminer`: `8083:8080`
-
-### Healthchecks
-
-Existem dois níveis:
-
-- Health do container (Docker): `healthcheck:` em cada serviço do compose.
-  - Exemplo do app: chama `GET /api/v1/health` dentro do container.
-- Health da aplicação (HTTP): `GET /api/v1/health`.
-
-O health do container serve para o Docker reportar `healthy/unhealthy` e para `depends_on` conseguir ordenar inicialização quando configurado.
-
-### Observabilidade (profile ops)
-
-Alguns serviços só sobem quando você habilita o profile `ops`:
-
-- `cadvisor` (métricas de containers): `8082:8080`
-- `dozzle` (UI de logs): `9999:8080`
-- `uptime-kuma` (monitor de uptime): `3002:3001`
-
-Para subir com observabilidade:
-
-- `docker-compose --profile ops up -d --build`
-
-### Logging e rotação de logs
-
-O compose define uma configuração reutilizável:
-
-```yaml
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "5"
+```bash
+cp envs/.env.example envs/.env
+npm ci
+docker compose up -d postgres postgres-keycloak redis rabbitmq keycloak minio
+npm run keycloak:sync:local
+npm run prisma:generate
+npx prisma migrate deploy
+npm run seed -- --reset
+npm run start:dev
 ```
 
-E aplica em cada serviço com:
+| Endereço | O que é |
+|---|---|
+| `http://localhost:3000/api/v1` | API (prefixo global `api/v1` em todas as rotas) |
+| `http://localhost:3000/api/docs` | Swagger — a lista de rotas sempre atualizada |
+| `http://localhost:3000/api/v1/health` | Health check |
+| `http://localhost:8080` | Keycloak |
+| `http://localhost:15672` | Painel do RabbitMQ |
+| `http://localhost:9001` | Console do MinIO |
+| `http://localhost:8083` | Adminer (navegar no banco) |
 
-```yaml
-logging: *default-logging
+Login de teste: os usuários do seed, todos com senha `Seed@123` —
+[`Docs/autenticacao/usuarios-de-teste.md`](Docs/autenticacao/usuarios-de-teste.md).
+
+> ⚠️ Não use `npm run docker:up` para o dia a dia: ele sobe também os serviços do worker de IA, que é
+> um projeto à parte e não está neste repositório.
+
+## Comandos
+
+| Comando | O que faz |
+|---|---|
+| `npm run start:dev` | API com recarga automática |
+| `npm run rabbitmq:consumers:dev` | Consumidores das filas (outro terminal) |
+| `npm test` | Testes unitários e de integração (`*.spec.ts`, `*.int-spec.ts`) |
+| `npm run test:e2e` | Testes de ponta a ponta contra Postgres real (`test/**/*.e2e-spec.ts`) |
+| `npm run lint` · `npm run typecheck` | Lint e checagem de tipos |
+| `npm run typecheck:seed` | Checagem de tipos do seed (fica fora do `tsconfig` principal) |
+| `npm run prisma:generate` | Gera o client do Prisma depois de mudar o schema |
+| `npm run prisma:migrate` | Cria uma migration nova em desenvolvimento |
+| `npm run seed -- --reset` | Recria os dados e os usuários de teste |
+| `npm run keycloak:sync:local` | Aplica realm, clients e papéis no Keycloak local |
+| `npm run drill:verify` | Verifica um banco restaurado (drill de backup) |
+
+## Estrutura
+
+```
+src/
+  core/<domínio>/         regras de negócio: domain/ (agregados, VOs, eventos),
+                          application/ (use cases) e infra/ (Prisma e in-memory)
+  nest-modules/<domínio>-module/
+                          controllers, DTOs, presenters e injeção de dependência
+prisma/                   schema, migrations e seed
+test/                     testes de ponta a ponta (Postgres real)
+infra/keycloak/           realm e compose de produção do Keycloak
+scripts/                  sync do Keycloak, smoke test de produção, drill de restauração
+envs/                     arquivos .env (só os .example vão para o repositório)
+Docs/                     documentação — comece pelo Docs/README.md
 ```
 
-Isso mantém `docker logs` funcionando e evita crescimento infinito do arquivo de logs (rotação por tamanho/quantidade).
+Os módulos de referência — copie o padrão deles — são `src/core/musician/` +
+`src/nest-modules/musicians-module/` e `src/core/establishment/` + `establishments-module/`.
 
-## Rodando local (WSL + Windows)
+## Documentação
 
-Se você usa WSL2, o `localhost` do Windows e o `localhost` do WSL podem não ser o mesmo em alguns setups.
+O índice está em [`Docs/README.md`](Docs/README.md). Os mais usados:
 
-- Para testar sem configurar nada: acesse pelo IP do WSL.
-  - Descobrir IP: `wsl hostname -I`
-  - Exemplo: `http://<IP_DO_WSL>:3000/api/docs`
-- Para tentar liberar `http://localhost:3000` no Windows:
-  - Crie `%UserProfile%\.wslconfig` com:
-    - `[wsl2]`
-    - `localhostForwarding=true`
-  - Execute: `wsl --shutdown`
+| Documento | Para quê |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Regras de ouro, convenções e armadilhas técnicas (vale para humanos e para agentes de IA) |
+| [`Docs/arquitetura/`](Docs/arquitetura/) | Como o código é organizado e a política HTTP da API |
+| [`Docs/regras-de-negocio/`](Docs/regras-de-negocio/README.md) | O que a API já faz, um arquivo por domínio |
+| [`Docs/funcionalidades/`](Docs/funcionalidades/) | O desenho por dentro das funcionalidades grandes (contrato, apresentação ao vivo, QR, e-mails) |
+| [`Docs/autenticacao/`](Docs/autenticacao/) | Keycloak, proteção de rotas, login e usuários de teste |
+| [`Docs/fluxo-de-trabalho/`](Docs/fluxo-de-trabalho/) | Branches, commits e pull requests |
 
-## Comandos úteis
+## Observabilidade local (opcional)
 
-- Subir: `npm run docker:up`
-- Derrubar: `npm run docker:down`
-- Status: `npm run docker:ps`
-- Logs do app: `npm run docker:logs:app`
+O compose tem um profile `ops` com ferramentas de observação dos containers:
 
+```bash
+docker compose --profile ops up -d cadvisor dozzle uptime-kuma
+```
+
+| Endereço | Ferramenta |
+|---|---|
+| `http://localhost:8082` | cAdvisor — métricas dos containers |
+| `http://localhost:9999` | Dozzle — logs dos containers |
+| `http://localhost:3002` | Uptime Kuma — monitor de disponibilidade |
+
+Os logs de todos os serviços giram por tamanho (10 MB × 5 arquivos), configurado em `x-logging` no
+`docker-compose.yml`.
+
+## WSL2
+
+No WSL2 o `localhost` do Windows nem sempre é o do Linux. Se `http://localhost:3000` não abrir no
+navegador do Windows, use o IP do WSL (`wsl hostname -I`) ou ative `localhostForwarding=true` em
+`%UserProfile%\.wslconfig` e rode `wsl --shutdown`.
+
+## Licença e confidencialidade
+
+Código proprietário. Acesso restrito a quem assinou o termo de colaboração — não redistribua.

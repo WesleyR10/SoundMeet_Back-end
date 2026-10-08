@@ -1,0 +1,17 @@
+# Cadastro e login
+
+> Parte das [regras de negócio](../README.md) — o que a API já faz, por domínio.
+> Marcações: `[x]` implementado · `[~]` parcial · `[ ]` pendente.
+
+*Seção original: “Domínio Auth (Registro e Identidade)”.*
+
+
+- [x] Registro de novos usuários via `POST /api/v1/auth/register` (`src/core/auth/application/use-cases/register/register.use-case.ts`) — única porta de entrada, já que `registrationAllowed: false` no realm Keycloak.
+  **Invariante crítica — NUNCA quebrar:** o ID do aggregate criado (`musician_id` ou `audience_id`) é sempre **igual ao `sub`** do usuário no Keycloak. O sistema de ownership (`MusicianOwnershipGuard`/`AudienceOwnershipGuard`, Bloco 4B) compara `currentUser.userId` (== `sub` do JWT) diretamente contra o ID do recurso na URL — se um fluxo de criação de conta usar um ID diferente do `sub`, o ownership dessa conta quebra silenciosamente (o dono nunca consegue editar o próprio recurso). Qualquer novo fluxo de criação de `Musician`/`Audience` vinculado a uma conta Keycloak deve respeitar essa invariante.
+  Detalhes de arquitetura em [autenticacao/login-e-cadastro.md](../autenticacao/login-e-cadastro.md).
+- [x] Login por email/senha via `POST /api/v1/auth/login` (`src/core/auth/application/use-cases/login/login.use-case.ts`, AUTH-3, 25/set/2026) — grant de senha no client **confidencial** `soundmeet-registration`; devolve só os tokens da sessão. Recusa **uniforme** (mesmo 401 para senha errada, conta inexistente ou bloqueada). Quem decide o papel é o cliente, pelas roles do JWT. Refresh e logout também passam pela API (`/auth/refresh`, `/auth/logout`).
+- [x] Registro de estabelecimento via `POST /api/v1/auth/register-establishment` (`src/core/auth/application/use-cases/register-establishment/register-establishment.use-case.ts`, 06/ago/2026) — rota **separada** do `POST /auth/register`, que só aceita `musician`/`audience`. Antes disto não existia caminho nenhum para criar a primeira conta de estabelecimento: `POST /establishments` já exigia a role `establishment`.
+  **A invariante `aggregate_id == sub` NÃO se aplica aqui — e isso é deliberado.** Uma conta pode operar até 3 estabelecimentos, então o `Establishment` tem UUID próprio e quem autoriza o dono é o claim multivalorado `establishment_ids` (escrito via `IIdentityClaimsWriter`), lido pelo `EstablishmentOwnershipGuard`. Qualquer fluxo novo que crie `Establishment` vinculado a uma conta deve escrever esse claim — sem ele o dono fica trancado para fora do que acabou de criar.
+  Ordem importa: o claim é gravado **antes** do insert. Falhar antes não cria nada; a ordem inversa deixaria um estabelecimento inoperável que *parece* ter sido criado com sucesso.
+  ⚠️ O claim só entra no **próximo** token. Desde o AUTH-1 (31/ago/2026) a rota **não emite tokens** (o `needs_token_refresh` saiu do output): o web manda a pessoa ao login depois do cadastro, e o token novo já nasce com `establishment_ids`.
+- [x] Login social + cadastro pendente via `POST /api/v1/auth/social-signup` (`src/core/auth/application/use-cases/social-signup/social-signup.use-case.ts`) — cobre usuário autenticado via provedor externo (Google) no Keycloak mas ainda sem role/aggregate local. **A invariante `musician_id`/`audience_id` == `sub` também vale neste caminho** — o aggregate é criado usando o `userId` do token (`@CurrentUser()`), nunca um ID novo. Compensação em caso de falha remove só a role atribuída (`removeRealmRole`), nunca deleta o usuário Keycloak (a conta não foi criada por nós).
